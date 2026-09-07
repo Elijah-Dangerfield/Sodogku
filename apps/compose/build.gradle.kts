@@ -89,6 +89,8 @@ kotlin {
             implementation(projects.libraries.scoring)
             implementation(projects.libraries.ads)
             implementation(projects.libraries.billing)
+            implementation(projects.libraries.progress)
+            implementation(projects.libraries.progress.impl)
 
             implementation(projects.libraries.storage)
             implementation(projects.libraries.storage.impl)

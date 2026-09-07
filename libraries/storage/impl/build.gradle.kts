@@ -13,6 +13,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.libraries.storage)
 
+            implementation(projects.libraries.progress)
             implementation(projects.libraries.core)
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.sodogku)

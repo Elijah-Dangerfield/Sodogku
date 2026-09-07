@@ -80,6 +80,43 @@ object HintFinder {
         return null
     }
 
+    /**
+     * Squares that deduction proves cannot hold a dog and the player cannot yet
+     * see, from their current position.
+     *
+     * This is what a *hint* should hand over. Revealing where a dog goes ends the
+     * puzzle; revealing where one cannot go leaves the deduction intact and shows
+     * the technique that ruled the squares out.
+     *
+     * It reports every square that *became* ruled out, not only the ones the
+     * engine announced as eliminations. On an easy board the engine solves by
+     * placement alone and announces no eliminations at all — the first version of
+     * this returned an empty list there, so a hint could be spent for nothing.
+     * What matters to the player is the cells that were open when they asked and
+     * are provably shut now, however the engine got there.
+     */
+    fun ruledOutCells(board: Board, placed: Solution, limit: Int = Int.MAX_VALUE): List<Int> {
+        if (placed.isComplete || limit <= 0) return emptyList()
+        if (board.ruleViolations(placed).isNotEmpty()) return emptyList()
+
+        val grid = CandidateGrid.of(board, placed)
+        val alreadyKnown = (0 until board.cellCount).filterNot { grid.isCandidate(it) }.toSet()
+        val found = LinkedHashSet<Int>()
+
+        while (found.size < limit && !grid.isSolved && !grid.isContradicted) {
+            when (val step = DeductionEngine.nextStep(grid) ?: break) {
+                is Deduction.Place -> grid.place(step.cell)
+                is Deduction.Eliminate -> step.cells.forEach { grid.eliminate(it) }
+            }
+            (0 until board.cellCount).forEach { cell ->
+                if (cell !in alreadyKnown && !grid.isCandidate(cell) && !grid.isPlaced(cell)) {
+                    found += cell
+                }
+            }
+        }
+        return found.take(limit)
+    }
+
     private fun mostConstrainedUnresolvedCell(
         board: Board,
         grid: CandidateGrid,

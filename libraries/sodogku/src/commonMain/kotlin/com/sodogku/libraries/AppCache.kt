@@ -9,6 +9,9 @@ import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
+/** What an ad refill tops a consumable up to. Holdings may exceed it. */
+const val ConsumableRefillTo: Int = 3
+
 /**
  * In-memory + persistent cache for app-wide state that doesn't need to be in the database.
  */
@@ -47,6 +50,18 @@ data class AppData(
      * then, and it is what the app opens on.
      */
     val currentLevel: Int = 1,
+
+    /**
+     * Held consumables. These are *not* capped at three — a refill tops up to
+     * three, but clearing levels grants extra, so the store is a reward for
+     * playing rather than a meter that only ever empties.
+     */
+    val bones: Int = ConsumableRefillTo,
+    val sniffs: Int = ConsumableRefillTo,
+    val treats: Int = ConsumableRefillTo,
+
+    /** Boosters whose first-use explainer has been seen, by name. */
+    val explainedBoosters: Set<String> = emptySet(),
 
     /**
      * Stable per-install identifier, minted on first read and persisted for

@@ -158,7 +158,13 @@ fun RuleChip(
     }
 }
 
-/** A booster with its remaining count, or a "watch an ad" prompt when empty. */
+/**
+ * A booster, with its holding as a corner badge.
+ *
+ * The badge shows even at zero, in the muted colour. A count that disappears
+ * when it runs out makes the button look broken rather than empty, and empty is
+ * the state that should invite a tap — that is where the ad offer lives.
+ */
 @Composable
 fun BoosterButton(
     label: String,
@@ -167,24 +173,38 @@ fun BoosterButton(
     enabled: Boolean = true,
     onClick: () -> Unit = {},
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-            .clip(Radii.Card)
-            .background(AppTheme.colors.surfaceSecondary.color)
-            .bounceClick(enabled = enabled, onClick = onClick)
-            .padding(horizontal = Dimension.D500, vertical = Dimension.D400),
-    ) {
-        Text(
-            text = label,
-            typography = AppTheme.typography.Body.B500,
-            color = if (enabled) AppTheme.colors.text else AppTheme.colors.textDisabled,
-        )
-        Text(
-            text = if (count > 0) "x$count" else "+",
-            typography = AppTheme.typography.Caption.C300,
-            color = AppTheme.colors.textSecondary,
-        )
+    Box(modifier = modifier) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .padding(BadgeInset)
+                .clip(Radii.Card)
+                .background(AppTheme.colors.surfaceSecondary.color)
+                .bounceClick(enabled = enabled, onClick = onClick)
+                .padding(horizontal = Dimension.D600, vertical = Dimension.D500),
+        ) {
+            Text(
+                text = label,
+                typography = AppTheme.typography.Body.B600,
+                color = if (enabled) AppTheme.colors.text else AppTheme.colors.textDisabled,
+            )
+        }
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .clip(Radii.Round)
+                .background(
+                    if (count > 0) AppTheme.colors.danger.color else AppTheme.colors.textDisabled.color,
+                )
+                .padding(horizontal = Dimension.D400, vertical = Dimension.D100),
+        ) {
+            Text(
+                text = count.toString(),
+                typography = AppTheme.typography.Caption.C300,
+                color = AppTheme.colors.onAccentPrimary,
+            )
+        }
     }
 }
 
@@ -198,6 +218,9 @@ private const val HighlightAlpha = 0.22f
 
 /** Bones are wider than they are tall, or they read as a lump. */
 private const val BoneAspect = 1.45f
+
+/** Room for the badge to overhang the button's corner. */
+private val BadgeInset = Dimension.D400
 
 /** Three palette fills, so the colour rule's miniature matches the real board. */
 private val RuleChipRegionColors =

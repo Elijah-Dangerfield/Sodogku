@@ -43,6 +43,13 @@ enum class BoardCellState {
     /** Ruled out, by auto-mark or by the player's own note. */
     Marked,
 
+    /**
+     * Ruled out the expensive way: the player guessed here and it cost a bone.
+     * Kept visually distinct because it is different information — a square
+     * someone *paid* for, not one they reasoned out.
+     */
+    Wrong,
+
     /** A dog. */
     Occupied,
 }
@@ -90,7 +97,9 @@ fun BoardCell(
     }
 
     val pop = remember { Animatable(if (state == BoardCellState.Occupied) 1f else 0f) }
-    val mark = remember { Animatable(if (state == BoardCellState.Marked) 1f else 0f) }
+    val mark = remember {
+        Animatable(if (state == BoardCellState.Empty || state == BoardCellState.Occupied) 0f else 1f)
+    }
     LaunchedEffect(state) {
         when (state) {
             BoardCellState.Occupied -> {
@@ -98,7 +107,7 @@ fun BoardCell(
                 pop.animateTo(Motion.PopOvershoot, Motion.Pop)
                 pop.animateTo(1f, Motion.Tap)
             }
-            BoardCellState.Marked -> {
+            BoardCellState.Marked, BoardCellState.Wrong -> {
                 pop.snapTo(0f)
                 mark.animateTo(1f, tween(Motion.MarkDrawMillis))
             }
@@ -139,9 +148,9 @@ fun BoardCell(
                         GlyphFraction,
                     )
                 }
-                if (mark.value > 0f) drawBoardMark(style.ink, MarkFraction, mark.value)
-                if (shake.value > 0f && shake.value < 1f) {
-                    drawBoardMark(StrikeInk, MarkFraction, progress = 1f)
+                if (mark.value > 0f) {
+                    val ink = if (state == BoardCellState.Wrong) StrikeInk else style.ink
+                    drawBoardMark(ink, MarkFraction, mark.value)
                 }
             }
             .pointerInput(enabled) {
@@ -178,7 +187,7 @@ fun BoardCell(
 /** Fits a 10x10 board on the narrowest phone we support with room for padding. */
 val DefaultCellSize: Dp = 34.dp
 
-/** A wrong tap flashes red before the cell settles into an ordinary mark. */
+/** A square that cost a bone stays red, for the rest of the attempt. */
 private val StrikeInk = Color(0xE6D32F2F)
 
 /**

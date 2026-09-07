@@ -92,6 +92,8 @@ include(":features:game:impl")
 include(":libraries:ads")
 include(":libraries:billing")
 include(":libraries:levels")
+include(":libraries:progress")
+include(":libraries:progress:impl")
 include(":libraries:puzzle")
 include(":libraries:scoring")
     // No api sibling on purpose: the public surface is the `logEvent`

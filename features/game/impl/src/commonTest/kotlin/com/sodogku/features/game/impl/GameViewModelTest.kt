@@ -13,6 +13,7 @@ import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
+import com.sodogku.libraries.sodogku.ConsumableRefillTo
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -192,47 +193,143 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun sniffPlacesARealDogAndSpendsACharge() = runUnitTest {
+    fun theFirstTapOfABoosterExplainsItRatherThanSpendingIt() = runUnitTest {
+        // Spending a consumable cannot be undone, so an unfamiliar button has to
+        // say what it costs before it costs anything.
         val vm = viewModel()
         val before = vm.state.sniffs
 
-        vm.takeAction(GameAction.SniffUsed)
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
 
-        assertEquals(before - 1, vm.state.sniffs)
+        assertEquals(Consumable.Sniff, vm.state.boosterPrompt)
+        assertEquals(before, vm.state.sniffs, "the explainer must not spend anything")
+    }
+
+    @Test
+    fun aLaterTapSpendsWithoutExplaining() = runUnitTest {
+        val vm = viewModel()
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        val after = vm.state.sniffs
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+
+        assertEquals(null, vm.state.boosterPrompt)
+        assertEquals(after - 1, vm.state.sniffs)
+    }
+
+    @Test
+    fun anEmptyBoosterAlwaysOffersTheRefill() = runUnitTest {
+        val vm = viewModel()
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        repeat(vm.state.sniffs) { vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff)) }
+        assertEquals(0, vm.state.sniffs)
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+
+        assertEquals(Consumable.Sniff, vm.state.boosterPrompt)
+    }
+
+    @Test
+    fun aSniffRulesSquaresOutButNeverPlacesADog() = runUnitTest {
+        // The whole point of the hint: it shows where a dog cannot go. One that
+        // hands over the answer ends the puzzle.
+        val vm = viewModel()
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+
+        assertEquals(0, vm.state.dogsPlaced)
+        assertTrue(vm.state.hintCells.isNotEmpty())
+        assertTrue(
+            vm.state.hintCells.none { it in level.solution.cells().toSet() },
+            "a hint must never rule out a square the answer occupies",
+        )
+    }
+
+    @Test
+    fun aSniffWithNothingToShowKeepsItsCharge() = runUnitTest {
+        // Spending a booster for no visible effect is worse than refusing it.
+        // On a nearly-solved board deduction has nothing left to rule out.
+        val vm = viewModel()
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
+        val before = vm.state.sniffs
+
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+
+        assertEquals(before, vm.state.sniffs)
+        assertTrue(vm.state.hintCells.isEmpty())
+    }
+
+    @Test
+    fun aTreatPlacesACorrectDogForFree() = runUnitTest {
+        val vm = viewModel()
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Treat))
+        val before = vm.state.treats
+
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Treat))
+
+        assertEquals(before - 1, vm.state.treats)
         assertEquals(1, vm.state.dogsPlaced)
         assertTrue(vm.state.placedCells.all { it in level.solution.cells().toSet() })
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining, "a treat risks no bone")
     }
 
     @Test
-    fun sniffIsIgnoredWithNoChargesLeft() = runUnitTest {
-        val vm = viewModel()
-        repeat(vm.state.sniffs) { vm.takeAction(GameAction.SniffUsed) }
-        val placed = vm.state.dogsPlaced
+    fun aRefillToppedUpByAnAdNeverReducesAHolding() = runUnitTest {
+        // Someone who earned five treats from level rewards and then watches an
+        // ad must not be punished back down to three.
+        val cache = InMemoryAppCache()
+        cache.set(AppData(treats = 5))
+        val vm = GameViewModel(
+            PlainLevel,
+            FixedAdGate(RewardOutcome.Rewarded),
+            FreeEntitlementsFake(),
+            clock,
+            cache,
+        )
+        assertEquals(5, vm.state.treats)
 
-        vm.takeAction(GameAction.SniffUsed)
+        vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Treat))
 
-        assertEquals(placed, vm.state.dogsPlaced)
+        assertEquals(5, vm.state.treats)
     }
 
     @Test
-    fun treatRestoresALifeAfterAStrike() = runUnitTest {
-        val vm = viewModel()
-        vm.commit(wrongCellIn(row = 0))
+    fun aRefillTopsAnEmptyBoosterBackToThree() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(sniffs = 0))
+        val vm = GameViewModel(
+            PlainLevel,
+            FixedAdGate(RewardOutcome.Rewarded),
+            FreeEntitlementsFake(),
+            clock,
+            cache,
+        )
 
-        vm.takeAction(GameAction.TreatUsed)
+        vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Sniff))
 
-        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
-        assertEquals(0, vm.state.treats)
+        assertEquals(ConsumableRefillTo, vm.state.sniffs)
+        assertEquals(ConsumableRefillTo, cache.get().sniffs)
     }
 
     @Test
-    fun treatCannotStockpileLivesAboveTheMaximum() = runUnitTest {
-        val vm = viewModel()
+    fun dismissingTheRefillAdLeavesTheHoldingAlone() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(sniffs = 0))
+        val vm = GameViewModel(
+            PlainLevel,
+            FixedAdGate(RewardOutcome.Dismissed),
+            FreeEntitlementsFake(),
+            clock,
+            cache,
+        )
 
-        vm.takeAction(GameAction.TreatUsed)
+        vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Sniff))
 
-        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
-        assertEquals(1, vm.state.treats, "a wasted treat must not be spent")
+        assertEquals(0, vm.state.sniffs)
+        assertEquals(null, vm.state.boosterPrompt)
     }
 
     @Test

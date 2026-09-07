@@ -292,66 +292,6 @@ They land in C4 alongside the board, against the existing tokens.
 
 ---
 
-## C4a · Interaction model, motion and the Focus system — **DONE** (2026-09-07)
-
-Design feedback after playing C4. **Unblocked by** C4.
-
-**Delivers**
-
-- **Tap marks, double tap commits.** The safe gesture is now the cheap one; a single tap can never
-  cost a bone. See `decisions.md` for why the second tap is recognised in the ViewModel rather than
-  by `detectTapGestures`.
-- **Motion everywhere on the board.** The grid lands as a diagonal wave, crosses draw stroke by
-  stroke, dogs overshoot and settle, wrong guesses flash red and shake.
-- **A wrong guess leaves the cell marked**, because the player just proved no dog goes there.
-- **The Focus system** (`:libraries:ui/system/Focus.kt`): `Modifier.focusTarget(key)`, a
-  `FocusRegistry`, and a `FocusScrim` that punches holes in a dim layer with `BlendMode.Clear`.
-  Several scattered targets can be lit at once, which is what the hint mode needs.
-- **The last-bone warning**, the first thing built on Focus: dims the board, spotlights the bones,
-  hangs a bubble under them. Fires on the *edge* into one life, once per attempt.
-- **In-game settings**, reachable from the board without leaving it. Currently exposes colourblind
-  mode, which C3a built and nothing had surfaced.
-- **Header chrome**: menu on the left, level and score centred, settings on the right.
-- **Bones from an ad** on the lose sheet — all three, not one, since a single bone puts the player
-  straight back where they were.
-- **A starter dog on levels 1 to 25.** A teaching aid more than a leg-up: the free dog fires the
-  auto-mark cascade immediately, so a new player sees the rules ruling cells out before having to
-  reason about any of them. It scores nothing.
-
-**Outcome.** 28 GameViewModel tests, all green, detekt clean, verified on device.
-
-### The bug this chunk actually turned up
-
-`SEAViewModel.state` reads a *derived* `stateIn` flow, so it lags `updateState` by a dispatch.
-Reading `state` back inside the same action returns the pre-update value. It surfaced as the
-starter dog working on device but not in tests — and the same pattern was in `place()` → `win()`,
-where a level's final score could silently drop the points for the placement that won it. Both are
-fixed and the rule is written down in `decisions.md`.
-
-### Still open from the same feedback
-
-Level drawer, hint spotlight mode, an always-available ad button, haptics, and the ad-frequency
-question (bones-only versus an interstitial every N levels). Tracked in C4b.
-
----
-
-## C4b · Level drawer, hints and haptics
-
-**Unblocked by** C4a.
-
-**Delivers**
-
-- A sliding level drawer from the menu button, with a fading list.
-- Hint mode on the Focus system: dim everything, light a row or several, and draw temporary
-  crosses showing where a dog *cannot* go. Three hints, refilled by an ad.
-- An always-available ad button that refills bones.
-- Haptics on place, strike and warning.
-- The ad-frequency decision. Current recommendation: keep rewarded ads as the *only* player-facing
-  ads (bones, hints, boosters) so an ad always reads as a gift, and add the level-complete
-  interstitial in C7 behind the config gate rather than now.
-
----
-
 ## C4 · `:features:game` — the playable board — **DONE** (2026-09-07)
 
 **Unblocked by** C1, C2, C3.
@@ -420,21 +360,96 @@ gate (C7), and stubbing them here would mean rewriting them there.
 
 ---
 
-## C5 · Progress and the level map
+## C4a · Interaction model, motion and the Focus system — **DONE** (2026-09-07)
 
-**Unblocked by** C4.
+Design feedback after playing C4. **Unblocked by** C4.
 
 **Delivers**
 
-- `:libraries:progress` + impl: Room tables `level_progress` and `daily_result`, booster
-  inventory, in-progress board snapshot.
-- Resume: backgrounding mid-level and returning restores placements, marks, lives, score, elapsed.
-- `:features:levels`: scrolling map, band headers with progress, paw ratings on completed tiles,
-  progressive disclosure with a configurable lookahead.
-- Unlock flow, skip flow (still against the fake `AdGate`).
+- **Tap marks, double tap commits.** The safe gesture is now the cheap one; a single tap can never
+  cost a bone. See `decisions.md` for why the second tap is recognised in the ViewModel rather than
+  by `detectTapGestures`.
+- **Motion everywhere on the board.** The grid lands as a diagonal wave, crosses draw stroke by
+  stroke, dogs overshoot and settle, wrong guesses flash red and shake.
+- **A wrong guess leaves the cell marked**, because the player just proved no dog goes there.
+- **The Focus system** (`:libraries:ui/system/Focus.kt`): `Modifier.focusTarget(key)`, a
+  `FocusRegistry`, and a `FocusScrim` that punches holes in a dim layer with `BlendMode.Clear`.
+  Several scattered targets can be lit at once, which is what the hint mode needs.
+- **The last-bone warning**, the first thing built on Focus: dims the board, spotlights the bones,
+  hangs a bubble under them. Fires on the *edge* into one life, once per attempt.
+- **In-game settings**, reachable from the board without leaving it. Currently exposes colourblind
+  mode, which C3a built and nothing had surfaced.
+- **Header chrome**: menu on the left, level and score centred, settings on the right.
+- **Bones from an ad** on the lose sheet — all three, not one, since a single bone puts the player
+  straight back where they were.
+- **A starter dog on levels 1 to 25.** A teaching aid more than a leg-up: the free dog fires the
+  auto-mark cascade immediately, so a new player sees the rules ruling cells out before having to
+  reason about any of them. It scores nothing.
 
-**Done when** progress survives process death, resume is exact, and the map correctly reflects
-every level state including `SKIPPED`.
+**Outcome.** 28 GameViewModel tests, all green, detekt clean, verified on device.
+
+### The bug this chunk actually turned up
+
+`SEAViewModel.state` reads a *derived* `stateIn` flow, so it lags `updateState` by a dispatch.
+Reading `state` back inside the same action returns the pre-update value. It surfaced as the
+starter dog working on device but not in tests — and the same pattern was in `place()` → `win()`,
+where a level's final score could silently drop the points for the placement that won it. Both are
+fixed and the rule is written down in `decisions.md`.
+
+### Still open from the same feedback
+
+Level drawer, hint spotlight mode, an always-available ad button, haptics, and the ad-frequency
+question (bones-only versus an interstitial every N levels). Tracked in C4b.
+
+---
+
+## C4b · The consumable economy
+
+**Unblocked by** C4a. Haptics, the level drawer and the in-game dialogs already landed.
+
+### The three consumables
+
+Redefined after play feedback. All three behave the same way, which is the point — one mental
+model, one refill mechanic, one dialog shape:
+
+| Consumable | What it does | Starts at |
+|---|---|---|
+| **Bone** | A wrong guess costs one. Out of bones ends the attempt. | 3 |
+| **Sniff** | A *hint*: dims the board and shows where a dog cannot go. | 3 |
+| **Treat** | A free correct placement. | 3 |
+
+- Every one refills to 3 by watching an ad.
+- Counts **can exceed 3**. Clearing levels grants extra, so the store of them is a reward for
+  playing rather than a meter that only ever empties. The cap is on the *refill*, not the holding.
+- Each shows its count as a badge on its button.
+
+### First use of a booster opens an explainer
+
+A dog still, a sentence on what the thing does, then either **Use it** (if they hold any) or
+**Watch an ad** and **Not now**. Only the first time per booster; after that a tap uses it, or
+offers the ad when the count is zero.
+
+The reason it is a dialog and not a tooltip: spending a consumable is irreversible, and the first
+time someone taps an unfamiliar button they should find out what it costs before it happens.
+
+### Also in this chunk
+
+- **A wrong guess leaves a permanently red cross**, not an ordinary one. It marks a square the
+  player *paid* for, which is different information from one they reasoned out.
+- Level rows in the drawer preview their reward.
+- An always-available ad button.
+
+---
+
+## C5 · Progress and per-level records
+
+**Unblocked by** C4b.
+
+`:libraries:progress` + impl: Room-backed `level_progress` (best score, best paws, best time,
+attempts, state) and the in-progress board snapshot so backgrounding mid-level resumes exactly.
+Level rewards are granted here, which is what feeds the drawer's prize preview.
+
+The one number that exists today, `AppData.currentLevel`, moves into this module.
 
 ---
 

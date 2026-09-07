@@ -27,6 +27,8 @@ import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.game_last_bone_body
 import sodogku.libraries.resources.generated.resources.game_last_bone_title
+import sodogku.libraries.resources.generated.resources.hint_body
+import sodogku.libraries.resources.generated.resources.hint_title
 import sodogku.libraries.resources.generated.resources.settings_colorblind
 import sodogku.libraries.resources.generated.resources.settings_colorblind_body
 import sodogku.libraries.resources.generated.resources.settings_done
@@ -36,8 +38,8 @@ import sodogku.libraries.resources.generated.resources.settings_haptics_body
 /** The thing the last-bone warning points at. */
 val LivesFocusKey = FocusTargetKey("game.lives")
 
-/** The board, for hint spotlights. */
-val BoardFocusKey = FocusTargetKey("game.board")
+/** One focus key per hinted cell, so a spotlight can light several at once. */
+fun hintKeyFor(cell: Int) = FocusTargetKey("game.hint.$cell")
 
 /**
  * Dims the board and lights up the bones when the player is down to their last
@@ -72,6 +74,37 @@ fun BoxScope.LastBoneWarning(state: GameState, onAction: (GameAction) -> Unit) {
 }
 
 /**
+ * The sniff's answer: the squares it ruled out, lit through the scrim.
+ *
+ * It shows where a dog *cannot* go, never where one does. A hint that hands over
+ * the answer ends the puzzle; one that rules squares out leaves the deduction
+ * intact and shows the technique that found them.
+ */
+@Composable
+fun BoxScope.SniffHint(state: GameState, onAction: (GameAction) -> Unit) {
+    FocusScrim(
+        spotlight = state.hintCells
+            .takeIf { it.isNotEmpty() }
+            ?.let { cells -> Spotlight(targets = cells.map(::hintKeyFor).toSet()) },
+        onDismiss = { onAction(GameAction.DismissWarning) },
+    ) {
+        SpeechBubble(anchorBottomPx = 0f) {
+            Text(
+                text = stringResource(Res.string.hint_title),
+                typography = AppTheme.typography.Heading.H600,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(Res.string.hint_body),
+                typography = AppTheme.typography.Body.B400,
+                color = AppTheme.colors.textSecondary,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/**
  * A card that hangs just below whatever the spotlight is lighting, so the copy
  * and the thing it is describing read as one object.
  */
@@ -81,12 +114,16 @@ private fun BoxScope.SpeechBubble(
     content: @Composable () -> Unit,
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current
+    // Never higher than MinTop: an anchor at the very top of the screen (a
+    // spotlight with no single thing to hang off) would otherwise put the card
+    // under the status bar.
+    val top = maxOf(with(density) { anchorBottomPx.toDp() } + Dimension.D600, MinTop)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Dimension.D300),
         modifier = Modifier
             .align(Alignment.TopCenter)
-            .padding(top = with(density) { anchorBottomPx.toDp() } + Dimension.D600)
+            .padding(top = top)
             .padding(horizontal = Dimension.D800)
             .widthIn(max = BubbleMaxWidth)
             .clip(Radii.Card)
@@ -161,3 +198,6 @@ fun BoxScope.GameSettingsSheet(
 }
 
 private val BubbleMaxWidth = Dimension.D1900 * 3
+
+/** Clears the status bar and the header when there is no anchor to hang from. */
+private val MinTop = Dimension.D1900

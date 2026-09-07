@@ -85,7 +85,7 @@ fun GameScreen(
                 levelId = level.id,
                 onOpenLevels = { drawerOpen = true },
                 onSettings = { dialog = GameDialog.Settings },
-                onExplainBones = { dialog = GameDialog.Bones },
+                onExplainBones = { onAction(GameAction.BoosterTapped(Consumable.Bone)) },
             )
 
             // The rules sit directly under the header rather than floating above
@@ -127,6 +127,8 @@ fun GameScreen(
 
             LastBoneWarning(state = state, onAction = onAction)
 
+            SniffHint(state = state, onAction = onAction)
+
             LevelDrawer(
                 open = drawerOpen,
                 currentLevelId = level.id,
@@ -137,6 +139,20 @@ fun GameScreen(
                     onAction(GameAction.GoToLevel(it))
                 },
                 onDismiss = { drawerOpen = false },
+            )
+        }
+
+        state.boosterPrompt?.let { booster ->
+            BoosterPrompt(
+                consumable = booster,
+                held = when (booster) {
+                    Consumable.Bone -> state.livesRemaining
+                    Consumable.Sniff -> state.sniffs
+                    Consumable.Treat -> state.treats
+                },
+                onUse = { onAction(GameAction.BoosterConfirmed(booster)) },
+                onWatchAd = { onAction(GameAction.BoosterRefillRequested(booster)) },
+                onDismiss = { onAction(GameAction.DismissBoosterPrompt) },
             )
         }
 
@@ -264,7 +280,13 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(CellGap)) {
                     repeat(size) { col ->
                         val index = level.board.cellAt(row, col)
+                        val hinted = index in state.hintCells
                         BoardCell(
+                            modifier = if (hinted) {
+                                Modifier.focusTarget(hintKeyFor(index))
+                            } else {
+                                Modifier
+                            },
                             region = level.board.regionAt(index),
                             state = cellState(state, index),
                             size = cell,
@@ -289,6 +311,7 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
 
 private fun cellState(state: GameState, cell: Int): BoardCellState = when (cell) {
     in state.placedCells -> BoardCellState.Occupied
+    in state.wrongGuesses -> BoardCellState.Wrong
     in state.autoMarks, in state.manualMarks -> BoardCellState.Marked
     else -> BoardCellState.Empty
 }
@@ -299,14 +322,14 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
         BoosterButton(
             label = stringResource(Res.string.game_sniff),
             count = state.sniffs,
-            enabled = state.phase == GamePhase.Playing && state.sniffs > 0,
-            onClick = { onAction(GameAction.SniffUsed) },
+            enabled = state.phase == GamePhase.Playing,
+            onClick = { onAction(GameAction.BoosterTapped(Consumable.Sniff)) },
         )
         BoosterButton(
             label = stringResource(Res.string.game_treat),
             count = state.treats,
-            enabled = state.phase == GamePhase.Playing && state.treats > 0,
-            onClick = { onAction(GameAction.TreatUsed) },
+            enabled = state.phase == GamePhase.Playing,
+            onClick = { onAction(GameAction.BoosterTapped(Consumable.Treat)) },
         )
     }
 }

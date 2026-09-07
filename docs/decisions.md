@@ -6,6 +6,50 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — Three consumables, one shape
+
+**Decision:** Bones, Sniffs and Treats all start at 3, all refill to 3 for a rewarded ad, and all
+may be *held* above 3 from level rewards. Sniff is the hint (rules squares out); Treat is a free
+correct placement.
+
+**Why one shape:** three different economies would be three things to learn before the puzzle. The
+refill is capped, the holding is not — so clearing levels grows a stash, and the store of them
+reads as a reward for playing rather than a meter that only ever empties. A refill never *reduces*
+a holding, which is the bug a naive `count = 3` would ship.
+
+**First tap of a booster always explains it**, whatever the count, and every tap explains once the
+count is zero. Spending a consumable is irreversible, so an unfamiliar button says what it costs
+before it costs anything. After that a tap just works.
+
+**A booster is never spent for nothing.** Found on device: on an easy board the deduction engine
+solves by placement alone and announces no eliminations, so the first `ruledOutCells` returned an
+empty list and a sniff was consumed with no visible effect. It now reports every square that
+*became* ruled out however the engine got there, and the ViewModel refuses to spend when there is
+nothing to show.
+
+## 2026-09-07 — `:libraries:progress` puts its Room entity in the api module
+
+**Decision:** the `@Entity` and `@Dao` for `level_progress` live in `:libraries:progress` (api),
+not in its `impl`.
+
+**Why:** the shared `AppDatabase` lives in `:libraries:storage:impl`, and the module-boundary rule
+forbids one impl depending on another. The entity has to be visible to the database, so it goes in
+the api module — the same reason the template's own `ExampleUserDataEntity` sits in
+`:libraries:sodogku:storage`. The alternative was giving progress a second database.
+
+**Also worth knowing:** `moduleConfig.storage()` alone does *not* give a module Room on iOS. It
+wires the plugin and KSP and adds `:libraries:storage` to the project-level `implementation`
+configuration, which the Android target picks up and the Kotlin/Native target does not. Android
+compiles clean and `compileKotlinIosSimulatorArm64` fails with unresolved `androidx.room`. The fix
+is an explicit `implementation(projects.libraries.storage)` in `commonMain.dependencies`.
+
+**Level state is ranked, not ordered by the enum.** `Locked < Unlocked < Skipped < Completed`, and
+state only ever moves up. That one rule gives "never regresses", "a replay is not a downgrade",
+"skipping a cleared level is a no-op" and "clearing a skipped level promotes it". The ranking is
+deliberately *not* the enum declaration order, so nothing outside the impl should read an ordering
+off the enum. `state` is persisted by name, not ordinal, so reordering the enum cannot silently
+reinterpret a saved campaign.
+
 ## 2026-09-07 — Dog animation ships as a sprite sheet, reversing the earlier call
 
 **Decision:** `dog_look` is packed into a 30-frame sprite sheet at board resolution

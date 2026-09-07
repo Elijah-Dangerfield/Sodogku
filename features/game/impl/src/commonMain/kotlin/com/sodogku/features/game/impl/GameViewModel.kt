@@ -19,6 +19,7 @@ import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.sodogku.AppCache
+import com.sodogku.libraries.sodogku.ConsumableRefillTo
 import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
 import me.tatarka.inject.annotations.Assisted
@@ -67,12 +68,16 @@ class GameViewModel(
         when (action) {
             GameAction.Load -> action.load()
             is GameAction.CellTapped -> action.tap(action.cell)
-            GameAction.SniffUsed -> action.sniff()
-            GameAction.TreatUsed -> action.treat()
+            is GameAction.BoosterTapped -> action.boosterTapped(action.consumable)
+            is GameAction.BoosterConfirmed -> action.spend(action.consumable)
+            is GameAction.BoosterRefillRequested -> action.refill(action.consumable)
+            GameAction.DismissBoosterPrompt -> action.updateState { it.copy(boosterPrompt = null) }
             GameAction.Retry -> action.restart()
             GameAction.ContinueAfterLoss -> action.continueAfterLoss()
             GameAction.Leave -> sendEvent(GameEvent.NavigateBack)
-            GameAction.DismissWarning -> action.updateState { it.copy(warning = null) }
+            GameAction.DismissWarning -> action.updateState {
+                it.copy(warning = null, hintCells = emptySet())
+            }
             GameAction.RefillBones -> action.refillBones()
             GameAction.ToggleColorblind -> action.toggleColorblind()
             GameAction.ToggleHaptics -> action.toggleHaptics()
@@ -97,6 +102,12 @@ class GameViewModel(
                 reduceAnimations = settings?.reduceAnimations == true,
                 isPro = entitlements.isPro.value,
                 unlockedThrough = settings?.currentLevel ?: 1,
+                sniffs = settings?.sniffs ?: ConsumableRefillTo,
+                treats = settings?.treats ?: ConsumableRefillTo,
+                explainedBoosters = settings?.explainedBoosters
+                    ?.mapNotNull { name -> Consumable.entries.firstOrNull { it.name == name } }
+                    ?.toSet()
+                    .orEmpty(),
             )
         }
 
@@ -144,8 +155,9 @@ class GameViewModel(
                 },
                 phase = GamePhase.Playing,
                 livesRemaining = ScoringConfig.MAX_LIVES,
-                sniffs = StartingSniffs,
-                treats = StartingTreats,
+                sniffs = it.sniffs,
+                treats = it.treats,
+                explainedBoosters = it.explainedBoosters,
                 colorblind = it.colorblind,
                 haptics = it.haptics,
                 reduceAnimations = it.reduceAnimations,
@@ -250,7 +262,7 @@ class GameViewModel(
             it.copy(
                 score = Scoring.strike(it.score),
                 livesRemaining = remaining,
-                manualMarks = it.manualMarks + cell,
+                wrongGuesses = it.wrongGuesses + cell,
                 strikeCell = cell,
                 strikeNonce = it.strikeNonce + 1,
             )
@@ -284,7 +296,6 @@ class GameViewModel(
             "score" to finished.total,
             "paws" to paws,
             "strikes_used" to (ScoringConfig.MAX_LIVES - state.livesRemaining),
-            "sniffs_used" to (StartingSniffs - state.sniffs),
             "attempt_number" to attemptNumber,
         )
         sendEvent(GameEvent.Won)
@@ -408,35 +419,156 @@ class GameViewModel(
     }
 
     /**
-     * Reveals the cell the *shallowest* remaining deduction proves, so a hint
-     * teaches a technique instead of handing over a square.
+     * The single entry point for every booster button.
+     *
+     * First tap of a booster always explains it, whatever the count. Spending a
+     * consumable is irreversible, and the first time someone taps an unfamiliar
+     * button they should learn what it costs before it happens. After that a tap
+     * spends one, or offers the ad when they are out.
      */
-    private suspend fun GameAction.sniff() {
+    private suspend fun GameAction.boosterTapped(consumable: Consumable) {
+        if (state.phase != GamePhase.Playing) return
+        val explained = consumable in state.explainedBoosters
+        if (!explained || countOf(consumable) <= 0) {
+            updateState { it.copy(boosterPrompt = consumable) }
+            return
+        }
+        spend(consumable)
+    }
+
+    private suspend fun GameAction.spend(consumable: Consumable) {
+        if (countOf(consumable) <= 0) return
+        markExplained(consumable)
+        when (consumable) {
+            Consumable.Sniff -> useSniff()
+            Consumable.Treat -> useTreat()
+            // Bones are spent by guessing wrong, never by tapping. The button is
+            // an explainer and a refill offer, nothing else.
+            Consumable.Bone -> updateState { it.copy(boosterPrompt = null) }
+        }
+    }
+
+    /**
+     * Tops the consumable back up to [ConsumableRefillTo] for an ad.
+     *
+     * Never *reduces* a holding: a player who earned five treats from level
+     * rewards and watches an ad should not be punished down to three.
+     */
+    private suspend fun GameAction.refill(consumable: Consumable) {
+        markExplained(consumable)
+        val granted = entitlements.isPro.value ||
+            adGate.showRewarded(AdPlacement.BoosterGrant) != RewardOutcome.Dismissed
+        if (!granted) {
+            updateState { it.copy(boosterPrompt = null) }
+            return
+        }
+
+        val topped = maxOf(countOf(consumable), ConsumableRefillTo)
+        logger.logEvent(
+            "game.booster_refilled",
+            "booster" to consumable.name.lowercase(),
+            "to" to topped,
+        )
+        persistCounts(consumable, topped)
+        updateState {
+            val next = when (consumable) {
+                Consumable.Bone -> it.copy(livesRemaining = topped, phase = GamePhase.Playing)
+                Consumable.Sniff -> it.copy(sniffs = topped)
+                Consumable.Treat -> it.copy(treats = topped)
+            }
+            next.copy(boosterPrompt = null)
+        }
+        if (consumable == Consumable.Bone) {
+            warnedAboutLastBone = false
+            lastPlacementAt = clock.markNow()
+        }
+    }
+
+    /**
+     * The hint. Shows where a dog *cannot* go rather than where one does: a hint
+     * that hands over the answer ends the puzzle, one that rules squares out
+     * teaches the technique that found them.
+     */
+    private suspend fun GameAction.useSniff() {
         val level = state.level ?: return
-        if (state.phase != GamePhase.Playing || state.sniffs <= 0) return
-        val cell = HintFinder.nextCell(level.board, state.placed) ?: return
+        val known = state.autoMarks + state.placedCells + state.wrongGuesses
+        val ruledOut = HintFinder
+            .ruledOutCells(level.board, state.placed, limit = SniffRevealLimit * SniffSearchSlack)
+            .filterNot { cell -> cell in known }
+            .take(SniffRevealLimit)
+            .toSet()
+
+        // A booster that costs a charge and shows nothing is worse than one that
+        // refuses. If deduction has nothing left to add, close the prompt and
+        // keep the sniff.
+        if (ruledOut.isEmpty()) {
+            logger.logEvent("game.booster_no_op", "booster" to "sniff", "level_id" to level.id)
+            updateState { it.copy(boosterPrompt = null) }
+            return
+        }
 
         logger.logEvent("game.booster_used", "booster" to "sniff", "level_id" to level.id)
-        updateState { it.copy(sniffs = it.sniffs - 1) }
+        persistCounts(Consumable.Sniff, state.sniffs - 1)
+        updateState {
+            it.copy(
+                sniffs = it.sniffs - 1,
+                boosterPrompt = null,
+                hintCells = ruledOut,
+            )
+        }
+    }
+
+    /** The free placement. Costs a treat, no bone, and no risk. */
+    private suspend fun GameAction.useTreat() {
+        val level = state.level ?: return
+        val cell = HintFinder.nextCell(level.board, state.placed) ?: run {
+            updateState { it.copy(boosterPrompt = null) }
+            return
+        }
+
+        logger.logEvent("game.booster_used", "booster" to "treat", "level_id" to level.id)
+        persistCounts(Consumable.Treat, state.treats - 1)
+        updateState { it.copy(treats = it.treats - 1, boosterPrompt = null) }
         place(cell)
     }
 
-    private suspend fun GameAction.treat() {
-        if (state.phase != GamePhase.Playing || state.treats <= 0) return
-        if (state.livesRemaining >= ScoringConfig.MAX_LIVES) return
+    private fun countOf(consumable: Consumable): Int = when (consumable) {
+        Consumable.Bone -> state.livesRemaining
+        Consumable.Sniff -> state.sniffs
+        Consumable.Treat -> state.treats
+    }
 
-        logger.logEvent("game.booster_used", "booster" to "treat")
-        updateState { it.copy(treats = it.treats - 1, livesRemaining = it.livesRemaining + 1) }
+    private suspend fun GameAction.markExplained(consumable: Consumable) {
+        if (consumable in state.explainedBoosters) return
+        updateState { it.copy(explainedBoosters = it.explainedBoosters + consumable) }
+        Catching {
+            appCache.update { it.copy(explainedBoosters = it.explainedBoosters + consumable.name) }
+        }.logOnFailure { "Failed to persist booster explainer" }
+    }
+
+    private suspend fun GameAction.persistCounts(consumable: Consumable, count: Int) {
+        Catching {
+            appCache.update {
+                when (consumable) {
+                    Consumable.Bone -> it.copy(bones = count)
+                    Consumable.Sniff -> it.copy(sniffs = count)
+                    Consumable.Treat -> it.copy(treats = count)
+                }
+            }
+        }.logOnFailure { "Failed to persist $consumable count" }
     }
 
     private fun elapsedMs(): Long = attemptStartedAt.elapsedNow().inWholeMilliseconds
 
     private companion object {
-        const val StartingSniffs = 3
-        const val StartingTreats = 1
-
         /** Levels that open with one dog already placed, as a teaching aid. */
         const val StarterDogThroughLevel = 25
+
+        /** How many squares one sniff rules out. Enough to unstick, not to solve. */
+        const val SniffRevealLimit = 4
+
+        /** Search wider than we show, since auto-marked cells get filtered out. */
+        const val SniffSearchSlack = 6
 
         /**
          * How long after a tap a second one on the same cell counts as a commit.
@@ -452,12 +584,24 @@ data class GameState(
     val placed: Solution = Solution.empty(1),
     val autoMarks: Set<Int> = emptySet(),
     val manualMarks: Set<Int> = emptySet(),
+
+    /**
+     * Squares that cost a bone. Tracked apart from [manualMarks] so they stay
+     * red: a square someone paid for reads differently from one they worked out.
+     */
+    val wrongGuesses: Set<Int> = emptySet(),
     val livesRemaining: Int = ScoringConfig.MAX_LIVES,
     val score: ScoreCard = ScoreCard.Empty,
     val paws: Int = 0,
     val elapsedMs: Long = 0,
     val sniffs: Int = 0,
     val treats: Int = 0,
+
+    /** Boosters whose first-use explainer the player has already seen. */
+    val explainedBoosters: Set<Consumable> = emptySet(),
+
+    /** The booster whose explainer or refill offer is open, if any. */
+    val boosterPrompt: Consumable? = null,
     val phase: GamePhase = GamePhase.Loading,
 
     /** Bumped per wrong tap so the same cell can shake twice in a row. */
@@ -496,6 +640,9 @@ data class GameState(
 
     /** A one-shot spotlight the player has to dismiss. */
     val warning: GameWarning? = null,
+
+    /** Squares a sniff has ruled out, spotlit until the player taps away. */
+    val hintCells: Set<Int> = emptySet(),
 ) {
     val placedCells: Set<Int> get() = placed.cells().toSet()
 
@@ -526,8 +673,16 @@ enum class GameWarning { LastBone }
 sealed interface GameAction {
     data object Load : GameAction
     data class CellTapped(val cell: Int) : GameAction
-    data object SniffUsed : GameAction
-    data object TreatUsed : GameAction
+    /** Tapping a booster button. May explain, use, or offer a refill. */
+    data class BoosterTapped(val consumable: Consumable) : GameAction
+
+    /** Confirmed from the explainer: spend one. */
+    data class BoosterConfirmed(val consumable: Consumable) : GameAction
+
+    /** Confirmed from the explainer: watch an ad to refill. */
+    data class BoosterRefillRequested(val consumable: Consumable) : GameAction
+
+    data object DismissBoosterPrompt : GameAction
     data object Retry : GameAction
     data object ContinueAfterLoss : GameAction
     data object Leave : GameAction

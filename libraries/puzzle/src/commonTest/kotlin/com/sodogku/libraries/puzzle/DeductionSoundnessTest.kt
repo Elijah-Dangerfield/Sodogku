@@ -128,6 +128,41 @@ class DeductionSoundnessTest {
     private fun describe(board: Board, cell: Int): String =
         "r${board.rowOf(cell)}c${board.colOf(cell)}"
 
+    @Test
+    fun aHintNeverRulesOutASquareTheAnswerOccupies() = forEachUniqueBoard(seed = 8675309, boards = 30) { board, solution ->
+        // The failure this guards is quiet and expensive: a hint that crosses off
+        // a square the dog actually belongs on makes the puzzle unsolvable and
+        // tells the player their own reasoning was wrong.
+        val truth = solution.cells().toSet()
+        var placed = Solution.empty(board.size)
+
+        repeat(board.size) {
+            val ruledOut = HintFinder.ruledOutCells(board, placed)
+            assertTrue(
+                ruledOut.none { it in truth },
+                "hint ruled out ${ruledOut.filter { c -> c in truth }} from the answer\n$board",
+            )
+            val next = HintFinder.nextCell(board, placed) ?: return@repeat
+            placed = placed.withPlacement(board.rowOf(next), board.colOf(next))
+        }
+    }
+
+    @Test
+    fun aHintRespectsItsLimit() {
+        val (board, _) = assertNotNull(Fixtures.uniqueBoard(7, Random(4242)))
+
+        val ruledOut = HintFinder.ruledOutCells(board, Solution.empty(board.size), limit = 3)
+
+        assertTrue(ruledOut.size <= 3, "asked for 3, got ${ruledOut.size}")
+    }
+
+    @Test
+    fun aFinishedBoardHasNothingLeftToRuleOut() {
+        val (board, solution) = assertNotNull(Fixtures.uniqueBoard(6, Random(99)))
+
+        assertTrue(HintFinder.ruledOutCells(board, solution).isEmpty())
+    }
+
     private companion object {
         /**
          * Capped below [Board.MAX_SIZE]: the property tests run the tier-4
