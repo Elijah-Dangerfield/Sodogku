@@ -16,8 +16,9 @@ cleaner offline story, and live-tunable monetization.
 Generated from the KMP template and trimmed (C0). The identity stack is gone: no accounts, no
 Supabase, no user-scoped server state. Progress is device-local.
 
-Chunks C0 through C3 are done and on `main`; `docs/BUILD-PLAN.md` tracks the rest and
-`docs/decisions.md` records why anything non-obvious is the way it is.
+Chunks C0 through C4a are done and on `main` — the game is playable end to end. C5 (progress and
+the level map) is next. `docs/BUILD-PLAN.md` tracks the rest and `docs/decisions.md` records why
+anything non-obvious is the way it is.
 
 ---
 
@@ -47,10 +48,18 @@ level.
 
 | Input | Result |
 |---|---|
-| Tap empty cell | Correct: dog pops in, points fly up, auto-mark fires. Wrong: strike. |
-| Tap X-marked cell | Clears the X. A second tap places (or strikes). |
-| Long-press empty cell | Toggles a manual X. Free, never a strike. |
+| Tap a cell | Draws the player's X, stroke by stroke. Tap again to erase it. **Never costs a bone.** |
+| Tap the same cell twice inside 320ms | Commits a guess. Correct: dog pops in, points fly up, auto-mark fires. Wrong: red X, shake, a bone. |
 | Tap a rule chip | Pulses the cells of the relevant grouping. |
+
+**The safe gesture is the cheap one.** A single tap only ever writes or erases a note, so the
+destructive action takes deliberate effort. The second tap is recognised in `GameViewModel` rather
+than by `detectTapGestures(onDoubleTap = ...)`: registering that makes Compose withhold the first
+tap until the double-tap timeout expires, putting ~300ms of lag on the gesture players perform
+dozens of times a board. See `decisions.md`.
+
+**A wrong guess leaves the cell marked**, not cleared. The player has just proved no dog goes
+there, and discarding that would make a strike cost information as well as a bone.
 
 **Auto-mark is on by default and is not optional in spirit.** Placing a dog immediately X's its
 whole row, its whole column, its entire color region, and its eight neighbors. The competitor
@@ -61,6 +70,10 @@ the default is on and the tutorial teaches it.
 
 Manual X-marking on top of auto-mark is what lets a careful player record their own deductions on
 the cells auto-mark cannot rule out.
+
+**Levels 1 to 25 open with one dog already placed.** A teaching aid more than a leg-up: the free
+dog fires the auto-mark cascade immediately, so a new player watches the three rules rule cells out
+before having to reason about any of them. It scores nothing, so it cannot inflate an early best.
 
 ### 1.3 Score
 
