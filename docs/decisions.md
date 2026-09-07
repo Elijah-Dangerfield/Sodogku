@@ -6,6 +6,61 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — Level packs ship as generated Kotlin, not as an asset
+
+**Decision:** `:tools:level-generator` writes `CampaignPackData.kt` and
+`DailyPackData.kt` into `:libraries:levels` as a `List<String>`, one
+pipe-delimited line per level. The spec originally called for a JSON/binary
+asset.
+
+**Why:** the pack verification test is the only thing standing between an
+unsolvable level and the store, and it has to run everywhere. Compose Resources
+loading is suspend, platform-mediated, and awkward in Android unit tests;
+generated source loads identically in a JVM test, on Android and on iOS with
+nothing in the way. A malformed pack then fails compilation rather than the app.
+
+**Cost:** 97KB of generated source in the repo, and regenerating produces a
+large diff. Accepted — it is append-only data nobody reads by hand, and the
+generator is deterministic per seed so an unchanged seed produces an unchanged
+file.
+
+## 2026-09-07 — Par scores and paw thresholds are derived, not baked into the pack
+
+**Decision:** `LevelDefinition` carries only `id`, `board`, `solution` and
+`difficulty`. The spec's `parScore` and `pawThresholds` fields are dropped;
+those get derived at runtime from size and difficulty in `:libraries:scoring`
+using coefficients from remote config.
+
+**Why:** baked thresholds are un-tunable. What counts as a three-paw clear is
+exactly the kind of number the config split (SPEC section 4) says belongs on the
+server, and freezing it into the pack would mean a regenerated pack and an app
+release to retune it. It also decouples C2 from C3 entirely.
+
+## 2026-09-07 — Uniqueness comes from targeted refinement, not random mutation
+
+**Decision:** `BoardFactory.refineToUnique` drives a board to a single solution
+by repeatedly pulling a rival solution and applying the region move that kills
+*that specific placement*, choosing between killers by which leaves the fewest
+solutions.
+
+**Alternatives measured, not assumed:**
+
+- *Random mutation.* 0 unique 10x10 boards in 60 attempts, unchanged from 12
+  rounds to 120. Random moves rarely invalidate any particular rival.
+- *Balanced region growth* (extend the smallest region rather than a random
+  frontier cell), on the theory that a 22-cell region constrains nothing.
+  Measurably **worse**: 2/40 versus 4/40 at 10x10. Uneven regions constrain
+  more, because a small region pins its dog tightly.
+
+Targeted refinement converts 23/40 at 10x10, and generating all 1230 shipped
+levels takes 42 seconds.
+
+**The subtle part:** progress is deliberately not gated on the solution count
+decreasing. The count is capped for speed, so a wide-open board reads the same
+before and after a genuinely useful move; demanding a strict decrease stalls a
+10x10 on move one. Killing the rival is the real invariant, and the seed
+solution survives by construction because region moves never touch a dog cell.
+
 ## 2026-09-07 — No accounts: the identity stack is removed, not disabled
 
 **Decision:** `:libraries:identity` (+ impl), the Supabase auth screens in

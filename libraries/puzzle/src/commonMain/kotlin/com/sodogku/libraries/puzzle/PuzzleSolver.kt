@@ -54,6 +54,21 @@ object PuzzleSolver {
         return solutions.singleOrNull()
     }
 
+    /**
+     * Up to [limit] complete solutions consistent with [given]. The generator
+     * uses this to get hold of a rival placement it can then design against;
+     * everything else should ask a narrower question.
+     */
+    fun solutions(
+        board: Board,
+        given: Solution = Solution.empty(board.size),
+        limit: Int,
+    ): List<Solution> {
+        require(limit >= 1) { "limit must be at least 1" }
+        val search = Search(board, given)
+        return if (search.contradicted) emptyList() else search.take(limit)
+    }
+
     /** True when [given] can still be extended to at least one complete solution. */
     fun isSatisfiable(board: Board, given: Solution): Boolean =
         countSolutions(board, given, limit = 1) > 0

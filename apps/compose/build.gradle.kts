@@ -85,6 +85,7 @@ kotlin {
             implementation(projects.libraries.review)
             implementation(projects.libraries.review.impl)
             implementation(projects.libraries.puzzle)
+            implementation(projects.libraries.levels)
 
             implementation(projects.libraries.storage)
             implementation(projects.libraries.storage.impl)

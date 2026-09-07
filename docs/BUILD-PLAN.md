@@ -131,7 +131,7 @@ Budget real time for C2 regardless: the 9x9 and 10x10 bands are where it will be
 
 ---
 
-## C2 · Level generation
+## C2 · Level generation — **DONE** (2026-09-07)
 
 **Unblocked by** C1.
 
@@ -147,6 +147,45 @@ Budget real time for C2 regardless: the 9x9 and 10x10 bands are where it will be
 
 **Done when** both packs exist, the verification test passes, and a difficulty histogram of the
 campaign pack matches the intended curve.
+
+**Outcome.** 500 campaign + 730 daily levels generated in 42 seconds, all bands hitting target.
+468 tests across the repo, 0 failures, detekt clean, green on JVM, Android and iOS.
+
+The C1 blocker is fixed. Targeted refinement (`BoardFactory.refineToUnique`) converts 23/40 boards
+at 10x10 where random mutation converted 0/60. Balanced region growth was tried and was
+measurably *worse* — uneven regions constrain more, because a small region pins its dog tightly.
+Both are recorded in `docs/decisions.md`.
+
+Shipped campaign curve, tier counts per band:
+
+| Band | n | t1 | t2 | t3 | t4 | t5 |
+|---|---|---|---|---|---|---|
+| 4x4 | 10 | 2 | 8 | 0 | 0 | 0 |
+| 5x5 | 30 | 8 | 19 | 3 | 0 | 0 |
+| 6x6 | 60 | 12 | 33 | 6 | 9 | 0 |
+| 7x7 | 80 | 10 | 47 | 7 | 16 | 0 |
+| 8x8 | 100 | 16 | 41 | 19 | 24 | 0 |
+| 9x9 | 110 | 8 | 40 | 25 | 37 | 0 |
+| 10x10 | 110 | 1 | 30 | 43 | 36 | 0 |
+
+Difficulty shifts steadily rightward with size and nothing scores tier 5. Levels 1 and 2 are
+tier 1, levels 3 to 10 are tier 2, and level 11 resets to tier 1 on a bigger grid — the sawtooth
+working as intended. The opening bands cap difficulty explicitly (`Band.maxDifficulty`) rather
+than relying on the sort: the first pass put a tier-4 board, which needs a hold-a-hypothesis
+contradiction step, at level 10, and that is exactly where a puzzle game loses a first session.
+
+**Two deviations from the spec**, both recorded in `docs/decisions.md`:
+
+- Packs ship as **generated Kotlin source**, not an asset file, so the verification test runs
+  identically on JVM, Android and iOS with no resource loading in the way.
+- `parScore` and `pawThresholds` are **not in the pack**. They get derived at runtime from size
+  and difficulty using config coefficients, so retuning a three-paw clear is a config change
+  rather than a regenerated pack plus an app release. This also decouples C2 from C3 entirely.
+
+**Regenerating:** `./gradlew :tools:level-generator:run`, optionally `--args="--seed N"`.
+Deterministic per seed. Note that `LevelPacks.PACK_VERSION` must be bumped if the pack ever
+changes after release — progress is keyed on level id, so a regenerated pack silently reassigns
+players' completed levels to different boards.
 
 ---
 

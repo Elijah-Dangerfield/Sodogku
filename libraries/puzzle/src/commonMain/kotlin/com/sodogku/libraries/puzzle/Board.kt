@@ -81,7 +81,8 @@ class Board(
         /** The largest board Sodogku ships, and the width of the bitmasks the solver uses. */
         const val MAX_SIZE: Int = 10
 
-        internal const val REGION_LETTERS: String = "ABCDEFGHIJ"
+        /** Region ids as they appear in the pack format, index 0 first. */
+        const val REGION_LETTERS: String = "ABCDEFGHIJ"
 
         private const val NEIGHBOR_CAPACITY = 8
 

@@ -87,6 +87,7 @@ if (!serverOnly) {
     include(":libraries:review:impl")
     include(":libraries:storage")
     include(":libraries:storage:impl")
+include(":libraries:levels")
 include(":libraries:puzzle")
     // No api sibling on purpose: the public surface is the `logEvent`
     // extension in :libraries:core; this impl only hosts the experimental
@@ -96,6 +97,12 @@ include(":libraries:puzzle")
     include(":libraries:sodogku:impl")
     include(":libraries:sodogku:storage")
     include(":libraries:ui")
+
+    // Offline level generation. Build-time only: it writes the generated packs
+    // into :libraries:levels and ships nothing. Depends on the same
+    // :libraries:puzzle solver the app hints with, so the pack is verified by
+    // the code that will later be asked to reason about it.
+    include(":tools:level-generator")
 
     // Custom detekt rules — a standalone JVM jar detekt loads via
     // `detektPlugins`. Dev/CI tooling only, never shipped; gated out of the

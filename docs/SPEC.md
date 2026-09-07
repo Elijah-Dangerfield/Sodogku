@@ -230,8 +230,11 @@ on device.
 2. Seed `N` regions, one at each dog cell. Randomly flood-fill unassigned cells from adjacent
    assigned cells until the board is covered. This construction guarantees contiguity and exactly
    one dog per region by definition.
-3. Run the exact solver and **count** solutions. If the count is not 1, mutate region boundaries
-   and re-count; discard after a bounded number of failures.
+3. **Refine to unique.** A freshly grown board typically has dozens of solutions. Pull a rival
+   solution, apply the region move that invalidates *that specific placement*, repeat. Random
+   mutation does not converge here (measured: 0 unique 10x10 boards in 60 attempts); targeted
+   refinement converts 23 of 40. The seed placement survives by construction, because a region
+   move never touches a dog cell.
 4. Score difficulty with the technique-tier solver.
 5. Compute a par score and derive the three paw thresholds.
 6. Deduplicate using a canonical form under the 8 grid symmetries plus region relabeling.
@@ -244,20 +247,26 @@ on `:libraries:core` (which has no JVM target, per the template's own decisions 
 
 ### 3.2 Pack format
 
+One pipe-delimited line per level, `id|size|regions|solution|difficulty`:
+
 ```
-LevelPack { packVersion: Int, kind: CAMPAIGN | DAILY, levels: List<Level> }
-Level {
-  id: Int              // level number shown to the player
-  size: Int            // 4..10
-  regions: String      // size*size chars, 'A'..'J', row-major
-  solution: List<Int>  // column index per row
-  difficulty: Int      // 1..5
-  parScore: Int
-  pawThresholds: List<Int>   // 3 ascending score cutoffs
-}
+137|7|AABBCCDAABBCCD...|2461503|3
 ```
 
-The solution ships in the asset. A determined player can unzip the IPA and read it; for a
+Regions are one letter per cell, row-major. The solution is one digit per row giving that row's
+column, which works because boards cap at 10.
+
+Packs ship as **generated Kotlin source** (`CampaignPackData.kt`, `DailyPackData.kt`), not as an
+asset file. The pack verification test is the only thing standing between an unsolvable level and
+the store, so it has to run everywhere; generated source loads identically in a JVM test, on
+Android and on iOS with no resource plumbing in the way, and a malformed pack fails compilation
+rather than the app.
+
+**No par score or paw thresholds in the pack.** Those are derived at runtime from size and
+difficulty using coefficients from remote config (section 4), so retuning what counts as a
+three-paw clear is a config change rather than a regenerated pack and an app release.
+
+The solution ships with the level. A determined player can unzip the IPA and read it; for a
 single-player game with no leaderboard that is worth nothing, and shipping it makes strike
 checking an O(1) lookup with zero runtime solve cost on a cold tap.
 

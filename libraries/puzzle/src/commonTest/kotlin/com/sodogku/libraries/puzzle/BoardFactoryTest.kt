@@ -101,4 +101,59 @@ class BoardFactoryTest {
             }
         }
     }
+
+    @Test
+    fun refineToUnique_alwaysPreservesTheSeedSolution() {
+        // The whole safety argument for refinement: it only ever moves non-dog
+        // cells, so the board it hands back is still solved by the placement it
+        // started from. If that breaks, the generator can emit a level whose
+        // recorded answer is wrong.
+        val random = Random(9001)
+        var refined = 0
+        repeat(30) {
+            val size = 5 + random.nextInt(4)
+            val seed = assertNotNull(BoardFactory.randomSolution(size, random))
+            val grown = BoardFactory.growRegions(seed, random)
+
+            val board = BoardFactory.refineToUnique(grown, seed, random) ?: return@repeat
+            refined++
+
+            assertTrue(board.structuralProblems().isEmpty(), board.structuralProblems().toString())
+            assertTrue(board.isSolvedBy(seed), "refinement orphaned the seed\n$board")
+            assertEquals(
+                seed,
+                PuzzleSolver.uniqueSolutionOrNull(board),
+                "refined board must be unique, and unique to the seed\n$board",
+            )
+        }
+        assertTrue(refined >= 15, "only $refined/30 boards refined; the generator would crawl")
+    }
+
+    @Test
+    fun refineToUnique_convertsTheLargestBoards() {
+        // C1 measured random mutation converting 0 of 60 at this size. This
+        // pins that the targeted version actually fixed it, so a regression in
+        // the refinement strategy fails here rather than in a slow generator run.
+        val random = Random(1234)
+        var hits = 0
+        repeat(12) {
+            val seed = assertNotNull(BoardFactory.randomSolution(Board.MAX_SIZE, random))
+            val grown = BoardFactory.growRegions(seed, random)
+            if (BoardFactory.refineToUnique(grown, seed, random) != null) hits++
+        }
+        assertTrue(hits >= 3, "only $hits/12 of the 10x10 boards refined to unique")
+    }
+
+    @Test
+    fun regionMoves_neverOffersADogCell() {
+        val random = Random(4321)
+        val seed = assertNotNull(BoardFactory.randomSolution(7, random))
+        val board = BoardFactory.growRegions(seed, random)
+        val dogCells = seed.cells().toSet()
+
+        val moves = BoardFactory.regionMoves(board, seed)
+
+        assertTrue(moves.isNotEmpty())
+        assertTrue(moves.none { it.cell in dogCells }, "a dog cell was offered for reassignment")
+    }
 }
