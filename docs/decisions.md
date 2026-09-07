@@ -6,6 +6,30 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — Dog art ships downscaled behind a component, and the clips stay archived
+
+**Decision:** the seven 1024px stills ship downscaled by use case (192px board poses, 512px hero
+poses) behind a single `Dog(pose = DogPose.X)` component in `:libraries:ui`. The six animated WebP
+loops are archived in `art/source/` and ship nowhere. No Coil dependency.
+
+**Why the downscale:** a cell on a 10x10 grid is about 108 physical pixels. Shipping the originals
+would be 8.3MB of assets and roughly 28MB of decoded bitmaps for one puzzle; downscaled it is
+620KB. The `DogPose` enum makes the board-versus-hero split a compile-time choice rather than a
+call-site judgement, so nobody can paint a 512px asset into a grid cell.
+
+**Why the clips wait:** two independent blockers. One 60-frame 512px loop is about 60MB fully
+decoded, so board-cell animation was never possible and has to be Compose-driven motion on a
+static asset regardless. And animated WebP does not play on Compose Multiplatform iOS at all —
+Coil 3's animated decoding routes through Android's `ImageDecoder`, and Skia gives you frame one.
+Adding Coil now would ship an animation that works on Android and silently freezes on iOS.
+
+**The portable fix, when we want it:** decode each clip to a build-time sprite sheet and step
+frames in Compose. Identical on both platforms, one bitmap, and the frame rate becomes ours.
+That is C12 work.
+
+**No third-party image library at all right now.** Static PNGs go through Compose Resources'
+`painterResource`.
+
 ## 2026-09-07 — Level packs ship as generated Kotlin, not as an asset
 
 **Decision:** `:tools:level-generator` writes `CampaignPackData.kt` and

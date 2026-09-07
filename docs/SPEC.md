@@ -13,14 +13,11 @@ cleaner offline story, and live-tunable monetization.
 
 ## 0. Repo status
 
-`Sodogku/` currently contains only a stray copy of `scripts/` (9 files, one commit `b2ea154`, no
-git remote). The template was never generated into it. Because there is no remote to preserve but
-the directory is the active working directory, the plan is to generate the template into a temp
-directory and move it in place, then delete the 8 stray root scripts (they are duplicated
-correctly under `scripts/` by the generator).
+Generated from the KMP template and trimmed (C0). The identity stack is gone: no accounts, no
+Supabase, no user-scoped server state. Progress is device-local.
 
-After generation, `com.kmptemplate.*` becomes `com.sodogku.*` and `:libraries:kmptemplate`
-becomes `:libraries:sodogku`. Everything below assumes the generated project.
+Chunks C0 through C3 are done and on `main`; `docs/BUILD-PLAN.md` tracks the rest and
+`docs/decisions.md` records why anything non-obvious is the way it is.
 
 ---
 
@@ -762,6 +759,57 @@ feedback.
 
 ---
 
+## 16a. The dog
+
+The art set is in hand (`art/source/`, seven 1024px stills and six 512px animated WebP loops).
+What ships is downscaled per use case, exposed through one design-system component:
+
+```kotlin
+Dog(pose = DogPose.Solved)
+```
+
+`DogPose` splits into board weight and hero weight, and the split is a **performance boundary, not
+a stylistic one**:
+
+| Weight | Poses | Shipped at | Why |
+|---|---|---|---|
+| Board | `Still`, `Focused` | 192px | A cell on a 10x10 is ~108 physical px, and up to 100 are on screen |
+| Hero | `Solved`, `Thinking`, `Paused`, `HardMode` | 512px | Never larger than ~256dp, only ever one on screen |
+
+Shipping the originals everywhere would be 8.3MB of assets and roughly 28MB of decoded bitmaps for
+one puzzle. Downscaled it is 620KB. The enum is the guardrail: callers pick a mood, not a file.
+
+### The animated clips are deliberately not wired up yet
+
+The six WebP loops (idle, look, tilt, bark, pant, flop) are archived in `art/source/clips/` and
+ship nowhere. Two reasons, and both need settling before they go in:
+
+1. **They cannot go on the board at all.** One 60-frame 512px clip is ~60MB fully decoded. Ten of
+   them is not a rendering problem, it is an out-of-memory crash. Animation on the board has to be
+   Compose-driven motion on a static asset: pop-in, wiggle, spring.
+2. **Animated WebP does not play on Compose Multiplatform iOS.** Coil 3's animated decoding is
+   Android-only (it goes through Android's `ImageDecoder`); Skia on iOS gives you the first frame.
+   Adding Coil today would buy an animation that works on one platform and silently freezes on the
+   other, which is worse than not having it.
+
+The portable answer is a **build-time sprite sheet**: decode each clip to N frames at board-or-hero
+resolution, pack them, and step through frames in Compose. Works identically everywhere, costs one
+bitmap, and the frame rate becomes ours to control. That is a chunk of work (C12), not a dependency
+we add now — and until then, static art plus Compose motion covers the placement pop, which is the
+moment that actually matters.
+
+**No Coil dependency yet.** Static PNGs go through Compose Resources' `painterResource` with no
+third-party library at all.
+
+### Asset gap to resolve
+
+`dog-appmark.png` is the intended app icon and it has a **sudoku grid with the numerals 3, 7, 1
+and 9 in it**. Sodogku has no numbers — that is the whole pitch. A store icon promising a number
+puzzle mis-sells the app to everyone who taps it and disappoints the ones who install. Needs a
+redraw with a colour-region grid instead of digits.
+
+---
+
 ## 17. Visual direction
 
 Candy-crush adjacent: generous corner radii, soft drop shadows, saturated but not neon, a rounded
@@ -773,6 +821,27 @@ game components (`BoardCell`, `RuleChip`, `LifeRow`, `PawRating`, `LevelTile`, `
 
 Motion: every interaction gets a spring, everything under 300ms, everything cancellable. A player
 clearing ten easy levels does not want to sit through animations.
+
+### The design system has to make the right thing the easy thing
+
+A new screen should get correct sizing, type, spacing and press feedback **by default**, not
+because whoever wrote it remembered to. Concretely:
+
+- **Nothing reaches past the design system.** No raw Material components, no hardcoded `dp` or hex
+  colours in a feature module. Screens compose `Screen(...)`, DS buttons, `Text` with an
+  `AppTheme.typography` token, and `Dimension.*` spacing.
+- **Every tappable bounces.** `bounceClick()` is baked into the DS buttons and the board cell, so a
+  feature never wires press feedback by hand.
+- **Every asset goes through a component.** `Dog(pose = ...)`, never a raw drawable reference, so
+  the board-versus-hero sizing decision cannot be got wrong at a call site.
+- **Detekt enforces what it can.** `VerifyStrings` already fails inline copy. The same mechanism
+  should grow rules for raw `dp` literals and direct Material imports inside `features/` once those
+  show up as recurring mistakes — a rule is cheaper than a code review habit.
+- **New components land in the catalog with previews** in the same change, so the next screen finds
+  them instead of reinventing them.
+
+This is why the theme work is scheduled *before* the board (C3a) rather than as a polish pass at
+the end. Every screen built against a placeholder theme is a screen that has to be revisited.
 
 ---
 
@@ -808,9 +877,13 @@ moderate difficulty so it stays a 3-to-5-minute daily habit rather than a wall.
 
 ### Art and audio
 
-- [ ] **Dog head asset.** SVG preferred, or PNG at 3x. Must read at ~28px on a 10x10 grid. One
-      hero dog for v1, designed so breed variants can swap at the same silhouette later.
-- [ ] Idle animation intent: second frame, Lottie, or faked in Compose from the static asset?
+- [x] ~~**Dog head asset.**~~ Delivered 2026-09-07: seven stills and six animated WebP loops.
+      Landed as `Dog(pose = ...)` with six poses; see section 16a.
+- [ ] **Redrawn app icon.** `dog-appmark.png` has a sudoku grid with the numerals 3, 7, 1, 9 in it.
+      Sodogku has no numbers, so the icon mis-sells the app on the store page. Needs a
+      colour-region grid instead of digits.
+- [ ] Confirm the animated clips are worth sprite-sheeting (section 16a) or whether Compose-driven
+      motion on the stills is enough. This is a "watch it move and decide" call, not a technical one.
 - [ ] **Bone icon** for lives, **paw** for the rating, and icons for the two boosters.
 - [ ] **App icon** (1024x1024), Android adaptive icon layers, notification icon.
 - [ ] **Region palette:** 10 colors plus the colorblind glyph set. I can propose a first pass if

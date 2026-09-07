@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.Screen
 import com.sodogku.libraries.ui.components.button.ButtonGhost
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
+import com.sodogku.libraries.ui.components.dog.Dog
+import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
@@ -46,11 +49,14 @@ fun OnboardingScreen(
                 .padding(padding),
         ) {
             Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = Dimension.D800),
             ) {
                 Spacer(modifier = Modifier.height(Dimension.D1200))
+                Dog(pose = DogPose.Solved)
+                Spacer(modifier = Modifier.height(Dimension.D600))
                 Text(
                     text = stringResource(Res.string.app_name),
                     typography = AppTheme.typography.Heading.H800,

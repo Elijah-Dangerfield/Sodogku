@@ -1,0 +1,82 @@
+{
+  "stills": {
+    "dog-still": {
+      "file": "stills/dog-still.png",
+      "size": 1024
+    },
+    "dog-focused": {
+      "file": "stills/dog-focused.png",
+      "size": 1024
+    },
+    "dog-solved": {
+      "file": "stills/dog-solved.png",
+      "size": 1024
+    },
+    "dog-thinking": {
+      "file": "stills/dog-thinking.png",
+      "size": 1024
+    },
+    "dog-appmark": {
+      "file": "stills/dog-appmark.png",
+      "size": 1024
+    },
+    "dog-paused": {
+      "file": "stills/dog-paused.png",
+      "size": 1024
+    },
+    "dog-hardmode": {
+      "file": "stills/dog-hardmode.png",
+      "size": 1024
+    }
+  },
+  "clips": {
+    "pant": {
+      "webp": "clips/dog_pant.webp",
+      "size": 512,
+      "fps": 24,
+      "frames": 58,
+      "duration": 2.4,
+      "loop": true
+    },
+    "look": {
+      "webp": "clips/dog_look.webp",
+      "size": 512,
+      "fps": 24,
+      "frames": 60,
+      "duration": 2.5,
+      "loop": true
+    },
+    "bark": {
+      "webp": "clips/dog_bark.webp",
+      "size": 512,
+      "fps": 24,
+      "frames": 60,
+      "duration": 2.5,
+      "loop": true
+    },
+    "tilt": {
+      "webp": "clips/dog_tilt.webp",
+      "size": 512,
+      "fps": 24,
+      "frames": 60,
+      "duration": 2.5,
+      "loop": true
+    },
+    "idle": {
+      "webp": "clips/dog_idle.webp",
+      "size": 512,
+      "fps": 24,
+      "frames": 62,
+      "duration": 2.6,
+      "loop": true
+    },
+    "flop": {
+      "webp": "clips/dog_flop.webp",
+      "size": 512,
+      "fps": 24,
+      "frames": 62,
+      "duration": 2.6,
+      "loop": true
+    }
+  }
+}

@@ -17,6 +17,7 @@ kotlin {
 
         commonMain.dependencies {
             implementation(projects.libraries.core)
+            api(projects.libraries.resources)
             // TODO honestly the sodogku library should expose the component that require sodogku domain
             implementation(projects.libraries.sodogku)
 

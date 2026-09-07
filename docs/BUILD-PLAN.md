@@ -9,6 +9,25 @@ Each chunk states what unblocks it, what it delivers, and how we know it is done
 
 ---
 
+## Working agreement
+
+Every chunk closes the same way, and none of it is optional — the docs are how the next session
+(or the next person) knows why anything is the way it is.
+
+1. **Verify.** `./gradlew testDebugUnitTest :apps:server:test :apps:compose:assembleDebug
+   :apps:compose:compileKotlinIosSimulatorArm64 detekt` all green. Run the app on a device when
+   the chunk changed anything visible.
+2. **Update the docs in the same change.** `SPEC.md` when behaviour or a number changed,
+   `BUILD-PLAN.md` with the chunk's outcome and anything it discovered, `decisions.md` for any
+   non-obvious call, `docs/practices/app-events.md` for any new event.
+3. **Record what was measured, not just what was chosen.** Several decisions here were made
+   against numbers that contradicted the obvious guess (balanced region growth being worse,
+   gentler scoring coefficients making the paw rating meaningless). Those numbers are the reason
+   nobody re-litigates them blind.
+4. **Say what is not verified.** Skipped tests, untested platforms, and environment gaps get
+   written down, not glossed.
+5. **Commit to `main`** with a Conventional Commits message.
+
 ## C0 · Project generation and template trim — **DONE** (2026-09-07)
 
 **Delivers**
@@ -212,6 +231,33 @@ by a test that drives the real API end to end rather than the formula in pieces.
 
 ---
 
+## C3a · Theme, art and design-system foundations
+
+**Unblocked by** C0. Scheduled **before** the board on purpose: every screen built against a
+placeholder theme is a screen that has to be revisited, and C4 will define most of the game's
+visual language whether the tokens are ready or not.
+
+**Delivers**
+
+- The Sodogku palette and type scale in `:libraries:ui/system`: 10 colourblind-workable region
+  colours, the rounded display font, radii, elevation, spacing.
+- Motion tokens so springs are consistent rather than per-call-site.
+- Game components in the catalog with previews: `BoardCell`, `RuleChip`, `LifeRow`, `PawRating`,
+  `LevelTile`, `ScoreCounter`, `FloatingPoints`, `BoosterButton`.
+- Detekt rules for the recurring mistakes (raw `dp` literals, direct Material imports in
+  `features/`), following the `VerifyStrings` pattern.
+
+**Partially done already (2026-09-07).** The dog art is landed and rendering: `Dog(pose = ...)` in
+`:libraries:ui`, six poses, downscaled per use case (620KB shipped against 8.3MB of source), and
+verified on device via the welcome screen. Originals and the animated clips are archived in
+`art/source/`. See SPEC section 16a for why the clips are not wired up and why there is no Coil
+dependency yet.
+
+**Done when** a new screen can be written with no raw `dp`, no Material import and no drawable
+reference, and looks right by default.
+
+---
+
 ## C4 · `:features:game` — the playable board
 
 **Unblocked by** C1, C2, C3.
@@ -366,11 +412,12 @@ TestFlight and internal track builds.
 ## Critical path
 
 ```
-C0 → C1 → C2 ─┐
-     └→ C3 ───┴→ C4 → C5 → C7 → C8 → C9
-                        └→ C6 → C10
-                             C7 → C11
+C0 → C1 → C2 ──┐
+     ├→ C3 ────┼→ C4 → C5 → C7 → C8 → C9
+     └→ C3a ───┘         └→ C6 → C10
+                              C7 → C11
 ```
 
-C12 runs alongside from C4 onward. The first hard external dependency is the dog art (C12) and the
-AdMob and store accounts (C8); everything up to C7 can be built with nothing from outside.
+C3a runs before C4 and C12 continues it from there. The dog art has landed, so the only remaining
+hard external dependencies are the AdMob and store accounts (C8) and the redrawn app icon; every
+chunk up to C7 can be built with nothing from outside.
