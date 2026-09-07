@@ -28,6 +28,19 @@ object LevelPacks {
     }
 
     /**
+     * The id of the last level in the campaign.
+     *
+     * Progress does not know how many levels ship, so `unlockedThrough` can run
+     * past the end when someone clears the final level. Clamping belongs here,
+     * once, rather than at every consumer — a forgotten clamp is a crash-free
+     * wrong answer that only shows up for players who finish.
+     */
+    val lastCampaignLevelId: Int get() = campaign.levels.lastOrNull()?.id ?: 1
+
+    /** [level] clamped to a level that actually exists in the campaign. */
+    fun clampToCampaign(level: Int): Int = level.coerceIn(1, lastCampaignLevelId)
+
+    /**
      * The daily board for a given local date, expressed as days since the Unix
      * epoch. Wraps when the pool runs out, which is two years away; a content
      * update ships a longer pool well before then.

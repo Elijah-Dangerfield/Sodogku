@@ -83,7 +83,10 @@ fun GameScreen(
             GameHeader(
                 state = state,
                 levelId = level.id,
-                onOpenLevels = { drawerOpen = true },
+                onOpenLevels = {
+                    drawerOpen = true
+                    onAction(GameAction.LevelsOpened)
+                },
                 onSettings = { dialog = GameDialog.Settings },
                 onExplainBones = { onAction(GameAction.BoosterTapped(Consumable.Bone)) },
             )
@@ -134,6 +137,7 @@ fun GameScreen(
                 currentLevelId = level.id,
                 unlockedThrough = state.unlockedThrough,
                 canJumpAnywhere = state.isPro,
+                records = state.records,
                 onPick = {
                     drawerOpen = false
                     onAction(GameAction.GoToLevel(it))

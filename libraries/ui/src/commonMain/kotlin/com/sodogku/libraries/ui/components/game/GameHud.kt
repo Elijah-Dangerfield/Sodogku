@@ -139,10 +139,12 @@ fun RuleChip(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
+        // bounceClick before clip/background, so the press scales the whole chip
+        // rather than shrinking the label inside a stationary pill.
         modifier = modifier
+            .bounceClick(onClick = onClick)
             .clip(Radii.Card)
             .background(background)
-            .bounceClick(onClick = onClick)
             .padding(horizontal = Dimension.D400, vertical = Dimension.D300),
     ) {
         Box(
@@ -178,9 +180,9 @@ fun BoosterButton(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .padding(BadgeInset)
+                .bounceClick(enabled = enabled, onClick = onClick)
                 .clip(Radii.Card)
                 .background(AppTheme.colors.surfaceSecondary.color)
-                .bounceClick(enabled = enabled, onClick = onClick)
                 .padding(horizontal = Dimension.D600, vertical = Dimension.D500),
         ) {
             Text(

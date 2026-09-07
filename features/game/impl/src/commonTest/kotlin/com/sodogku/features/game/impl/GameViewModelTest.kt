@@ -10,6 +10,9 @@ import com.sodogku.libraries.billing.RestoreOutcome
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
+import com.sodogku.libraries.progress.LevelRecord
+import com.sodogku.libraries.progress.LevelState
+import com.sodogku.libraries.progress.ProgressRepository
 import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
@@ -24,6 +27,7 @@ import kotlin.time.TestTimeSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 
 class GameViewModelTest : CoroutineTest() {
 
@@ -282,13 +286,7 @@ class GameViewModelTest : CoroutineTest() {
         // ad must not be punished back down to three.
         val cache = InMemoryAppCache()
         cache.set(AppData(treats = 5))
-        val vm = GameViewModel(
-            PlainLevel,
-            FixedAdGate(RewardOutcome.Rewarded),
-            FreeEntitlementsFake(),
-            clock,
-            cache,
-        )
+        val vm = viewModel(cache = cache)
         assertEquals(5, vm.state.treats)
 
         vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Treat))
@@ -300,13 +298,7 @@ class GameViewModelTest : CoroutineTest() {
     fun aRefillTopsAnEmptyBoosterBackToThree() = runUnitTest {
         val cache = InMemoryAppCache()
         cache.set(AppData(sniffs = 0))
-        val vm = GameViewModel(
-            PlainLevel,
-            FixedAdGate(RewardOutcome.Rewarded),
-            FreeEntitlementsFake(),
-            clock,
-            cache,
-        )
+        val vm = viewModel(cache = cache)
 
         vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Sniff))
 
@@ -318,13 +310,7 @@ class GameViewModelTest : CoroutineTest() {
     fun dismissingTheRefillAdLeavesTheHoldingAlone() = runUnitTest {
         val cache = InMemoryAppCache()
         cache.set(AppData(sniffs = 0))
-        val vm = GameViewModel(
-            PlainLevel,
-            FixedAdGate(RewardOutcome.Dismissed),
-            FreeEntitlementsFake(),
-            clock,
-            cache,
-        )
+        val vm = viewModel(adGate = FixedAdGate(RewardOutcome.Dismissed), cache = cache)
 
         vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Sniff))
 
@@ -463,13 +449,7 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun hapticsToggleAndPersist() = runUnitTest {
         val cache = InMemoryAppCache()
-        val vm = GameViewModel(
-            PlainLevel,
-            FixedAdGate(RewardOutcome.Rewarded),
-            FreeEntitlementsFake(),
-            clock,
-            cache,
-        )
+        val vm = viewModel(cache = cache)
         assertTrue(vm.state.haptics, "vibration is on by default")
 
         vm.takeAction(GameAction.ToggleHaptics)
@@ -481,13 +461,7 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun colorblindModeTogglesAndPersists() = runUnitTest {
         val cache = InMemoryAppCache()
-        val vm = GameViewModel(
-            PlainLevel,
-            FixedAdGate(RewardOutcome.Rewarded),
-            FreeEntitlementsFake(),
-            clock,
-            cache,
-        )
+        val vm = viewModel(cache = cache)
 
         vm.takeAction(GameAction.ToggleColorblind)
 
@@ -506,13 +480,100 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
     }
 
+    @Test
+    fun openingALevelRecordsTheAttempt() = runUnitTest {
+        // Counted when the level opens, not when it is cleared: an attempt the
+        // player walked away from still happened.
+        val progress = InMemoryProgress()
+
+        viewModel(progress = progress)
+
+        assertEquals(1, progress.record(PlainLevel).attempts)
+    }
+
+    @Test
+    fun everyRestartCountsAsAnotherAttempt() = runUnitTest {
+        val progress = InMemoryProgress()
+        val vm = viewModel(progress = progress)
+
+        vm.takeAction(GameAction.Retry)
+
+        assertEquals(2, progress.record(PlainLevel).attempts)
+    }
+
+    @Test
+    fun aWinRecordsTheScorePawsAndTime() = runUnitTest {
+        val progress = InMemoryProgress()
+        val vm = viewModel(progress = progress)
+
+        solve(vm)
+
+        val record = progress.record(PlainLevel)
+        assertEquals(LevelState.Completed, record.state)
+        assertEquals(vm.state.score.total, record.bestScore)
+        assertEquals(vm.state.paws, record.bestPaws)
+        assertEquals(vm.state.elapsedMs, record.bestTimeMs)
+        assertTrue(record.bestTimeMs > 0, "a clear has to carry a duration to beat later")
+    }
+
+    @Test
+    fun aWinOpensTheNextLevel() = runUnitTest {
+        val vm = viewModel()
+
+        solve(vm)
+
+        assertEquals(PlainLevel + 1, vm.state.unlockedThrough)
+    }
+
+    @Test
+    fun theDrawerUnlocksFromProgressAlone() = runUnitTest {
+        // Progress is the only thing that says how far the player got. The
+        // AppData stopgap this replaced is gone, and a second source would drift.
+        val progress = InMemoryProgress()
+        progress.onCompleted(StarterDogLevel, score = 10, paws = 1, timeMs = 100)
+
+        val vm = viewModel(levelId = StarterDogLevel, progress = progress)
+
+        assertEquals(StarterDogLevel + 1, vm.state.unlockedThrough)
+    }
+
+    @Test
+    fun unlockedThroughStopsAtTheEndOfThePack() = runUnitTest {
+        // Clearing the last level unlocks `id + 1` in the repository, which is
+        // one past everything that shipped.
+        val lastLevel = LevelPacks.campaign.size
+        val progress = InMemoryProgress()
+        progress.onCompleted(lastLevel, score = 1, paws = 3, timeMs = 1)
+        assertEquals(lastLevel + 1, progress.unlockedThrough(), "the fake has to reproduce the bug")
+
+        val vm = viewModel(levelId = lastLevel, progress = progress)
+
+        assertEquals(lastLevel, vm.state.unlockedThrough)
+    }
+
+    @Test
+    fun openingTheDrawerLoadsEveryLevelRecord() = runUnitTest {
+        val progress = InMemoryProgress()
+        progress.onCompleted(StarterDogLevel, score = 900, paws = 3, timeMs = 4_000)
+        val vm = viewModel(progress = progress)
+        assertTrue(vm.state.records.isEmpty(), "records cost a query, so nothing loads them early")
+
+        vm.takeAction(GameAction.LevelsOpened)
+
+        assertEquals(3, vm.state.records[StarterDogLevel]?.bestPaws)
+        assertEquals(LevelState.Completed, vm.state.records[StarterDogLevel]?.state)
+        assertEquals(null, vm.state.records[300], "an untouched level has no record at all")
+    }
+
     private val clock = TestTimeSource()
 
     private fun viewModel(
         levelId: Int = PlainLevel,
         adGate: AdGate = FixedAdGate(RewardOutcome.Rewarded),
         entitlements: Entitlements = FreeEntitlementsFake(),
-    ) = GameViewModel(levelId, adGate, entitlements, clock, InMemoryAppCache())
+        cache: AppCache = InMemoryAppCache(),
+        progress: ProgressRepository = InMemoryProgress(),
+    ) = GameViewModel(levelId, adGate, entitlements, clock, cache, progress)
 
     /**
      * Commits a guess: two taps inside the double-tap window. A single tap only
@@ -578,6 +639,74 @@ class GameViewModelTest : CoroutineTest() {
         override suspend fun get(): AppData = state.value
         override suspend fun set(value: AppData) { state.value = value }
         override suspend fun clear() { state.value = AppData() }
+    }
+
+    /**
+     * In-memory [ProgressRepository].
+     *
+     * Keeps the two rules the game leans on — a metric only ever improves, and
+     * clearing a level opens the next — so a test asserting on either is
+     * asserting the contract the Room implementation also has to meet. It keeps
+     * the *unclamped* `unlockedThrough`, one past the end of the pack after the
+     * last level, because clamping that is the game's job.
+     */
+    private class InMemoryProgress : ProgressRepository {
+        private val records = mutableMapOf<Int, LevelRecord>()
+
+        override fun observe(levelId: Int): Flow<LevelRecord> =
+            flowOf(records[levelId] ?: LevelRecord.unplayed(levelId))
+
+        override suspend fun record(levelId: Int): LevelRecord =
+            records[levelId] ?: LevelRecord.unplayed(levelId)
+
+        override suspend fun all(): List<LevelRecord> = records.values.sortedBy { it.levelId }
+
+        override suspend fun unlockedThrough(): Int = records.values
+            .filter { it.state != LevelState.Locked }
+            .maxOfOrNull { it.levelId }
+            ?: LevelRecord.FIRST_LEVEL_ID
+
+        override suspend fun onAttemptStarted(levelId: Int) {
+            val current = record(levelId)
+            records[levelId] = current.copy(
+                state = current.state.orUnlocked(),
+                attempts = current.attempts + 1,
+            )
+        }
+
+        override suspend fun onCompleted(levelId: Int, score: Int, paws: Int, timeMs: Long) {
+            val current = record(levelId)
+            records[levelId] = current.copy(
+                state = LevelState.Completed,
+                bestScore = maxOf(current.bestScore, score),
+                bestPaws = maxOf(current.bestPaws, paws),
+                bestTimeMs = if (current.bestTimeMs == 0L) {
+                    timeMs
+                } else {
+                    minOf(current.bestTimeMs, timeMs)
+                },
+            )
+            unlock(levelId + 1)
+        }
+
+        override suspend fun onSkipped(levelId: Int) {
+            val current = record(levelId)
+            if (current.state != LevelState.Completed) {
+                records[levelId] = current.copy(state = LevelState.Skipped)
+            }
+            unlock(levelId + 1)
+        }
+
+        override suspend fun reset() {
+            records.clear()
+        }
+
+        private suspend fun unlock(levelId: Int) {
+            records[levelId] = record(levelId).let { it.copy(state = it.state.orUnlocked()) }
+        }
+
+        private fun LevelState.orUnlocked(): LevelState =
+            if (this == LevelState.Locked) LevelState.Unlocked else this
     }
 
     private class FixedAdGate(private val outcome: RewardOutcome) : AdGate {

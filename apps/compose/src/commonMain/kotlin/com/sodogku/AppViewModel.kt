@@ -5,6 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.sodogku.features.game.GameRoute
 import com.sodogku.features.onboarding.OnboardingRoute
 import com.sodogku.libraries.config.EnsureAppConfigLoaded
+import com.sodogku.libraries.core.Catching
+import com.sodogku.libraries.core.logOnFailure
+import com.sodogku.libraries.levels.LevelPacks
+import com.sodogku.libraries.progress.LevelRecord
+import com.sodogku.libraries.progress.ProgressRepository
 import com.sodogku.libraries.core.logging.KLog
 import com.sodogku.libraries.navigation.Route
 import com.sodogku.libraries.networking.AccessDeniedBus
@@ -58,6 +63,7 @@ class AppViewModel(
     private val appCache: AppCache,
     private val ensureAppConfigLoaded: EnsureAppConfigLoaded,
     private val accessDeniedBus: AccessDeniedBus,
+    private val progress: ProgressRepository,
 ) : ViewModel() {
 
     private val logger = KLog.withTag("AppNav")
@@ -95,17 +101,24 @@ class AppViewModel(
 
     init {
         viewModelScope.launch {
-            val data = appCache.get()
-            val onboarded = data.hasUserOnboarded
+            val onboarded = appCache.get().hasUserOnboarded
+            // Progress is the single source of how far the player got. The old
+            // `AppData.currentLevel` stopgap is gone, and reading it here after
+            // nothing writes it would have opened everyone on level 1 forever.
+            val level = Catching { progress.unlockedThrough() }
+                .logOnFailure { "Failed to read progress for the start destination" }
+                .getOrNull()
+                ?.let(LevelPacks::clampToCampaign)
+                ?: LevelRecord.FIRST_LEVEL_ID
             logger.d {
                 "Resolving start destination: hasUserOnboarded=$onboarded → " +
-                    if (onboarded) "Game(level ${data.currentLevel})" else "Onboarding"
+                    if (onboarded) "Game(level $level)" else "Onboarding"
             }
             // The puzzle *is* the home screen. Sending a returning player to a
             // menu first puts a navigation between them and the thing they
             // opened the app to do; the level list is a drawer on the board.
             _startDestination.value = if (onboarded) {
-                GameRoute(data.currentLevel)
+                GameRoute(level)
             } else {
                 OnboardingRoute()
             }

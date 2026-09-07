@@ -44,14 +44,6 @@ data class AppData(
     val reduceAnimations: Boolean = false,
 
     /**
-     * The furthest level reached. Everything up to it is unlocked; the level
-     * drawer greys out the rest. Real per-level records arrive with
-     * `:libraries:progress` in C5 — this is the one number the game needs before
-     * then, and it is what the app opens on.
-     */
-    val currentLevel: Int = 1,
-
-    /**
      * Held consumables. These are *not* capped at three — a refill tops up to
      * three, but clearing levels grants extra, so the store is a reward for
      * playing rather than a meter that only ever empties.

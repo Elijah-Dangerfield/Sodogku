@@ -15,6 +15,8 @@ import com.sodogku.libraries.ui.components.board.BoardCell
 import com.sodogku.libraries.ui.components.board.BoardCellState
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
+import com.sodogku.libraries.ui.components.game.RewardBadge
+import com.sodogku.libraries.ui.components.game.RewardButton
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.system.color.RegionPalette
 import com.sodogku.system.AppTheme
@@ -116,6 +118,39 @@ fun DogCatalog(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * The two ad-facing controls, which share the secondary accent so a player only
+ * has to learn one colour. Check this page whenever the accent moves: an offer
+ * that stops being visually distinct from an ordinary CTA is the failure mode,
+ * and it looks fine in isolation.
+ */
+@Composable
+fun RewardCatalog(modifier: Modifier = Modifier) {
+    CatalogPage(
+        title = "Reward controls",
+        description = "RewardButton is a standing offer and pulses in bursts with a rest " +
+            "between; RewardBadge marks a button the player already wanted as one that plays " +
+            "an ad first. Both go quiet under LocalInspectionMode so previews and screenshot " +
+            "tests can reach idle.",
+        modifier = modifier,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimension.D400),
+        ) {
+            RewardButton(label = RewardSample)
+            RewardButton(label = RewardSample, enabled = false)
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
+        ) {
+            Text(text = BadgedControlSample, typography = AppTheme.typography.Body.B500)
+            RewardBadge()
+        }
+    }
+}
+
 @Composable
 private fun CatalogPage(
     title: String,
@@ -142,6 +177,10 @@ private fun CatalogPage(
 
 private const val CHUNK = 3
 
+/** Catalog copy is developer-facing spec, so it stays a constant rather than a string resource. */
+private const val RewardSample = "Free bones"
+private const val BadgedControlSample = "Next level"
+
 @Preview
 @Composable
 private fun RegionPaletteCatalogPreview() = PreviewContent { RegionPaletteCatalog() }
@@ -153,3 +192,7 @@ private fun BoardCellCatalogPreview() = PreviewContent { BoardCellCatalog() }
 @Preview
 @Composable
 private fun DogCatalogPreview() = PreviewContent { DogCatalog() }
+
+@Preview
+@Composable
+private fun RewardCatalogPreview() = PreviewContent { RewardCatalog() }

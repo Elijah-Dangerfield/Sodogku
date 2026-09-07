@@ -66,4 +66,7 @@
     <string name="booster_have">You have %1$d</string>
     <string name="hint_title">No dogs here</string>
     <string name="hint_body">These squares are ruled out. Tap anywhere to carry on.</string>
+
+    <!-- Stands in for the reward art on the next level to play. Replace the glyph, not the key. -->
+    <string name="levels_reward">🦴</string>
 </resources>

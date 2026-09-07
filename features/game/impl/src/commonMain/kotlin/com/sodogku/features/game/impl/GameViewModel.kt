@@ -11,6 +11,8 @@ import com.sodogku.libraries.core.logging.logEvent
 import com.sodogku.libraries.flowroutines.SEAViewModel
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
+import com.sodogku.libraries.progress.LevelRecord
+import com.sodogku.libraries.progress.ProgressRepository
 import com.sodogku.libraries.puzzle.HintFinder
 import com.sodogku.libraries.puzzle.Solution
 import com.sodogku.libraries.puzzle.autoMarkedCells
@@ -49,6 +51,7 @@ class GameViewModel(
      */
     private val clock: TimeSource.WithComparableMarks,
     private val appCache: AppCache,
+    private val progress: ProgressRepository,
 ) : SEAViewModel<GameState, GameEvent, GameAction>(initialStateArg = GameState()) {
 
     private val logger = KLog.withTag("Game")
@@ -83,6 +86,7 @@ class GameViewModel(
             GameAction.ToggleHaptics -> action.toggleHaptics()
             GameAction.ToggleReduceAnimations -> action.toggleReduceAnimations()
             GameAction.NextLevel -> action.nextLevel()
+            GameAction.LevelsOpened -> action.loadRecords()
             is GameAction.GoToLevel -> action.goToLevel(action.levelId)
             GameAction.OpenPrivacy -> sendEvent(GameEvent.OpenPrivacy)
             GameAction.OpenTerms -> sendEvent(GameEvent.OpenTerms)
@@ -101,7 +105,6 @@ class GameViewModel(
                 haptics = settings?.hapticsEnabled != false,
                 reduceAnimations = settings?.reduceAnimations == true,
                 isPro = entitlements.isPro.value,
-                unlockedThrough = settings?.currentLevel ?: 1,
                 sniffs = settings?.sniffs ?: ConsumableRefillTo,
                 treats = settings?.treats ?: ConsumableRefillTo,
                 explainedBoosters = settings?.explainedBoosters
@@ -133,6 +136,13 @@ class GameViewModel(
             "difficulty" to level.difficulty,
             "attempt_number" to attemptNumber,
         )
+        // Recorded when the level opens rather than when it is cleared: an
+        // abandoned attempt still happened, and it is what unlocks the level's
+        // own row so `unlockedThrough` can see it.
+        Catching { progress.onAttemptStarted(level.id) }
+            .logOnFailure { "Failed to record the start of level ${level.id}" }
+        val unlocked = unlockedThrough()
+
         // The starter dog is folded into this one update rather than applied by
         // a second one. `state` reads a derived flow that lags `updateState` by
         // a dispatch, so a follow-up that re-read `state` would see the board as
@@ -162,10 +172,24 @@ class GameViewModel(
                 haptics = it.haptics,
                 reduceAnimations = it.reduceAnimations,
                 isPro = it.isPro,
-                unlockedThrough = maxOf(it.unlockedThrough, level.id),
+                records = it.records,
+                unlockedThrough = maxOf(unlocked, level.id),
             )
         }
     }
+
+    /**
+     * How far the drawer opens.
+     *
+     * The repository unlocks `levelId + 1` on a clear and has no idea where the
+     * pack ends, so clearing level 500 reports 501. Clamping belongs here, at
+     * the only place that knows what shipped.
+     */
+    private suspend fun unlockedThrough(): Int = Catching { progress.unlockedThrough() }
+        .logOnFailure { "Failed to read unlocked progress" }
+        .getOrNull()
+        ?.let(LevelPacks::clampToCampaign)
+        ?: LevelRecord.FIRST_LEVEL_ID
 
     /**
      * The core interaction, and the reason the safe gesture is the cheap one.
@@ -298,6 +322,14 @@ class GameViewModel(
             "strikes_used" to (ScoringConfig.MAX_LIVES - state.livesRemaining),
             "attempt_number" to attemptNumber,
         )
+        // Every metric here is a *best*, not a last: the repository keeps the
+        // better of what it holds and what this attempt scored, so a replay can
+        // never cost the player a three-paw clear. It also opens the next level,
+        // which is why nothing else writes an unlock.
+        Catching { progress.onCompleted(level.id, finished.total, paws, duration) }
+            .logOnFailure { "Failed to record the clear of level ${level.id}" }
+        val unlocked = unlockedThrough()
+
         sendEvent(GameEvent.Won)
         updateState {
             it.copy(
@@ -305,6 +337,7 @@ class GameViewModel(
                 score = finished,
                 paws = paws,
                 elapsedMs = duration,
+                unlockedThrough = maxOf(it.unlockedThrough, unlocked),
             )
         }
     }
@@ -386,8 +419,11 @@ class GameViewModel(
     }
 
     /**
-     * Advances to the next level in the pack and records how far the player has
-     * reached, which is both what the app opens on and what unlocks the drawer.
+     * Advances to the next level in the pack.
+     *
+     * It writes no unlock of its own. The clear that got the player here already
+     * opened the next level in the repository, and starting the attempt records
+     * the rest — two writers for one fact is how the two disagree.
      */
     private suspend fun GameAction.nextLevel() {
         val current = state.level ?: return
@@ -397,12 +433,28 @@ class GameViewModel(
             return
         }
         attemptNumber = 1
-        Catching {
-            appCache.update { data ->
-                data.copy(currentLevel = maxOf(data.currentLevel, next.id))
-            }
-        }.logOnFailure { "Failed to record level progress" }
         startAttempt(next)
+    }
+
+    /**
+     * The drawer's per-level history, read when it opens rather than observed.
+     *
+     * 500 rows that only change when an attempt ends do not need a live query
+     * behind them, and the drawer is the only thing that reads them.
+     */
+    private suspend fun GameAction.loadRecords() {
+        val records = Catching { progress.all() }
+            .logOnFailure { "Failed to read level records" }
+            .getOrNull()
+            .orEmpty()
+            .associateBy { it.levelId }
+        val unlocked = unlockedThrough()
+        updateState {
+            it.copy(
+                records = records,
+                unlockedThrough = maxOf(unlocked, it.level?.id ?: LevelRecord.FIRST_LEVEL_ID),
+            )
+        }
     }
 
     private suspend fun GameAction.goToLevel(levelId: Int) {
@@ -623,7 +675,13 @@ data class GameState(
     val reduceAnimations: Boolean = false,
 
     /** How far the player has reached; the level drawer unlocks up to it. */
-    val unlockedThrough: Int = 1,
+    val unlockedThrough: Int = LevelRecord.FIRST_LEVEL_ID,
+
+    /**
+     * What the player has done with each level they have touched, keyed by id.
+     * Filled when the drawer opens; levels with no entry have never been played.
+     */
+    val records: Map<Int, LevelRecord> = emptyMap(),
 
     /** Pro can jump to any level in the drawer, not just the ones reached. */
     val isPro: Boolean = false,
@@ -692,6 +750,9 @@ sealed interface GameAction {
     data object ToggleHaptics : GameAction
     data object ToggleReduceAnimations : GameAction
     data object NextLevel : GameAction
+
+    /** The drawer was opened, so its per-level records need reading. */
+    data object LevelsOpened : GameAction
     data class GoToLevel(val levelId: Int) : GameAction
     data object OpenPrivacy : GameAction
     data object OpenTerms : GameAction
