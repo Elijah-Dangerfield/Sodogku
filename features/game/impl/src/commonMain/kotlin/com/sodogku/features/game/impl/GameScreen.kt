@@ -225,6 +225,7 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
                             colorblind = state.colorblind,
                             strikeNonce = if (state.strikeCell == index) state.strikeNonce else 0,
                             entranceDelayMillis = (row + col) * Motion.BoardWaveStepMillis,
+                            animationOffset = index,
                             enabled = state.phase == GamePhase.Playing,
                             onTap = { onAction(GameAction.CellTapped(index)) },
                         )

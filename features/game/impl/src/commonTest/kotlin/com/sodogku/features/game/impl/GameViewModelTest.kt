@@ -15,6 +15,7 @@ import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -360,6 +361,24 @@ class GameViewModelTest : CoroutineTest() {
             vm.state.livesRemaining,
             "a single bone would put the player straight back here",
         )
+    }
+
+    @Test
+    fun hapticsToggleAndPersist() = runUnitTest {
+        val cache = InMemoryAppCache()
+        val vm = GameViewModel(
+            PlainLevel,
+            FixedAdGate(RewardOutcome.Rewarded),
+            FreeEntitlementsFake(),
+            clock,
+            cache,
+        )
+        assertTrue(vm.state.haptics, "vibration is on by default")
+
+        vm.takeAction(GameAction.ToggleHaptics)
+
+        assertFalse(vm.state.haptics)
+        assertFalse(cache.get().hapticsEnabled)
     }
 
     @Test

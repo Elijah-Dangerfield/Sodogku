@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
  * which is exactly what the first pass produced — the lobes were large enough
  * relative to the bar that they merged into one lump.
  */
-fun DrawScope.drawBone(color: Color) {
+fun DrawScope.drawBone(fill: Color, edge: Color) {
     val width = size.width
     val height = size.height
     val lobe = height * BONE_LOBE_FRACTION
@@ -31,15 +31,20 @@ fun DrawScope.drawBone(color: Color) {
     val centreY = height / 2f
     val spread = lobe * BONE_LOBE_SPREAD
 
-    drawRoundRect(
-        color = color,
-        topLeft = Offset(lobe, centreY - barHeight / 2f),
-        size = Size(width - lobe * 2f, barHeight),
-        cornerRadius = CornerRadius(barHeight / 2f),
-    )
-    listOf(lobe, width - lobe).forEach { x ->
-        drawCircle(color, radius = lobe, center = Offset(x, centreY - spread))
-        drawCircle(color, radius = lobe, center = Offset(x, centreY + spread))
+    // Outline first, fill inset over it: drawing an edge as a stroke would trace
+    // the seams between the bar and the lobes and make the bone look welded.
+    val rim = lobe * BONE_RIM_FRACTION
+    listOf(edge to 0f, fill to rim).forEach { (color, inset) ->
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(lobe, centreY - barHeight / 2f + inset),
+            size = Size(width - lobe * 2f, barHeight - inset * 2f),
+            cornerRadius = CornerRadius((barHeight - inset * 2f) / 2f),
+        )
+        listOf(lobe, width - lobe).forEach { x ->
+            drawCircle(color, radius = lobe - inset, center = Offset(x, centreY - spread))
+            drawCircle(color, radius = lobe - inset, center = Offset(x, centreY + spread))
+        }
     }
 }
 
@@ -173,6 +178,7 @@ private const val EMPTY_ALPHA = 0.14f
 private const val BONE_LOBE_FRACTION = 0.21f
 private const val BONE_BAR_FRACTION = 0.30f
 private const val BONE_LOBE_SPREAD = 0.95f
+private const val BONE_RIM_FRACTION = 0.22f
 
 private const val PAW_PAD_WIDTH = 0.56f
 private const val PAW_PAD_HEIGHT = 0.40f

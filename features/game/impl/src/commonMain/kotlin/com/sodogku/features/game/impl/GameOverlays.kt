@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
+import com.sodogku.libraries.ui.components.Switch
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.system.FocusScrim
@@ -29,6 +30,8 @@ import sodogku.libraries.resources.generated.resources.game_last_bone_title
 import sodogku.libraries.resources.generated.resources.settings_colorblind
 import sodogku.libraries.resources.generated.resources.settings_colorblind_body
 import sodogku.libraries.resources.generated.resources.settings_done
+import sodogku.libraries.resources.generated.resources.settings_haptics
+import sodogku.libraries.resources.generated.resources.settings_haptics_body
 
 /** The thing the last-bone warning points at. */
 val LivesFocusKey = FocusTargetKey("game.lives")
@@ -131,10 +134,25 @@ fun BoxScope.GameSettingsSheet(
                 typography = AppTheme.typography.Body.B400,
                 color = AppTheme.colors.textSecondary,
             )
-            com.sodogku.libraries.ui.components.Switch(
+            Switch(
                 checked = state.colorblind,
                 onCheckedChange = { onAction(GameAction.ToggleColorblind) },
             )
+
+            Text(
+                text = stringResource(Res.string.settings_haptics),
+                typography = AppTheme.typography.Heading.H600,
+            )
+            Text(
+                text = stringResource(Res.string.settings_haptics_body),
+                typography = AppTheme.typography.Body.B400,
+                color = AppTheme.colors.textSecondary,
+            )
+            Switch(
+                checked = state.haptics,
+                onCheckedChange = { onAction(GameAction.ToggleHaptics) },
+            )
+
             ButtonPrimary(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(Res.string.settings_done))
             }

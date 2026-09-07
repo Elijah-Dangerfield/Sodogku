@@ -22,8 +22,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sodogku.libraries.ui.PreviewContent
-import com.sodogku.libraries.ui.components.dog.Dog
-import com.sodogku.libraries.ui.components.dog.DogPose
+import com.sodogku.libraries.ui.components.dog.AnimatedDog
 import com.sodogku.libraries.ui.system.color.RegionPalette
 import com.sodogku.libraries.ui.system.color.drawBoardMark
 import com.sodogku.libraries.ui.system.color.drawRegionGlyph
@@ -73,6 +72,8 @@ fun BoardCell(
     colorblind: Boolean = false,
     strikeNonce: Int = 0,
     entranceDelayMillis: Int = 0,
+    /** Staggers the placed dog's idle loop so a board of them is not in lockstep. */
+    animationOffset: Int = 0,
     enabled: Boolean = true,
     onTap: () -> Unit = {},
 ) {
@@ -144,9 +145,11 @@ fun BoardCell(
             },
     ) {
         if (pop.value > 0f) {
-            Dog(
-                pose = DogPose.Still,
+            // A placed dog is alive: it looks around and blinks. Driven from a
+            // shared sprite sheet, so ten of them on a board cost one bitmap.
+            AnimatedDog(
                 size = size * DogFraction,
+                frameOffset = animationOffset,
                 modifier = Modifier.graphicsLayer {
                     scaleX = pop.value
                     scaleY = pop.value

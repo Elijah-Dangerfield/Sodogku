@@ -6,6 +6,39 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — Dog animation ships as a sprite sheet, reversing the earlier call
+
+**Decision:** `dog_look` is packed into a 30-frame sprite sheet at board resolution
+(`scripts/build_dog_sprites.py`) and stepped in Compose. A placed dog looks around and blinks.
+
+**This reverses the C3a decision** that the clips should stay archived. That call rested on two
+claims, and one of them was wrong:
+
+- *"Animated WebP does not play on Compose Multiplatform iOS."* Still true, and still the reason
+  the source clips are not shipped directly.
+- *"A clip cannot go on the board — ten of them is an out-of-memory crash."* Wrong, because it
+  assumed one decode per cell. At most `N` dogs are ever placed, they all render the same
+  animation, and a sheet is decoded **once** and shared. Packed at 128px and subsampled to 30
+  frames it is 260KB, not 60MB.
+
+The earlier note also recorded that Pillow could not read the clips. That was a bad feature probe
+on my part (`features.check("webp_anim")` is not a real feature name); Pillow reads all 60 frames
+fine.
+
+**Cost:** the sheet's frame count and grid are duplicated between the script's arguments and
+`AnimatedDog.kt`'s constants. A mismatch shows up as a visibly wrong animation rather than a build
+failure, which is why both are documented in SPEC section 16a.
+
+## 2026-09-07 — Haptics go through one object, not through call sites
+
+**Decision:** `Haptics` in `:libraries:ui` maps game events (`Mark`, `Place`, `Strike`, `Win`) to
+Compose feedback types, and is constructed with the player's on/off setting already applied.
+
+**Why:** the setting has to be honoured everywhere without every feature remembering to check it,
+and Compose Multiplatform exposes only two haptic types today (`TextHandleMove`, `LongPress`). The
+mapping from a rich set of game moments onto that thin vocabulary is a decision worth making once,
+in one place, rather than at each call site.
+
 ## 2026-09-07 — `state` lags `updateState`, so never read it back inside one action
 
 **The landmine:** `SEAViewModel.state` reads `stateFlow.value`, and `stateFlow` is a *derived*

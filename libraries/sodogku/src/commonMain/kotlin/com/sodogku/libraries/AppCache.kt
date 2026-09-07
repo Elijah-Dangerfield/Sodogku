@@ -31,6 +31,9 @@ data class AppData(
      */
     val colorblindMode: Boolean = false,
 
+    /** Vibration on marks, placements and strikes. */
+    val hapticsEnabled: Boolean = true,
+
     /**
      * Stable per-install identifier, minted on first read and persisted for
      * the app's lifetime on this device (survives sign-out; dies with

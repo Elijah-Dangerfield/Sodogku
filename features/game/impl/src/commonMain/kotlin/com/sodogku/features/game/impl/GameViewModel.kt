@@ -75,15 +75,21 @@ class GameViewModel(
             GameAction.DismissWarning -> action.updateState { it.copy(warning = null) }
             GameAction.RefillBones -> action.refillBones()
             GameAction.ToggleColorblind -> action.toggleColorblind()
+            GameAction.ToggleHaptics -> action.toggleHaptics()
             is GameAction.TimerTick -> action.updateState { it.copy(elapsedMs = elapsedMs()) }
         }
     }
 
     private suspend fun GameAction.load() {
-        val colorblind = Catching { appCache.get().colorblindMode }
-            .logOnFailure { "Failed to read colorblind mode" }
-            .getOrNull() == true
-        updateState { it.copy(colorblind = colorblind) }
+        val settings = Catching { appCache.get() }
+            .logOnFailure { "Failed to read game settings" }
+            .getOrNull()
+        updateState {
+            it.copy(
+                colorblind = settings?.colorblindMode == true,
+                haptics = settings?.hapticsEnabled != false,
+            )
+        }
 
         val level = LevelPacks.campaign.byId(levelId)
         if (level == null) {
@@ -132,6 +138,7 @@ class GameViewModel(
                 sniffs = StartingSniffs,
                 treats = StartingTreats,
                 colorblind = it.colorblind,
+                haptics = it.haptics,
             )
         }
     }
@@ -170,6 +177,7 @@ class GameViewModel(
     /** Writes or erases the player's own cross. Free, and never a life. */
     private suspend fun GameAction.toggleMark(cell: Int) {
         if (cell in state.autoMarks) return
+        sendEvent(GameEvent.Marked(cell))
         updateState {
             it.copy(
                 manualMarks = if (cell in it.manualMarks) {
@@ -267,6 +275,7 @@ class GameViewModel(
             "sniffs_used" to (StartingSniffs - state.sniffs),
             "attempt_number" to attemptNumber,
         )
+        sendEvent(GameEvent.Won)
         updateState {
             it.copy(
                 phase = GamePhase.Won,
@@ -337,6 +346,13 @@ class GameViewModel(
         updateState { it.copy(colorblind = next) }
         Catching { appCache.update { data -> data.copy(colorblindMode = next) } }
             .logOnFailure { "Failed to persist colorblind mode" }
+    }
+
+    private suspend fun GameAction.toggleHaptics() {
+        val next = !state.haptics
+        updateState { it.copy(haptics = next) }
+        Catching { appCache.update { data -> data.copy(hapticsEnabled = next) } }
+            .logOnFailure { "Failed to persist haptics setting" }
     }
 
     private suspend fun GameAction.restart() {
@@ -410,6 +426,9 @@ data class GameState(
     /** Region glyphs on, for players who cannot separate the fills by hue. */
     val colorblind: Boolean = false,
 
+    /** Vibration on marks, placements and strikes. */
+    val haptics: Boolean = true,
+
     /** The free dog on early levels, so the UI can mark it as not the player's doing. */
     val starterDogCell: Int? = null,
 
@@ -429,6 +448,10 @@ sealed interface GameEvent {
     /** For sound and haptics; the cell animates itself. */
     data class PlacedDog(val cell: Int) : GameEvent
 
+    data class Marked(val cell: Int) : GameEvent
+
+    data object Won : GameEvent
+
     data class Struck(val cell: Int) : GameEvent
 }
 
@@ -446,5 +469,6 @@ sealed interface GameAction {
     data object DismissWarning : GameAction
     data object RefillBones : GameAction
     data object ToggleColorblind : GameAction
+    data object ToggleHaptics : GameAction
     data class TimerTick(val at: Long) : GameAction
 }

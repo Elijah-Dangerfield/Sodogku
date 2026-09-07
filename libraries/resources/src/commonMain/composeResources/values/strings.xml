@@ -26,5 +26,7 @@
     <string name="game_levels_menu">Levels</string>
     <string name="settings_colorblind">Shapes on colors</string>
     <string name="settings_colorblind_body">Adds a distinct shape to each color, so regions stay apart without relying on hue.</string>
+    <string name="settings_haptics">Vibration</string>
+    <string name="settings_haptics_body">A small buzz when you mark a square, place a dog, or get one wrong.</string>
     <string name="settings_done">Done</string>
 </resources>

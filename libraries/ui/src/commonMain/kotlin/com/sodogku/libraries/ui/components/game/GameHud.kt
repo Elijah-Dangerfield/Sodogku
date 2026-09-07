@@ -62,7 +62,12 @@ fun LifeRow(
                         scaleX = scale.value
                         scaleY = scale.value
                     }
-                    .drawBehind { drawBone(if (spent) SpentBone else LiveBone) },
+                    .drawBehind {
+                        drawBone(
+                            fill = if (spent) SpentBone else LiveBone,
+                            edge = if (spent) SpentBoneEdge else LiveBoneEdge,
+                        )
+                    },
             )
         }
     }
@@ -198,8 +203,17 @@ private const val BoneAspect = 1.45f
 private val RuleChipRegionColors =
     listOf(RegionPalette[0].fill, RegionPalette[3].fill, RegionPalette[7].fill)
 
-private val LiveBone = Color(0xFFF3E4C8)
-private val SpentBone = Color(0xFF9E9E9E)
+/**
+ * Warm gold, not cream. The first pass used a pale bone colour that washed out
+ * against a light background and read as beige rather than as a thing worth
+ * keeping.
+ */
+private val LiveBone = Color(0xFFF5C043)
+private val LiveBoneEdge = Color(0xFFC8871B)
+
+/** Spent bones stay bone-shaped but go colourless, so the loss is legible at a glance. */
+private val SpentBone = Color(0xFFDEDAD6)
+private val SpentBoneEdge = Color(0xFFB4AEA8)
 private val EarnedPaw = Color(0xFFF5B93D)
 private val UnearnedPaw = Color(0x33000000)
 
