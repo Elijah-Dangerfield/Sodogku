@@ -87,13 +87,14 @@ kotlin {
             implementation(projects.libraries.puzzle)
             implementation(projects.libraries.levels)
             implementation(projects.libraries.scoring)
+            implementation(projects.libraries.ads)
+            implementation(projects.libraries.billing)
 
             implementation(projects.libraries.storage)
             implementation(projects.libraries.storage.impl)
             implementation(projects.libraries.sodogku.storage)
             implementation(projects.libraries.config)
             implementation(projects.libraries.config.impl)
-            implementation(projects.libraries.sodogku.storage)
             implementation(projects.libraries.networking)
             implementation(projects.libraries.networking.impl)
             implementation(projects.libraries.telemetry.impl)
@@ -102,6 +103,8 @@ kotlin {
             implementation(projects.features.home.impl)
             implementation(projects.features.onboarding)
             implementation(projects.features.onboarding.impl)
+            implementation(projects.features.game)
+            implementation(projects.features.game.impl)
 
             implementation(libs.atomicfu)
             

@@ -4,4 +4,19 @@
     <string name="onboarding_tagline">Find where every dog belongs. One per color, one per row and column, and never touching.</string>
     <string name="onboarding_start_tutorial">Teach me how</string>
     <string name="onboarding_skip_tutorial">I know how to play</string>
+
+    <string name="game_level">Level %1$d</string>
+    <string name="game_dogs_progress">%1$d / %2$d</string>
+    <string name="game_rule_one_per_region">1 dog per color</string>
+    <string name="game_rule_one_per_line">1 dog per row &amp; column</string>
+    <string name="game_rule_no_touching">Dogs cannot touch</string>
+    <string name="game_sniff">Sniff</string>
+    <string name="game_treat">Treat</string>
+    <string name="game_won_title">Good dog!</string>
+    <string name="game_lost_title">Out of bones</string>
+    <string name="game_continue">Keep going</string>
+    <string name="game_retry">Start over</string>
+    <string name="game_back_to_levels">Levels</string>
+    <string name="game_next_level">Next level</string>
+    <string name="home_temporary_launcher">Temporary launcher. The level map replaces this in C5.</string>
 </resources>

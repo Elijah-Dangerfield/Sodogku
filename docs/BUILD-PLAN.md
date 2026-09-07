@@ -292,7 +292,7 @@ They land in C4 alongside the board, against the existing tokens.
 
 ---
 
-## C4 · `:features:game` — the playable board
+## C4 · `:features:game` — the playable board — **DONE** (2026-09-07)
 
 **Unblocked by** C1, C2, C3.
 
@@ -309,6 +309,54 @@ They land in C4 alongside the board, against the existing tokens.
 
 **Done when** a level is playable end to end on both platforms, win and lose both reachable, and
 this is the first point where we stop and actually play it before continuing.
+
+**Outcome.** Playable. Verified on an Android emulator by actually solving level 1: wrong tap cost
+a bone, correct taps placed dogs and scored, auto-mark fired, the win sheet showed 4411 points and
+2 paws, and three deliberate misses reached the lose sheet with continue / retry / levels. 20
+GameViewModel tests, everything green, detekt clean.
+
+`:libraries:ads` and `:libraries:billing` landed here as **api modules only** — `AdGate`,
+`Entitlements` and their outcome types, with `AlwaysRewardingAdGate` and `FreeEntitlements` as the
+default bindings until C8. Defining the seam now means the gating logic in the game loop is real
+and tested rather than retrofitted.
+
+The load-bearing rule of the ad layer is pinned by test: `RewardOutcome` distinguishes `NoFill`,
+`Offline` and `Failed` from `Dismissed` because **only a deliberate dismissal may withhold a
+reward**. An empty ad network must never be why someone cannot finish a puzzle they are most of the
+way through.
+
+### Four bugs found by running it, not by testing it
+
+1. **The win sheet had no surface.** Content sat straight on the scrim, so "Good dog!" was dark
+   text on a dark translucent board — effectively invisible. It has its own card now.
+2. **Bones rendered as blobs.** The lobes were large enough relative to the bar that they merged
+   into one lump, and a bone in a square box cannot read as a bone regardless. Landscape box,
+   smaller lobes, wider spread.
+3. **The "1 dog per color" rule diagram showed a shaded column**, which is not what a region is.
+   It said "one per column" twice and never mentioned colour. It now draws three contiguous groups
+   in real palette fills with a pip in one.
+4. **A void between the header and the board.** The rule chips were floating below a flexible
+   spacer; they belong directly under the score as reference material.
+
+### Two bugs caught by the project's own detekt rules
+
+- `AnimatedStateReadInComposition` caught `LifeRow` unwrapping `animateFloatAsState` with `by`,
+  which recomposes the whole row on every animation frame, three times over. Now read inside
+  `graphicsLayer`.
+- `NoRawDesignValues` (added in C3a) caught a raw `4.dp` in the board's cell gutter.
+
+Both are exactly what those rules exist for, and neither would have failed a test.
+
+### Scaffolding to remove in C5
+
+`HomeScreen` is a temporary three-button launcher (4x4, 7x7, 10x10) so the board is reachable and
+testable at the sizes that differ. The level map replaces it wholesale.
+
+### Not yet wired
+
+Timer ticks, the interstitial after a level completes, progress persistence, and the next-level
+button on the win sheet. Those need `:libraries:progress` (C5) and the config-driven ad frequency
+gate (C7), and stubbing them here would mean rewriting them there.
 
 ---
 

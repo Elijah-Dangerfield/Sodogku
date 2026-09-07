@@ -5,6 +5,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.toRoute
 import com.sodogku.features.home.FeedbackRoute
+import com.sodogku.features.game.GameRoute
 import com.sodogku.features.home.HomeRoute
 import com.sodogku.features.home.impl.bugreport.BugReportScreen
 import com.sodogku.features.home.impl.bugreport.BugReportViewModel
@@ -35,6 +36,7 @@ class HomeFeatureEntryPoint(
                 viewModel = viewModel,
                 onNavigateToFeedback = { router.navigate(FeedbackRoute()) },
                 onNavigateToBugReport = { router.navigate(BugReportRoute()) },
+                onPlay = { levelId -> router.navigate(GameRoute(levelId)) },
             )
         }
         

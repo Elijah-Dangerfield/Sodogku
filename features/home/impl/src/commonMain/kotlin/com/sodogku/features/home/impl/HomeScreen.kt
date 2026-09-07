@@ -18,12 +18,26 @@ import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.system.VerticalSpacerD800
+import org.jetbrains.compose.resources.stringResource
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.home_temporary_launcher
+
+/**
+ * One entry per band, so the board can be checked at the sizes that actually
+ * differ: the smallest grid, a mid one, and the largest.
+ */
+private val LaunchLevels = listOf(
+    "Level 1 (4x4)" to 1,
+    "Level 101 (7x7)" to 101,
+    "Level 391 (10x10)" to 391,
+)
 
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToFeedback: () -> Unit,
     onNavigateToBugReport: () -> Unit,
+    onPlay: (levelId: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.stateFlow.collectAsStateWithLifecycle()
@@ -47,13 +61,20 @@ fun HomeScreen(
             VerticalSpacerD800()
 
             Text(
-                text = "This is your starting point.\nBuild something amazing!",
+                text = stringResource(Res.string.home_temporary_launcher),
                 typography = AppTheme.typography.Body.B500,
                 color = AppTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
             )
 
             VerticalSpacerD800()
+
+            LaunchLevels.forEach { (label, levelId) ->
+                Button(onClick = { onPlay(levelId) }) {
+                    Text(label)
+                }
+                VerticalSpacerD500()
+            }
 
             Button(onClick = onNavigateToFeedback) {
                 Text("Send Feedback")

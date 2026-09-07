@@ -3,21 +3,18 @@ plugins {
 }
 
 android {
-    namespace = "com.sodogku.features.home.impl"
+    namespace = "com.sodogku.features.game"
 }
+
 
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.features.home)
-            implementation(projects.features.game)
-            implementation(projects.libraries.navigation)
-
+            
             implementation(projects.libraries.core)
-            implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.ui)
-            implementation(projects.libraries.resources)
-            implementation(projects.libraries.sodogku)
+            implementation(projects.libraries.navigation)
+            implementation(projects.libraries.flowroutines)
 
             // Compose dependencies (navigation and lifecycle provided by sodogku.feature plugin)
             implementation(compose.runtime)
@@ -26,10 +23,6 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
-        }
-
-        commonTest.dependencies {
-            implementation(projects.libraries.flowroutines.testing)
         }
     }
 }

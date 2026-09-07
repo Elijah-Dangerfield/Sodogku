@@ -71,6 +71,8 @@ if (!serverOnly) {
     include(":features:home:impl")
     include(":features:onboarding")
     include(":features:onboarding:impl")
+include(":features:game")
+include(":features:game:impl")
 
     // Libraries
     include(":libraries:config")
@@ -87,6 +89,8 @@ if (!serverOnly) {
     include(":libraries:review:impl")
     include(":libraries:storage")
     include(":libraries:storage:impl")
+include(":libraries:ads")
+include(":libraries:billing")
 include(":libraries:levels")
 include(":libraries:puzzle")
 include(":libraries:scoring")
