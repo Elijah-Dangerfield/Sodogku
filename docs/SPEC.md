@@ -142,27 +142,43 @@ ship `CONTINUE` and keep `LOCK` behind the flag so it can be A/B tested without 
 The failure state, whatever the mode, is **written to disk the moment the third strike lands**,
 before any animation. Force-quitting the app is the first thing a motivated player tries.
 
-### 1.5 Boosters
+### 1.5 The three consumables
 
-Two consumable boosters with inventory counts, in a bottom bar on the board, matching the
-competitor's layout.
+Bones, Sniffs and Treats deliberately share one shape. Three different economies would be three
+things to learn before the puzzle.
 
-| Booster | Effect |
-|---|---|
-| **Sniff** | Reveals one correct cell and places the dog. No life cost. Counts against paw rating. |
-| **Treat** | Restores one life mid-attempt. |
+| Consumable | What it does | Where it is spent |
+|---|---|---|
+| **Bone** | A wrong guess costs one. Out of bones ends the attempt. | By guessing wrong, never by tapping |
+| **Sniff** | A hint: dims the board and lights the squares deduction has ruled out. | The Sniff button |
+| **Treat** | Places one correct dog, free, with no bone at risk. | The Treat button |
 
-Earning them:
+- All three start at **3**.
+- All three **refill to 3** for a rewarded ad.
+- All three may be **held above 3**. Clearing levels grants extra, so a stash is a reward for
+  playing rather than a meter that only ever empties. The cap is on the *refill*, not the holding,
+  and a refill never reduces a holding.
+- Each shows its count as a badge on its button, including at zero. A count that vanishes when it
+  runs out makes the button look broken rather than empty, and empty is the state that should
+  invite a tap.
 
-- 1 Sniff granted on first clear of a level.
-- 1 Treat granted every `boosters.treatEveryNLevels` levels (default 5).
-- Rewarded ad grants 1 of either, capped at `boosters.adGrantsPerDay` (default 5).
-- Pro starts each level with 3 Sniffs and 1 Treat, refreshed per attempt.
-- Starting inventory for a new player: 3 Sniffs, 1 Treat.
+**The sniff shows where a dog cannot go, never where one does.** A hint that hands over the answer
+ends the puzzle; one that rules squares out leaves the deduction intact and shows the technique
+that found them. It picks the squares the *shallowest* remaining reasoning proves, straight out of
+the technique-tier solver in `:libraries:puzzle`.
 
-The Sniff picker must not choose a random unsolved cell. It picks the cell that the *shallowest*
-remaining deduction proves, so it teaches a technique instead of just handing over a square. This
-falls straight out of the technique-tier solver in `:libraries:puzzle`.
+**A booster is never spent for nothing.** If deduction has nothing left to add, the sniff refuses
+rather than consuming a charge — a booster that costs something and shows nothing is worse than
+one that declines.
+
+#### First use always explains
+
+The first tap of each booster opens an explainer — a dog, a sentence, then **Use one** (if they
+hold any), **Watch an ad for 3**, and **Not now**. After that a tap just spends one, and the
+explainer only returns when the count hits zero.
+
+Spending a consumable cannot be undone. The first time someone taps an unfamiliar button they
+should find out what it costs before it happens.
 
 ### 1.6 Skip
 
@@ -791,6 +807,17 @@ a stylistic one**:
 
 Shipping the originals everywhere would be 8.3MB of assets and roughly 28MB of decoded bitmaps for
 one puzzle. Downscaled it is 620KB. The enum is the guardrail: callers pick a mood, not a file.
+
+### The Focus system
+
+Dimming the screen and lighting one thing is used by three features already — the last-bone
+warning, the sniff hint, and the tutorial coach marks to come — so it is one design-system
+primitive rather than three overlays.
+
+`Modifier.focusTarget(key)` registers where a thing is; `FocusScrim` dims everything and punches
+holes with `BlendMode.Clear`. The blend-mode approach is what lets a spotlight cover **several
+scattered targets at once**, which drawing four rectangles around a single rect cannot: the sniff
+lights four unrelated squares on the board.
 
 ### The clips ship as sprite sheets, not as animated WebP
 
