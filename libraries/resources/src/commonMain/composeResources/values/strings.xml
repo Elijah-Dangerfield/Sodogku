@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Sodogku</string>
+
+    <string name="onboarding_tagline">Find where every dog belongs. One per color, one per row and column, and never touching.</string>
+    <string name="onboarding_start_tutorial">Teach me how</string>
+    <string name="onboarding_skip_tutorial">I know how to play</string>
+</resources>

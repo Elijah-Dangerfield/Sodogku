@@ -1,0 +1,5 @@
+[
+  { "path": "upgrade.minSupportedVersionCode", "type": "int", "default": 1, "description": "Below this build code, force upgrade" },
+  { "path": "upgrade.maintenanceMode", "type": "string", "default": "off", "description": "Maintenance gate", "allowedValues": ["off", "banner", "blocking"] },
+  { "path": "upgrade.maintenanceMessage", "type": "string", "default": "We're updating the servers, back in a moment.", "description": "Maintenance banner/blocking copy" }
+]

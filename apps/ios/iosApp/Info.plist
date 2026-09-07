@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.sodogku.maintenance</string>
+	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<!--
+	  Without this key the generated plist defaults CFBundleName to
+	  $(PRODUCT_NAME), and App Store delivery rejects names that are
+	  already taken by another app (ITMS-90129). Keep it set to the
+	  app's display name; it must be unique on the App Store.
+	-->
+	<key>CFBundleName</key>
+	<string>Sodogku</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>We'd like to send you notifications.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+	</array>
+	<!--
+	  Custom-scheme deep links. `sodogku://login-callback` is the browser
+	  OAuth return trip and `sodogku://auth/confirmed` the verify-email
+	  redirect — .onOpenURL in iOSApp.swift forwards both to DeepLinkBridge.
+
+	  Universal Links (https://...) require an `Associated Domains`
+	  entitlement (`applinks:example.com`) plus an
+	  apple-app-site-association file at https://example.com/.well-known/.
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.sodogku</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>sodogku</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

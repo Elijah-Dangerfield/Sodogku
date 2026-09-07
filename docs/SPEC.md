@@ -1,0 +1,826 @@
+# Sodogku
+
+A bubbly, animated logic puzzle game for iOS and Android. The player gets a grid divided into
+colored regions and works out where the dogs go. Tap a cell: if a dog belongs there, a dog head
+pops in with a bounce and points fly up. If it doesn't, you lose a life. Three lives and the
+attempt is over.
+
+Competitor and design reference: **Meowdoku** (`com.oakever.meowdoku`), itself a cat skin on
+LinkedIn's *Queens*. We are building the dog version with better polish, real telemetry, a
+cleaner offline story, and live-tunable monetization.
+
+---
+
+## 0. Repo status
+
+`Sodogku/` currently contains only a stray copy of `scripts/` (9 files, one commit `b2ea154`, no
+git remote). The template was never generated into it. Because there is no remote to preserve but
+the directory is the active working directory, the plan is to generate the template into a temp
+directory and move it in place, then delete the 8 stray root scripts (they are duplicated
+correctly under `scripts/` by the generator).
+
+After generation, `com.kmptemplate.*` becomes `com.sodogku.*` and `:libraries:kmptemplate`
+becomes `:libraries:sodogku`. Everything below assumes the generated project.
+
+---
+
+## 1. The game
+
+### 1.1 Rules
+
+Sodogku is the Queens ruleset. An `N x N` grid is partitioned into `N` contiguous colored
+regions. The player places `N` dogs so that:
+
+1. Exactly one dog per color region.
+2. Exactly one dog per row and exactly one per column.
+3. No two dogs touch, including diagonally.
+
+Three rule chips sit permanently under the header, each with a tiny 3x3 diagram illustrating the
+rule, exactly as the competitor does. They are not a one-time tutorial element, they stay on
+screen for all 500 levels.
+
+**Every puzzle must have exactly one solution.** The tap mechanic tells the player "right" or
+"wrong" on every tap, and "right" is only definable if the answer is unique. A two-solution
+puzzle makes the game lie.
+
+Minimum grid is 4x4. `N = 2` and `N = 3` have no valid placement under rule 3, so there is no 3x3
+level.
+
+### 1.2 Board interaction
+
+| Input | Result |
+|---|---|
+| Tap empty cell | Correct: dog pops in, points fly up, auto-mark fires. Wrong: strike. |
+| Tap X-marked cell | Clears the X. A second tap places (or strikes). |
+| Long-press empty cell | Toggles a manual X. Free, never a strike. |
+| Tap a rule chip | Pulses the cells of the relevant grouping. |
+
+**Auto-mark is on by default and is not optional in spirit.** Placing a dog immediately X's its
+whole row, its whole column, its entire color region, and its eight neighbors. The competitor
+does this and the second screenshot shows it clearly: by six dogs placed on a 9x9, most of the
+board is already X'd. This is what makes a 9x9 tractable and it is the single biggest quality
+difference between a good implementation and a bad one. It is a settings toggle for purists, but
+the default is on and the tutorial teaches it.
+
+Manual X-marking on top of auto-mark is what lets a careful player record their own deductions on
+the cells auto-mark cannot rule out.
+
+### 1.3 Score
+
+Score is the headline number, shown in the header next to the level. Time is tracked underneath
+for records and achievements but is not the primary display.
+
+Per correct placement:
+
+```
+points = basePerPlacement × size × comboMultiplier × speedMultiplier
+```
+
+- `basePerPlacement` defaults to 100, remote config.
+- `size` is the grid dimension, so a 9x9 placement is worth more than a 4x4 one.
+- `comboMultiplier` ramps with consecutive correct placements: 1.0, 1.05, 1.1, 1.15 and so on,
+  capped. Resets to 1.0 on a strike.
+- `speedMultiplier` decays from 1.3 to 1.0 over `scoring.speedWindowMs` (default 8000) since the
+  previous placement.
+
+Level completion bonus:
+
+```
+bonus = completionBase × size × difficulty × (1 + livesRemaining × livesBonusRate)
+```
+
+Praise text floats over the board on high-multiplier placements: "Nice", "Great", "Excellent",
+"Perfect". Purely cosmetic, thresholds in config.
+
+**Paw rating** (0 to 3) is score-based, not strike-based. The generator computes a par score per
+level and stores three thresholds in the pack. This is more standard than counting strikes and it
+rewards speed and combo, which is what the score system exists to do.
+
+Records kept per level: `best_score`, `best_time_ms`, `best_paws`.
+
+### 1.4 Lives, failure, and continuing
+
+Three lives per attempt, shown as bone icons in the header (the competitor uses fish; bones are
+the dog equivalent). Lives do **not** persist across attempts and do **not** regenerate on a
+timer. Every retry starts with three.
+
+On the third strike the attempt ends. The board dims, the answer is **not** revealed, and the
+player is offered:
+
+| Option | Cost |
+|---|---|
+| Continue from here with one life restored | Rewarded ad, or free for Pro. Board state is preserved. |
+| Retry from scratch | Free, always. |
+| Back to the level map | Free. |
+
+This is the "continue" pattern from endless runners and it is what casual puzzle games actually
+ship. It converts better than a hard lock and it never strands a player.
+
+`ads.failureMode` in remote config switches between `CONTINUE` (above, the default) and `LOCK`
+(the competitor's harsher model: the level locks and a rewarded ad is required to reopen it). We
+ship `CONTINUE` and keep `LOCK` behind the flag so it can be A/B tested without a release.
+
+The failure state, whatever the mode, is **written to disk the moment the third strike lands**,
+before any animation. Force-quitting the app is the first thing a motivated player tries.
+
+### 1.5 Boosters
+
+Two consumable boosters with inventory counts, in a bottom bar on the board, matching the
+competitor's layout.
+
+| Booster | Effect |
+|---|---|
+| **Sniff** | Reveals one correct cell and places the dog. No life cost. Counts against paw rating. |
+| **Treat** | Restores one life mid-attempt. |
+
+Earning them:
+
+- 1 Sniff granted on first clear of a level.
+- 1 Treat granted every `boosters.treatEveryNLevels` levels (default 5).
+- Rewarded ad grants 1 of either, capped at `boosters.adGrantsPerDay` (default 5).
+- Pro starts each level with 3 Sniffs and 1 Treat, refreshed per attempt.
+- Starting inventory for a new player: 3 Sniffs, 1 Treat.
+
+The Sniff picker must not choose a random unsolved cell. It picks the cell that the *shallowest*
+remaining deduction proves, so it teaches a technique instead of just handing over a square. This
+falls straight out of the technique-tier solver in `:libraries:puzzle`.
+
+### 1.6 Skip
+
+After two failed attempts on a level, a **Skip** option appears. Rewarded ad, or free for Pro.
+Capped at `progression.skipsPerDay` (default 3) for everyone including Pro, otherwise a Pro user
+skips to level 500 in an afternoon and has nothing left.
+
+A skipped level records `state = SKIPPED`: no score, no paws, no time. It stays available on the
+map and can be cleared properly later. Skipping unlocks the next level normally.
+
+### 1.7 Grid sizes and the 500-level curve
+
+500 verified levels in a bundled pack, ordered into bands. Within each band the difficulty
+sawtooths (each band opens easier than the previous band closed) so the ramp never feels like a
+wall.
+
+| Levels | Grid |
+|---|---|
+| 1 to 10 | 4x4 (tutorial band, 1 to 3 guided) |
+| 11 to 40 | 5x5 |
+| 41 to 100 | 6x6 |
+| 101 to 180 | 7x7 |
+| 181 to 280 | 8x8 |
+| 281 to 390 | 9x9 |
+| 391 to 500 | 10x10 |
+
+Difficulty is not grid size, it is the deduction depth the solver needs, scored 1 to 5:
+
+1. Single-cell region elimination alone.
+2. Needs row/column exclusion inside a region.
+3. Needs multi-region reasoning.
+4. Needs one depth-1 contradiction step.
+5. Deeper.
+
+The generator buckets by this score and the shipped ordering interleaves it with grid size.
+Telemetry then tells us where the real difficulty is versus the designed difficulty, which is
+what we use to re-order the pack in a content update.
+
+### 1.8 Level map and progressive disclosure
+
+Vertically scrolling map grouped by band, with a band header showing progress ("Band 4 · 7x7 ·
+12/80"). Completed levels show their paw rating. The current level is the visually loudest tile.
+The next 5 are visible silhouettes; everything beyond is a dimmed placeholder. Pro can jump to
+the first level of any band it has reached.
+
+`progression.lookaheadCount` (default 5) is remote config, so the disclosure can be widened or
+narrowed without a release.
+
+---
+
+## 2. Daily Challenge
+
+One board per calendar day, identical for every player. This is the strongest retention mechanic
+in the genre and it costs almost nothing given a bundled pack.
+
+- **Pool.** A separate `daily` pack of 730 levels (two years), generated alongside the campaign
+  pack. Kept separate so the daily never spoils a campaign level. When the pool runs out the app
+  wraps with an offset, and we ship a new pool in a content update well before then.
+- **Selection.** `dailyIndex = daysSinceEpoch(localDate) % poolSize`. Local device date, no
+  server. Someone can time-travel by changing their clock; that costs us nothing.
+- **One attempt shape.** Same three lives, same boosters, same scoring. Once completed or failed,
+  the day's result is locked in. A failed daily can be continued with a rewarded ad exactly like
+  a campaign level, but only once.
+- **Streak.** Consecutive days with a completed daily. Local. A missed day resets it. A
+  **Streak Freeze** costs a rewarded ad and covers one missed day, capped at
+  `daily.freezesPerMonth` (default 2). This is the single most reliable ad impression in the app.
+- **Entry point.** A prominent card at the top of the level map with the day's date, the streak
+  count, and a done/not-done state.
+- **Sharing.** The daily is what people share, because everyone had the same board.
+
+`daily.enabled` is a remote config kill switch.
+
+---
+
+## 3. Level content pipeline
+
+Levels are generated offline by a JVM tool and shipped as versioned assets. Nothing is generated
+on device.
+
+### 3.1 The generator (`tools/level-generator`, JVM only)
+
+1. Pick `N`. Backtrack a random valid dog placement: a permutation `p` of columns where
+   `|p(i) - p(i+1)| >= 2` for all adjacent rows.
+2. Seed `N` regions, one at each dog cell. Randomly flood-fill unassigned cells from adjacent
+   assigned cells until the board is covered. This construction guarantees contiguity and exactly
+   one dog per region by definition.
+3. Run the exact solver and **count** solutions. If the count is not 1, mutate region boundaries
+   and re-count; discard after a bounded number of failures.
+4. Score difficulty with the technique-tier solver.
+5. Compute a par score and derive the three paw thresholds.
+6. Deduplicate using a canonical form under the 8 grid symmetries plus region relabeling.
+7. Bucket into the curve, emit `campaign.pack` and `daily.pack`.
+
+The generator depends on `:libraries:puzzle` and nothing else, so the solver that verifies the
+pack is byte-identical to the solver that runs Sniff on device. That shared dependency is why
+`:libraries:puzzle` needs a `jvm()` target alongside android and ios, and why it must not depend
+on `:libraries:core` (which has no JVM target, per the template's own decisions log).
+
+### 3.2 Pack format
+
+```
+LevelPack { packVersion: Int, kind: CAMPAIGN | DAILY, levels: List<Level> }
+Level {
+  id: Int              // level number shown to the player
+  size: Int            // 4..10
+  regions: String      // size*size chars, 'A'..'J', row-major
+  solution: List<Int>  // column index per row
+  difficulty: Int      // 1..5
+  parScore: Int
+  pawThresholds: List<Int>   // 3 ascending score cutoffs
+}
+```
+
+The solution ships in the asset. A determined player can unzip the IPA and read it; for a
+single-player game with no leaderboard that is worth nothing, and shipping it makes strike
+checking an O(1) lookup with zero runtime solve cost on a cold tap.
+
+### 3.3 The test that makes this safe
+
+One test in `:libraries:levels` loads both shipped packs and asserts, for every level: regions
+are contiguous, region count equals `size`, the solver finds **exactly one** solution, and it
+equals the shipped `solution`. Runs in CI on every commit. This is the only thing standing
+between us and an unsolvable level in production, which is unrecallable without a store release.
+
+---
+
+## 4. Remote config: what is server-driven and what is not
+
+The template's app config (Postgres-backed, edited through the `:apps:admin` web console, with a
+bundled fallback map and an offline-first client repository) is the live-ops lever. Getting the
+split right is worth more than any other decision in this document, because it determines what we
+can fix on a Tuesday afternoon versus what needs a two-week store review.
+
+### 4.1 The rule
+
+**Config owns numbers and switches. The binary owns content and logic shape.**
+
+If changing it requires a new asset, a new string, or new code paths, it belongs in the binary.
+If it is a threshold, a cap, a frequency, a URL, or an on/off, it belongs in config.
+
+### 4.2 Two hard constraints
+
+1. **Every key has a bundled fallback.** `FallbackConfigMap` must be complete. The app has to be
+   fully playable, correctly monetized, and legally compliant on a first launch with no network,
+   forever, if the server never comes back.
+2. **Monetization keys fail open toward the player.** A config outage must produce *fewer* ads
+   and *fewer* blocks, never more. A server problem must never be able to lock a player out of a
+   game they already paid for or already had access to.
+
+Config refresh is throttled and offline-first, so a change applies on the next successful fetch,
+not instantly to a session already in progress. For genuine emergencies, kill switches should be
+checked at the point of use rather than cached in a ViewModel at screen entry.
+
+### 4.3 The key table
+
+**Ads**
+
+| Key | Default | What it does |
+|---|---|---|
+| `ads.enabled` | true | Master kill switch. False means no ad calls at all. |
+| `ads.newUserGraceLevels` | 5 | No ads at all before this level. |
+| `ads.newUserGraceMinutes` | 5 | No ads in the first N minutes of first session. |
+| `ads.interstitialEveryNLevels` | 3 | Levels between automatic interstitials. |
+| `ads.interstitialCooldownSec` | 60 | Minimum wall-clock gap between interstitials. |
+| `ads.interstitialsPerSessionMax` | 8 | Hard ceiling. |
+| `ads.appOpenEnabled` | false | App-open ad on cold start. Off until we want it. |
+| `ads.appOpenCooldownHours` | 4 | |
+| `ads.bannerOnLevelMap` | false | Banner on the map. Never on the board. |
+| `ads.failureMode` | CONTINUE | `CONTINUE` or `LOCK`. |
+| `ads.offlineGraceLevels` | 3 | |
+| `ads.offlineGraceMinutes` | 20 | |
+| `ads.rewardedPlacements` | all on | Per-placement enable map. |
+
+**Progression and economy**
+
+| Key | Default |
+|---|---|
+| `progression.skipsPerDay` | 3 |
+| `progression.skipAfterFailedAttempts` | 2 |
+| `progression.lookaheadCount` | 5 |
+| `boosters.startingSniffs` | 3 |
+| `boosters.startingTreats` | 1 |
+| `boosters.treatEveryNLevels` | 5 |
+| `boosters.adGrantsPerDay` | 5 |
+| `boosters.proSniffsPerAttempt` | 3 |
+| `boosters.proTreatsPerAttempt` | 1 |
+
+**Scoring**
+
+`scoring.basePerPlacement` (100), `scoring.completionBase` (500), `scoring.comboStep` (0.05),
+`scoring.comboMax` (2.0), `scoring.speedWindowMs` (8000), `scoring.speedMaxMultiplier` (1.3),
+`scoring.livesBonusRate` (0.25), `scoring.praiseThresholds`.
+
+**Daily**
+
+`daily.enabled` (true), `daily.freezesPerMonth` (2), `daily.poolOffset` (0).
+
+**Paywall**
+
+`paywall.triggers` (which moments show it), `paywall.offlineBlockEnabled` (true),
+`paywall.sessionCap` (2). Price is never in config, it comes from the store.
+
+**Legal**
+
+`legal.termsVersion`, `legal.termsUrl`, `legal.privacyVersion`, `legal.privacyUrl`,
+`legal.forceReacceptBelow`.
+
+**App**
+
+`app.minSupportedVersion` (force-update gate), `app.softUpdateVersion`, `app.maintenanceMessage`,
+`app.reviewPromptAfterLevel`.
+
+**Telemetry** (already in the template)
+
+`telemetry.appEventsEnabled`, `telemetry.appEventsSampleRate`, `telemetry.klogForwardingEnabled`.
+
+**Feature flags**
+
+`features.dailyChallenge`, `features.achievements`, `features.sharing`, `features.boosters`. One
+per shippable-but-hideable feature, so anything can be dark-launched.
+
+### 4.4 What stays in the binary, and why
+
+| Thing | Why not config |
+|---|---|
+| Level packs | Content. Needs generation and CI verification. A bad pack is worse than a stale one. |
+| Achievement definitions | Each needs an icon and copy, so a new one needs a release anyway. Same argument as the Cards achievements doc. |
+| Game rules and scoring formula shape | Only the coefficients are tunable, not the formula. |
+| Band structure and difficulty curve | It is the pack. |
+| Store product ID | Changing it is a store operation, not a config one. |
+| Anything needed before first config fetch | Onboarding, tutorial, level 1. |
+
+---
+
+## 5. Monetization
+
+### 5.1 The product
+
+One non-consumable, **$4.99: Sodogku Pro**. Play calls it a managed in-app product, Apple calls
+it non-consumable. It grants:
+
+- No ads, ever.
+- Unlimited offline play.
+- Free continues, free skips (still under the daily skip cap), free streak freezes.
+- 3 Sniffs and 1 Treat at the start of every attempt.
+- Jump to the first level of any band reached.
+
+Apple requires a visible **Restore Purchases** control; it lives in Settings. Because the
+entitlement lives with the store account, restore already solves most of the "I got a new phone"
+problem.
+
+### 5.2 Plumbing (AdMob + native billing)
+
+`:libraries:billing`:
+
+```kotlin
+interface Entitlements {
+    val isPro: StateFlow<Boolean>
+    suspend fun purchasePro(): PurchaseOutcome   // Success | Cancelled | AlreadyOwned |
+                                                 // Unavailable | Failed(kind)
+    suspend fun restore(): RestoreOutcome
+}
+```
+
+Sealed per-operation outcomes, not thrown exceptions, matching how the template's identity
+library models sign-in. Android wraps Play Billing 7. iOS wraps StoreKit 2 in Swift and is
+injected through `IosAppComponentFactory.create(...)`, the template's established pattern for
+Swift implementations (no expect/actual).
+
+The entitlement is cached in `AppData` and treated as **true until proven false**. If the store
+is unreachable at launch, a paying customer must not see ads. Only an explicit "not entitled"
+response clears the cache.
+
+`:libraries:ads`:
+
+```kotlin
+interface AdGate {
+    suspend fun showInterstitial(placement: Placement): AdOutcome
+    suspend fun showRewarded(placement: Placement): RewardOutcome  // Rewarded | Dismissed |
+                                                                    // NoFill | Offline | Failed
+    fun preload(placement: Placement)
+}
+```
+
+Both libraries ship fake impls used by `:apps:integration` and every feature test, so all gating
+logic is testable without an ad network.
+
+### 5.3 Placements, normalized for the genre
+
+Your original sketch had a forced ad to advance every level. That is unusually punishing and it
+is not what shipped casual puzzle games do. The normal shape:
+
+| Placement | Type | Trigger |
+|---|---|---|
+| `level_complete` | Interstitial | Fires **automatically** after a level, subject to the N-levels / cooldown / session-cap triple gate. The player never waits on it to advance and never opts in. |
+| `continue_level` | Rewarded | Third strike, restore a life, keep the board. |
+| `booster_grant` | Rewarded | Earn a Sniff or a Treat. |
+| `skip_level` | Rewarded | After 2 failed attempts. |
+| `streak_freeze` | Rewarded | Cover a missed daily. |
+| `app_open` | App Open | Cold start, off by default. |
+| `map_banner` | Banner | Level map only, off by default. Never on the board, it wrecks touch targets. |
+
+Three things that matter more than the frequency numbers:
+
+1. **New-user grace.** No ads before level 5 or the first 5 minutes. Day-0 ad exposure is the
+   biggest single driver of first-session churn in this genre.
+2. **Never on the board.** No banner over a grid with 44pt touch targets.
+3. **A failed ad grants the reward.** `NoFill` and `Failed` both succeed. Only a deliberate
+   `Dismissed` withholds. An ad network outage must never block a player.
+
+---
+
+## 6. Offline
+
+- Play is fully local. Both packs are bundled, nothing needs the network to solve.
+- Pro is unaffected, offline is unlimited.
+- Free players get a grace of `ads.offlineGraceLevels` (3) levels or `ads.offlineGraceMinutes`
+  (20), whichever comes first, counted from the first ad gate that could not be served.
+- When the grace is spent: a friendly blocking screen offering reconnect or Pro. This is the
+  highest-intent paywall moment in the app, so instrument it carefully.
+- Grace counters persist to disk and reset on a successful ad view, not on reconnect.
+
+The template's `AppState.isOffline` distinguishes "OS says no network" from "our backend is
+unreachable". Only the former trips the grace, since ad networks are reachable when our own
+server is down.
+
+---
+
+## 7. Legal and compliance
+
+### 7.1 The kids-theming decision, resolve before ads are wired
+
+"Big bubbly kids themed" is an art direction with an expensive policy consequence. If Sodogku is
+classified child-directed:
+
+- Google Play Families policy restricts you to certified ad SDKs, no personalized ads, no ad ID.
+- Apple's Kids Category bans third-party analytics and advertising outright, killing both AdMob
+  and the Grafana pipeline.
+- COPPA and GDPR-K attach.
+
+**Recommendation: general audience, not children.** Keep the friendly style, declare 13+ in the
+Play target-audience questionnaire, do not enroll in Designed for Families, do not select the
+Kids Category. Set AdMob's `tagForChildDirectedTreatment` to not-child-directed and leave
+`tagForUnderAgeOfConsent` unset. This is what Meowdoku does. A heavily kid-appealing icon plus a
+13+ declaration can still draw a Play review flag, so the art should read "cute", not "preschool".
+
+### 7.2 Consent
+
+- **UMP consent SDK** for EEA and UK, shown before the first ad request.
+- **App Tracking Transparency** on iOS, before the first ad request, not at launch. Ask at a
+  moment where the value is legible.
+
+Both are hard store requirements and both are easy to forget until review rejects the build.
+
+### 7.3 Terms and privacy acceptance
+
+`:libraries:legal` holds a version gate. Versions and URLs come from config, so publishing new
+terms is a config change, not a release. On launch, compare accepted versions in `AppData`
+against config: behind `forceReacceptBelow` means a blocking sheet, otherwise a dismissible
+banner. Acceptance is recorded locally with a timestamp. No accounts means no server-side record
+and no need for one.
+
+The template already generates `pages/privacy.html` and `pages/terms.html` through GitHub Pages.
+
+---
+
+## 8. Achievements
+
+Cards-style but simpler: no accounts means no server fold. `:libraries:achievements` holds a pure
+`fold(counters, facts)` and a client-side registry. Facts are per-completion records, counters
+are derived, everything is local.
+
+Progress cannot survive a reinstall. That is the honest cost of no accounts and it should be
+stated plainly in Settings.
+
+Starter catalog: First Steps (clear level 1), Good Dog (10), Best in Show (100), Top Dog (500),
+Perfect Form (a zero-strike clear), Flawless Ten (10 consecutive), Speed Demon (any level under
+30s), Blitz (7x7+ under 60s), High Roller (a single level over 20,000 points), Marathon (30 minute
+session), Night Owl (1am to 5am), Early Bird (5am to 8am), Comeback (clear after two strikes), No
+Help Needed (25 levels, no boosters), Daily Devotion (7 day streak), Faithful (30 day streak),
+Completionist (3 paws on a whole band).
+
+Toggleable in Settings, which suppresses toasts and hides the tab but keeps recording, so
+re-enabling shows accurate history.
+
+---
+
+## 9. Sharing
+
+Wordle-style, and the daily is the version people will actually share, because everyone had the
+same board.
+
+```
+Sodogku Daily · Sep 8
+⏱ 1:42   🏆 14,820   🐾🐾🐾
+🔥 12 day streak
+
+🟪🟩🟩🟨🟨🟦🟦
+🟪🟪🟩🟨🟦🟦🟥
+...
+sodogku.app
+```
+
+Share from the win sheet, the daily card, and a level-map long-press. `share.tapped` is worth
+watching closely, it is the cheapest organic growth channel the app has.
+
+---
+
+## 10. Tutorial
+
+Levels 1 to 3 are guided, not a separate mode. Retheme the template's existing
+`:features:onboarding:impl`:
+
+- **Level 1 (4x4):** one rule at a time. Highlight a region, "one dog per color". Only the correct
+  cell is tappable.
+- **Level 2 (4x4):** rows and columns. Show auto-mark firing, since it is the mechanic players
+  most need to understand.
+- **Level 3 (4x4):** adjacency and manual X-marking. Allow one wrong tap with no life charged.
+- From level 4 the gloves come off.
+
+Coach-mark overlay with a spotlight cutout. Per-step events, because tutorial drop-off is where
+casual puzzle games bleed the most installs. Skippable, and re-runnable from Settings.
+
+---
+
+## 11. Settings
+
+- **Game:** sound, haptics, auto-mark, colorblind mode, show timer.
+- **Progress:** achievements on/off, reset progress (with a real confirmation), rerun tutorial.
+- **Sodogku Pro:** buy, or "Pro active" plus **Restore Purchases**.
+- **Legal:** privacy policy, terms, ad partners, reopen consent form.
+- **Support:** report a bug (the template's Sentry-backed flow, which already attaches screenshots
+  and a session log), rate the app (`:libraries:review`), version and build.
+
+---
+
+## 12. Architecture
+
+```
+features/
+  game/          + impl    Board screen, GameViewModel, win/lose sheets, boosters
+  levels/        + impl    Level map, band headers, daily card
+  daily/         + impl    Daily challenge entry, streak, freeze
+  settings/      + impl    Settings, legal, bug report, restore
+  achievements/  + impl    Badge grid, detail sheet
+  onboarding/    impl      Retheme into the tutorial
+libraries/
+  puzzle/                  Pure Kotlin. Grid, rules, exact solver, technique-tier
+                           solver, uniqueness. android + ios + jvm. Zero deps.
+  levels/                  Pack loading + the CI verification test
+  progress/      + impl    Room-backed records, boosters inventory, streaks
+  scoring/                 Pure Kotlin. Score, combo, paw thresholds.
+  ads/           + impl    AdGate; AdMob Android, AdMob iOS via Swift
+  billing/       + impl    Entitlements; Play Billing / StoreKit 2
+  achievements/            Pure fold logic
+  legal/         + impl    Document versions + acceptance gate
+tools/
+  level-generator          JVM CLI, depends on :libraries:puzzle
+```
+
+`:libraries:puzzle` and `:libraries:scoring` being pure and dependency-free is the load-bearing
+decision. Everything interesting (uniqueness, difficulty, hints, pack verification, score) is
+testable with no Compose, no DI, no platform code.
+
+Board rendering lives in `:features:game:impl`, but reusable bouncy primitives (`BounceClick.kt`,
+`Pulsate.kt`, the color and typography resource system) already exist in `:libraries:ui` and
+should be extended there.
+
+### 12.1 GameViewModel
+
+```
+State  = board, placedDogs, autoMarks, manualMarks, livesRemaining, score, combo,
+         elapsedMs, sniffs, treats, phase (Playing | Won | Lost | Paused)
+Action = CellTapped, CellLongPressed, SniffUsed, TreatUsed, Restart, Continue,
+         Skip, Pause, Resume, TimerTick
+Event  = ShowRewardedAd(placement), ShowInterstitial, NavigateNext, ShowPaywall,
+         PlaySound, Haptic, ShowShareSheet, FloatPoints(cell, points, praise)
+```
+
+Timer runs off a monotonic clock and pauses on background, so a backgrounded app cannot silently
+ruin a best time.
+
+---
+
+## 13. Persistence
+
+### 13.1 Room: `level_progress`
+
+`level_id` (PK), `state` (`LOCKED` / `UNLOCKED` / `IN_PROGRESS` / `COMPLETED` / `SKIPPED`),
+`best_score`, `best_time_ms`, `best_paws`, `attempts`, `boosters_used_on_best`,
+`first_completed_at`, `last_played_at`.
+
+### 13.2 Room: `daily_result`
+
+`date` (PK, local ISO date), `level_index`, `completed`, `score`, `time_ms`, `paws`, `froze`.
+
+### 13.3 In-progress board
+
+Saved separately: placements, marks, lives, score, combo, elapsed. Backgrounding mid-level and
+returning an hour later resumes exactly where you were. Puzzle players expect this and its
+absence reads as a bug.
+
+### 13.4 `AppData`
+
+`currentLevel`, `hasCompletedTutorial`, `soundEnabled`, `hapticsEnabled`, `autoMarkEnabled`,
+`achievementsEnabled`, `colorblindMode`, `showTimer`, `acceptedTermsVersion`,
+`acceptedPrivacyVersion`, `cachedAdFreeEntitlement`, `sniffCount`, `treatCount`,
+`dailyStreak`, `lastDailyDate`, `freezesUsedThisMonth`, `skipsUsedToday`, `skipsDate`,
+`adGrantsToday`, `adGrantsDate`, `levelsSinceLastInterstitial`, `lastInterstitialAt`,
+`interstitialsThisSession`, `offlineGraceLevelsUsed`, `offlineGraceStartedAt`,
+`firstLaunchAt`, `totalPlayTimeMs`, `sessionsPlayed`, `longestSessionMs`.
+
+---
+
+## 14. Telemetry
+
+The template already has Sentry + Loki + Tempo pivoting on `session_id`, with conventions in
+`docs/practices/app-events.md`. Add these in the same change that introduces each one.
+
+**No per-tap event.** Forty taps per level across 500 levels is a volume and cost problem.
+Aggregate into the completion event.
+
+| Event | Attributes |
+|---|---|
+| `game.level_started` | `level_id`, `size`, `difficulty`, `attempt_number`, `is_retry`, `mode` (campaign / daily) |
+| `game.level_completed` | `level_id`, `mode`, `duration_ms`, `score`, `paws`, `strikes_used`, `sniffs_used`, `treats_used`, `is_first_clear`, `is_personal_best`, `taps_total`, `manual_marks` |
+| `game.level_failed` | `level_id`, `mode`, `duration_ms`, `dogs_placed`, `attempt_number` |
+| `game.level_abandoned` | `level_id`, `duration_ms`, `dogs_placed` |
+| `game.continued` | `level_id`, `source` (ad / pro) |
+| `game.skipped` | `level_id`, `failed_attempts` |
+| `game.booster_used` | `level_id`, `booster`, `remaining` |
+| `daily.started` / `daily.completed` | `date`, `streak`, `score` |
+| `daily.streak_broken` | `previous_streak` |
+| `daily.freeze_used` | `streak` |
+| `ads.gate_shown` | `placement`, `level_id`, `is_offline` |
+| `ads.result` | `placement`, `outcome`, `latency_ms` |
+| `ads.offline_block` | `level_id`, `grace_levels_used` |
+| `iap.paywall_shown` | `trigger` |
+| `iap.purchase_result` | `outcome`, `error_kind` |
+| `iap.restore_result` | `outcome` |
+| `achievement.unlocked` | `achievement_id`, `level_id` |
+| `share.tapped` | `mode`, `level_id`, `paws` |
+| `tutorial.step_viewed` / `tutorial.completed` / `tutorial.skipped` | `step` |
+| `legal.terms_prompt_shown` / `legal.terms_accepted` | `terms_version`, `blocking` |
+
+### Dashboards
+
+1. **Level drop-off curve.** Players reaching level N. This is *the* metric for a level-based
+   puzzle game; the cliff tells you which level is killing retention.
+2. **Difficulty calibration.** Per level: fail rate, median clear time, median score, median
+   strikes, booster rate, plotted against the generator's designed difficulty. Divergence drives
+   the next content update's reordering.
+3. **Ad funnel.** `gate_shown` to `result=rewarded`, by placement and platform. Watch nofill: a
+   high rate means we are giving rewards away.
+4. **Paywall conversion.** By trigger. Tells you which moment actually sells Pro.
+5. **Daily retention.** DAU on the daily, streak length distribution, freeze usage.
+6. **Tutorial funnel.** Step drop-off across levels 1 to 3.
+
+---
+
+## 15. Server scope
+
+Minimal. `:apps:server` on Fly, one small instance plus a small Fly Postgres.
+
+Postgres is required, not optional: the template's remote config is Postgres-backed
+(`PostgresAppConfigSource`, migrations `V4` to `V6`) and the admin console writes through it.
+Config is the reason the server exists, so the DB comes with it.
+
+Ships: `GET /_health`, the app-config endpoints, and the `:apps:admin` console.
+
+Removed from the template: migrations `V1__profiles.sql`, `V2__fk_auth_users.sql`,
+`V3__player_reports.sql`, plus `MeRoutes`, `PlayerReportRoutes`, the profile and moderation
+repositories, and the Supabase JWT setup. There are no users, so there is nothing to
+authenticate. The admin console keeps its own admin auth.
+
+The client treats the config endpoint as fully optional. A server outage must be completely
+invisible to a player.
+
+---
+
+## 16. Accessibility
+
+The core mechanic is color, so this is a design constraint, not a checkbox.
+
+Roughly 8% of men have red-green color vision deficiency, and no 10-color palette survives
+deuteranopia.
+
+- **Colorblind mode** overlays each region with a distinct light glyph (paw, bone, star, heart)
+  so the glyph, not the hue, is the region identity.
+- Pick the base palette for lightness separation as well as hue separation.
+- Never encode anything only in color: rule chips, strike feedback, and region highlight all need
+  a shape or motion component.
+
+Also: 44pt minimum touch targets means a 10x10 board fills the width on a small phone; dynamic
+type in header and settings; and "reduce motion" degrades bounces to fades rather than removing
+feedback.
+
+---
+
+## 17. Visual direction
+
+Candy-crush adjacent: generous corner radii, soft drop shadows, saturated but not neon, a rounded
+display font (Baloo 2, Fredoka, or Nunito, all OFL and safe to bundle).
+
+Build the Sodogku theme as a new palette and type scale inside `:libraries:ui/system`, and add
+game components (`BoardCell`, `RuleChip`, `LifeRow`, `PawRating`, `LevelTile`, `ScoreCounter`,
+`FloatingPoints`, `BoosterButton`) to the existing catalog so they get preview coverage.
+
+Motion: every interaction gets a spring, everything under 300ms, everything cancellable. A player
+clearing ten easy levels does not want to sit through animations.
+
+---
+
+## 18. Non-goals for v1
+
+- No accounts, no sign-in, no cloud save. Progress is device-local, stated plainly in Settings.
+- No social features, no friends, no leaderboards.
+- No server-delivered level packs.
+- No cosmetics economy or dog skins (strong v2 candidate, pairs well with the booster economy).
+
+**Switching phones.** The Pro entitlement travels via store restore with no work. Only progress
+is stranded. The cheap v2 fix is an export/import code: the client serializes progress into a
+short opaque string the player pastes on the new device. No server, no account. That beats the
+manual "give us a user id" idea, which is more support burden than it is worth.
+
+---
+
+## 19. Open questions
+
+**Q1. Was the competitor's second booster a life-restore?** I specced Treat as a life restore
+based on the two badged icons in the bottom bar. If it turns out to be something else (undo,
+reveal-a-row, shuffle), swapping it is a small change.
+
+**Q2. App-open ads.** Specced and built, defaulted off. They monetize well and they annoy well.
+Worth turning on later with a cooldown once retention is measured, not at launch.
+
+**Q3. Does the daily use campaign difficulty or its own curve?** Specced as its own pool at
+moderate difficulty so it stays a 3-to-5-minute daily habit rather than a wall.
+
+---
+
+## 20. What I need from you
+
+### Art and audio
+
+- [ ] **Dog head asset.** SVG preferred, or PNG at 3x. Must read at ~28px on a 10x10 grid. One
+      hero dog for v1, designed so breed variants can swap at the same silhouette later.
+- [ ] Idle animation intent: second frame, Lottie, or faked in Compose from the static asset?
+- [ ] **Bone icon** for lives, **paw** for the rating, and icons for the two boosters.
+- [ ] **App icon** (1024x1024), Android adaptive icon layers, notification icon.
+- [ ] **Region palette:** 10 colors plus the colorblind glyph set. I can propose a first pass if
+      you would rather react to something than start blank.
+- [ ] **Font choice.**
+- [ ] **Sounds:** dog place, strike, level win, praise sting, button tap, achievement unlock,
+      booster use. Seven files, and they matter more than you would think for the feel.
+- [ ] Empty-state, locked-level, and offline-block illustrations.
+
+### Accounts and credentials
+
+- [ ] Bundle IDs (proposing `com.sodogku` for both).
+- [ ] Play Console app, AdMob app ID, and one ad unit per placement per platform (interstitial,
+      rewarded, app-open, banner).
+- [ ] App Store Connect record and the StoreKit non-consumable product ID.
+- [ ] Play managed product ID. Keep both IDs identical if the stores allow.
+- [ ] Sentry DSN.
+- [ ] Grafana Cloud OTLP endpoint and token.
+- [ ] Fly app name and org.
+- [ ] Support email.
+- [ ] Domain, for the share footer and privacy pages.
+
+### Copy
+
+- [ ] Privacy policy and terms text, naming AdMob as a data recipient and covering the ad ID. I
+      can draft both from the `pages/` scaffolding, but a human should read them before they go live.
+- [ ] Store listing: title, short and long description, keywords.
+
+### Decisions
+
+- [ ] Section 7.1, kids versus general audience. Gates the entire ad business model.
+- [ ] Q1 through Q3 above.

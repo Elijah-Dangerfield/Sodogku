@@ -1,0 +1,59 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>VerifyStrings:AccessDeniedScreen.kt:"Appeal this decision"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Already have an account? Sign in"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Back to sign in"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Back"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Continue with Google"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Create your account"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Don't have an account? Create one"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Email"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Forgot password?"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Save your progress and sign in from any device."</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Sign in to pick up where you left off."</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Sign in with Apple"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Verify your email"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"Welcome back"</ID>
+    <ID>VerifyStrings:AuthScreens.kt:"or use your email"</ID>
+    <ID>VerifyStrings:BlockingErrorScreen.kt:"(which is me cause I wrote myself)"</ID>
+    <ID>VerifyStrings:BlockingErrorScreen.kt:"Report to developers"</ID>
+    <ID>VerifyStrings:BugReportScreen.kt:"Describe what happened…"</ID>
+    <ID>VerifyStrings:BugReportScreen.kt:"Help us understand what went wrong. We would love to fix it!"</ID>
+    <ID>VerifyStrings:BugReportScreen.kt:"Message"</ID>
+    <ID>VerifyStrings:CameraPreview.android.kt:"Camera Ready"</ID>
+    <ID>VerifyStrings:Colors.kt:"42m remaining"</ID>
+    <ID>VerifyStrings:Colors.kt:"Active session"</ID>
+    <ID>VerifyStrings:Colors.kt:"All good"</ID>
+    <ID>VerifyStrings:Colors.kt:"Card content"</ID>
+    <ID>VerifyStrings:Colors.kt:"Color palette"</ID>
+    <ID>VerifyStrings:Colors.kt:"Modern light theme"</ID>
+    <ID>VerifyStrings:Colors.kt:"Recent activity"</ID>
+    <ID>VerifyStrings:Colors.kt:"Status"</ID>
+    <ID>VerifyStrings:Colors.kt:"View all"</ID>
+    <ID>VerifyStrings:ErrorDialogContent.kt:"(which is me cause I wrote myself)"</ID>
+    <ID>VerifyStrings:FeedbackScreen.kt:"Describe what happened…"</ID>
+    <ID>VerifyStrings:FeedbackScreen.kt:"Message"</ID>
+    <ID>VerifyStrings:FeedbackScreen.kt:"We'd love to hear from you"</ID>
+    <ID>VerifyStrings:HomeScreen.kt:"Report a Bug"</ID>
+    <ID>VerifyStrings:HomeScreen.kt:"Send Feedback"</ID>
+    <ID>VerifyStrings:HomeScreen.kt:"This is your starting point.\nBuild something amazing!"</ID>
+    <ID>VerifyStrings:HomeScreen.kt:"Welcome to Sodogku"</ID>
+    <ID>VerifyStrings:NativeButton.jvm.kt:"Native Button"</ID>
+    <ID>VerifyStrings:OnboardingScreen.kt:"Back"</ID>
+    <ID>VerifyStrings:OnboardingScreen.kt:"Continue as guest"</ID>
+    <ID>VerifyStrings:OnboardingScreen.kt:"Create an account"</ID>
+    <ID>VerifyStrings:OnboardingScreen.kt:"Display name"</ID>
+    <ID>VerifyStrings:OnboardingScreen.kt:"Jump right in as a guest, or sign in to pick up where you left off."</ID>
+    <ID>VerifyStrings:OnboardingScreen.kt:"Pick a display name"</ID>
+    <ID>VerifyStrings:OnboardingScreen.kt:"Sign in with email"</ID>
+    <ID>VerifyStrings:OnboardingScreen.kt:"Suggest another"</ID>
+    <ID>VerifyStrings:OnboardingScreen.kt:"This is how you'll show up in the app. You can change it later."</ID>
+    <ID>VerifyStrings:OnboardingScreen.kt:"Welcome"</ID>
+    <ID>VerifyStrings:SessionExpiredScreen.kt:"Couldn't start a new session. Check your connection and try again."</ID>
+    <ID>VerifyStrings:ShakeDialog.kt:"Dismiss"</ID>
+    <ID>VerifyStrings:ShakeDialog.kt:"Report a bug"</ID>
+    <ID>VerifyStrings:SplashScreen.kt:"Sodogku"</ID>
+  </CurrentIssues>
+</SmellBaseline>
