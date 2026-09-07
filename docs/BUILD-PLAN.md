@@ -56,7 +56,7 @@ The iOS *Kotlin* target compiles, and the Swift wrapper had its two auth files r
 
 ---
 
-## C1 · `:libraries:puzzle`
+## C1 · `:libraries:puzzle` — **DONE** (2026-09-07)
 
 **Unblocked by** C0.
 
@@ -75,6 +75,59 @@ The iOS *Kotlin* target compiles, and the Swift wrapper had its two auth files r
 4x4 through 10x10 boards solve correctly, a deliberately ambiguous board reports 2 solutions, the
 tier solver agrees with hand-classified fixtures, and the next-deduction finder never returns a
 cell that is not actually forced.
+
+**Outcome.** 64 tests, green on JVM, Android and iOS, detekt clean. `BoardFactory` also landed
+here rather than in the generator: the construction primitives are puzzle-domain logic, they keep
+the C2 tool thin, and the soundness property test needs them.
+
+Two tests carry most of the weight:
+
+- **`DeductionSoundnessTest`** drives the engine over random unique boards and asserts it never
+  eliminates a cell the solution occupies and never places a dog outside it. An unsound technique
+  does not crash, it quietly mis-scores difficulty and points hints at the wrong square.
+- **`countSolutions_agreesWithBruteForceEnumeration`** checks the pruned search against an
+  independent oracle that enumerates every column permutation and filters with the public rule
+  checker, sharing no code with the solver.
+
+Soundness alone would pass with a do-nothing engine, so `DifficultyTest` separately pins that the
+engine finishes at least 80% of unique boards and that scores spread across tiers.
+
+### The finding C2 has to deal with
+
+Measured difficulty distribution on random unique boards (40 per size), and the generation cost
+alongside it:
+
+| Size | Unique boards found | Attempts | Tier 1 / 2 / 3 / 4 | Time |
+|---|---|---|---|---|
+| 4 | 40 | 40 | 8 / 30 / 1 / 1 | 31ms |
+| 6 | 40 | 40 | 11 / 24 / 2 / 3 | 66ms |
+| 7 | 40 | 40 | 5 / 22 / 6 / 7 | 387ms |
+| 8 | 40 | 59 | 3 / 29 / 3 / 5 | 1.8s |
+| 9 | 40 | 295 | 7 / 22 / 4 / 7 | 17s |
+| 10 | **9** | 400 | 2 / 6 / 0 / 1 | 39s |
+
+The tier spread is healthy and nothing scored tier 5, so the engine is strong enough to rate the
+whole pack. **Uniqueness is the problem.** At 10x10 the hit rate collapses to about 2%, and the
+campaign needs 110 boards at that size plus the daily pool.
+
+Two things were ruled out by measurement rather than assumed:
+
+- **More mutation rounds do not help.** 0 hits out of 60 at 10x10, unchanged from 12 rounds to
+  120. Single boundary-cell moves barely shift the constraint structure.
+- **The mutation primitive is not broken.** `mutateRegions_actuallyMovesCells` pins that it really
+  moves cells and preserves every invariant, because a silent no-op and a non-converging strategy
+  look identical from the outside and want opposite fixes.
+
+Region sizes are already very uneven from the frontier-biased growth (spreads like
+`[1, 7, 7, 7, 10, 12, 12, 13, 14, 17]`), and those boards still blow past 50 solutions. So
+unevenness is not the missing ingredient either.
+
+**What C2 should do instead: targeted refinement.** When a board has more than one solution, pull
+a second solution, find a row where it differs from the seed, and move region boundaries
+specifically to invalidate *that* alternative (for example, put the cell the alternative uses into
+a region another of its dogs already occupies). That is directed search against a named
+counterexample rather than random walking, and it is the standard way these generators converge.
+Budget real time for C2 regardless: the 9x9 and 10x10 bands are where it will be spent.
 
 ---
 
