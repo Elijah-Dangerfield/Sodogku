@@ -13,6 +13,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesTo
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import kotlin.time.Clock
+import kotlin.time.TimeSource
 
 @ContributesTo(AppScope::class)
 @SingleIn(AppScope::class)
@@ -62,5 +63,13 @@ interface AppComponent {
 
     @Provides
     fun provideClock(): Clock = Clock.System
+
+    /**
+     * The monotonic clock, for anything measuring *elapsed* time rather than
+     * wall-clock time: a level's duration, the speed bonus, gesture windows.
+     * Injected so those are testable against a clock a test can advance.
+     */
+    @Provides
+    fun provideTimeSource(): TimeSource.WithComparableMarks = TimeSource.Monotonic
 
 }

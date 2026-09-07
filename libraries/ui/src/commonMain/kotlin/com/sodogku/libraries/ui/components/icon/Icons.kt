@@ -52,6 +52,9 @@ import androidx.compose.material.icons.rounded.Pin
 import androidx.compose.material.icons.rounded.QuestionMark
 import androidx.compose.material.icons.rounded.Receipt
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.PlayCircleOutline
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material.icons.rounded.ThumbUp
@@ -216,6 +219,15 @@ enum class Icons(
     ),
 
     Settings(androidx.compose.material.icons.Icons.Rounded.Settings),
+
+    /** The level drawer's handle. */
+    Menu(androidx.compose.material.icons.Icons.Rounded.Menu),
+
+    /** Hints. */
+    Lightbulb(androidx.compose.material.icons.Icons.Rounded.Lightbulb),
+
+    /** Watch an ad for something. */
+    PlayCircle(androidx.compose.material.icons.Icons.Rounded.PlayCircleOutline),
 
     ChevronLeft(androidx.compose.material.icons.Icons.Rounded.ChevronLeft),
 

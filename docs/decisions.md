@@ -6,6 +6,48 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — `state` lags `updateState`, so never read it back inside one action
+
+**The landmine:** `SEAViewModel.state` reads `stateFlow.value`, and `stateFlow` is a *derived*
+`stateIn` of the mutable flow. It propagates on a coroutine dispatch, so reading `state`
+immediately after `updateState { }` in the same action returns the value from **before** the
+update.
+
+**Found by:** the starter dog silently not appearing in tests while working on device. Production
+happened to interleave a dispatch between the two; the test scheduler did not. Same code, two
+answers, neither of them reliable.
+
+**It was not just the one site.** `place()` updated the score and then called `win()`, which
+re-read `state.score` — so a level's final score could drop the points for the very placement that
+won it. It looked right on device for the same accidental reason.
+
+**Rule:** inside one action, read `state` once at the top, then either fold everything into a
+single `updateState`, or pass computed values on as parameters. The lambda argument of
+`updateState` *is* fresh (it reads the mutable flow), so composing writes is fine — only reading
+`state` back is not.
+
+## 2026-09-07 — Tap marks, double tap commits, and the second tap is recognised in the ViewModel
+
+**Decision:** a single tap writes or erases the player's cross and can never cost a life. A second
+tap on the same cell within 320ms commits a guess. The double-tap is detected in `GameViewModel`,
+not by `detectTapGestures(onDoubleTap = ...)`.
+
+**Why not the gesture detector:** registering `onDoubleTap` makes Compose withhold `onTap` until
+the double-tap timeout expires. That puts ~300ms of lag on marking, which is the gesture a player
+performs dozens of times per board. Recognising the second tap upstream lets the cross draw
+instantly and convert if another tap follows.
+
+**Alternative considered:** LinkedIn Queens cycles empty → X → queen → empty on single taps, which
+has no timing window at all. Rejected because it makes "erase this cross" a three-tap operation,
+and erasing is common.
+
+**Cost accepted:** a very fast deliberate double tap on an empty cell briefly shows a cross before
+the dog lands. It reads as the mark being upgraded rather than as a glitch.
+
+**Related:** a wrong guess leaves the cell marked rather than clearing it. The player has just
+proved no dog goes there, and discarding that would make a strike cost information as well as a
+bone.
+
 ## 2026-09-07 — Region ink is derived from contrast, not chosen
 
 **Decision:** `RegionStyle.ink` (the colour marks and glyphs are drawn in) is computed per fill by

@@ -14,6 +14,7 @@ kotlin {
 
 
             implementation(projects.libraries.core)
+            implementation(projects.libraries.sodogku)
             implementation(projects.libraries.ui)
             implementation(projects.libraries.navigation)
             implementation(projects.libraries.flowroutines)
@@ -35,6 +36,7 @@ kotlin {
 
         commonTest.dependencies {
             implementation(projects.libraries.flowroutines.testing)
+            implementation(projects.libraries.sodogku)
             implementation(projects.libraries.levels)
             implementation(projects.libraries.puzzle)
             implementation(projects.libraries.scoring)

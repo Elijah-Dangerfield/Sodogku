@@ -11,31 +11,41 @@ import com.sodogku.libraries.flowroutines.testing.CoroutineTest
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.scoring.ScoringConfig
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import com.sodogku.libraries.sodogku.AppCache
+import com.sodogku.libraries.sodogku.AppData
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TestTimeSource
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 class GameViewModelTest : CoroutineTest() {
 
-    private val level: LevelDefinition = assertNotNull(LevelPacks.campaign.byId(1))
+    /**
+     * The default test level. Deliberately past [StarterDogLevel]: the early
+     * levels open with a dog already placed and its auto-marks spread, which
+     * makes them a bad fixture for testing the loop itself.
+     */
+    private val level: LevelDefinition = assertNotNull(LevelPacks.campaign.byId(PlainLevel))
 
     @Test
     fun loadsTheRequestedLevelAndStartsPlaying() = runUnitTest {
         val vm = viewModel()
 
         assertEquals(GamePhase.Playing, vm.state.phase)
-        assertEquals(1, vm.state.level?.id)
+        assertEquals(PlainLevel, vm.state.level?.id)
         assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
     }
 
     @Test
-    fun aCorrectTapPlacesADogAndScores() = runUnitTest {
+    fun aCorrectGuessPlacesADogAndScores() = runUnitTest {
         val vm = viewModel()
 
-        vm.takeAction(GameAction.CellTapped(cellFor(row = 0)))
+        vm.commit(cellFor(row = 0))
 
         assertEquals(1, vm.state.dogsPlaced)
         assertTrue(vm.state.score.total > 0)
@@ -43,11 +53,11 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun aCorrectTapAutoMarksTheRowColumnRegionAndNeighbours() = runUnitTest {
+    fun aCorrectGuessAutoMarksTheRowColumnRegionAndNeighbours() = runUnitTest {
         val vm = viewModel()
         val cell = cellFor(row = 0)
 
-        vm.takeAction(GameAction.CellTapped(cell))
+        vm.commit(cell)
 
         val board = level.board
         val row = board.rowOf(cell)
@@ -59,12 +69,12 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun aWrongTapCostsALifeAndResetsTheCombo() = runUnitTest {
+    fun aWrongGuessCostsALifeAndResetsTheCombo() = runUnitTest {
         val vm = viewModel()
-        vm.takeAction(GameAction.CellTapped(cellFor(row = 0)))
+        vm.commit(cellFor(row = 0))
         val earned = vm.state.score.total
 
-        vm.takeAction(GameAction.CellTapped(tappableWrongCell(vm)))
+        vm.commit(tappableWrongCell(vm))
 
         assertEquals(ScoringConfig.MAX_LIVES - 1, vm.state.livesRemaining)
         assertEquals(0, vm.state.score.combo)
@@ -76,9 +86,9 @@ class GameViewModelTest : CoroutineTest() {
         val vm = viewModel()
         val cell = wrongCellIn(row = 0)
 
-        vm.takeAction(GameAction.CellTapped(cell))
+        vm.commit(cell)
         val first = vm.state.strikeNonce
-        vm.takeAction(GameAction.CellTapped(cell))
+        vm.commit(cell)
 
         assertTrue(vm.state.strikeNonce != first, "a repeated wrong tap has to re-fire the shake")
     }
@@ -87,7 +97,7 @@ class GameViewModelTest : CoroutineTest() {
     fun threeStrikesEndTheAttempt() = runUnitTest {
         val vm = viewModel()
 
-        repeat(ScoringConfig.MAX_LIVES) { vm.takeAction(GameAction.CellTapped(wrongCellIn(row = it))) }
+        repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
 
         assertEquals(GamePhase.Lost, vm.state.phase)
         assertEquals(0, vm.state.livesRemaining)
@@ -107,7 +117,7 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun tappingAnAutoMarkedCellDoesNothing() = runUnitTest {
         val vm = viewModel()
-        vm.takeAction(GameAction.CellTapped(cellFor(row = 0)))
+        vm.commit(cellFor(row = 0))
         val marked = vm.state.autoMarks.first()
 
         vm.takeAction(GameAction.CellTapped(marked))
@@ -117,30 +127,67 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun longPressMarksAndUnmarksWithoutRisk() = runUnitTest {
+    fun aSingleTapOnlyEverWritesTheNote() = runUnitTest {
+        // The safety property of the whole interaction model: one tap can never
+        // cost a life, however wrong the cell is.
         val vm = viewModel()
         val cell = wrongCellIn(row = 0)
 
-        vm.takeAction(GameAction.CellLongPressed(cell))
-        assertTrue(cell in vm.state.manualMarks)
-        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining, "marking must never cost a life")
+        vm.note(cell)
 
-        vm.takeAction(GameAction.CellLongPressed(cell))
-        assertTrue(cell !in vm.state.manualMarks)
+        assertTrue(cell in vm.state.manualMarks)
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+        assertEquals(0, vm.state.dogsPlaced)
     }
 
     @Test
-    fun tappingAManualMarkClearsItRatherThanRiskingALife() = runUnitTest {
-        // Someone who marked a cell by mistake should be able to undo it without
-        // being punished for correcting themselves.
+    fun tappingANotedCellAgainErasesIt() = runUnitTest {
         val vm = viewModel()
         val cell = wrongCellIn(row = 0)
-        vm.takeAction(GameAction.CellLongPressed(cell))
+        vm.note(cell)
 
-        vm.takeAction(GameAction.CellTapped(cell))
+        vm.note(cell)
 
         assertTrue(cell !in vm.state.manualMarks)
         assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+    }
+
+    @Test
+    fun twoTapsOutsideTheWindowAreTwoNotesRatherThanACommit() = runUnitTest {
+        // The failure this guards: a slow tap-tap on a wrong cell costing a life
+        // the player never meant to spend.
+        val vm = viewModel()
+        val cell = wrongCellIn(row = 0)
+
+        vm.takeAction(GameAction.CellTapped(cell))
+        clock += LateGap
+        vm.takeAction(GameAction.CellTapped(cell))
+
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+        assertTrue(cell !in vm.state.manualMarks, "the second tap erased the note")
+    }
+
+    @Test
+    fun tapsOnTwoDifferentCellsNeverCommit() = runUnitTest {
+        val vm = viewModel()
+
+        vm.takeAction(GameAction.CellTapped(wrongCellIn(row = 0)))
+        vm.takeAction(GameAction.CellTapped(wrongCellIn(row = 1)))
+
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+        assertEquals(2, vm.state.manualMarks.size)
+    }
+
+    @Test
+    fun aWrongGuessLeavesTheCellMarked() = runUnitTest {
+        // The player just proved no dog goes there. Clearing it would make the
+        // strike cost information as well as a life.
+        val vm = viewModel()
+        val cell = wrongCellIn(row = 0)
+
+        vm.commit(cell)
+
+        assertTrue(cell in vm.state.manualMarks)
     }
 
     @Test
@@ -169,7 +216,7 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun treatRestoresALifeAfterAStrike() = runUnitTest {
         val vm = viewModel()
-        vm.takeAction(GameAction.CellTapped(wrongCellIn(row = 0)))
+        vm.commit(wrongCellIn(row = 0))
 
         vm.takeAction(GameAction.TreatUsed)
 
@@ -190,9 +237,9 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun continueAfterLossRestoresOneLifeAndKeepsTheBoard() = runUnitTest {
         val vm = viewModel()
-        vm.takeAction(GameAction.CellTapped(cellFor(row = 0)))
+        vm.commit(cellFor(row = 0))
         repeat(ScoringConfig.MAX_LIVES) {
-            vm.takeAction(GameAction.CellTapped(tappableWrongCell(vm)))
+            vm.commit(tappableWrongCell(vm))
         }
         assertEquals(GamePhase.Lost, vm.state.phase)
 
@@ -214,7 +261,7 @@ class GameViewModelTest : CoroutineTest() {
             RewardOutcome.Failed("boom"),
         ).forEach { outcome ->
             val vm = viewModel(adGate = FixedAdGate(outcome))
-            repeat(ScoringConfig.MAX_LIVES) { vm.takeAction(GameAction.CellTapped(wrongCellIn(row = it))) }
+            repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
 
             vm.takeAction(GameAction.ContinueAfterLoss)
 
@@ -225,7 +272,7 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun dismissingTheAdWithholdsTheContinue() = runUnitTest {
         val vm = viewModel(adGate = FixedAdGate(RewardOutcome.Dismissed))
-        repeat(ScoringConfig.MAX_LIVES) { vm.takeAction(GameAction.CellTapped(wrongCellIn(row = it))) }
+        repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
 
         vm.takeAction(GameAction.ContinueAfterLoss)
 
@@ -236,7 +283,7 @@ class GameViewModelTest : CoroutineTest() {
     fun proSkipsTheAdEntirely() = runUnitTest {
         val gate = FixedAdGate(RewardOutcome.Dismissed)
         val vm = viewModel(adGate = gate, entitlements = ProEntitlements())
-        repeat(ScoringConfig.MAX_LIVES) { vm.takeAction(GameAction.CellTapped(wrongCellIn(row = it))) }
+        repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
 
         vm.takeAction(GameAction.ContinueAfterLoss)
 
@@ -247,38 +294,128 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun retryClearsTheBoardAndRestoresEveryLife() = runUnitTest {
         val vm = viewModel()
-        vm.takeAction(GameAction.CellTapped(cellFor(row = 0)))
+        vm.commit(cellFor(row = 0))
         repeat(ScoringConfig.MAX_LIVES) {
-            vm.takeAction(GameAction.CellTapped(tappableWrongCell(vm)))
+            vm.commit(tappableWrongCell(vm))
         }
 
         vm.takeAction(GameAction.Retry)
 
         assertEquals(GamePhase.Playing, vm.state.phase)
         assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
-        assertEquals(0, vm.state.dogsPlaced)
         assertEquals(0, vm.state.score.total)
+        assertEquals(0, vm.state.dogsPlaced)
     }
 
     @Test
-    fun tapsDoNothingOnceTheAttemptIsOver() = runUnitTest {
+    fun earlyLevelsOpenWithOneDogAlreadyPlaced() = runUnitTest {
+        // A teaching aid more than a leg-up: the free dog fires the auto-mark
+        // cascade straight away, so the rules are visible before anyone has to
+        // reason about them.
+        val early = assertNotNull(LevelPacks.campaign.byId(StarterDogLevel))
+        val vm = viewModel(levelId = StarterDogLevel)
+
+        assertEquals(1, vm.state.dogsPlaced)
+        assertTrue(vm.state.starterDogCell in early.solution.cells().toSet())
+        assertEquals(0, vm.state.score.total, "a gift must not inflate an early best score")
+        assertTrue(vm.state.autoMarks.isNotEmpty())
+    }
+
+    @Test
+    fun laterLevelsOpenEmpty() = runUnitTest {
+        val vm = viewModel(levelId = PlainLevel)
+
+        assertEquals(0, vm.state.dogsPlaced)
+        assertEquals(null, vm.state.starterDogCell)
+    }
+
+    @Test
+    fun theLastBoneWarningFiresOnceOnTheEdgeIntoOneLife() = runUnitTest {
+        // On the edge, not whenever one life happens to be showing. A warning
+        // that reappears on every redraw stops being read.
+        val vm = viewModel()
+        assertEquals(null, vm.state.warning)
+
+        vm.commit(tappableWrongCell(vm))
+        assertEquals(null, vm.state.warning, "two lives left is not a warning")
+
+        vm.commit(tappableWrongCell(vm))
+        assertEquals(GameWarning.LastBone, vm.state.warning)
+
+        vm.takeAction(GameAction.DismissWarning)
+        assertEquals(null, vm.state.warning)
+    }
+
+    @Test
+    fun refillingBonesFromAnAdRestoresEveryLife() = runUnitTest {
+        val vm = viewModel()
+        repeat(ScoringConfig.MAX_LIVES) { vm.commit(tappableWrongCell(vm)) }
+        assertEquals(GamePhase.Lost, vm.state.phase)
+
+        vm.takeAction(GameAction.RefillBones)
+
+        assertEquals(GamePhase.Playing, vm.state.phase)
+        assertEquals(
+            ScoringConfig.MAX_LIVES,
+            vm.state.livesRemaining,
+            "a single bone would put the player straight back here",
+        )
+    }
+
+    @Test
+    fun colorblindModeTogglesAndPersists() = runUnitTest {
+        val cache = InMemoryAppCache()
+        val vm = GameViewModel(
+            PlainLevel,
+            FixedAdGate(RewardOutcome.Rewarded),
+            FreeEntitlementsFake(),
+            clock,
+            cache,
+        )
+
+        vm.takeAction(GameAction.ToggleColorblind)
+
+        assertTrue(vm.state.colorblind)
+        assertTrue(cache.get().colorblindMode)
+    }
+
+    @Test
+    fun guessesDoNothingOnceTheAttemptIsOver() = runUnitTest {
         val vm = viewModel()
         solve(vm)
 
-        vm.takeAction(GameAction.CellTapped(wrongCellIn(row = 0)))
+        vm.commit(wrongCellIn(row = 0))
 
         assertEquals(GamePhase.Won, vm.state.phase)
         assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
     }
 
+    private val clock = TestTimeSource()
+
     private fun viewModel(
-        levelId: Int = 1,
+        levelId: Int = PlainLevel,
         adGate: AdGate = FixedAdGate(RewardOutcome.Rewarded),
         entitlements: Entitlements = FreeEntitlementsFake(),
-    ) = GameViewModel(levelId, adGate, entitlements)
+    ) = GameViewModel(levelId, adGate, entitlements, clock, InMemoryAppCache())
+
+    /**
+     * Commits a guess: two taps inside the double-tap window. A single tap only
+     * ever writes the player's own cross.
+     */
+    private fun GameViewModel.commit(cell: Int) {
+        takeAction(GameAction.CellTapped(cell))
+        takeAction(GameAction.CellTapped(cell))
+        clock += SettleGap
+    }
+
+    /** A tap far enough after the last one that it cannot read as a commit. */
+    private fun GameViewModel.note(cell: Int) {
+        takeAction(GameAction.CellTapped(cell))
+        clock += SettleGap
+    }
 
     private fun solve(vm: GameViewModel) {
-        (0 until level.size).forEach { row -> vm.takeAction(GameAction.CellTapped(cellFor(row))) }
+        (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
     }
 
     private fun cellFor(row: Int): Int = level.board.cellAt(row, level.solution[row])
@@ -303,6 +440,29 @@ class GameViewModelTest : CoroutineTest() {
                 cell !in vm.state.manualMarks &&
                 cell !in vm.state.placedCells
         }
+
+    private companion object {
+        /** Past the starter-dog band, so the board opens empty. */
+        const val PlainLevel = 200
+
+        /** Inside the starter-dog band. */
+        const val StarterDogLevel = 1
+
+        /** Long enough that the next tap starts a fresh gesture. */
+        val SettleGap = 500.milliseconds
+
+        /** Just past the commit window, so a second tap is a second note. */
+        val LateGap = 400.milliseconds
+    }
+
+    /** In-memory [AppCache], so a settings toggle can be asserted without disk. */
+    private class InMemoryAppCache : AppCache {
+        private val state = MutableStateFlow(AppData())
+        override val updates: Flow<AppData> = state
+        override suspend fun get(): AppData = state.value
+        override suspend fun set(value: AppData) { state.value = value }
+        override suspend fun clear() { state.value = AppData() }
+    }
 
     private class FixedAdGate(private val outcome: RewardOutcome) : AdGate {
         var rewardedShown = 0

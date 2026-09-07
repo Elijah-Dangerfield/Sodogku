@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -26,10 +30,14 @@ import com.sodogku.libraries.ui.components.game.LifeRow
 import com.sodogku.libraries.ui.components.game.RuleChip
 import com.sodogku.libraries.ui.components.game.RuleDiagram
 import com.sodogku.libraries.ui.components.game.ScoreCounter
+import com.sodogku.libraries.ui.components.icon.IconButton
+import com.sodogku.libraries.ui.components.icon.Icons
+import com.sodogku.libraries.ui.system.focusTarget
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.scoring.Praise
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
+import com.sodogku.system.Motion
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
@@ -51,6 +59,8 @@ fun GameScreen(
     onAction: (GameAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var settingsOpen by remember { mutableStateOf(false) }
+
     Screen(modifier = modifier) { padding ->
         val level = state.level
         if (level == null) {
@@ -66,7 +76,12 @@ fun GameScreen(
                 .padding(padding)
                 .padding(horizontal = Dimension.D500),
         ) {
-            GameHeader(state = state, levelId = level.id)
+            GameHeader(
+                state = state,
+                levelId = level.id,
+                onLeave = { onAction(GameAction.Leave) },
+                onSettings = { settingsOpen = true },
+            )
 
             // The rules sit directly under the header rather than floating above
             // the board: they are reference material, and a gap between them and
@@ -104,18 +119,35 @@ fun GameScreen(
                     GameOutcomeSheet(state = state, onAction = onAction)
                 }
             }
+
+            LastBoneWarning(state = state, onAction = onAction)
+
+            if (settingsOpen) {
+                GameSettingsSheet(
+                    state = state,
+                    onAction = onAction,
+                    onDismiss = { settingsOpen = false },
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun GameHeader(state: GameState, levelId: Int) {
+private fun GameHeader(
+    state: GameState,
+    levelId: Int,
+    onLeave: () -> Unit,
+    onSettings: () -> Unit,
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = Dimension.D500),
+        modifier = Modifier.fillMaxWidth().padding(vertical = Dimension.D400),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column {
+        IconButton(icon = Icons.Menu(null), onClick = onLeave)
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = stringResource(Res.string.game_level, levelId),
                 typography = AppTheme.typography.Caption.C300,
@@ -123,18 +155,28 @@ private fun GameHeader(state: GameState, levelId: Int) {
             )
             ScoreCounter(score = state.score.total)
         }
-        Column(horizontalAlignment = Alignment.End) {
-            LifeRow(remaining = state.livesRemaining)
-            Text(
-                text = stringResource(
-                    Res.string.game_dogs_progress,
-                    state.dogsPlaced,
-                    state.dogsRequired,
-                ),
-                typography = AppTheme.typography.Caption.C300,
-                color = AppTheme.colors.textSecondary,
-            )
-        }
+
+        IconButton(icon = Icons.Settings(null), onClick = onSettings)
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = Dimension.D400),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(
+                Res.string.game_dogs_progress,
+                state.dogsPlaced,
+                state.dogsRequired,
+            ),
+            typography = AppTheme.typography.Caption.C300,
+            color = AppTheme.colors.textSecondary,
+        )
+        LifeRow(
+            remaining = state.livesRemaining,
+            modifier = Modifier.focusTarget(LivesFocusKey),
+        )
     }
 }
 
@@ -180,11 +222,11 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
                             region = level.board.regionAt(index),
                             state = cellState(state, index),
                             size = cell,
-                            colorblind = false,
+                            colorblind = state.colorblind,
                             strikeNonce = if (state.strikeCell == index) state.strikeNonce else 0,
+                            entranceDelayMillis = (row + col) * Motion.BoardWaveStepMillis,
                             enabled = state.phase == GamePhase.Playing,
-                            onClick = { onAction(GameAction.CellTapped(index)) },
-                            onLongClick = { onAction(GameAction.CellLongPressed(index)) },
+                            onTap = { onAction(GameAction.CellTapped(index)) },
                         )
                     }
                 }

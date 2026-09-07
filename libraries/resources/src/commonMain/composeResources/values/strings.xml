@@ -19,4 +19,12 @@
     <string name="game_back_to_levels">Levels</string>
     <string name="game_next_level">Next level</string>
     <string name="home_temporary_launcher">Temporary launcher. The level map replaces this in C5.</string>
+    <string name="game_last_bone_title">One chance left</string>
+    <string name="game_last_bone_body">Tap anywhere to keep going.</string>
+    <string name="game_refill_bones">Watch an ad for 3 bones</string>
+    <string name="game_settings">Settings</string>
+    <string name="game_levels_menu">Levels</string>
+    <string name="settings_colorblind">Shapes on colors</string>
+    <string name="settings_colorblind_body">Adds a distinct shape to each color, so regions stay apart without relying on hue.</string>
+    <string name="settings_done">Done</string>
 </resources>

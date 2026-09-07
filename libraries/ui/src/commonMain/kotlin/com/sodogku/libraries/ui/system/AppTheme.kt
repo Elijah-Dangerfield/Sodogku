@@ -10,7 +10,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.runtime.remember
+import com.sodogku.libraries.ui.system.FocusRegistry
 import com.sodogku.libraries.ui.system.LocalColors
+import com.sodogku.libraries.ui.system.LocalFocusRegistry
 import com.sodogku.libraries.ui.system.LocalContentColor
 import com.sodogku.libraries.ui.system.LocalTypography
 import com.sodogku.system.color.Colors
@@ -42,6 +45,7 @@ fun AppThemeProvider(
     )
 
     val typography = rememberTypography()
+    val focusRegistry = remember { FocusRegistry() }
 
     MaterialWrapper {
         CompositionLocalProvider(
@@ -50,6 +54,7 @@ fun AppThemeProvider(
             LocalTypography provides typography,
             androidx.compose.material3.LocalContentColor provides colors.text.color,
             LocalColors provides colors,
+            LocalFocusRegistry provides focusRegistry,
             content = content
         )
     }

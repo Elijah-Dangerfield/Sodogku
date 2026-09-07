@@ -4,6 +4,8 @@ import com.sodogku.libraries.ads.AdGate
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
+import com.sodogku.libraries.core.Catching
+import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.logging.KLog
 import com.sodogku.libraries.core.logging.logEvent
 import com.sodogku.libraries.flowroutines.SEAViewModel
@@ -16,6 +18,8 @@ import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.ScoringConfig
+import com.sodogku.libraries.sodogku.AppCache
+import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
 import me.tatarka.inject.annotations.Assisted
 import me.tatarka.inject.annotations.Inject
@@ -37,14 +41,23 @@ class GameViewModel(
     @Assisted private val levelId: Int,
     private val adGate: AdGate,
     private val entitlements: Entitlements,
+    /**
+     * Injected rather than reaching for [TimeSource.Monotonic] directly, because
+     * both the speed bonus and double-tap recognition are timing decisions, and
+     * a test cannot assert on either against a clock it does not control.
+     */
+    private val clock: TimeSource.WithComparableMarks,
+    private val appCache: AppCache,
 ) : SEAViewModel<GameState, GameEvent, GameAction>(initialStateArg = GameState()) {
 
     private val logger = KLog.withTag("Game")
 
-    private val clock = TimeSource.Monotonic
     private var attemptStartedAt = clock.markNow()
     private var lastPlacementAt = clock.markNow()
     private var attemptNumber = 1
+    private var lastTappedCell: Int? = null
+    private var warnedAboutLastBone = false
+    private var lastTapAt: ComparableTimeMark? = null
 
     init {
         takeAction(GameAction.Load)
@@ -54,17 +67,24 @@ class GameViewModel(
         when (action) {
             GameAction.Load -> action.load()
             is GameAction.CellTapped -> action.tap(action.cell)
-            is GameAction.CellLongPressed -> action.mark(action.cell)
             GameAction.SniffUsed -> action.sniff()
             GameAction.TreatUsed -> action.treat()
             GameAction.Retry -> action.restart()
             GameAction.ContinueAfterLoss -> action.continueAfterLoss()
             GameAction.Leave -> sendEvent(GameEvent.NavigateBack)
+            GameAction.DismissWarning -> action.updateState { it.copy(warning = null) }
+            GameAction.RefillBones -> action.refillBones()
+            GameAction.ToggleColorblind -> action.toggleColorblind()
             is GameAction.TimerTick -> action.updateState { it.copy(elapsedMs = elapsedMs()) }
         }
     }
 
     private suspend fun GameAction.load() {
+        val colorblind = Catching { appCache.get().colorblindMode }
+            .logOnFailure { "Failed to read colorblind mode" }
+            .getOrNull() == true
+        updateState { it.copy(colorblind = colorblind) }
+
         val level = LevelPacks.campaign.byId(levelId)
         if (level == null) {
             logger.e { "No level $levelId in the campaign pack" }
@@ -77,6 +97,9 @@ class GameViewModel(
     private suspend fun GameAction.startAttempt(level: LevelDefinition) {
         attemptStartedAt = clock.markNow()
         lastPlacementAt = attemptStartedAt
+        lastTappedCell = null
+        lastTapAt = null
+        warnedAboutLastBone = false
         logger.logEvent(
             "game.level_started",
             "level_id" to level.id,
@@ -84,47 +107,69 @@ class GameViewModel(
             "difficulty" to level.difficulty,
             "attempt_number" to attemptNumber,
         )
+        // The starter dog is folded into this one update rather than applied by
+        // a second one. `state` reads a derived flow that lags `updateState` by
+        // a dispatch, so a follow-up that re-read `state` would see the board as
+        // it was before this update landed.
+        val starterRow = 0
+        val giveStarter = level.id <= StarterDogThroughLevel
+        val opening = Solution.empty(level.size).let {
+            if (giveStarter) it.withPlacement(starterRow, level.solution[starterRow]) else it
+        }
+
         updateState {
             GameState(
                 level = level,
-                placed = Solution.empty(level.size),
+                placed = opening,
+                autoMarks = if (giveStarter) level.board.autoMarkedCells(opening) else emptySet(),
+                starterDogCell = if (giveStarter) {
+                    level.board.cellAt(starterRow, level.solution[starterRow])
+                } else {
+                    null
+                },
                 phase = GamePhase.Playing,
                 livesRemaining = ScoringConfig.MAX_LIVES,
                 sniffs = StartingSniffs,
                 treats = StartingTreats,
+                colorblind = it.colorblind,
             )
         }
     }
 
     /**
-     * The core interaction. A tap on a marked cell clears the mark rather than
-     * risking a life — otherwise a player who marked a cell by mistake would be
-     * punished for correcting themselves.
+     * The core interaction, and the reason the safe gesture is the cheap one.
+     *
+     * A single tap only ever writes or erases the player's own note — it can
+     * never cost a life. Committing to a dog takes a *second* tap inside
+     * [DoubleTapWindowMs], so the destructive action is deliberate.
+     *
+     * The second tap is recognised here rather than by the cell's gesture
+     * detector on purpose: registering `onDoubleTap` in Compose withholds the
+     * first tap until the double-tap timeout elapses, which would put ~300ms of
+     * lag on the gesture players use most. Instead the cross draws instantly and
+     * a follow-up tap converts it.
      */
     private suspend fun GameAction.tap(cell: Int) {
-        val level = state.level ?: return
         if (state.phase != GamePhase.Playing) return
         if (cell in state.placedCells) return
 
-        if (cell in state.manualMarks) {
-            updateState { it.copy(manualMarks = it.manualMarks - cell) }
-            return
-        }
-        if (cell in state.autoMarks) return
+        val now = clock.markNow()
+        val isSecondTap = lastTappedCell == cell &&
+            lastTapAt?.let { now - it }?.inWholeMilliseconds?.let { it <= DoubleTapWindowMs } == true
+        lastTappedCell = cell
+        lastTapAt = now
 
-        val row = level.board.rowOf(cell)
-        val correct = level.solution[row] == level.board.colOf(cell)
-        if (correct) place(cell) else strike(cell)
+        if (isSecondTap) {
+            lastTappedCell = null
+            commit(cell)
+        } else {
+            toggleMark(cell)
+        }
     }
 
-    /**
-     * The player's own "no dog here" note, on a cell auto-mark could not rule
-     * out. Free and reversible: marking is how someone records a deduction, and
-     * charging a life for thinking would be the wrong game.
-     */
-    private suspend fun GameAction.mark(cell: Int) {
-        if (state.phase != GamePhase.Playing) return
-        if (cell in state.placedCells || cell in state.autoMarks) return
+    /** Writes or erases the player's own cross. Free, and never a life. */
+    private suspend fun GameAction.toggleMark(cell: Int) {
+        if (cell in state.autoMarks) return
         updateState {
             it.copy(
                 manualMarks = if (cell in it.manualMarks) {
@@ -134,6 +179,16 @@ class GameViewModel(
                 },
             )
         }
+    }
+
+    /** The committed guess. This is the only path that can cost a life. */
+    private suspend fun GameAction.commit(cell: Int) {
+        val level = state.level ?: return
+        if (cell in state.autoMarks) return
+
+        val row = level.board.rowOf(cell)
+        val correct = level.solution[row] == level.board.colOf(cell)
+        if (correct) place(cell) else strike(cell)
     }
 
     private suspend fun GameAction.place(cell: Int) {
@@ -158,27 +213,41 @@ class GameViewModel(
         }
         sendEvent(GameEvent.PlacedDog(cell))
 
-        if (placed.isComplete) win()
+        // The finished card is handed on rather than re-read from `state`, which
+        // lags this update by a dispatch — re-reading would drop the points for
+        // the very placement that won the level.
+        if (placed.isComplete) win(level, scored.card)
     }
 
+    /**
+     * A wrong guess. The cell is left *marked*, not cleared: the player has just
+     * proved no dog goes there, and throwing that away would make the strike
+     * cost information as well as a life.
+     */
     private suspend fun GameAction.strike(cell: Int) {
         val remaining = state.livesRemaining - 1
         updateState {
             it.copy(
                 score = Scoring.strike(it.score),
                 livesRemaining = remaining,
+                manualMarks = it.manualMarks + cell,
                 strikeCell = cell,
                 strikeNonce = it.strikeNonce + 1,
             )
         }
         sendEvent(GameEvent.Struck(cell))
-        if (remaining <= 0) lose()
+        when {
+            remaining <= 0 -> lose()
+            remaining == 1 && !warnedAboutLastBone -> {
+                warnedAboutLastBone = true
+                updateState { it.copy(warning = GameWarning.LastBone) }
+            }
+        }
     }
 
-    private suspend fun GameAction.win() {
-        val level = state.level ?: return
+    private suspend fun GameAction.win(level: LevelDefinition, earned: ScoreCard) {
         val finished = Scoring.complete(
-            state.score,
+            earned,
             level.size,
             level.difficulty,
             state.livesRemaining,
@@ -243,6 +312,33 @@ class GameViewModel(
         updateState { it.copy(phase = GamePhase.Playing, livesRemaining = 1) }
     }
 
+    /**
+     * Trades an ad for a full set of bones and puts the board back in play.
+     *
+     * Deliberately restores *all* of them rather than one, unlike the continue:
+     * this is the offer made to someone who has already run out, and handing
+     * them a single bone would put them right back here on the next guess.
+     */
+    private suspend fun GameAction.refillBones() {
+        val granted = entitlements.isPro.value ||
+            adGate.showRewarded(AdPlacement.BoosterGrant) != RewardOutcome.Dismissed
+        if (!granted) return
+
+        lastPlacementAt = clock.markNow()
+        warnedAboutLastBone = false
+        logger.logEvent("game.bones_refilled", "level_id" to (state.level?.id ?: 0))
+        updateState {
+            it.copy(phase = GamePhase.Playing, livesRemaining = ScoringConfig.MAX_LIVES)
+        }
+    }
+
+    private suspend fun GameAction.toggleColorblind() {
+        val next = !state.colorblind
+        updateState { it.copy(colorblind = next) }
+        Catching { appCache.update { data -> data.copy(colorblindMode = next) } }
+            .logOnFailure { "Failed to persist colorblind mode" }
+    }
+
     private suspend fun GameAction.restart() {
         val level = state.level ?: return
         attemptNumber++
@@ -276,6 +372,16 @@ class GameViewModel(
     private companion object {
         const val StartingSniffs = 3
         const val StartingTreats = 1
+
+        /** Levels that open with one dog already placed, as a teaching aid. */
+        const val StarterDogThroughLevel = 25
+
+        /**
+         * How long after a tap a second one on the same cell counts as a commit.
+         * Matches the platform double-tap timeout closely enough to feel native
+         * without inheriting its latency.
+         */
+        const val DoubleTapWindowMs = 320L
     }
 }
 
@@ -300,6 +406,15 @@ data class GameState(
     val pointsNonce: Int = 0,
     val lastPoints: Int = 0,
     val lastPraise: Praise = Praise.None,
+
+    /** Region glyphs on, for players who cannot separate the fills by hue. */
+    val colorblind: Boolean = false,
+
+    /** The free dog on early levels, so the UI can mark it as not the player's doing. */
+    val starterDogCell: Int? = null,
+
+    /** A one-shot spotlight the player has to dismiss. */
+    val warning: GameWarning? = null,
 ) {
     val placedCells: Set<Int> get() = placed.cells().toSet()
 
@@ -317,14 +432,19 @@ sealed interface GameEvent {
     data class Struck(val cell: Int) : GameEvent
 }
 
+/** Something the game wants to stop and point at. */
+enum class GameWarning { LastBone }
+
 sealed interface GameAction {
     data object Load : GameAction
     data class CellTapped(val cell: Int) : GameAction
-    data class CellLongPressed(val cell: Int) : GameAction
     data object SniffUsed : GameAction
     data object TreatUsed : GameAction
     data object Retry : GameAction
     data object ContinueAfterLoss : GameAction
     data object Leave : GameAction
+    data object DismissWarning : GameAction
+    data object RefillBones : GameAction
+    data object ToggleColorblind : GameAction
     data class TimerTick(val at: Long) : GameAction
 }

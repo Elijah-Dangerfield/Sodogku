@@ -27,6 +27,7 @@ import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.game_back_to_levels
 import sodogku.libraries.resources.generated.resources.game_continue
 import sodogku.libraries.resources.generated.resources.game_lost_title
+import sodogku.libraries.resources.generated.resources.game_refill_bones
 import sodogku.libraries.resources.generated.resources.game_retry
 import sodogku.libraries.resources.generated.resources.game_won_title
 
@@ -84,6 +85,12 @@ private fun LostSheet(onAction: (GameAction) -> Unit, modifier: Modifier) {
             textAlign = TextAlign.Center,
         )
         ButtonPrimary(
+            onClick = { onAction(GameAction.RefillBones) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(Res.string.game_refill_bones))
+        }
+        ButtonSecondary(
             onClick = { onAction(GameAction.ContinueAfterLoss) },
             modifier = Modifier.fillMaxWidth(),
         ) {

@@ -6,6 +6,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 
 /**
@@ -93,24 +94,40 @@ fun DrawScope.drawRegionGlyph(
  * ruled this out". A cross is excluded from the region set precisely so it can
  * mean exactly one thing.
  */
-fun DrawScope.drawBoardMark(color: Color, fraction: Float = MARK_FRACTION) {
+fun DrawScope.drawBoardMark(
+    color: Color,
+    fraction: Float = MARK_FRACTION,
+    progress: Float = 1f,
+) {
     val extent = minOf(size.width, size.height) * fraction
     val centre = Offset(size.width / 2f, size.height / 2f)
     val half = extent / 2f
-    val stroke = Stroke(width = extent * MARK_STROKE_FRACTION)
+    val strokeWidth = extent * MARK_STROKE_FRACTION
 
-    drawLine(
-        color,
-        Offset(centre.x - half, centre.y - half),
-        Offset(centre.x + half, centre.y + half),
-        strokeWidth = stroke.width,
-    )
-    drawLine(
-        color,
-        Offset(centre.x - half, centre.y + half),
-        Offset(centre.x + half, centre.y - half),
-        strokeWidth = stroke.width,
-    )
+    // Two strokes drawn in sequence rather than both at once. A cross that
+    // appears whole reads as a state change; one that is *drawn* reads as the
+    // player making a note, which is what the gesture actually is.
+    val first = (progress / STROKE_SPLIT).coerceIn(0f, 1f)
+    val second = ((progress - STROKE_SPLIT) / (1f - STROKE_SPLIT)).coerceIn(0f, 1f)
+
+    if (first > 0f) {
+        drawLine(
+            color,
+            Offset(centre.x - half, centre.y - half),
+            Offset(centre.x - half + extent * first, centre.y - half + extent * first),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+    }
+    if (second > 0f) {
+        drawLine(
+            color,
+            Offset(centre.x - half, centre.y + half),
+            Offset(centre.x - half + extent * second, centre.y + half - extent * second),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+    }
 }
 
 private fun polygon(centre: Offset, points: List<Pair<Float, Float>>): Path = Path().apply {
@@ -137,3 +154,6 @@ private const val DOUBLE_BAR_GAP_FRACTION = 0.08f
 private const val CHEVRON_RISE = 0.7f
 private const val MARK_FRACTION = 0.5f
 private const val MARK_STROKE_FRACTION = 0.22f
+
+/** Fraction of the draw spent on the first stroke before the second starts. */
+private const val STROKE_SPLIT = 0.55f

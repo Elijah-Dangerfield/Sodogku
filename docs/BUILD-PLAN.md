@@ -292,6 +292,66 @@ They land in C4 alongside the board, against the existing tokens.
 
 ---
 
+## C4a · Interaction model, motion and the Focus system — **DONE** (2026-09-07)
+
+Design feedback after playing C4. **Unblocked by** C4.
+
+**Delivers**
+
+- **Tap marks, double tap commits.** The safe gesture is now the cheap one; a single tap can never
+  cost a bone. See `decisions.md` for why the second tap is recognised in the ViewModel rather than
+  by `detectTapGestures`.
+- **Motion everywhere on the board.** The grid lands as a diagonal wave, crosses draw stroke by
+  stroke, dogs overshoot and settle, wrong guesses flash red and shake.
+- **A wrong guess leaves the cell marked**, because the player just proved no dog goes there.
+- **The Focus system** (`:libraries:ui/system/Focus.kt`): `Modifier.focusTarget(key)`, a
+  `FocusRegistry`, and a `FocusScrim` that punches holes in a dim layer with `BlendMode.Clear`.
+  Several scattered targets can be lit at once, which is what the hint mode needs.
+- **The last-bone warning**, the first thing built on Focus: dims the board, spotlights the bones,
+  hangs a bubble under them. Fires on the *edge* into one life, once per attempt.
+- **In-game settings**, reachable from the board without leaving it. Currently exposes colourblind
+  mode, which C3a built and nothing had surfaced.
+- **Header chrome**: menu on the left, level and score centred, settings on the right.
+- **Bones from an ad** on the lose sheet — all three, not one, since a single bone puts the player
+  straight back where they were.
+- **A starter dog on levels 1 to 25.** A teaching aid more than a leg-up: the free dog fires the
+  auto-mark cascade immediately, so a new player sees the rules ruling cells out before having to
+  reason about any of them. It scores nothing.
+
+**Outcome.** 28 GameViewModel tests, all green, detekt clean, verified on device.
+
+### The bug this chunk actually turned up
+
+`SEAViewModel.state` reads a *derived* `stateIn` flow, so it lags `updateState` by a dispatch.
+Reading `state` back inside the same action returns the pre-update value. It surfaced as the
+starter dog working on device but not in tests — and the same pattern was in `place()` → `win()`,
+where a level's final score could silently drop the points for the placement that won it. Both are
+fixed and the rule is written down in `decisions.md`.
+
+### Still open from the same feedback
+
+Level drawer, hint spotlight mode, an always-available ad button, haptics, and the ad-frequency
+question (bones-only versus an interstitial every N levels). Tracked in C4b.
+
+---
+
+## C4b · Level drawer, hints and haptics
+
+**Unblocked by** C4a.
+
+**Delivers**
+
+- A sliding level drawer from the menu button, with a fading list.
+- Hint mode on the Focus system: dim everything, light a row or several, and draw temporary
+  crosses showing where a dog *cannot* go. Three hints, refilled by an ad.
+- An always-available ad button that refills bones.
+- Haptics on place, strike and warning.
+- The ad-frequency decision. Current recommendation: keep rewarded ads as the *only* player-facing
+  ads (bones, hints, boosters) so an ad always reads as a gift, and add the level-complete
+  interstitial in C7 behind the config gate rather than now.
+
+---
+
 ## C4 · `:features:game` — the playable board — **DONE** (2026-09-07)
 
 **Unblocked by** C1, C2, C3.

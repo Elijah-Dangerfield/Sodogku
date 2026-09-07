@@ -39,6 +39,18 @@ object Motion {
     /** Cell fills, X marks appearing, anything cross-fading. */
     const val FadeMillis: Int = 180
 
+    /**
+     * How long a player's cross takes to draw itself, stroke by stroke.
+     *
+     * Short on purpose. A player marking up a 10x10 will do this dozens of
+     * times, and anything slower than a flick of a pen becomes the thing
+     * standing between them and their next thought.
+     */
+    const val MarkDrawMillis: Int = 170
+
+    /** Per-cell stagger for the board's entrance wave, measured on the diagonal. */
+    const val BoardWaveStepMillis: Int = 22
+
     /** How far a pressed element scales down. Matches `bounceClick`'s default. */
     const val PressScale: Float = 0.90f
 

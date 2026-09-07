@@ -25,6 +25,13 @@ data class AppData(
     val hasCompletedTutorial: Boolean = false,
 
     /**
+     * Identifies regions by glyph as well as hue. Region colour is the core
+     * mechanic, and no ten-colour set survives red-green colour vision
+     * deficiency, so this is a real accessibility mode rather than a preference.
+     */
+    val colorblindMode: Boolean = false,
+
+    /**
      * Stable per-install identifier, minted on first read and persisted for
      * the app's lifetime on this device (survives sign-out; dies with
      * uninstall). Sent as X-Install-Id on authenticated requests so the
