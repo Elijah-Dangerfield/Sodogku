@@ -231,7 +231,7 @@ by a test that drives the real API end to end rather than the formula in pieces.
 
 ---
 
-## C3a · Theme, art and design-system foundations
+## C3a · Theme, art and design-system foundations — **DONE** (2026-09-07)
 
 **Unblocked by** C0. Scheduled **before** the board on purpose: every screen built against a
 placeholder theme is a screen that has to be revisited, and C4 will define most of the game's
@@ -247,14 +247,48 @@ visual language whether the tokens are ready or not.
 - Detekt rules for the recurring mistakes (raw `dp` literals, direct Material imports in
   `features/`), following the `VerifyStrings` pattern.
 
-**Partially done already (2026-09-07).** The dog art is landed and rendering: `Dog(pose = ...)` in
-`:libraries:ui`, six poses, downscaled per use case (620KB shipped against 8.3MB of source), and
-verified on device via the welcome screen. Originals and the animated clips are archived in
-`art/source/`. See SPEC section 16a for why the clips are not wired up and why there is no Coil
-dependency yet.
-
 **Done when** a new screen can be written with no raw `dp`, no Material import and no drawable
 reference, and looks right by default.
+
+**Outcome.** All green, verified on device.
+
+- **`Dog(pose = ...)`** with six poses, downscaled per use case (620KB shipped against 8.3MB of
+  source). Originals and animated clips archived in `art/source/`; SPEC section 16a covers why the
+  clips are not wired up and why there is no Coil dependency.
+- **`RegionPalette`**, ten fills plus a distinct glyph each, and **`BoardCell`** with its pop,
+  shake, auto-mark and long-press built in — so a screen cannot forget to animate a cell or wire
+  press feedback by hand.
+- **`Motion`** tokens (Pop, Tap, fade, shake duration), a `Radii.Cell` token, and
+  **`bounceCombinedClick`** for the tap-plus-long-press gesture the board needs.
+- **Poppins** replaces Roboto as the sans family. Already bundled with the template, geometric and
+  near-circular, so the display face got rounder with no new asset and no licensing step. Baloo 2
+  or Fredoka are drop-in if it should be rounder still.
+- **`NoRawDesignValues`** detekt rule: fails raw `dp`/`sp` literals and direct Material imports in
+  feature code, excluding `:libraries:ui` (which has to define them) and previews. It caught one
+  real violation in `HomeScreen`, which was fixed rather than baselined.
+- **Catalog page** for regions, cells and dog poses, with previews.
+
+### Two bugs the on-device render caught that review did not
+
+Both were found by putting the palette on a phone and looking at it, and neither would have
+failed a test:
+
+1. **Three of the ten ink colours were wrong.** Marks are drawn in dark or light ink depending on
+   the fill, and hand-assigning that put light ink on coral, green and plum — all dark enough that
+   the mark nearly vanished. Ink is now *derived* from the WCAG contrast ratio against each fill,
+   which removes the whole error class rather than fixing three values.
+2. **The X mark reused a region's identity glyph.** `BoardCell` drew the player's "no dog here"
+   mark with `RegionGlyph.Plus` — which is region 6's glyph — directly under a comment claiming it
+   deliberately was not one of them. On a region-6 cell in colourblind mode, "this is region 6" and
+   "you ruled this out" would have been the same shape. The mark now has its own cross, and a
+   cross is excluded from the region set so it can only ever mean one thing.
+
+### Deferred out of this chunk, deliberately
+
+`RuleChip`, `LifeRow`, `PawRating`, `LevelTile`, `ScoreCounter`, `FloatingPoints` and
+`BoosterButton` are **not** built yet. Their shape depends on the screen that holds them, and
+designing seven components against no layout is how a catalog fills up with APIs nobody can use.
+They land in C4 alongside the board, against the existing tokens.
 
 ---
 

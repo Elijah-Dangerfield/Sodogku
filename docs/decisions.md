@@ -6,6 +6,33 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — Region ink is derived from contrast, not chosen
+
+**Decision:** `RegionStyle.ink` (the colour marks and glyphs are drawn in) is computed per fill by
+comparing the WCAG contrast ratio of a dark ink and a light ink against it, rather than being
+declared alongside the fill.
+
+**Why:** hand-assigning it got three of ten wrong. Coral, green and plum all read as "dark
+colours" by eye but are light enough that white ink nearly vanishes on them. The mistake was
+invisible in code review and instantly obvious once the palette was rendered as a strip on a
+device. A derivation removes the error class permanently, and it self-corrects if a fill is ever
+retuned.
+
+**Related:** the same render caught `BoardCell` drawing the player's X mark with
+`RegionGlyph.Plus`, which is region 6's own identity glyph — under a comment asserting it was
+deliberately not one of them. The mark now has a dedicated cross, and a cross is excluded from
+`RegionGlyph` so the shape can only carry one meaning.
+
+## 2026-09-07 — Poppins, not a new font file
+
+**Decision:** the sans family points at Poppins, which the template already bundles, rather than
+adding Baloo 2 or Fredoka.
+
+**Why:** Poppins is geometric and near-circular, which gets most of the way to the rounded display
+face the art direction wants, at the cost of zero new assets and no licensing step. If it needs to
+be rounder, both alternatives are OFL and are a drop-in replacement in `FontFamily.kt` with nothing
+else in the type scale changing.
+
 ## 2026-09-07 — Dog art ships downscaled behind a component, and the clips stay archived
 
 **Decision:** the seven 1024px stills ship downscaled by use case (192px board poses, 512px hero

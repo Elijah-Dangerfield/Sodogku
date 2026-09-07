@@ -15,6 +15,7 @@ import com.sodogku.libraries.ui.components.Screen
 import com.sodogku.libraries.ui.components.button.Button
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.system.AppTheme
+import com.sodogku.system.Dimension
 import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.system.VerticalSpacerD800
 
@@ -32,7 +33,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(24.dp),
+                .padding(Dimension.D900),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {

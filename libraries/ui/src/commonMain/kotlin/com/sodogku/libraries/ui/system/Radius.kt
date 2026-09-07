@@ -50,6 +50,9 @@ object Radii {
     val Banner get() = R400
     val Header get() = None
     val Card get() = R400
+
+    /** One board square. Generous enough to read as bubbly at 34dp. */
+    val Cell get() = R300
 }
 
 

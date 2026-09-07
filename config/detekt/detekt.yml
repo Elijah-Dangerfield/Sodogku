@@ -14,3 +14,15 @@ sodogku:
     excludes: ['**/apps/admin/**']
   AnimatedStateReadInComposition:
     active: true
+  NoRawDesignValues:
+    active: true
+    # The design system itself has to define the tokens and wrap the Material
+    # primitives somewhere, and that somewhere is :libraries:ui. The admin
+    # console is a local-only dev tool on Compose HTML, not the DS.
+    excludes: ['**/libraries/ui/**', '**/apps/admin/**']
+    # Material types the DS legitimately re-exports rather than wraps: shapes
+    # and window insets are layout primitives with no themed equivalent.
+    allowedMaterialImports:
+      - 'androidx.compose.material3.Surface'
+      - 'androidx.compose.material3.MaterialTheme'
+      - 'androidx.compose.material3.ExperimentalMaterial3Api'

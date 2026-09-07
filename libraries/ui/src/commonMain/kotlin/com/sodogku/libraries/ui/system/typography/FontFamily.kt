@@ -28,18 +28,26 @@ val BrandFontFamily: FontFamily
         ),
     )
 
+/**
+ * Poppins, not Roboto. Poppins is geometric and near-circular, which is the
+ * closest thing to the rounded display face the art direction wants without
+ * bundling another font file — and it ships with the template already.
+ *
+ * If this ever needs to be rounder still, Baloo 2 and Fredoka are both OFL and
+ * are drop-in replacements here; nothing else in the type scale would change.
+ */
 val SansSerifFontFamily: FontFamily
     @Composable get() = FontFamily(
         Font(
-            resource = Res.font.Roboto_Light, weight = FontWeight.Light
+            resource = Res.font.poppins_light, weight = FontWeight.Light
         ), Font(
-            resource = Res.font.Roboto_Regular, weight = FontWeight.Normal
+            resource = Res.font.poppins_regular, weight = FontWeight.Normal
         ), Font(
-            resource = Res.font.Roboto_Medium, weight = FontWeight.Medium
+            resource = Res.font.poppins_medium, weight = FontWeight.Medium
         ), Font(
-            resource = Res.font.Roboto_Bold, weight = FontWeight.Bold
+            resource = Res.font.poppins_bold, weight = FontWeight.Bold
         ), Font(
-            resource = Res.font.Roboto_SemiBold, weight = FontWeight.SemiBold
+            resource = Res.font.poppins_semibold, weight = FontWeight.SemiBold
         )
     )
 

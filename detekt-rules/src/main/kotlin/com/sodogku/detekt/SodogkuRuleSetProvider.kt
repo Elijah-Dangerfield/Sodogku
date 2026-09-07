@@ -17,6 +17,7 @@ class SodogkuRuleSetProvider : RuleSetProvider {
         listOf(
             ::VerifyStrings,
             ::AnimatedStateReadInComposition,
+            ::NoRawDesignValues,
         ),
     )
 }
