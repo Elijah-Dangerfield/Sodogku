@@ -78,23 +78,32 @@ points = basePerPlacement × size × comboMultiplier × speedMultiplier
 
 - `basePerPlacement` defaults to 100, remote config.
 - `size` is the grid dimension, so a 9x9 placement is worth more than a 4x4 one.
-- `comboMultiplier` ramps with consecutive correct placements: 1.0, 1.05, 1.1, 1.15 and so on,
-  capped. Resets to 1.0 on a strike.
-- `speedMultiplier` decays from 1.3 to 1.0 over `scoring.speedWindowMs` (default 8000) since the
-  previous placement.
+- `comboMultiplier` ramps with consecutive correct placements: 1.0, 1.08, 1.16 and so on, capped
+  at 2.0. Resets to 1.0 on a strike.
+- `speedMultiplier` decays linearly from 1.6 to 1.0 over `scoring.speedWindowMs` (default 8000)
+  since the previous placement. Linear rather than exponential so the pressure a player feels is
+  proportional to the clock they can see.
+
+The multipliers have to spread **wide**, not just exist. A first pass used gentler numbers
+(combo step 0.05, speed max 1.3, lives rate 0.25) and the worst run a player could physically
+finish still landed at 63% of par, above the two-paw line — so a single paw was unreachable and
+the rating carried no information at all. Compressing the range is the failure mode to watch
+whenever these get retuned.
 
 Level completion bonus:
 
 ```
-bonus = completionBase × size × difficulty × (1 + livesRemaining × livesBonusRate)
+bonus = completionBase × size × (1 + (difficulty - 1) × difficultyBonusRate)
+                              × (1 + livesRemaining × livesBonusRate)
 ```
 
 Praise text floats over the board on high-multiplier placements: "Nice", "Great", "Excellent",
 "Perfect". Purely cosmetic, thresholds in config.
 
-**Paw rating** (0 to 3) is score-based, not strike-based. The generator computes a par score per
-level and stores three thresholds in the pack. This is more standard than counting strikes and it
-rewards speed and combo, which is what the score system exists to do.
+**Paw rating** (0 to 3) is score-based, not strike-based, which rewards the speed and combo the
+score system exists to measure. Par is *derived at runtime* from size and difficulty (see section
+3.2), never stored in the pack, so retuning what a three-paw clear means is a config change.
+Finishing at all earns one paw; the second and third are fractions of par (0.60 and 0.85).
 
 Records kept per level: `best_score`, `best_time_ms`, `best_paws`.
 
@@ -342,9 +351,10 @@ checked at the point of use rather than cached in a ViewModel at screen entry.
 
 **Scoring**
 
-`scoring.basePerPlacement` (100), `scoring.completionBase` (500), `scoring.comboStep` (0.05),
-`scoring.comboMax` (2.0), `scoring.speedWindowMs` (8000), `scoring.speedMaxMultiplier` (1.3),
-`scoring.livesBonusRate` (0.25), `scoring.praiseThresholds`.
+`scoring.basePerPlacement` (100), `scoring.completionBase` (250), `scoring.comboStep` (0.08),
+`scoring.comboMax` (2.0), `scoring.speedWindowMs` (8000), `scoring.speedMaxMultiplier` (1.6),
+`scoring.livesBonusRate` (0.5), `scoring.difficultyBonusRate` (0.2), `scoring.twoPawFraction`
+(0.60), `scoring.threePawFraction` (0.85), and the four praise cutoffs.
 
 **Daily**
 

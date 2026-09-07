@@ -189,7 +189,7 @@ players' completed levels to different boards.
 
 ---
 
-## C3 · `:libraries:scoring`
+## C3 · `:libraries:scoring` — **DONE** (2026-09-07)
 
 **Unblocked by** C1 (needs nothing from C2).
 
@@ -199,6 +199,16 @@ Every coefficient injected as a config-shaped data class, never a hardcoded cons
 
 **Done when** unit tests pin the formula against worked examples and confirm a strike resets the
 combo.
+
+**Outcome.** 24 tests, zero dependencies (not even `:libraries:puzzle` — scoring only ever needs a
+size and a difficulty tier as ints).
+
+The tuning caught a real problem. The first set of coefficients produced a multiplier range too
+narrow for the paw thresholds to mean anything: the worst run a player can physically finish (two
+strikes spent, every placement slow) still scored 63% of par, above the two-paw line, so one paw
+was unreachable. Widening combo step 0.05 → 0.08, speed max 1.3 → 1.6 and lives rate 0.25 → 0.5
+spreads completed runs across roughly 0.45 to 1.0 of par, and the three bands are now each pinned
+by a test that drives the real API end to end rather than the formula in pieces.
 
 ---
 
