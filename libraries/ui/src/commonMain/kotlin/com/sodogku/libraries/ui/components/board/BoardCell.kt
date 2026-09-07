@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.dog.AnimatedDog
+import com.sodogku.libraries.ui.components.dog.Dog
+import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.system.color.RegionPalette
 import com.sodogku.libraries.ui.system.color.drawBoardMark
 import com.sodogku.libraries.ui.system.color.drawRegionGlyph
@@ -74,6 +76,8 @@ fun BoardCell(
     entranceDelayMillis: Int = 0,
     /** Staggers the placed dog's idle loop so a board of them is not in lockstep. */
     animationOffset: Int = 0,
+    /** False swaps the living dog for a still, for the battery setting. */
+    animated: Boolean = true,
     enabled: Boolean = true,
     onTap: () -> Unit = {},
 ) {
@@ -128,7 +132,13 @@ fun BoardCell(
             .clip(Radii.Cell)
             .drawBehind {
                 drawRect(style.fill)
-                if (colorblind) drawRegionGlyph(style.glyph, style.ink, GlyphFraction)
+                if (colorblind) {
+                    drawRegionGlyph(
+                        style.glyph,
+                        style.ink.copy(alpha = style.ink.alpha * GlyphAlpha),
+                        GlyphFraction,
+                    )
+                }
                 if (mark.value > 0f) drawBoardMark(style.ink, MarkFraction, mark.value)
                 if (shake.value > 0f && shake.value < 1f) {
                     drawBoardMark(StrikeInk, MarkFraction, progress = 1f)
@@ -147,15 +157,20 @@ fun BoardCell(
         if (pop.value > 0f) {
             // A placed dog is alive: it looks around and blinks. Driven from a
             // shared sprite sheet, so ten of them on a board cost one bitmap.
-            AnimatedDog(
-                size = size * DogFraction,
-                frameOffset = animationOffset,
-                modifier = Modifier.graphicsLayer {
-                    scaleX = pop.value
-                    scaleY = pop.value
-                    alpha = pop.value.coerceIn(0f, 1f)
-                },
-            )
+            val dogModifier = Modifier.graphicsLayer {
+                scaleX = pop.value
+                scaleY = pop.value
+                alpha = pop.value.coerceIn(0f, 1f)
+            }
+            if (animated) {
+                AnimatedDog(
+                    size = size * DogFraction,
+                    frameOffset = animationOffset,
+                    modifier = dogModifier,
+                )
+            } else {
+                Dog(pose = DogPose.Still, size = size * DogFraction, modifier = dogModifier)
+            }
         }
     }
 }
@@ -166,7 +181,13 @@ val DefaultCellSize: Dp = 34.dp
 /** A wrong tap flashes red before the cell settles into an ordinary mark. */
 private val StrikeInk = Color(0xE6D32F2F)
 
-private const val GlyphFraction = 0.55f
+/**
+ * The region glyph is a watermark, not a badge. Loud enough to tell two fills
+ * apart at a glance, quiet enough that a board of them does not compete with
+ * the crosses and dogs the player is actually reading.
+ */
+private const val GlyphFraction = 0.42f
+private const val GlyphAlpha = 0.45f
 private const val MarkFraction = 0.46f
 private const val DogFraction = 0.82f
 private const val ShakeCycles = 18f

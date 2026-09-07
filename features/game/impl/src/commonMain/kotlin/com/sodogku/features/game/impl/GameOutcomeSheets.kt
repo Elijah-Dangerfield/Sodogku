@@ -27,6 +27,8 @@ import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.game_back_to_levels
 import sodogku.libraries.resources.generated.resources.game_continue
 import sodogku.libraries.resources.generated.resources.game_lost_title
+import sodogku.libraries.resources.generated.resources.game_next_level
+import sodogku.libraries.resources.generated.resources.game_watch_ad_badge
 import sodogku.libraries.resources.generated.resources.game_refill_bones
 import sodogku.libraries.resources.generated.resources.game_retry
 import sodogku.libraries.resources.generated.resources.game_won_title
@@ -67,12 +69,31 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
             color = AppTheme.colors.accentPrimary,
         )
         ButtonPrimary(
-            onClick = { onAction(GameAction.Leave) },
+            onClick = { onAction(GameAction.NextLevel) },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(stringResource(Res.string.game_back_to_levels))
+            Text(stringResource(Res.string.game_next_level))
+            // The badge marks the moments an ad is coming, so the tap is never a
+            // surprise. It only appears when one is actually due (C7 wires the
+            // frequency gate; nothing is due yet).
+            if (state.adBeforeNextLevel) AdBadge()
         }
     }
+}
+
+/** A small marker meaning "this button plays an ad first". */
+@Composable
+private fun AdBadge() {
+    Text(
+        text = stringResource(Res.string.game_watch_ad_badge),
+        typography = AppTheme.typography.Caption.C200,
+        color = AppTheme.colors.onAccentPrimary,
+        modifier = Modifier
+            .padding(start = Dimension.D300)
+            .clip(Radii.Round)
+            .background(AppTheme.colors.accentSecondary.color)
+            .padding(horizontal = Dimension.D300, vertical = Dimension.D50),
+    )
 }
 
 @Composable

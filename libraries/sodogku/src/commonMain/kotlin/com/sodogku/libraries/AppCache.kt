@@ -35,6 +35,20 @@ data class AppData(
     val hapticsEnabled: Boolean = true,
 
     /**
+     * Swaps the animated dogs for stills and shortens the board's entrance.
+     * A battery setting rather than an accessibility one, though it serves both.
+     */
+    val reduceAnimations: Boolean = false,
+
+    /**
+     * The furthest level reached. Everything up to it is unlocked; the level
+     * drawer greys out the rest. Real per-level records arrive with
+     * `:libraries:progress` in C5 — this is the one number the game needs before
+     * then, and it is what the app opens on.
+     */
+    val currentLevel: Int = 1,
+
+    /**
      * Stable per-install identifier, minted on first read and persisted for
      * the app's lifetime on this device (survives sign-out; dies with
      * uninstall). Sent as X-Install-Id on authenticated requests so the

@@ -26,6 +26,8 @@ import com.sodogku.libraries.ui.components.board.BoardCell
 import com.sodogku.libraries.ui.components.board.BoardCellState
 import com.sodogku.libraries.ui.components.game.BoosterButton
 import com.sodogku.libraries.ui.components.game.FloatingPoints
+import com.sodogku.libraries.ui.bounceClick
+import com.sodogku.libraries.ui.components.game.DogCounter
 import com.sodogku.libraries.ui.components.game.LifeRow
 import com.sodogku.libraries.ui.components.game.RuleChip
 import com.sodogku.libraries.ui.components.game.RuleDiagram
@@ -35,14 +37,15 @@ import com.sodogku.libraries.ui.components.icon.Icons
 import com.sodogku.libraries.ui.system.focusTarget
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.scoring.Praise
+import com.sodogku.libraries.core.BuildInfo
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
-import sodogku.libraries.resources.generated.resources.game_dogs_progress
-import sodogku.libraries.resources.generated.resources.game_level
+import sodogku.libraries.resources.generated.resources.game_level_label
+import sodogku.libraries.resources.generated.resources.game_score_label
 import sodogku.libraries.resources.generated.resources.game_rule_no_touching
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_line
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_region
@@ -59,7 +62,8 @@ fun GameScreen(
     onAction: (GameAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var settingsOpen by remember { mutableStateOf(false) }
+    var dialog by remember { mutableStateOf<GameDialog?>(null) }
+    var drawerOpen by remember { mutableStateOf(false) }
 
     Screen(modifier = modifier) { padding ->
         val level = state.level
@@ -79,14 +83,15 @@ fun GameScreen(
             GameHeader(
                 state = state,
                 levelId = level.id,
-                onLeave = { onAction(GameAction.Leave) },
-                onSettings = { settingsOpen = true },
+                onOpenLevels = { drawerOpen = true },
+                onSettings = { dialog = GameDialog.Settings },
+                onExplainBones = { dialog = GameDialog.Bones },
             )
 
             // The rules sit directly under the header rather than floating above
             // the board: they are reference material, and a gap between them and
             // the score reads as a hole on a small grid.
-            RuleChips()
+            RuleChips(onExplain = { dialog = GameDialog.Rules })
 
             Spacer(modifier = Modifier.weight(WEIGHT_FILL))
 
@@ -122,14 +127,29 @@ fun GameScreen(
 
             LastBoneWarning(state = state, onAction = onAction)
 
-            if (settingsOpen) {
-                GameSettingsSheet(
-                    state = state,
-                    onAction = onAction,
-                    onDismiss = { settingsOpen = false },
-                )
-            }
+            LevelDrawer(
+                open = drawerOpen,
+                currentLevelId = level.id,
+                unlockedThrough = state.unlockedThrough,
+                canJumpAnywhere = state.isPro,
+                onPick = {
+                    drawerOpen = false
+                    onAction(GameAction.GoToLevel(it))
+                },
+                onDismiss = { drawerOpen = false },
+            )
         }
+
+        GameDialogHost(
+            dialog = dialog,
+            state = state,
+            onAction = onAction,
+            onDismiss = { dialog = null },
+            onOpenPrivacy = { onAction(GameAction.OpenPrivacy) },
+            onOpenTerms = { onAction(GameAction.OpenTerms) },
+            onOpenFeedback = { onAction(GameAction.OpenFeedback) },
+            appVersion = BuildInfo.versionName,
+        )
     }
 }
 
@@ -137,23 +157,27 @@ fun GameScreen(
 private fun GameHeader(
     state: GameState,
     levelId: Int,
-    onLeave: () -> Unit,
+    onOpenLevels: () -> Unit,
     onSettings: () -> Unit,
+    onExplainBones: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = Dimension.D400),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
-        IconButton(icon = Icons.Menu(null), onClick = onLeave)
+        IconButton(icon = Icons.Menu(null), onClick = onOpenLevels)
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = stringResource(Res.string.game_level, levelId),
-                typography = AppTheme.typography.Caption.C300,
-                color = AppTheme.colors.textSecondary,
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D1000)) {
+            HeaderStat(
+                label = stringResource(Res.string.game_level_label),
+                value = levelId.toString(),
             )
-            ScoreCounter(score = state.score.total)
+            HeaderStat(
+                label = stringResource(Res.string.game_score_label),
+                value = null,
+                content = { ScoreCounter(score = state.score.total) },
+            )
         }
 
         IconButton(icon = Icons.Settings(null), onClick = onSettings)
@@ -164,36 +188,58 @@ private fun GameHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = stringResource(
-                Res.string.game_dogs_progress,
-                state.dogsPlaced,
-                state.dogsRequired,
-            ),
-            typography = AppTheme.typography.Caption.C300,
-            color = AppTheme.colors.textSecondary,
-        )
+        DogCounter(found = state.dogsPlaced, total = state.dogsRequired)
         LifeRow(
             remaining = state.livesRemaining,
-            modifier = Modifier.focusTarget(LivesFocusKey),
+            modifier = Modifier
+                .focusTarget(LivesFocusKey)
+                .bounceClick(onClick = onExplainBones),
         )
     }
 }
 
+/**
+ * A stat with its label above it. The number is the display face at heading
+ * weight, because the level and the score are the two things a player glances
+ * at mid-puzzle and neither should need looking for.
+ */
 @Composable
-private fun RuleChips() {
+private fun HeaderStat(
+    label: String,
+    value: String?,
+    content: @Composable () -> Unit = {},
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = label,
+            typography = AppTheme.typography.Body.B400,
+            color = AppTheme.colors.textSecondary,
+        )
+        if (value != null) {
+            Text(text = value, typography = AppTheme.typography.Heading.H700)
+        } else {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun RuleChips(onExplain: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D300)) {
         RuleChip(
             diagram = RuleDiagram.OnePerRegion,
             label = stringResource(Res.string.game_rule_one_per_region),
+            onClick = onExplain,
         )
         RuleChip(
             diagram = RuleDiagram.OnePerLine,
             label = stringResource(Res.string.game_rule_one_per_line),
+            onClick = onExplain,
         )
         RuleChip(
             diagram = RuleDiagram.NoTouching,
             label = stringResource(Res.string.game_rule_no_touching),
+            onClick = onExplain,
         )
     }
 }
@@ -224,8 +270,13 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
                             size = cell,
                             colorblind = state.colorblind,
                             strikeNonce = if (state.strikeCell == index) state.strikeNonce else 0,
-                            entranceDelayMillis = (row + col) * Motion.BoardWaveStepMillis,
+                            entranceDelayMillis = if (state.reduceAnimations) {
+                                0
+                            } else {
+                                (row + col) * Motion.BoardWaveStepMillis
+                            },
                             animationOffset = index,
+                            animated = !state.reduceAnimations,
                             enabled = state.phase == GamePhase.Playing,
                             onTap = { onAction(GameAction.CellTapped(index)) },
                         )

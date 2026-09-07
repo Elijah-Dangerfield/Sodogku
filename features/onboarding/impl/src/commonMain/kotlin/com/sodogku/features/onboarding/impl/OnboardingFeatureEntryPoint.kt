@@ -3,7 +3,7 @@ package com.sodogku.features.onboarding.impl
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
-import com.sodogku.features.home.HomeRoute
+import com.sodogku.features.game.GameRoute
 import com.sodogku.features.onboarding.OnboardingRoute
 import com.sodogku.libraries.flowroutines.ObserveEvents
 import com.sodogku.libraries.navigation.FeatureEntryPoint
@@ -30,7 +30,7 @@ class OnboardingFeatureEntryPoint(
             viewModel.ObserveEvents { event ->
                 when (event) {
                     OnboardingEvent.NavigateToHome -> router.navigate(
-                        HomeRoute(),
+                        GameRoute(),
                         NavigationOptions(launchSingleTop = true, clearBackStack = true),
                     )
                 }

@@ -2,7 +2,7 @@ package com.sodogku
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.sodogku.features.home.HomeRoute
+import com.sodogku.features.game.GameRoute
 import com.sodogku.features.onboarding.OnboardingRoute
 import com.sodogku.libraries.config.EnsureAppConfigLoaded
 import com.sodogku.libraries.core.logging.KLog
@@ -31,8 +31,8 @@ private const val BootConfigTimeoutMillis = 8_000L
 
 /**
  * App-level ViewModel. Resolves the start destination by reading the persistent
- * `AppData` cache — returning players land on [HomeRoute]; first-launch players
- * land on [OnboardingRoute].
+ * `AppData` cache — returning players land straight on the puzzle they had
+ * reached; first-launch players land on [OnboardingRoute].
  *
  * Scoped as singleton so Android's splash-screen API can read the same instance
  * used by the App composable.
@@ -95,12 +95,20 @@ class AppViewModel(
 
     init {
         viewModelScope.launch {
-            val onboarded = appCache.get().hasUserOnboarded
+            val data = appCache.get()
+            val onboarded = data.hasUserOnboarded
             logger.d {
                 "Resolving start destination: hasUserOnboarded=$onboarded → " +
-                    if (onboarded) "Home" else "Onboarding"
+                    if (onboarded) "Game(level ${data.currentLevel})" else "Onboarding"
             }
-            _startDestination.value = if (onboarded) HomeRoute() else OnboardingRoute()
+            // The puzzle *is* the home screen. Sending a returning player to a
+            // menu first puts a navigation between them and the thing they
+            // opened the app to do; the level list is a drawer on the board.
+            _startDestination.value = if (onboarded) {
+                GameRoute(data.currentLevel)
+            } else {
+                OnboardingRoute()
+            }
             // Start destination resolved — release the platform splash; the
             // Compose boot gate now covers the rest of the wait.
             _isReady.value = true

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.toRoute
 import com.sodogku.features.game.GameRoute
+import com.sodogku.features.home.FeedbackRoute
 import com.sodogku.libraries.flowroutines.ObserveEvents
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.Router
@@ -37,6 +38,12 @@ class GameFeatureEntryPoint(
                     is GameEvent.PlacedDog -> haptics.play(Feel.Place)
                     is GameEvent.Struck -> haptics.play(Feel.Strike)
                     GameEvent.Won -> haptics.play(Feel.Win)
+                    // Legal pages are hosted (GitHub Pages via `pages/`), so they
+                    // open in a browser rather than as in-app screens. The URLs
+                    // move to remote config with the rest of the legal gate in C11.
+                    GameEvent.OpenPrivacy -> router.openWebLink(PrivacyUrl)
+                    GameEvent.OpenTerms -> router.openWebLink(TermsUrl)
+                    GameEvent.OpenFeedback -> router.navigate(FeedbackRoute())
                 }
             }
 
@@ -44,3 +51,7 @@ class GameFeatureEntryPoint(
         }
     }
 }
+
+/** Placeholders until `legal.privacyUrl` / `legal.termsUrl` land in remote config (C11). */
+private const val PrivacyUrl = "https://elijah-dangerfield.github.io/Sodogku/privacy.html"
+private const val TermsUrl = "https://elijah-dangerfield.github.io/Sodogku/terms.html"

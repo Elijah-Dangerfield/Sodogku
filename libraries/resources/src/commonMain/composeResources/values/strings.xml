@@ -5,7 +5,8 @@
     <string name="onboarding_start_tutorial">Teach me how</string>
     <string name="onboarding_skip_tutorial">I know how to play</string>
 
-    <string name="game_level">Level %1$d</string>
+    <string name="game_level_label">Level</string>
+    <string name="game_score_label">Score</string>
     <string name="game_dogs_progress">%1$d / %2$d</string>
     <string name="game_rule_one_per_region">1 dog per color</string>
     <string name="game_rule_one_per_line">1 dog per row &amp; column</string>
@@ -29,4 +30,28 @@
     <string name="settings_haptics">Vibration</string>
     <string name="settings_haptics_body">A small buzz when you mark a square, place a dog, or get one wrong.</string>
     <string name="settings_done">Done</string>
+    <string name="game_watch_ad_badge">Ad</string>
+    <string name="game_dogs_found">%1$d/%2$d</string>
+
+    <string name="rules_title">How to play</string>
+    <string name="rules_body">Find the one square in every color where a dog belongs.\n\nTap a square to cross it off. Tap it twice to place a dog there. Cross off freely — only placing a dog can cost you a bone.</string>
+    <string name="rules_region_body">Every color holds exactly one dog. Once a dog lands, the rest of that color is out.</string>
+    <string name="rules_line_body">Every row and every column holds exactly one dog too.</string>
+    <string name="rules_touch_body">No two dogs may touch, not even corner to corner.</string>
+
+    <string name="bones_title">Bones</string>
+    <string name="bones_body">Three bones per attempt. Placing a dog on the wrong square costs one. Run out and the attempt ends — but you can watch an ad for three more, or start the puzzle over.\n\nCrossing squares off is always free.</string>
+
+    <string name="levels_title">Levels</string>
+    <string name="levels_locked">Locked</string>
+    <string name="levels_size">%1$d×%2$d</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_reduce_animations">Reduce animations</string>
+    <string name="settings_reduce_animations_body">Still dogs and a shorter board entrance. Easier on the battery.</string>
+    <string name="settings_privacy">Privacy policy</string>
+    <string name="settings_terms">Terms of service</string>
+    <string name="settings_feedback">Send feedback</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="common_close">Close</string>
 </resources>

@@ -11,6 +11,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
                         implementation(projects.features.game)
+            implementation(projects.features.home)
 
 
             implementation(projects.libraries.core)

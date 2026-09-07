@@ -76,6 +76,12 @@ class GameViewModel(
             GameAction.RefillBones -> action.refillBones()
             GameAction.ToggleColorblind -> action.toggleColorblind()
             GameAction.ToggleHaptics -> action.toggleHaptics()
+            GameAction.ToggleReduceAnimations -> action.toggleReduceAnimations()
+            GameAction.NextLevel -> action.nextLevel()
+            is GameAction.GoToLevel -> action.goToLevel(action.levelId)
+            GameAction.OpenPrivacy -> sendEvent(GameEvent.OpenPrivacy)
+            GameAction.OpenTerms -> sendEvent(GameEvent.OpenTerms)
+            GameAction.OpenFeedback -> sendEvent(GameEvent.OpenFeedback)
             is GameAction.TimerTick -> action.updateState { it.copy(elapsedMs = elapsedMs()) }
         }
     }
@@ -88,6 +94,9 @@ class GameViewModel(
             it.copy(
                 colorblind = settings?.colorblindMode == true,
                 haptics = settings?.hapticsEnabled != false,
+                reduceAnimations = settings?.reduceAnimations == true,
+                isPro = entitlements.isPro.value,
+                unlockedThrough = settings?.currentLevel ?: 1,
             )
         }
 
@@ -139,6 +148,9 @@ class GameViewModel(
                 treats = StartingTreats,
                 colorblind = it.colorblind,
                 haptics = it.haptics,
+                reduceAnimations = it.reduceAnimations,
+                isPro = it.isPro,
+                unlockedThrough = maxOf(it.unlockedThrough, level.id),
             )
         }
     }
@@ -355,6 +367,40 @@ class GameViewModel(
             .logOnFailure { "Failed to persist haptics setting" }
     }
 
+    private suspend fun GameAction.toggleReduceAnimations() {
+        val next = !state.reduceAnimations
+        updateState { it.copy(reduceAnimations = next) }
+        Catching { appCache.update { data -> data.copy(reduceAnimations = next) } }
+            .logOnFailure { "Failed to persist reduce-animations setting" }
+    }
+
+    /**
+     * Advances to the next level in the pack and records how far the player has
+     * reached, which is both what the app opens on and what unlocks the drawer.
+     */
+    private suspend fun GameAction.nextLevel() {
+        val current = state.level ?: return
+        val next = LevelPacks.campaign.byId(current.id + 1)
+        if (next == null) {
+            sendEvent(GameEvent.NavigateBack)
+            return
+        }
+        attemptNumber = 1
+        Catching {
+            appCache.update { data ->
+                data.copy(currentLevel = maxOf(data.currentLevel, next.id))
+            }
+        }.logOnFailure { "Failed to record level progress" }
+        startAttempt(next)
+    }
+
+    private suspend fun GameAction.goToLevel(levelId: Int) {
+        val target = LevelPacks.campaign.byId(levelId) ?: return
+        if (!entitlements.isPro.value && levelId > state.unlockedThrough) return
+        attemptNumber = 1
+        startAttempt(target)
+    }
+
     private suspend fun GameAction.restart() {
         val level = state.level ?: return
         attemptNumber++
@@ -429,6 +475,22 @@ data class GameState(
     /** Vibration on marks, placements and strikes. */
     val haptics: Boolean = true,
 
+    /** Stills instead of animated dogs, and a shorter board entrance. */
+    val reduceAnimations: Boolean = false,
+
+    /** How far the player has reached; the level drawer unlocks up to it. */
+    val unlockedThrough: Int = 1,
+
+    /** Pro can jump to any level in the drawer, not just the ones reached. */
+    val isPro: Boolean = false,
+
+    /**
+     * True when advancing will play an ad first, so the win sheet can badge the
+     * button rather than springing one on the player. Wired to the config-driven
+     * frequency gate in C7; nothing sets it yet.
+     */
+    val adBeforeNextLevel: Boolean = false,
+
     /** The free dog on early levels, so the UI can mark it as not the player's doing. */
     val starterDogCell: Int? = null,
 
@@ -451,6 +513,9 @@ sealed interface GameEvent {
     data class Marked(val cell: Int) : GameEvent
 
     data object Won : GameEvent
+    data object OpenPrivacy : GameEvent
+    data object OpenTerms : GameEvent
+    data object OpenFeedback : GameEvent
 
     data class Struck(val cell: Int) : GameEvent
 }
@@ -470,5 +535,11 @@ sealed interface GameAction {
     data object RefillBones : GameAction
     data object ToggleColorblind : GameAction
     data object ToggleHaptics : GameAction
+    data object ToggleReduceAnimations : GameAction
+    data object NextLevel : GameAction
+    data class GoToLevel(val levelId: Int) : GameAction
+    data object OpenPrivacy : GameAction
+    data object OpenTerms : GameAction
+    data object OpenFeedback : GameAction
     data class TimerTick(val at: Long) : GameAction
 }
