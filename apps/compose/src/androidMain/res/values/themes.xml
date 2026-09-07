@@ -14,5 +14,6 @@
     </style>
 
     <!-- Splash background matches the app theme background (ColorResource.Gray50) -->
-    <color name="splash_background">#FAFAFA</color>
+    <!-- Matches the launcher icon background, so the splash reads as the icon growing. -->
+    <color name="splash_background">#FAF5EB</color>
 </resources>
