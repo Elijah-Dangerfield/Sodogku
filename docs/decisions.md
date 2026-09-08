@@ -6,6 +6,109 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-08 — Ads narrow to consumables, and a failed ad shows Pro instead of nothing
+
+Two punch-list items that turned out to be the same conversation. The owner:
+"no ads except for bones and sniffs and other stuff", and "if the ads cannot
+load lets just have a self promo option where we promote sodogku pro".
+
+### What was actually there
+
+An audit of every placement, because the list in SPEC 5.3 and the list with a
+caller are not the same list.
+
+| Placement | Format | Production caller |
+| --- | --- | --- |
+| `continue_level` | Rewarded | `GameViewModel.refillBones()` from the lose sheet |
+| `booster_grant` | Rewarded | `GameViewModel.refillBones()` mid-board, and `refill()` |
+| `skip_level` | Rewarded | `SkipRepositoryImpl.skip()` |
+| `streak_freeze` | Rewarded | `DailyRepositoryImpl.useFreeze()` and `.restoreStreak()` |
+| `level_complete` | Interstitial | **none** |
+| `app_open` | App Open | **none**, and no `AdPlacement` for it either |
+| `map_banner` | Banner | **none**, and the map it needs does not exist |
+
+So "everything else" is one placement with a caller: nothing. The automatic
+interstitial was never wired. `BUILD-PLAN.md` still carries an open item asking
+someone to wire it, and the decision here is that nobody should.
+
+**The four rewarded placements all survive**, which is a wider reading of "bones
+and sniffs" than the words allow, and deliberate. The distinction the owner is
+drawing is not consumables versus everything else, it is *ads the player asked
+for* versus *ads that happen to them*. A rewarded ad is a trade offered at a
+moment the player is already stopped and already weighing something. The
+interstitial is the only format in the app that interrupts.
+
+Two of the four are also load-bearing, and removing them would break a feature
+rather than remove an ad: `SkipRepositoryImpl` has no other cost for a skip, and
+`DailyRepositoryImpl` has no other cost for a freeze or a restore. Take the ad
+away and both become free actions capped only by `progression.skipsPerDay` and
+`daily.freezesPerMonth`. That is a real economy change, not an ad change, and it
+belongs to whoever owns the streak economy the owner mentions in the same
+breath.
+
+**The interstitial removal is not in this change**, because it cannot be made
+without a coordinated edit across four modules. `AdGate.showInterstitial` is
+overridden by test doubles in `:features:game:impl` and `:libraries:progress:impl`,
+and deleting `RealAdGate`'s triple gate orphans `ads.interstitialEveryNLevels`,
+`ads.interstitialCooldownSec` and `ads.interstitialsPerSessionMax`, which
+`ConfigValuesAreReadTest` in `:apps:integration` then fails on, correctly. The
+whole removal is one commit or none.
+
+### The stand-in
+
+SPEC 5.3 has always said a failed ad grants the reward. What it never said is
+what the player is looking at while that happens, and the answer was nothing. A
+rewarded slot is the one moment a player volunteers their attention; handing it
+back unused on every no-fill throws away the only inventory we own outright.
+
+`RealAdGate` now asks `PaywallCoordinator.requestAdStandIn` on `NoFill`,
+`Offline`, `NotShown` and `Failed`, and the paywall goes up with its close
+controls held for five seconds.
+
+**The reward is decided before the promo is shown and the promo cannot touch
+it.** In `unserved()` the request is a statement and `outcome` is returned
+unchanged, so no later edit can make the sheet part of the expression that
+produces a reward. Making the promo *earn* the bones would mean closing it early
+had to withhold them, and that is a second `Dismissed` path wearing a feature's
+clothes: exactly the bug the `AdGate` KDoc exists to prevent. It is also the
+worse product. A player who was denied an ad, shown a sales pitch, and then
+denied their bones has learned something about us.
+
+**Five seconds, and the number that matters is the relation.** Five is the skip
+delay every rewarded format already trains players to expect, so the wait reads
+as familiar rather than as the app hanging. But the invariant under test is that
+the dwell is shorter than the fifteen to thirty second video it replaces: a
+fallback that cost more than the ad would make a bad fill rate something to hope
+for.
+
+**The dwell holds this screen's controls and not the system back gesture.** A
+five second sheet a player cannot escape is an ad network's bad afternoon
+becoming their problem, which is the one thing SPEC 4.2 forbids outright. The
+offline block swallows back because it is the state the player is in; this is a
+pitch. What the lock buys is a default, not a cage.
+
+**It is capped like an offer and not gated on `paywall.triggers`.** That list
+names the moments we chose to sell at, and this is not one of them; it is the
+replacement for content the player was promised, closer in kind to the offline
+block. It does spend `paywall.sessionCap`, because a thin-inventory afternoon
+must not turn every booster into a sales screen. And it is suppressed entirely
+where the gate has just put the same sheet up on the way in, which is
+`continue_level` and `skip_level`: two Pro sheets around one ad gate is a nag.
+
+### The debug placeholder, folded into the same path
+
+The ask was a fake interstitial in debug so it is obvious when an ad would have
+shown. Two things changed the shape of it. The interstitial has no caller and
+will not get one, and a debug build already requests Google's test units, which
+fill on every call and stamp "Test Ad" on the creative, so an ad that *shows* is
+never in doubt.
+
+The invisible case is the other one: the gate asked, the SDK had nothing, and the
+player carried on with no sign anything was attempted. That is the same case the
+stand-in exists for, so the two share a code path. In a debug build the sheet
+carries a `placement · reason` line; in release that string is empty. One path
+that release exercises beats a debug-only screen nobody notices rotting.
+
 ## 2026-09-08 — The speed window scales with the grid, and the curve is a declared list
 
 Two changes, from two reports: "I keep getting 2/3 paws, I'm solving super fast"

@@ -436,6 +436,110 @@ class RealAdGateTest : CoroutineTest() {
     }
 
     // ------------------------------------------------------------------
+    // The self-promo stand-in
+    // ------------------------------------------------------------------
+
+    @Test
+    fun everyUnservedRewardedAdPutsProUpRatherThanNothing() = runUnitTest {
+        val unserved = listOf(
+            AdShowOutcome(AdShowResult.NoFill) to "no_fill",
+            AdShowOutcome(AdShowResult.Offline) to "offline",
+            AdShowOutcome(AdShowResult.NotShown) to "not_shown",
+            AdShowOutcome(AdShowResult.Failed, "load_3") to "load_3",
+        )
+
+        unserved.forEach { (outcome, _) ->
+            network.outcome = outcome
+            gate().showRewarded(AdPlacement.BoosterGrant)
+        }
+
+        assertEquals(
+            unserved.map { (_, reason) -> AdsRewardedPlacements.BOOSTER_GRANT to reason },
+            paywall.standIns,
+            "A rewarded slot is attention the player volunteered. Handing it back " +
+                "unused on every no-fill throws away the only inventory we own.",
+        )
+    }
+
+    @Test
+    fun theStandInCannotChangeTheReward() = runUnitTest {
+        // The promo is shown *after* the outcome is decided and can never reach
+        // it. If watching it were what earned the bones, closing it early would
+        // have to withhold them, and that is a second `Dismissed` path wearing a
+        // feature's clothes.
+        network.outcome = AdShowOutcome(AdShowResult.NoFill)
+
+        val withStandIn = gate().showRewarded(AdPlacement.BoosterGrant)
+        val withoutStandIn = gate().showRewarded(AdPlacement.ContinueLevel)
+
+        assertTrue(paywall.standIns.isNotEmpty(), "the booster grant did take the stand-in path")
+        assertEquals(RewardOutcome.NoFill, withStandIn)
+        assertEquals(withStandIn, withoutStandIn, "Whether Pro appeared must not change the reward")
+    }
+
+    @Test
+    fun aGateThatJustOfferedProDoesNotOfferItAgainOnTheWayOut() = runUnitTest {
+        // `continue_level` puts the sheet up on the way *in*. Two Pro sheets
+        // around one ad gate is the nag `paywall.sessionCap` exists to stop.
+        network.outcome = AdShowOutcome(AdShowResult.NoFill)
+
+        gate().showRewarded(AdPlacement.ContinueLevel)
+
+        assertEquals(listOf(PaywallTrigger.ContinueLevel), paywall.offers)
+        assertEquals(emptyList(), paywall.standIns)
+    }
+
+    @Test
+    fun anOfferTheCoordinatorRefusedLeavesTheStandInToDoItsJob() = runUnitTest {
+        // The pre-ad offer is capped or switched off, so nothing was shown on
+        // the way in and the slot really is empty.
+        paywall.acceptsOffers = false
+        network.outcome = AdShowOutcome(AdShowResult.NoFill)
+
+        gate().showRewarded(AdPlacement.ContinueLevel)
+
+        assertEquals(emptyList(), paywall.offers)
+        assertEquals(
+            listOf(AdsRewardedPlacements.CONTINUE_LEVEL to "no_fill"),
+            paywall.standIns,
+        )
+    }
+
+    @Test
+    fun neitherAWatchedAdNorADismissedOneIsStoodInFor() = runUnitTest {
+        network.outcome = AdShowOutcome(AdShowResult.Rewarded)
+        gate().showRewarded(AdPlacement.BoosterGrant)
+
+        network.outcome = AdShowOutcome(AdShowResult.Dismissed)
+        gate().showRewarded(AdPlacement.BoosterGrant)
+
+        assertEquals(
+            listOf(AdFormat.Rewarded, AdFormat.Rewarded),
+            network.shown,
+            "both gates really did reach the network",
+        )
+        assertEquals(
+            emptyList(),
+            paywall.standIns,
+            "One slot was filled and the other the player closed on purpose. " +
+                "Selling to someone who just said no is the nag, not the fallback.",
+        )
+    }
+
+    @Test
+    fun aFreeRewardIsNotAnUnservedOneAndNeverPitchesPro() = runUnitTest {
+        // Ads off, placement off, still inside the new-user grace: the reward
+        // was free because we chose not to show an ad, not because we failed to.
+        val adsOff = gate(ads = mapOf("enabled" to false)).showRewarded(AdPlacement.BoosterGrant)
+        val placementOff = gate(ads = mapOf("rewardedPlacements" to mapOf("booster_grant" to false)))
+            .showRewarded(AdPlacement.BoosterGrant)
+
+        assertEquals(listOf(RewardOutcome.Rewarded, RewardOutcome.Rewarded), listOf(adsOff, placementOff))
+        assertEquals(emptyList(), network.shown, "neither gate went near an ad")
+        assertEquals(emptyList(), paywall.standIns)
+    }
+
+    // ------------------------------------------------------------------
 
     /**
      * [ads] is merged over a base that switches the **new-user grace off**.

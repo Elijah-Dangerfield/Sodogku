@@ -85,6 +85,26 @@ class RealPaywallCoordinator(
         return bus.tryEmit(PaywallRequest.OfflineBlock)
     }
 
+    override fun requestAdStandIn(placementId: String, reason: String): Boolean {
+        if (entitlements.isPro.value) return false
+
+        // Capped like an offer, and unlike the offline block. The block is a
+        // state the player is stuck in and has to keep being explained; this is
+        // a pitch, and a pitch that arrives after every failed booster ad on a
+        // bad fill day is the nag the cap exists for. `paywall.triggers` is
+        // deliberately not consulted; see the interface KDoc.
+        if (spentThisSession() >= sessionCap()) return false
+        recordShown()
+
+        logger.logEvent(
+            "iap.paywall_shown",
+            "trigger" to PaywallTrigger.AdUnavailable.id,
+            "placement" to placementId,
+            "reason" to reason,
+        )
+        return bus.tryEmit(PaywallRequest.AdStandIn(placementId = placementId, reason = reason))
+    }
+
     private fun spentThisSession(): Int {
         rollIfNeeded()
         return shownThisSession

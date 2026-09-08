@@ -21,14 +21,16 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @ContributesBinding(AppScope::class, multibinding = true)
 @Inject
 class PaywallFeatureEntryPoint(
-    private val paywallViewModelFactory: (trigger: String) -> PaywallViewModel,
+    private val paywallViewModelFactory: (trigger: String, dwellSeconds: Int) -> PaywallViewModel,
     private val offlineBlockViewModelFactory: () -> OfflineBlockViewModel,
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
         screen<PaywallRoute> { backStackEntry ->
             val route = backStackEntry.toRoute<PaywallRoute>()
-            val viewModel: PaywallViewModel = viewModel { paywallViewModelFactory(route.trigger) }
+            val viewModel: PaywallViewModel = viewModel {
+                paywallViewModelFactory(route.trigger, route.dwellSeconds)
+            }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
 
             viewModel.ObserveEvents { event ->
@@ -42,7 +44,11 @@ class PaywallFeatureEntryPoint(
                 }
             }
 
-            PaywallScreen(state = state, onAction = viewModel::takeAction)
+            PaywallScreen(
+                state = state,
+                onAction = viewModel::takeAction,
+                standInNote = route.standInNote,
+            )
         }
 
         screen<OfflineBlockRoute> {

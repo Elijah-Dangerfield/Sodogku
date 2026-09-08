@@ -62,15 +62,20 @@ fun PaywallScreen(
     state: PaywallState,
     onAction: (PaywallAction) -> Unit,
     modifier: Modifier = Modifier,
+    standInNote: String = "",
 ) {
     val scrollState = rememberScrollState()
+    val dwelling = state.secondsUntilDismissible > 0
 
     Screen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopBar(
                 title = stringResource(Res.string.paywall_title),
-                onNavigateBack = { onAction(PaywallAction.Dismiss) },
+                // Null rather than disabled: a back arrow that does nothing
+                // reads as a broken screen, and this one comes back the moment
+                // the dwell is up.
+                onNavigateBack = if (dwelling) null else ({ onAction(PaywallAction.Dismiss) }),
                 scrollState = scrollState,
             )
         },
@@ -82,6 +87,16 @@ fun PaywallScreen(
                 .screenContentPadding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            if (standInNote.isNotEmpty()) {
+                Text(
+                    text = standInNote,
+                    typography = AppTheme.typography.Caption.C300,
+                    color = AppTheme.colors.status.warning,
+                    textAlign = TextAlign.Center,
+                )
+                VerticalSpacerD300()
+            }
+
             Dog(pose = DogPose.Solved)
 
             VerticalSpacerD500()
@@ -150,8 +165,15 @@ fun PaywallScreen(
             ButtonGhost(
                 onClick = { onAction(PaywallAction.Dismiss) },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !dwelling,
             ) {
-                Text(text = stringResource(Res.string.paywall_not_now))
+                // A bare numeral while the dwell runs, the way every skippable
+                // ad counts itself down. Nothing to translate, and nothing that
+                // has to be read to be understood.
+                Text(
+                    text = if (dwelling) "${state.secondsUntilDismissible}"
+                    else stringResource(Res.string.paywall_not_now),
+                )
             }
 
             VerticalSpacerD1200()
@@ -182,6 +204,18 @@ private fun PaywallScreenPreview() {
         PaywallScreen(
             state = PaywallState(priceLabel = "$4.99"),
             onAction = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun PaywallScreenPreview_StandingInForAnAd() {
+    PreviewContent {
+        PaywallScreen(
+            state = PaywallState(priceLabel = "$4.99", secondsUntilDismissible = 5),
+            onAction = {},
+            standInNote = "booster_grant · no_fill",
         )
     }
 }

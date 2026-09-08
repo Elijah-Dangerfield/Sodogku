@@ -26,6 +26,15 @@ enum class PaywallTrigger(val id: String) {
      * absurd, and it is not an interruption to cap.
      */
     Direct("direct"),
+
+    /**
+     * A rewarded ad the player asked for could not be served, so Pro stood in
+     * for it. Deliberately not part of `paywall.triggers`; see
+     * [PaywallCoordinator.requestAdStandIn]. The id exists so a sale made off
+     * the back of a failed ad is distinguishable in `iap.paywall_shown` from one
+     * we chose to make.
+     */
+    AdUnavailable("ad_unavailable"),
 }
 
 /** What the app should put on screen. */
@@ -39,6 +48,36 @@ sealed interface PaywallRequest {
      * network at all and `ads.offlineGrace*` is spent.
      */
     data object OfflineBlock : PaywallRequest
+
+    /**
+     * Pro standing in for a rewarded ad that could not be served.
+     *
+     * [placementId] and [reason] are the `ads.*` placement id and the SDK's
+     * verdict (`no_fill`, `offline`, `not_shown`, or an error kind). Neither is
+     * copy: the screen only surfaces them in a debug build, where "why did an ad
+     * not appear here" is otherwise invisible.
+     */
+    data class AdStandIn(
+        val placementId: String,
+        val reason: String,
+        val dwellSeconds: Int = DEFAULT_DWELL_SECONDS,
+    ) : PaywallRequest {
+        companion object {
+            /**
+             * How long the sheet's own close controls stay locked.
+             *
+             * Five seconds because that is the skip delay every rewarded ad
+             * format already trains players to expect, so the wait reads as
+             * familiar rather than as the app hanging. The number that matters
+             * is not five, it is *less than the ad it replaces*: a rewarded
+             * video runs fifteen to thirty seconds, so an inventory outage is
+             * always cheaper for the player than a full house. A fallback that
+             * cost more than the ad would be a reason to hope our fill rate
+             * stays bad.
+             */
+            const val DEFAULT_DWELL_SECONDS: Int = 5
+        }
+    }
 }
 
 /**
@@ -71,4 +110,21 @@ interface PaywallCoordinator {
      * unlimited offline play, SPEC 5.1).
      */
     fun requestOfflineBlock(): Boolean
+
+    /**
+     * Put Pro up in place of a rewarded ad that could not be served.
+     *
+     * **This can never decide a reward.** By the time it is called the ad gate
+     * has already resolved the outcome, and every outcome that reaches here is
+     * one that grants. The player has their bones before this returns, whatever
+     * it returns.
+     *
+     * Not gated on `paywall.triggers`, and that is the one thing about it worth
+     * arguing over. That list names the moments we *chose* to sell at, and this
+     * is not one. It is the replacement for content the player was promised and
+     * we failed to deliver, closer in kind to [requestOfflineBlock] than to
+     * [requestOffer]. It **is** counted against `paywall.sessionCap`, though, so
+     * a thin-inventory afternoon cannot turn every booster into a sales pitch.
+     */
+    fun requestAdStandIn(placementId: String, reason: String): Boolean
 }

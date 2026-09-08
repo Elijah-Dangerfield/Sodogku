@@ -67,6 +67,38 @@ class RealPaywallCoordinatorTest : CoroutineTest() {
         assertFalse(coordinator.requestOffer(PaywallTrigger.ContinueLevel))
         assertFalse(coordinator.requestOffer(PaywallTrigger.Direct))
         assertFalse(coordinator.requestOfflineBlock(), "Pro is unlimited offline play")
+        assertFalse(
+            coordinator.requestAdStandIn("booster_grant", "no_fill"),
+            "Pro never sees an ad, so there is no empty slot to fill",
+        )
+    }
+
+    @Test
+    fun theAdStandInIsNotOnTheTriggerListAndDoesNotNeedToBe() = runUnitTest {
+        // `paywall.triggers` names the moments we chose to sell at. This is not
+        // one of them: it is the replacement for content the player was promised
+        // and we could not deliver. Gating it on that list would mean the
+        // fallback shipped switched off.
+        val coordinator = coordinator(paywall = mapOf("triggers" to emptyList<String>()))
+
+        assertFalse(coordinator.requestOffer(PaywallTrigger.ContinueLevel))
+        assertTrue(coordinator.requestAdStandIn("booster_grant", "no_fill"))
+    }
+
+    @Test
+    fun theAdStandInSpendsTheSameSessionCapAsAnOffer() = runUnitTest {
+        // It is a pitch, so it can nag. A thin-inventory afternoon must not turn
+        // every booster into a sales screen.
+        val coordinator = coordinator(paywall = mapOf("sessionCap" to 2))
+
+        assertTrue(coordinator.requestAdStandIn("booster_grant", "no_fill"))
+        assertTrue(coordinator.requestOffer(PaywallTrigger.ContinueLevel))
+        assertFalse(coordinator.requestAdStandIn("booster_grant", "no_fill"))
+        assertFalse(coordinator.requestOffer(PaywallTrigger.SkipLevel), "one shared cap, not two")
+
+        sessions.roll()
+
+        assertTrue(coordinator.requestAdStandIn("skip_level", "offline"))
     }
 
     @Test
@@ -110,12 +142,33 @@ class RealPaywallCoordinatorTest : CoroutineTest() {
 
         coordinator.requestOffer(PaywallTrigger.SkipLevel)
         coordinator.requestOfflineBlock()
+        coordinator.requestAdStandIn("booster_grant", "no_fill")
 
         assertEquals(
-            listOf(PaywallRequest.Offer(PaywallTrigger.SkipLevel), PaywallRequest.OfflineBlock),
+            listOf(
+                PaywallRequest.Offer(PaywallTrigger.SkipLevel),
+                PaywallRequest.OfflineBlock,
+                PaywallRequest.AdStandIn("booster_grant", "no_fill", dwellSeconds = 5),
+            ),
             seen,
         )
         collector.cancel()
+    }
+
+    @Test
+    fun theStandInNeverCostsMoreThanTheAdItReplaces() = runUnitTest {
+        // Five seconds is the skip delay every rewarded format already trains
+        // players to expect, so it reads as familiar. But the number that has to
+        // hold is the relation, not the value: if the fallback ever ran longer
+        // than the video it stands in for, a bad fill rate would become
+        // something to hope for rather than something to fix.
+        val dwell = PaywallRequest.AdStandIn.DEFAULT_DWELL_SECONDS
+
+        assertTrue(dwell > 0, "a dwell of zero is a sheet nobody reads")
+        assertTrue(
+            dwell < ShortestRewardedVideoSeconds,
+            "$dwell seconds is not shorter than the ad it replaces",
+        )
     }
 
     private fun coordinator(
@@ -136,5 +189,10 @@ class RealPaywallCoordinatorTest : CoroutineTest() {
         override val isPro: StateFlow<Boolean> = MutableStateFlow(isPro)
         override suspend fun purchasePro(trigger: String?): PurchaseOutcome = PurchaseOutcome.Unavailable
         override suspend fun restore(): RestoreOutcome = RestoreOutcome.NothingToRestore
+    }
+
+    private companion object {
+        /** The short end of a rewarded video. AdMob's own creatives run 15 to 30. */
+        const val ShortestRewardedVideoSeconds = 15
     }
 }

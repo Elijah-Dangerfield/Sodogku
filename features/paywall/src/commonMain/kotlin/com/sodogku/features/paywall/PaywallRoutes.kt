@@ -18,6 +18,20 @@ import kotlinx.serialization.Serializable
 @Serializable
 class PaywallRoute(
     val trigger: String = "direct",
+    /**
+     * Seconds the sheet's own close controls stay locked, for the one case where
+     * this screen is standing in for a rewarded ad that could not be served.
+     * Zero, meaning no lock at all, everywhere else, which is every other
+     * caller.
+     */
+    val dwellSeconds: Int = 0,
+    /**
+     * Why the stand-in fired, as `placement · reason`. Rendered only in a debug
+     * build, and empty in every release one. It is diagnostic, not copy: without
+     * it, an ad that silently failed to appear and an ad that was never
+     * requested look identical from the outside.
+     */
+    val standInNote: String = "",
 ) : Route(
     enter = AnimationType.SlideUp,
     exit = AnimationType.SlideDown,

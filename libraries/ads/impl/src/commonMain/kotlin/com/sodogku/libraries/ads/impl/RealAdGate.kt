@@ -158,7 +158,7 @@ class RealAdGate(
         // player who has not been shown one yet — day 0, inside the new-user
         // grace — is the friction SPEC 5.3 spends a whole section avoiding, and
         // the offline path has its own block screen to put up instead.
-        placement.paywallTrigger?.let { paywall.requestOffer(it) }
+        val offered = placement.paywallTrigger?.let { paywall.requestOffer(it) } == true
 
         val started = now()
         network.prepare()
@@ -181,11 +181,55 @@ class RealAdGate(
             }
 
             AdShowResult.Dismissed -> RewardOutcome.Dismissed
-            AdShowResult.NoFill -> RewardOutcome.NoFill
-            AdShowResult.Offline -> RewardOutcome.Offline
-            AdShowResult.NotShown -> RewardOutcome.NoFill
-            AdShowResult.Failed -> RewardOutcome.Failed(outcome.errorKind ?: "sdk")
+            AdShowResult.NoFill -> unserved(placement, RewardOutcome.NoFill, "no_fill", offered)
+            AdShowResult.Offline -> unserved(placement, RewardOutcome.Offline, "offline", offered)
+            AdShowResult.NotShown -> unserved(placement, RewardOutcome.NoFill, "not_shown", offered)
+            AdShowResult.Failed -> {
+                val kind = outcome.errorKind ?: "sdk"
+                unserved(placement, RewardOutcome.Failed(kind), kind, offered)
+            }
         }
+    }
+
+    /**
+     * The player asked for an ad, the network had none, and they have been paid
+     * anyway. Put Pro up in the space the ad was going to occupy.
+     *
+     * SPEC 5.3 has always said an ad failure grants; what it never said is what
+     * the player should be looking at while that happens, and the answer used to
+     * be "nothing". A rewarded slot is the one moment a player has volunteered
+     * their attention, and handing it back unused on every no-fill throws away
+     * the only inventory we own outright.
+     *
+     * **[outcome] is returned untouched, and that is the whole design.** The
+     * stand-in is a statement here, never part of the expression that produces
+     * the return value, so no future edit to it can invent a second path that
+     * withholds a reward. Whether the sheet appears, whether the player reads
+     * it, whether they close it in half a second: none of it can reach the
+     * bones. Making the promo *earn* the reward would mean closing it early had
+     * to withhold, which is exactly the `Dismissed`-shaped bug the [AdGate] KDoc
+     * exists to prevent, dressed up as a feature.
+     *
+     * [alreadyOffered] suppresses it where the gate has *just* put the same
+     * sheet up on its way in (a third strike, a skip). Two Pro sheets around one
+     * ad gate is a nag, and the pre-ad offer is the better placed of the two.
+     */
+    private fun unserved(
+        placement: AdPlacement,
+        outcome: RewardOutcome,
+        reason: String,
+        alreadyOffered: Boolean,
+    ): RewardOutcome {
+        if (!alreadyOffered) {
+            val shown = paywall.requestAdStandIn(placement.configId, reason)
+            logger.logEvent(
+                "ads.stand_in",
+                "placement" to placement.configId,
+                "reason" to reason,
+                "shown" to shown,
+            )
+        }
+        return outcome
     }
 
     /**

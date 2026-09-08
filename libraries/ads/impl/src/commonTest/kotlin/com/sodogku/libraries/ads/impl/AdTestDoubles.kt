@@ -71,19 +71,29 @@ class FakeEntitlements(isProNow: Boolean = false) : Entitlements {
     override suspend fun restore(): RestoreOutcome = RestoreOutcome.NothingToRestore
 }
 
-class FakePaywallCoordinator : PaywallCoordinator {
+class FakePaywallCoordinator(
+    /** What `requestOffer` answers. False models a capped or disabled trigger. */
+    var acceptsOffers: Boolean = true,
+) : PaywallCoordinator {
     val offers = mutableListOf<PaywallTrigger>()
+    val standIns = mutableListOf<Pair<String, String>>()
     var offlineBlocks = 0
 
     override val requests: Flow<PaywallRequest> = emptyFlow()
 
     override fun requestOffer(trigger: PaywallTrigger): Boolean {
+        if (!acceptsOffers) return false
         offers += trigger
         return true
     }
 
     override fun requestOfflineBlock(): Boolean {
         offlineBlocks++
+        return true
+    }
+
+    override fun requestAdStandIn(placementId: String, reason: String): Boolean {
+        standIns += placementId to reason
         return true
     }
 }

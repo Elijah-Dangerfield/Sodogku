@@ -1,5 +1,6 @@
 package com.sodogku.features.paywall.impl
 
+import androidx.lifecycle.viewModelScope
 import com.sodogku.libraries.billing.Entitlements
 import com.sodogku.libraries.billing.ProductIds
 import com.sodogku.libraries.billing.PurchaseOutcome
@@ -8,8 +9,11 @@ import com.sodogku.libraries.billing.StoreBilling
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.flowroutines.SEAViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import me.tatarka.inject.annotations.Assisted
 import me.tatarka.inject.annotations.Inject
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The Pro sheet.
@@ -24,14 +28,27 @@ import me.tatarka.inject.annotations.Inject
 class PaywallViewModel(
     /** The `paywall.triggers` id that opened this sheet, for the purchase event. */
     @Assisted private val trigger: String,
+    /** See `PaywallRoute.dwellSeconds`. Zero for every caller but the ad stand-in. */
+    @Assisted dwellSeconds: Int,
     private val entitlements: Entitlements,
     private val store: StoreBilling,
 ) : SEAViewModel<PaywallState, PaywallEvent, PaywallAction>(
-    initialStateArg = PaywallState(),
+    initialStateArg = PaywallState(secondsUntilDismissible = dwellSeconds),
 ) {
 
     init {
         takeAction(PaywallAction.Load)
+        // Its own coroutine rather than a loop inside `handleAction`: actions
+        // are drained one at a time, so a five-second countdown sitting in the
+        // handler would hold Buy and Restore behind it.
+        if (dwellSeconds > 0) {
+            viewModelScope.launch {
+                repeat(dwellSeconds) {
+                    delay(1.seconds)
+                    takeAction(PaywallAction.Tick)
+                }
+            }
+        }
     }
 
     override suspend fun handleAction(action: PaywallAction) {
@@ -40,7 +57,22 @@ class PaywallViewModel(
             is PaywallAction.Buy -> action.buy()
             is PaywallAction.Restore -> action.restore()
             is PaywallAction.MessageShown -> action.updateState { it.copy(message = null) }
-            is PaywallAction.Dismiss -> sendEvent(PaywallEvent.Dismiss)
+            // No floor: the countdown ticks exactly `dwellSeconds` times and
+            // nothing else emits this, so a negative here would mean the loop
+            // itself is wrong and is worth failing a test over rather than
+            // clamping away.
+            is PaywallAction.Tick -> action.updateState {
+                it.copy(secondsUntilDismissible = it.secondsUntilDismissible - 1)
+            }
+
+            // The dwell holds this screen's own controls and nothing else. The
+            // system back gesture never reaches here, on purpose: a five-second
+            // sheet the player cannot escape is an ad network's bad afternoon
+            // becoming their problem, which is the one thing SPEC 4.2 forbids
+            // outright. What the lock buys is a default, not a cage.
+            is PaywallAction.Dismiss -> if (state.secondsUntilDismissible <= 0) {
+                sendEvent(PaywallEvent.Dismiss)
+            }
         }
     }
 
@@ -110,6 +142,12 @@ data class PaywallState(
     val isWorking: Boolean = false,
     val isPro: Boolean = false,
     val message: PaywallMessage? = null,
+    /**
+     * Counts down to zero while this sheet is standing in for an ad. Above zero
+     * the close controls are held and show the number, the way a skippable ad
+     * does; zero means no dwell was ever asked for, which is the normal case.
+     */
+    val secondsUntilDismissible: Int = 0,
 )
 
 sealed interface PaywallEvent {
@@ -123,4 +161,5 @@ sealed interface PaywallAction {
     data object Restore : PaywallAction
     data object Dismiss : PaywallAction
     data object MessageShown : PaywallAction
+    data object Tick : PaywallAction
 }

@@ -4,7 +4,9 @@ import com.sodogku.features.paywall.OfflineBlockRoute
 import com.sodogku.features.paywall.PaywallRoute
 import com.sodogku.libraries.billing.PaywallCoordinator
 import com.sodogku.libraries.billing.PaywallRequest
+import com.sodogku.libraries.billing.PaywallTrigger
 import com.sodogku.libraries.core.AutoInit
+import com.sodogku.libraries.core.BuildInfo
 import com.sodogku.libraries.flowroutines.AppCoroutineScope
 import com.sodogku.libraries.navigation.NavigationOptions
 import com.sodogku.libraries.navigation.Router
@@ -53,8 +55,35 @@ class PaywallNavigator(
                         OfflineBlockRoute(),
                         NavigationOptions(launchSingleTop = true),
                     )
+
+                    is PaywallRequest.AdStandIn -> router.navigate(
+                        PaywallRoute(
+                            trigger = PaywallTrigger.AdUnavailable.id,
+                            dwellSeconds = request.dwellSeconds,
+                            standInNote = request.standInNote(BuildInfo.isDebug),
+                        ),
+                        NavigationOptions(launchSingleTop = true),
+                    )
                 }
             }
         }
     }
 }
+
+/**
+ * The stand-in's diagnostic line, and the reason S5's "black screen that says
+ * ads go here" is one line rather than a screen.
+ *
+ * A debug build already requests Google's test units, which fill on every call
+ * and stamp "Test Ad" on the creative, so an ad that *shows* is never in doubt.
+ * The invisible case is the other one: the gate asked for an ad, the SDK had
+ * nothing, and the player carried on with no sign anything was attempted. That
+ * is the case this names, and it is the same case the stand-in exists for, so
+ * the two share a code path instead of having a debug-only screen that only
+ * developers ever exercise and nobody notices rotting.
+ *
+ * Empty in release. It is a placement id and an SDK error kind; it is not copy
+ * and it is not for players.
+ */
+internal fun PaywallRequest.AdStandIn.standInNote(isDebug: Boolean): String =
+    if (isDebug) "$placementId · $reason" else ""
