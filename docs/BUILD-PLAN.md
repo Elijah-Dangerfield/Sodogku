@@ -2078,6 +2078,7 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S16 | "Beat 84.6% of players" on the win dialog. Decide whether that is real data or a qualitative message derived from the player's own run | |
 | S17 | A trophy on each of the floating achievement pills | |
 | S18 | **Difficulty ramps too slowly.** It stays easy for too long | |
+| S19 | The shake dialog picks a random "sentient" title. Remove all of it and make it normal | **DONE** (2026-09-08) |
 
 ### Notes taken while logging these
 

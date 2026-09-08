@@ -77,13 +77,7 @@ class IosShakeDetector : ShakeDetector {
             if (currentTime - lastShakeTime > SHAKE_COOLDOWN_MS) {
                 lastShakeTime = currentTime
                 
-                val intensity = when {
-                    magnitude > VIGOROUS_THRESHOLD -> ShakeIntensity.VIGOROUS
-                    magnitude > NORMAL_THRESHOLD -> ShakeIntensity.NORMAL
-                    else -> ShakeIntensity.GENTLE
-                }
-                
-                shakeChannel.trySend(ShakeEvent(currentTime, intensity))
+                shakeChannel.trySend(ShakeEvent(currentTime))
             }
         }
     }
@@ -91,8 +85,6 @@ class IosShakeDetector : ShakeDetector {
     companion object {
         private const val UPDATE_INTERVAL: NSTimeInterval = 0.1
         private const val SHAKE_THRESHOLD = 1.5
-        private const val NORMAL_THRESHOLD = 2.0
-        private const val VIGOROUS_THRESHOLD = 3.0
         private const val SHAKE_COOLDOWN_MS = 1500L
     }
 }

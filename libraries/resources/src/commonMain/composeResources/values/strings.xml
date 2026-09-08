@@ -31,6 +31,14 @@
     <string name="settings_haptics">Vibration</string>
     <string name="settings_haptics_body">A small buzz when you mark a square, place a dog, or get one wrong.</string>
     <string name="settings_done">Done</string>
+
+    <!-- Shake to report. The body says why the dialog appeared, because a shake
+         is easy to trigger by accident and a bare "Report a problem" on a phone
+         in your pocket is alarming rather than helpful. -->
+    <string name="shake_title">Report a problem</string>
+    <string name="shake_body">You shook your device. If something is wrong, tell us about it.</string>
+    <string name="shake_report">Report a bug</string>
+    <string name="shake_dismiss">Dismiss</string>
     <string name="game_watch_ad_badge">Ad</string>
     <string name="game_skip_level">Skip this level</string>
     <string name="game_skip_remaining">%1$d skips left today</string>

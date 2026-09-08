@@ -7,25 +7,41 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import com.sodogku.system.AppTheme
-import com.sodogku.system.Dimension
-import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.button.Button
 import com.sodogku.libraries.ui.components.button.ButtonSize
 import com.sodogku.libraries.ui.components.button.ButtonStyle
 import com.sodogku.libraries.ui.components.button.ButtonType
 import com.sodogku.libraries.ui.components.text.Text
+import com.sodogku.system.AppTheme
+import com.sodogku.system.Dimension
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.shake_body
+import sodogku.libraries.resources.generated.resources.shake_dismiss
+import sodogku.libraries.resources.generated.resources.shake_report
+import sodogku.libraries.resources.generated.resources.shake_title
 
 // Debug-only CTA label — dev-facing, so a constant rather than a string
 // resource (the button never renders in release builds).
 private const val NetworkInspectorCta = "Network inspector"
 
+/**
+ * "You shook your phone, did you mean to report something?"
+ *
+ * The copy is fixed. It used to be picked at random from a few hundred
+ * generated lines that tried to sound sentient, escalating with how many times
+ * you had shaken and how hard, addressing you by name, commenting on the hour.
+ * A dialog that opens by accident and says "Is this love? Probably not." is a
+ * bug report the player does not file.
+ *
+ * The body says *why* the dialog appeared, which is the one thing it has to do:
+ * a shake is easy to trigger by accident, and a bare "Report a problem" from a
+ * phone in a pocket reads as something being wrong with the app.
+ */
 @Composable
 fun ShakeDialog(
-    headline: String,
-    subtext: String?,
     onDismiss: () -> Unit,
     onReportBug: () -> Unit,
     modifier: Modifier = Modifier,
@@ -40,30 +56,22 @@ fun ShakeDialog(
         modifier = modifier,
         topContent = {
             Text(
-                text = headline,
+                text = stringResource(Res.string.shake_title),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
         },
         content = {
-            Column(
+            Text(
+                text = stringResource(Res.string.shake_body),
+                typography = AppTheme.typography.Body.B600,
+                color = AppTheme.colors.textSecondary,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (subtext != null) {
-                    Spacer(modifier = Modifier.height(Dimension.D300))
-                    Text(
-                        text = subtext,
-                        typography = AppTheme.typography.Body.B600,
-                        color = AppTheme.colors.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    VerticalSpacerD500()
-                }
-            }
+            )
         },
         bottomContent = {
-            Column{
+            Column {
                 Button(
                     onClick = {
                         state.dismiss()
@@ -73,7 +81,7 @@ fun ShakeDialog(
                     size = ButtonSize.Medium,
                     type = ButtonType.Danger,
                 ) {
-                    Text("Report a bug")
+                    Text(stringResource(Res.string.shake_report))
                 }
 
                 if (onOpenNetworkInspector != null) {
@@ -97,64 +105,27 @@ fun ShakeDialog(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth(),
                     size = ButtonSize.Medium,
-                    style = ButtonStyle.Text
+                    style = ButtonStyle.Text,
                 ) {
-                    Text("Dismiss")
+                    Text(stringResource(Res.string.shake_dismiss))
                 }
             }
-        }
+        },
     )
 }
 
 @Preview
 @Composable
-private fun ShakeDialogPreview_WithSubtext() {
+private fun ShakeDialogPreview() {
     PreviewContent {
-        ShakeDialog(
-            headline = "I felt that.",
-            subtext = "Testing the waters?",
-            onDismiss = {},
-            onReportBug = {},
-        )
+        ShakeDialog(onDismiss = {}, onReportBug = {})
     }
 }
 
 @Preview
 @Composable
-private fun ShakeDialogPreview_NoSubtext() {
+private fun ShakeDialogPreviewWithInspector() {
     PreviewContent {
-        ShakeDialog(
-            headline = "Whoa.",
-            subtext = null,
-            onDismiss = {},
-            onReportBug = {},
-        )
-    }
-}
-
-@Preview
-@Composable
-private fun ShakeDialogPreview_WithInspector() {
-    PreviewContent {
-        ShakeDialog(
-            headline = "I felt that.",
-            subtext = "Testing the waters?",
-            onDismiss = {},
-            onReportBug = {},
-            onOpenNetworkInspector = {},
-        )
-    }
-}
-
-@Preview
-@Composable
-private fun ShakeDialogPreview_LongMessage() {
-    PreviewContent {
-        ShakeDialog(
-            headline = "You really like shaking me.",
-            subtext = "I've lost count.",
-            onDismiss = {},
-            onReportBug = {},
-        )
+        ShakeDialog(onDismiss = {}, onReportBug = {}, onOpenNetworkInspector = {})
     }
 }

@@ -2,8 +2,6 @@ package com.sodogku
 
 import com.sodogku.libraries.core.ShakeDetector
 import com.sodogku.libraries.core.ShakeEvent
-import com.sodogku.libraries.core.ShakeMessageContext
-import com.sodogku.libraries.core.ShakeMessageProvider
 import com.sodogku.libraries.navigation.Router
 import com.sodogku.libraries.navigation.ShakeDialogRoute
 import kotlinx.coroutines.CoroutineScope
@@ -18,13 +16,10 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @SingleIn(AppScope::class)
 class ShakeHandler(
     private val shakeDetector: ShakeDetector,
-    private val shakeMessageProvider: ShakeMessageProvider,
     private val router: Router,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var isShowingDialog = false
-    // Process-local flavor counter for the shake easter-egg copy.
-    private var shakeCount = 0
     
     fun start() {
         shakeDetector.start()
@@ -43,27 +38,9 @@ class ShakeHandler(
         isShowingDialog = false
     }
     
-    private suspend fun handleShake(event: ShakeEvent) {
+    private fun handleShake(event: ShakeEvent) {
         if (isShowingDialog) return
-        
-        val context = ShakeMessageContext(
-            shakeCount = shakeCount,
-            intensity = event.intensity,
-            isLateNight = false,
-            isFirstSession = false,
-            userName = null,
-        )
-        
-        val message = shakeMessageProvider.getMessage(context)
-        
         isShowingDialog = true
-        router.navigate(
-            ShakeDialogRoute(
-                headline = message.headline,
-                subtext = message.subtext,
-            )
-        )
-
-        shakeCount++
+        router.navigate(ShakeDialogRoute)
     }
 }

@@ -7,7 +7,6 @@ import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.Router
 import com.sodogku.libraries.navigation.ShakeDialogRoute
 import com.sodogku.libraries.navigation.dialog
-import com.sodogku.libraries.navigation.toRouteOrNull
 import com.sodogku.libraries.networking.NetworkInspector
 import com.sodogku.libraries.ui.components.dialog.ShakeDialog
 import me.tatarka.inject.annotations.Inject
@@ -23,13 +22,9 @@ class ShakeDialogEntryPoint(
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
-        dialog<ShakeDialogRoute> { backStackEntry, dialogState ->
-            val route = backStackEntry.toRouteOrNull<ShakeDialogRoute>()
-
+        dialog<ShakeDialogRoute> { _, dialogState ->
             ShakeDialog(
                 state = dialogState,
-                headline = route?.headline ?: "I felt that.",
-                subtext = route?.subtext,
                 onDismiss = { router.goBack() },
                 onReportBug = {
                     router.goBack()
