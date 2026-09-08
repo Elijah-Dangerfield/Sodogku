@@ -17,16 +17,23 @@ the filesystem, so nothing can be wired to them.
 
 Wanted, in rough priority order:
 
-- **The paw-print background** for the launch handoff. The iOS splash lands the
-  dog in the right place already, and the background fading in behind it is the
-  half that is still missing (S/R12).
-- **The welcome-screen backgrounds** you described (R5 / P13).
+- **The three paw-and-bone backgrounds** shown in chat on 2026-09-08. These are
+  the ones blocking the welcome screen having any background at all, and the
+  launch handoff behind the dog (R5 / P13, S/R12). `art/source/backgrounds/README.md`
+  names the three files and says where each goes.
 - **A flame icon** for the streak badge. The streak currently draws a paw print
   from the design system, which works. Swapping it is one line in
   `StreakButton.kt` once an `Icons.Flame` exists.
 - **The sad dog and the bone artwork** mentioned earlier.
 
-Any common format is fine. Put them in `art/source/` and say which is which.
+Put the originals in `art/source/`, and copy anything the app renders into
+`libraries/resources/src/commonMain/composeResources/drawable/` as lowercase
+snake_case. That is the whole pipeline: Compose generates `Res.drawable.<name>`
+from the filename.
+
+**Pasting an image into a chat message does not put it on disk.** It has to be
+saved as a file, which is why this item has outlived several attempts to close
+it.
 
 ---
 
