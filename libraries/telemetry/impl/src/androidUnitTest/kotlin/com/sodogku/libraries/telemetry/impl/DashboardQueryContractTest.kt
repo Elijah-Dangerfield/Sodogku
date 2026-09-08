@@ -420,6 +420,26 @@ private fun parseQuery(expr: String, legendFormat: String?): Query {
 private const val UNWRAP = "unwrap "
 private val NUMBER = Regex("""-?[0-9]+(\.[0-9]+)?""")
 
+/**
+ * Comment lines inside an argument list, which are common here and were poison.
+ *
+ * Emit sites in this repo are heavily commented, and a comment is prose, and
+ * prose has commas in it. Since arguments are separated by splitting on
+ * top-level commas, a comment reading "clear rate, time, score, retries" became
+ * four arguments, and the genuine `"key" to value` after it was left fused to
+ * the last fragment where [ATTRIBUTE_PAIR] could not match it.
+ *
+ * So every attribute introduced by a comment was invisible to the scan, and the
+ * event's attribute list was quietly short. It fails closed — a dashboard
+ * querying such an attribute is reported as querying something the event does
+ * not carry — so nothing shipped broken. What it did was point the failure
+ * message at the dashboard when the bug was here, listing "emits: [...]" without
+ * the very attribute the emit site plainly has.
+ */
+private val COMMENT_LINE = Regex("""(?m)^\s*//[^\n]*\n""")
+
+private fun String.withoutComments(): String = COMMENT_LINE.replace(this, "")
+
 private val LOG_EVENT_CALL = Regex("""logEvent\s*\(""")
 private val ATTRIBUTE_PAIR = Regex("""^\s*"([a-z0-9_]+)"\s+to\s+(.+)$""", RegexOption.DOT_MATCHES_ALL)
 private val STRINGY_VALUE = Regex("""^"|\.name\b|\.toString\(\)|simpleName|\.lowercase\(\)""")
@@ -457,7 +477,13 @@ private fun MutableMap<String, MutableMap<String, MutableList<String>>>.absorbLo
         val open = call.range.last
         val arguments = balancedArguments(source, open)
             ?: error("unbalanced logEvent( call at offset ${call.range.first}")
-        val parts = splitTopLevel(arguments)
+        // Comments are stripped *before* splitting, not after, and that
+        // ordering is the whole fix. `splitTopLevel` separates arguments on
+        // commas, and prose contains commas: a comment reading "clear rate,
+        // time, score, retries" was cut into four fake arguments, and the real
+        // `"auto_mark" to autoMark` that followed it ended up glued to the tail
+        // of one of them and matched nothing.
+        val parts = splitTopLevel(arguments.withoutComments())
         val name = parts.firstOrNull()?.trim()?.removeSurrounding("\"") ?: return@forEach
         if (!name.matches(EVENT_NAME)) return@forEach
 

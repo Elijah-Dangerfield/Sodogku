@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "**Is the deduction engine's difficulty rating true?**\n\n`difficulty` on `game.level_started` / `game.level_completed` is the tier the generator's deduction engine assigned — a claim about how hard a board is to *reason* about. `duration_ms`, `strikes_used` and `attempt_number` are what players actually experienced. This board is the two put next to each other.\n\n**The shape to look for: monotonic tiers.** Every measure should step up with the tier. A tier that completes faster, or with fewer strikes, than the tier below it is a mis-rating. The engine has already been wrong once — a guard bug in the tier-2 adjacency technique had 4% of boards rated harder than they are (`docs/decisions.md`, 2026-09-07) — and nothing in the app would have surfaced it, because pack verification only checks that the stored numbers are in range. An inverted step between two adjacent tiers is what that bug looks like from here.\n\n**Known gap: `game.level_failed` carries no `difficulty`.** So there is no true fail rate per tier on this board, only the proxies — mean attempts per clear, and the per-level loss table at the bottom. Until the failure event carries the tier, a tier hard enough that people mostly *lose* on it is under-represented in every panel above, because only clears report a tier at all. See `docs/practices/app-events.md`.\n\n**Loki-backed, so nothing here can see past Grafana Cloud's log retention.** Widening the time picker does not widen the answer.\n\n**Delivery is at-least-once.** A record can rarely ship twice (export acknowledged, process died before the buffer delete), so read raw counts as approximate. Panels that count *installs* rather than records are immune to it by construction — a duplicate lands in the same `install_id` series and collapses.",
+  "description": "**Is the deduction engine's difficulty rating true?**\n\n`difficulty` on `game.level_started` / `game.level_completed` is the tier the generator's deduction engine assigned \u2014 a claim about how hard a board is to *reason* about. `duration_ms`, `strikes_used` and `attempt_number` are what players actually experienced. This board is the two put next to each other.\n\n**The shape to look for: monotonic tiers.** Every measure should step up with the tier. A tier that completes faster, or with fewer strikes, than the tier below it is a mis-rating. The engine has already been wrong once \u2014 a guard bug in the tier-2 adjacency technique had 4% of boards rated harder than they are (`docs/decisions.md`, 2026-09-07) \u2014 and nothing in the app would have surfaced it, because pack verification only checks that the stored numbers are in range. An inverted step between two adjacent tiers is what that bug looks like from here.\n\n**Known gap: `game.level_failed` carries no `difficulty`.** So there is no true fail rate per tier on this board, only the proxies \u2014 mean attempts per clear, and the per-level loss table at the bottom. Until the failure event carries the tier, a tier hard enough that people mostly *lose* on it is under-represented in every panel above, because only clears report a tier at all. See `docs/practices/app-events.md`.\n\n**Loki-backed, so nothing here can see past Grafana Cloud's log retention.** Widening the time picker does not widen the answer.\n\n**Delivery is at-least-once.** A record can rarely ship twice (export acknowledged, process died before the buffer delete), so read raw counts as approximate. Panels that count *installs* rather than records are immune to it by construction \u2014 a duplicate lands in the same `install_id` series and collapses.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -39,7 +39,7 @@
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "description": "**The panel this board exists for.** Median `duration_ms` on a campaign clear, grouped by the `difficulty` tier the deduction engine assigned when the pack was generated.\n\n**The shape to look for is monotonic.** Tier 1 fastest, tier 5 slowest, each step up longer than the one below it. Any tier that completes *faster* than the tier beneath it is the engine's rating being wrong about those boards — the rating is a claim about how hard a board is to reason about, and this is the measurement of whether the claim holds.\n\nThis is not hypothetical. A guard bug in the tier-2 adjacency technique had 4% of boards rated harder than they are (`docs/decisions.md`, 2026-09-07). Nothing in the app would have surfaced it — pack verification only checks the stored numbers are in range — and this panel is the one that would have: an inverted step between two adjacent tiers.\n\nRead it next to attempts and strikes to the right. One tier out of line on all three is a mis-rating; out of line on time alone is usually a bigger grid, not a harder one.",
+      "description": "**The panel this board exists for.** Median `duration_ms` on a campaign clear, grouped by the `difficulty` tier the deduction engine assigned when the pack was generated.\n\n**The shape to look for is monotonic.** Tier 1 fastest, tier 5 slowest, each step up longer than the one below it. Any tier that completes *faster* than the tier beneath it is the engine's rating being wrong about those boards \u2014 the rating is a claim about how hard a board is to reason about, and this is the measurement of whether the claim holds.\n\nThis is not hypothetical. A guard bug in the tier-2 adjacency technique had 4% of boards rated harder than they are (`docs/decisions.md`, 2026-09-07). Nothing in the app would have surfaced it \u2014 pack verification only checks the stored numbers are in range \u2014 and this panel is the one that would have: an inverted step between two adjacent tiers.\n\nRead it next to attempts and strikes to the right. One tier out of line on all three is a mis-rating; out of line on time alone is usually a bigger grid, not a harder one.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -108,7 +108,7 @@
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "description": "How many of the three bones a clear cost, by designed tier.\n\nThe second half of the inversion check, and the more sensitive one: clear time picks up grid size and how carefully someone plays, strikes pick up how often the board misled them. A tier whose median strikes sit below the tier under it is mis-rated regardless of what the clock says.\n\nOnly clears carry this — `game.level_failed` does not report the tier at all, so a tier that is hard enough to lose on is under-represented here by construction. See the board description.",
+      "description": "How many of the three bones a clear cost, by designed tier.\n\nThe second half of the inversion check, and the more sensitive one: clear time picks up grid size and how carefully someone plays, strikes pick up how often the board misled them. A tier whose median strikes sit below the tier under it is mis-rated regardless of what the clock says.\n\nOnly clears carry this \u2014 `game.level_failed` does not report the tier at all, so a tier that is hard enough to lose on is under-represented here by construction. See the board description.",
       "fieldConfig": {
         "defaults": {
           "decimals": 2,
@@ -177,7 +177,7 @@
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "description": "Average `attempt_number` on the attempt that finally cleared, by tier.\n\nThe closest thing this board has to a fail rate. `attempt_number` counts tries at *this* level in this session, so a clear on attempt 4 means three losses preceded it — which makes this a loss signal that does not need `difficulty` on the failure event.\n\n1.0 means first-time clears. Anything near it for a high tier means the tier is not doing anything.",
+      "description": "Average `attempt_number` on the attempt that finally cleared, by tier.\n\nThe closest thing this board has to a fail rate. `attempt_number` counts tries at *this* level in this session, so a clear on attempt 4 means three losses preceded it \u2014 which makes this a loss signal that does not need `difficulty` on the failure event.\n\n1.0 means first-time clears. Anything near it for a high tier means the tier is not doing anything.",
       "fieldConfig": {
         "defaults": {
           "decimals": 2,
@@ -315,7 +315,7 @@
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "description": "The control for the panel above it. Bigger boards take longer whatever the engine rated them, so a tier that looks slow may only be a tier that happens to hold the 9×9s.\n\nIf clear time separates cleanly by `size` and barely by `difficulty`, the engine is rating board area rather than deduction depth.",
+      "description": "The control for the panel above it. Bigger boards take longer whatever the engine rated them, so a tier that looks slow may only be a tier that happens to hold the 9\u00d79s.\n\nIf clear time separates cleanly by `size` and barely by `difficulty`, the engine is rating board area rather than deduction depth.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -373,7 +373,7 @@
           "expr": "quantile_over_time(0.5, {service_name=\"sodogku-client\", deployment_environment=\"$env\"} | event_name=\"game.level_completed\" | mode=\"campaign\" | unwrap duration_ms [$__range]) by (size)",
           "refId": "A",
           "queryType": "instant",
-          "legendFormat": "{{size}}×{{size}}"
+          "legendFormat": "{{size}}\u00d7{{size}}"
         }
       ],
       "title": "Median clear time by grid size",
@@ -384,7 +384,7 @@
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "description": "How many campaign clears fed the panels on this board.\n\nThe floor, and the first thing to check when a tier looks alarming. Medians over a handful of clears are noise, and at 0 nothing here means anything at all — no build is shipping `game.level_completed` yet.",
+      "description": "How many campaign clears fed the panels on this board.\n\nThe floor, and the first thing to check when a tier looks alarming. Medians over a handful of clears are noise, and at 0 nothing here means anything at all \u2014 no build is shipping `game.level_completed` yet.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -464,7 +464,7 @@
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "description": "The regression panel. A pack regeneration or a change to the deduction engine shows up here as one tier's line stepping to a new level on the release date, and as two lines crossing when a tier boundary moves.\n\nLines that cross and stay crossed are the same inversion the first panel shows, with a date attached — which is what turns 'the ratings are wrong' into 'this change made them wrong'.",
+      "description": "The regression panel. A pack regeneration or a change to the deduction engine shows up here as one tier's line stepping to a new level on the release date, and as two lines crossing when a tier boundary moves.\n\nLines that cross and stay crossed are the same inversion the first panel shows, with a date attached \u2014 which is what turns 'the ratings are wrong' into 'this change made them wrong'.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -562,7 +562,7 @@
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "description": "`game.booster_no_op` — a Sniff or a Treat the player spent that had nothing left to show.\n\nIn the registry's own words this is a difficulty-calibration signal, not a UI one: it means the hint engine ran out of things to say earlier than it should, which happens when a board's remaining deductions are not the kind the hint engine can express. A rise here alongside a flat clear time is the engine and the boards drifting apart.",
+      "description": "`game.booster_no_op` \u2014 a Sniff or a Treat the player spent that had nothing left to show.\n\nIn the registry's own words this is a difficulty-calibration signal, not a UI one: it means the hint engine ran out of things to say earlier than it should, which happens when a board's remaining deductions are not the kind the hint engine can express. A rise here alongside a flat clear time is the engine and the boards drifting apart.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -853,7 +853,7 @@
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "description": "`game.level_failed` per level, with how far they got. `dogs_placed` is the difference between 'too hard' and 'unlucky': a board people lose on with one dog left is a board they nearly had, and a board people lose on at two dogs is one they never read.\n\nKept separate from the tier panels above because **the failure event does not carry `difficulty`** — see the board description.",
+      "description": "`game.level_failed` per level, with how far they got. `dogs_placed` is the difference between 'too hard' and 'unlucky': a board people lose on with one dog left is a board they nearly had, and a board people lose on at two dogs is one they never read.\n\nKept separate from the tier panels above because **the failure event does not carry `difficulty`** \u2014 see the board description.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -937,6 +937,154 @@
           }
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "Does turning the crosses off change how the game plays?",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "grafanacloud-logs"
+      },
+      "description": "`auto_mark` rode four hot events for a day and **no panel read it**, which made it cost with no reader. This is the comparison it was added for.\n\nA player who turns the crosses off is doing the bookkeeping by hand, so a longer clear time here is expected and is not a problem. What would be a problem is the gap widening with difficulty: that would mean the setting stops being a preference and starts being a handicap on exactly the boards where the bookkeeping matters most.\n\nRead next to the clear rate on the right. Slower and *just as likely to finish* is a preference working as intended.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 51
+      },
+      "id": 113,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "grafanacloud-logs"
+          },
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "quantile_over_time(0.5, {service_name=\"sodogku-client\", deployment_environment=\"$env\"} | event_name=\"game.level_completed\" | mode=\"campaign\" | unwrap duration_ms [$__range]) by (auto_mark)"
+        }
+      ],
+      "title": "Median clear time, auto-mark on versus off",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "grafanacloud-logs"
+      },
+      "description": "The half that matters. If players with auto-mark off fail materially more often, the setting is not a preference, it is a difficulty setting nobody was told about.\n\nA small gap is fine and expected: crossing squares off by hand means missing one occasionally, and that is the trade the player chose. A large or widening gap is the signal to reconsider whether the setting should also adjust something else.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 51
+      },
+      "id": 113,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "grafanacloud-logs"
+          },
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "sum(count_over_time({service_name=\"sodogku-client\", deployment_environment=\"$env\"} | event_name=\"game.level_failed\" [$__range])) by (auto_mark) / sum(count_over_time({service_name=\"sodogku-client\", deployment_environment=\"$env\"} | event_name=\"game.level_started\" [$__range])) by (auto_mark)"
+        }
+      ],
+      "title": "Levels failed per level started, auto-mark on versus off",
+      "type": "bargauge"
     }
   ],
   "preload": false,
@@ -995,7 +1143,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "Sodogku · Difficulty calibration",
+  "title": "Sodogku \u00b7 Difficulty calibration",
   "uid": "sodogku-difficulty",
   "weekStart": ""
 }
