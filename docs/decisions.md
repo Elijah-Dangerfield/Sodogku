@@ -1912,3 +1912,20 @@ class. Splitting those means a delegate that takes a `(GameState) -> GameState`
 rather than a plain move, and that is a change with real risk. Recorded rather
 than attempted, because it was not the day for it: three agents were editing
 this file.
+
+## 2026-09-08 — filled buttons are deep by default
+
+`BasicButton` has had a "3D lip" since C3a — a hard band behind the face that the
+face drops onto when pressed — and `Button.kt` gated it behind `deep = false`. So
+the mechanism existed, was documented in the KDoc with an example, and **no
+screen in the app used it**. Every CTA shipped as a flat rectangle of Material
+blue on a cream page.
+
+Flipped to on. In a game a CTA should look like something you could press, and a
+per-call-site opt-in means every new screen ships flat until somebody remembers.
+Ghost buttons still get nothing: a lip under a borderless text button is a shadow
+under a link.
+
+Same shape as the dialog padding, found the same day. A design system that makes
+the right thing *available* rather than *default* gets the wrong thing on every
+screen, and each call site looks correct in isolation.

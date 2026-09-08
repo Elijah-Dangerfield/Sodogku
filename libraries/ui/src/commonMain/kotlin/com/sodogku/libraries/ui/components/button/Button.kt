@@ -33,7 +33,7 @@
  * ButtonPrimary(onClick = { }, accent = ButtonAccent.Secondary) { Text("Upgrade") }
  *
  * // opt into the springy 3D lip
- * ButtonPrimary(onClick = { }, deep = true) { Text("Continue") }
+ * ButtonPrimary(onClick = { }) { Text("Continue") }   // deep by default
  *
  * // full control
  * Button(type = ButtonType.Primary, style = ButtonStyle.Outlined, size = ButtonSize.Small, onClick = { }) {
@@ -73,7 +73,7 @@ fun Button(
     size: ButtonSize = LocalButtonSize.current,
     style: ButtonStyle = LocalButtonStyle.current,
     enabled: Boolean = true,
-    deep: Boolean = false,
+    deep: Boolean = true,
     onDisabledTap: (() -> Unit)? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable () -> Unit,
@@ -201,7 +201,7 @@ fun ButtonPrimary(
     style: ButtonStyle = ButtonStyle.Filled,
     onDisabledTap: (() -> Unit)? = null,
     enabled: Boolean = true,
-    deep: Boolean = false,
+    deep: Boolean = true,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable () -> Unit,
 ) {
@@ -238,7 +238,7 @@ fun ButtonSecondary(
     style: ButtonStyle = ButtonStyle.Outlined,
     onDisabledTap: (() -> Unit)? = null,
     enabled: Boolean = true,
-    deep: Boolean = false,
+    deep: Boolean = true,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable () -> Unit,
 ) {
@@ -272,7 +272,7 @@ fun ButtonGhost(
     size: ButtonSize = LocalButtonSize.current,
     style: ButtonStyle = ButtonStyle.Text,
     enabled: Boolean = true,
-    deep: Boolean = false,
+    deep: Boolean = true,
     onDisabledTap: (() -> Unit)? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable () -> Unit,
@@ -305,7 +305,7 @@ fun ButtonDanger(
     style: ButtonStyle = ButtonStyle.Filled,
     onDisabledTap: (() -> Unit)? = null,
     enabled: Boolean = true,
-    deep: Boolean = false,
+    deep: Boolean = true,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable () -> Unit,
 ) {
@@ -378,6 +378,18 @@ private fun backgroundColor(
 
 @Composable
 @ReadOnlyComposable
+/**
+ * The band behind a filled button's face, which the face drops onto when
+ * pressed.
+ *
+ * On by default. In a game every CTA should look like something you could press
+ * rather than a rectangle of colour, and a per-call-site opt-in meant every
+ * screen shipped flat until someone remembered — which is what happened: the
+ * mechanism was here from C3a and nothing in the app used it.
+ *
+ * Ghost buttons still get nothing. A lip under a borderless text button is a
+ * shadow under a link.
+ */
 private fun deepColor(
     type: ButtonType,
     accent: ButtonAccent,
