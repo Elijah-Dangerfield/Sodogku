@@ -91,4 +91,21 @@ tasks.withType<Test>().configureEach {
             exclude("**/build/**")
         },
     ).withPropertyName("configReaderScan")
+
+    // The iOS tests in this module read files that are not Kotlin at all — a
+    // plist, an asset catalog's Contents.json, an .xcscheme, the Fastfile — so
+    // the `*.kt` tree above does not see them and the task stays UP-TO-DATE
+    // when one of them changes.
+    //
+    // That hole is worse than it sounds: it makes the tests *look* like they
+    // work. Mutating the launch colour and then deleting the shared scheme both
+    // left the suite green, and the earlier mutation runs that did fail only
+    // failed because unrelated Kotlin was changing at the same moment. A test
+    // that passes for that reason is not a test.
+    inputs.files(
+        rootProject.fileTree(repo.dir("apps/ios")) {
+            include("**/*.plist", "**/*.xcscheme", "**/Contents.json", "**/Fastfile")
+            exclude("**/build/**", "**/xcuserdata/**")
+        },
+    ).withPropertyName("iosProjectScan")
 }
