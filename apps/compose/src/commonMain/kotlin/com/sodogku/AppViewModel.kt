@@ -134,7 +134,7 @@ class AppViewModel(
             // menu first puts a navigation between them and the thing they
             // opened the app to do; the level list is a drawer on the board.
             _startDestination.value = if (onboarded) {
-                GameRoute(450)
+                GameRoute(level)
             } else {
                 OnboardingRoute()
             }

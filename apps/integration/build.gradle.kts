@@ -81,7 +81,14 @@ tasks.withType<Test>().configureEach {
     // whose subject is "does any file mention this class".
     val repo = rootProject.layout.projectDirectory
     systemProperty("sodogku.repoRoot", repo.asFile.absolutePath)
-    inputs.dir(repo.dir("libraries")).withPropertyName("librariesForConfigReaderScan")
-    inputs.dir(repo.dir("features")).withPropertyName("featuresForConfigReaderScan")
-    inputs.dir(repo.dir("apps")).withPropertyName("appsForConfigReaderScan")
+    // A filtered tree, not `inputs.dir`. Declaring the directories wholesale
+    // swept in `*/build/**`, which is another task's output, and Gradle
+    // correctly rejected the undeclared dependency — the whole suite went red
+    // while the test passed on its own.
+    inputs.files(
+        rootProject.fileTree(repo) {
+            include("libraries/**/*.kt", "features/**/*.kt", "apps/**/*.kt")
+            exclude("**/build/**")
+        },
+    ).withPropertyName("configReaderScan")
 }
