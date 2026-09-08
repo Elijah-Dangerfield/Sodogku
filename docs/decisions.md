@@ -413,3 +413,33 @@ Late on, the auto-marks have already crossed off everything derivable — measur
 at 5 of 7 placed with one candidate per open row — so there is genuinely nothing
 to reveal, and the ViewModel declines to spend the sniff. Asserting a reveal
 there would be asserting a lie.
+
+## 2026-09-07 — the kill switch was pointed at a key nothing reads
+
+The spec's config table named the force-update gate `app.minSupportedVersion`.
+The admin console's kill-switch panel and its manifest registry were already
+built against `upgrade.minSupportedVersionCode`, from the template. Following the
+spec would have shipped an emergency control that edits a key no client reads,
+and it would have looked like it worked right up until the emergency.
+
+The client moved to the admin's namespace rather than the other way round: the
+console has a live panel, a registry and server validation behind that path, and
+the spec was a draft. `upgrade.maintenanceMode` came along with it, so the client
+now declares the whole gate the console can already set.
+
+The registry's `minSupportedVersionCode` default also went from 1 to 0, matching
+the client's fail-open rule. Every gate in this namespace defaults to "block
+nobody", because it is the only config that can brick every install at once.
+
+## 2026-09-07 — treats start at three, like everything else
+
+Section 4.3 of the spec said 1, section 1.5 and the "three consumables, one
+shape" decision said 3, and the config landed on 1 because the table is what the
+implementer was pointed at. Three is right — the whole reason the consumables
+share a shape is that three different economies would be three things to learn
+before the puzzle. The table was the stale copy; it now says 3.
+
+Added `boosters.refillTo` while here. What an ad tops you up to was the one core
+economy number that was a compile-time constant while everything around it was
+tunable. It is a floor, never a cap: level rewards push a holding above it and a
+refill leaves those alone.

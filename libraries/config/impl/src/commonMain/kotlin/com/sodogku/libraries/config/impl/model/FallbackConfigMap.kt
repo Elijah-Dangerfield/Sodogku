@@ -87,11 +87,12 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
     ),
     "boosters" to mapOf(
         "startingSniffs" to 3,
-        "startingTreats" to 1,
+        "startingTreats" to 3,
         "treatEveryNLevels" to 5,
         "adGrantsPerDay" to 5,
         "proSniffsPerAttempt" to 3,
-        "proTreatsPerAttempt" to 1,
+        "proTreatsPerAttempt" to 3,
+        "refillTo" to 3,
     ),
     "scoring" to mapOf(
         "basePerPlacement" to 100,
@@ -126,10 +127,15 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
         "privacyUrl" to "https://elijah-dangerfield.github.io/Sodogku/privacy.html",
         "forceReacceptBelow" to 0,
     ),
-    "app" to mapOf(
-        "minSupportedVersion" to 0,
-        "softUpdateVersion" to 0,
+    // The upgrade gates live under the namespace the admin console already
+    // edits, so the kill switch is wired end to end. See AppMinSupportedVersion.
+    "upgrade" to mapOf(
+        "minSupportedVersionCode" to 0,
+        "softUpdateVersionCode" to 0,
+        "maintenanceMode" to "off",
         "maintenanceMessage" to "",
+    ),
+    "app" to mapOf(
         "reviewPromptAfterLevel" to 10,
     ),
     "features" to mapOf(

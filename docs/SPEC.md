@@ -369,11 +369,12 @@ checked at the point of use rather than cached in a ViewModel at screen entry.
 | `progression.skipAfterFailedAttempts` | 2 |
 | `progression.lookaheadCount` | 5 |
 | `boosters.startingSniffs` | 3 |
-| `boosters.startingTreats` | 1 |
+| `boosters.startingTreats` | 3 |
 | `boosters.treatEveryNLevels` | 5 |
 | `boosters.adGrantsPerDay` | 5 |
 | `boosters.proSniffsPerAttempt` | 3 |
-| `boosters.proTreatsPerAttempt` | 1 |
+| `boosters.proTreatsPerAttempt` | 3 |
+| `boosters.refillTo` | 3 |
 
 **Scoring**
 
@@ -396,10 +397,19 @@ checked at the point of use rather than cached in a ViewModel at screen entry.
 `legal.termsVersion`, `legal.termsUrl`, `legal.privacyVersion`, `legal.privacyUrl`,
 `legal.forceReacceptBelow`.
 
-**App**
+**App and upgrade**
 
-`app.minSupportedVersion` (force-update gate), `app.softUpdateVersion`, `app.maintenanceMessage`,
+`upgrade.minSupportedVersionCode` (force-update gate), `upgrade.softUpdateVersionCode`,
+`upgrade.maintenanceMode` (`off` / `banner` / `blocking`), `upgrade.maintenanceMessage`,
 `app.reviewPromptAfterLevel`.
+
+The upgrade gates sit under `upgrade.` rather than `app.`, which is where an earlier
+draft of this table put them. The admin console's kill-switch panel and its manifest
+registry were already built against `upgrade.*`, so the `app.*` naming would have left
+the one control that has to work in an emergency editing a key no client reads. Every
+one of these defaults to 0 or `off`: a force-update gate is the only config value that
+can brick every install at once, so a missing, partial or unreachable config has to
+resolve to "block nobody".
 
 **Telemetry** (already in the template)
 

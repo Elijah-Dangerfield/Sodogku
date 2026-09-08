@@ -67,21 +67,14 @@ class BoostersStartingSniffs(appConfigMap: AppConfigMap) : IntConfigValue(appCon
     override val default = 3
 }
 
-/**
- * Treats a brand-new player starts with.
- *
- * SPEC section 4.3 says 1 while section 1.5 and the 2026-09-07 "three
- * consumables, one shape" decision say all three consumables start at 3. This
- * follows the key table; if the one-shape rule is the live intent, this default
- * and [BoostersProTreatsPerAttempt] are the two numbers to move.
- */
+/** Treats a brand-new player starts with. Three, like everything else. */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
 class BoostersStartingTreats(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
     override val name = "Starting treats"
     override val path = "boosters.startingTreats"
-    override val default = 1
+    override val default = 3
 }
 
 /**
@@ -123,17 +116,30 @@ class BoostersProSniffsPerAttempt(appConfigMap: AppConfigMap) : IntConfigValue(a
     override val default = 3
 }
 
-/**
- * Treats Pro starts every attempt with. Carries the same section 4.3 versus
- * section 1.5 disagreement as [BoostersStartingTreats].
- */
+/** Treats Pro starts every attempt with. */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
 class BoostersProTreatsPerAttempt(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
     override val name = "Pro treats per attempt"
     override val path = "boosters.proTreatsPerAttempt"
-    override val default = 1
+    override val default = 3
+}
+
+/**
+ * What one rewarded ad tops a consumable up to.
+ *
+ * A *floor*, never a cap: level rewards can push a holding above it, and a
+ * refill leaves those alone. So this is the number that decides how generous the
+ * ad is, not how much a player is allowed to own.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class BoostersRefillTo(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Ad refills up to"
+    override val path = "boosters.refillTo"
+    override val default = 3
 }
 
 /** Every `progression.*` and `boosters.*` value. Registered in [SodogkuConfigValues]. */
@@ -147,4 +153,5 @@ fun progressionConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>
     BoostersAdGrantsPerDay(appConfigMap),
     BoostersProSniffsPerAttempt(appConfigMap),
     BoostersProTreatsPerAttempt(appConfigMap),
+    BoostersRefillTo(appConfigMap),
 )
