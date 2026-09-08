@@ -44,6 +44,7 @@ class SettingsViewModel(
         when (action) {
             SettingsAction.Load -> action.load()
             SettingsAction.Back -> sendEvent(SettingsEvent.NavigateBack)
+            SettingsAction.ToggleAutoMark -> action.toggleAutoMark()
             SettingsAction.ToggleHaptics -> action.toggleHaptics()
             SettingsAction.ToggleReduceAnimations -> action.toggleReduceAnimations()
             SettingsAction.ToggleColorblind -> action.toggleColorblind()
@@ -80,6 +81,7 @@ class SettingsViewModel(
 
         updateState {
             it.copy(
+                autoMarkEnabled = saved.autoMarkEnabled,
                 hapticsEnabled = saved.hapticsEnabled,
                 reduceAnimations = saved.reduceAnimations,
                 colorblindMode = saved.colorblindMode,
@@ -119,6 +121,20 @@ class SettingsViewModel(
     // Each toggle reads `state` exactly once, at the top, and passes the result
     // on. `state` is a derived flow that lags `updateState` by a dispatch, so
     // reading it back after a write returns the stale value.
+    /**
+     * Display only, the same shape as [toggleAchievements] and for a related
+     * reason: the board keeps deducting the whole cascade whether or not it
+     * draws it, so this writes one boolean and reaches nothing that reasons
+     * about the puzzle. A second line here that touched the deduction would be
+     * the bug — the sniff would start giving worse advice to the players who
+     * turned this off, which is the opposite of what they asked for.
+     */
+    private suspend fun SettingsAction.toggleAutoMark() {
+        val next = !state.autoMarkEnabled
+        updateState { it.copy(autoMarkEnabled = next) }
+        persist { it.copy(autoMarkEnabled = next) }
+    }
+
     private suspend fun SettingsAction.toggleHaptics() {
         val next = !state.hapticsEnabled
         updateState { it.copy(hapticsEnabled = next) }
@@ -176,6 +192,13 @@ class SettingsViewModel(
 }
 
 data class SettingsState(
+    /**
+     * Whether a placed dog crosses off the squares it rules out.
+     *
+     * True by default because that is what the game does and what the tutorial
+     * teaches. Off is the purist option and changes only what is drawn.
+     */
+    val autoMarkEnabled: Boolean = true,
     val hapticsEnabled: Boolean = true,
     val reduceAnimations: Boolean = false,
     val colorblindMode: Boolean = false,
@@ -226,6 +249,7 @@ sealed interface SettingsEvent {
 sealed interface SettingsAction {
     data object Load : SettingsAction
     data object Back : SettingsAction
+    data object ToggleAutoMark : SettingsAction
     data object ToggleHaptics : SettingsAction
     data object ToggleReduceAnimations : SettingsAction
     data object ToggleColorblind : SettingsAction

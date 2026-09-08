@@ -41,8 +41,29 @@ enum class GamePhase { Loading, Playing, Won, Lost, Recap }
 data class GameState(
     val level: LevelDefinition? = null,
     val placed: Solution = Solution.empty(1),
+    /**
+     * Every square the dogs in [placed] rule out — **what the game knows**, not
+     * what the player has been shown.
+     *
+     * The two used to be one set, and separating them is the whole of R8. With
+     * "Cross off squares for me" switched off nothing here is drawn, but all of
+     * it is still true: `Board.autoMarkedCells` is the same cascade the
+     * difficulty engine rated the level against, and the sniff has to reason
+     * from the real deduction state or it starts giving worse advice to exactly
+     * the players who asked for less help. What is drawn is [visibleAutoMarks],
+     * and every reader has to pick one deliberately.
+     */
     val autoMarks: Set<Int> = emptySet(),
     val manualMarks: Set<Int> = emptySet(),
+
+    /**
+     * `AppData.autoMarkEnabled` — whether [autoMarks] are drawn.
+     *
+     * True by default, so a board built before the cache has been read shows
+     * the game as it is played. Nothing about the puzzle changes when this is
+     * false; see [visibleAutoMarks].
+     */
+    val autoMarkVisible: Boolean = true,
 
     /** What an ad tops a booster up to, so the prompt's copy matches the tap. */
     val refillTo: Int = 3,
@@ -332,6 +353,25 @@ data class GameState(
     val bonesUnspent: Int
         get() = (ScoringConfig.MAX_LIVES - strikesThisAttempt).coerceAtLeast(0)
 
+    /**
+     * The auto-marks a player can actually see crossed off — **what the board
+     * is showing**, as against the deduction in [autoMarks].
+     *
+     * Anything that answers a question about the *screen* reads this: how a
+     * square draws, whether a screen reader is offered a placement on it, and
+     * whether a commit landed on a square that already looked ruled out.
+     * Anything that answers a question about the *puzzle* reads [autoMarks].
+     * Confusing the two is silent in both directions — hints quietly degrade,
+     * or the board offers controls on squares that are already crossed off — so
+     * the distinction is stated rather than left to be inferred from a name.
+     *
+     * [clearedMarks] comes off here rather than out of [autoMarks] because
+     * auto-marks are recomputed from [placed] on every move, so anything
+     * removed from that set would reappear on the next placement.
+     */
+    val visibleAutoMarks: Set<Int>
+        get() = if (autoMarkVisible) autoMarks - clearedMarks else emptySet()
+
     val placedCells: Set<Int> get() = placed.cells().toSet()
 
     val dogsPlaced: Int get() = placed.placedCount
@@ -438,6 +478,15 @@ data class DisplaySettings(
     val colorblind: Boolean,
     val haptics: Boolean,
     val reduceAnimations: Boolean,
+
+    /**
+     * Belongs here rather than being read once when the board opens, for the
+     * reason the other three do: the gear opens a real screen, so a player
+     * flips this and comes straight back to the board. It is a display setting
+     * despite changing what the board looks like mid-puzzle — the deduction
+     * underneath does not move, so nothing has to be recomputed when it lands.
+     */
+    val autoMark: Boolean,
 )
 
 /** Something the game wants to stop and point at. */

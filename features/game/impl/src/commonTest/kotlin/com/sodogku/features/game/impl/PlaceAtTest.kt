@@ -75,12 +75,40 @@ class PlaceAtTest {
         assertNotNull(placeAt(playing(manualMarks = setOf(5)), cell = 5) {})
     }
 
+    /**
+     * With auto-mark off nothing is drawn, so nothing is refused.
+     *
+     * This is the accessibility half of R8 and it fails silently in the worst
+     * direction: a screen-reader player who turns the crosses off would find
+     * most of the board — a whole row, column, region and ring per dog — quietly
+     * offering no way to place anything, with no announcement saying why.
+     */
+    @Test
+    fun withAutoMarkOffARuledOutSquareOffersThePlacementAgain() {
+        val state = playing(autoMarks = setOf(5))
+        assertNull(placeAt(state, cell = 5) {}, "the fixture rules nothing out")
+
+        assertNotNull(placeAt(state.copy(autoMarkVisible = false), cell = 5) {})
+    }
+
+    /**
+     * An auto-mark the player tapped away reads as empty, so it has to offer
+     * what an empty square offers. It did not before: `placeAt` tested the raw
+     * deduction, and `clearedMarks` only ever came off in the drawing.
+     */
+    @Test
+    fun anAutoMarkThePlayerClearedOffersThePlacement() {
+        assertNotNull(placeAt(playing(autoMarks = setOf(5), clearedMarks = setOf(5)), cell = 5) {})
+    }
+
     private fun playing(
         autoMarks: Set<Int> = emptySet(),
         manualMarks: Set<Int> = emptySet(),
         wrongGuesses: Set<Int> = emptySet(),
+        clearedMarks: Set<Int> = emptySet(),
         placed: Solution = Solution.empty(4),
     ) = GameState(
+        clearedMarks = clearedMarks,
         level = LevelDefinition(
             id = 1,
             board = Board.parse("AABBAABBCCDDCCDD"),

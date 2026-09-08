@@ -146,6 +146,50 @@ class TutorialBoardTest {
         }
     }
 
+    @Test
+    fun theCurriculumForAPuristStillHasSomethingToPointAt() {
+        // The same walk as `everyLessonHasSomethingToPointAt`, over the shorter
+        // script and with no marks at all — because with auto-mark off nothing
+        // is drawn, so `visibleMarks` is empty for the whole run. Dropping two
+        // steps changes which squares the remaining ones resolve to, and the
+        // failure of getting that wrong is the one that walk exists to catch: a
+        // gated lesson with nothing to tap, which strands the player.
+        val script = Tutorial.scriptFor(autoMark = false)
+        assertTrue(
+            script.size < Tutorial.Script.size,
+            "the purist script is the full one, so this walks the same ground twice",
+        )
+        assertTrue(TutorialStep.Graduation in script, "the run has no ending")
+
+        var placed = Solution.empty(level.size)
+            .withPlacement(StarterRow, level.solution[StarterRow])
+        var gated = 0
+
+        script.forEach { step ->
+            val cells = Tutorial.cellsFor(step, level, placed, emptySet(), emptySet())
+            if (Tutorial.triggerFor(step) == TutorialTrigger.Tap) return@forEach
+            gated++
+            assertTrue(cells.isNotEmpty(), "$step asks for a gesture on nothing")
+            val cell = cells.single()
+            assertTrue(cell !in placed.cells().toSet(), "$step lit an occupied square")
+            when (Tutorial.triggerFor(step)) {
+                TutorialTrigger.Placed -> {
+                    assertTrue(isAnswer(cell), "$step asks for a placement on a wrong square")
+                    placed = placed.withPlacement(level.board.rowOf(cell), level.board.colOf(cell))
+                }
+                TutorialTrigger.Struck ->
+                    assertTrue(!isAnswer(cell), "$step asks for a wrong guess on the answer")
+                TutorialTrigger.Marked, TutorialTrigger.Tap -> Unit
+            }
+        }
+
+        assertTrue(gated > 0, "no step was checked, so the walk asserts nothing")
+        assertTrue(
+            !placed.isComplete,
+            "the script finishes the board, which would fire the win sheet over the last coach mark",
+        )
+    }
+
     private fun isAnswer(cell: Int): Boolean =
         level.board.colOf(cell) == level.solution[level.board.rowOf(cell)]
 

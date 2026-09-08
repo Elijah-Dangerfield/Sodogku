@@ -61,9 +61,17 @@ class TutorialRunner(private val logger: Logger) {
         armed = onFirstLevel && !hasCompletedTutorial
     }
 
-    /** Loads the script, or nothing when the run is not armed. */
-    fun begin() {
-        script = if (armed) Tutorial.Script else emptyList()
+    /**
+     * Loads the script, or nothing when the run is not armed.
+     *
+     * [autoMark] is the player's setting, and it decides which curriculum runs
+     * — see [Tutorial.scriptFor]. Read here rather than held from [arm] because
+     * a replay from Settings is the one way a player reaches this having
+     * already turned auto-mark off, and that is precisely the run that must not
+     * teach a feature they switched off.
+     */
+    fun begin(autoMark: Boolean) {
+        script = if (armed) Tutorial.scriptFor(autoMark) else emptyList()
         index = 0
     }
 
@@ -71,10 +79,10 @@ class TutorialRunner(private val logger: Logger) {
     fun openingFrame(
         level: LevelDefinition,
         placed: Solution,
-        autoMarks: Set<Int>,
+        visibleMarks: Set<Int>,
     ): TutorialFrame {
         if (script.isEmpty()) return TutorialFrame.None
-        return frameFor(level, placed, autoMarks, justMarked = emptySet())
+        return frameFor(level, placed, visibleMarks, justMarked = emptySet())
     }
 
     /**
@@ -87,12 +95,12 @@ class TutorialRunner(private val logger: Logger) {
     fun frameFor(
         level: LevelDefinition,
         placed: Solution,
-        autoMarks: Set<Int>,
+        visibleMarks: Set<Int>,
         justMarked: Set<Int>,
     ): TutorialFrame {
         while (index < script.size) {
             val step = script[index]
-            val cells = Tutorial.cellsFor(step, level, placed, autoMarks, justMarked)
+            val cells = Tutorial.cellsFor(step, level, placed, visibleMarks, justMarked)
             if (Tutorial.triggerFor(step) == TutorialTrigger.Tap || cells.isNotEmpty()) {
                 logger.logEvent("tutorial.step_viewed", "step" to step.name)
                 return TutorialFrame(step, cells)

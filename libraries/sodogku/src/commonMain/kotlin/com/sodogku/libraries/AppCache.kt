@@ -44,6 +44,21 @@ data class AppData(
     val hapticsEnabled: Boolean = true,
 
     /**
+     * Whether a placed dog crosses off the squares it rules out.
+     *
+     * **Display only.** The game keeps deducting either way — the sniff, the
+     * difficulty engine and the level pack all reason over the full cascade —
+     * so this decides what the player is *shown*, not what is true. Turning it
+     * off hands the bookkeeping back rather than making the board harder.
+     *
+     * On by default, and it has to be. It is what every existing player already
+     * has, and the tutorial teaches auto-mark as a step: a default of off would
+     * make that lesson a lie on first launch. A player who turns it off later
+     * has chosen the bookkeeping knowingly.
+     */
+    val autoMarkEnabled: Boolean = true,
+
+    /**
      * Swaps the animated dogs for stills and shortens the board's entrance.
      * A battery setting rather than an accessibility one, though it serves both.
      */

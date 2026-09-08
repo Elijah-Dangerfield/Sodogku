@@ -542,8 +542,13 @@ private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Uni
  * after the first and always inside the 320ms window. If that window ever moves
  * to a place a synthetic pair cannot reach, this becomes an action of its own.
  *
- * Null on a square the board has already ruled out for itself — `commit` refuses
- * those, so offering the action would announce a control that does nothing.
+ * Null on a square that already draws a cross the board put there. Offering a
+ * placement on one would announce a control for something the player can see is
+ * ruled out — so the test is [GameState.visibleAutoMarks] and not the deduction
+ * behind it. That matters twice over. With auto-mark off nothing is crossed off,
+ * every empty square offers the action, and a screen-reader player is not
+ * quietly locked out of most of the board; and an auto-mark the player tapped
+ * away reads as empty, so it now offers the action too, which it did not before.
  */
 internal fun placeAt(
     state: GameState,
@@ -552,7 +557,7 @@ internal fun placeAt(
     onAction: (GameAction) -> Unit,
 ): (() -> Unit)? {
     if (state.phase != GamePhase.Playing) return null
-    if (cell in state.autoMarks || cell in placed || cell in state.wrongGuesses) return null
+    if (cell in state.visibleAutoMarks || cell in placed || cell in state.wrongGuesses) return null
     return {
         onAction(GameAction.CellTapped(cell))
         onAction(GameAction.CellTapped(cell))
@@ -563,10 +568,10 @@ private fun cellState(state: GameState, cell: Int, placed: Set<Int>): BoardCellS
     cell in placed -> BoardCellState.Occupied
     cell in state.wrongGuesses -> BoardCellState.Wrong
     cell in state.manualMarks -> BoardCellState.Marked
-    // An auto-mark the player has tapped away reads as empty again. It is still
-    // in `autoMarks`, because that set is derived from the placements and is
-    // recomputed on every move; the clearing is an exclusion laid over it.
-    cell in state.autoMarks && cell !in state.clearedMarks -> BoardCellState.Marked
+    // The drawn set, which is `autoMarks` less the ones the player has tapped
+    // away and empty entirely when the setting is off. The deduction itself is
+    // unchanged in both cases — the board simply stops saying it out loud.
+    cell in state.visibleAutoMarks -> BoardCellState.Marked
     else -> BoardCellState.Empty
 }
 

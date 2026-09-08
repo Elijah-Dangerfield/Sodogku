@@ -78,6 +78,26 @@ object Tutorial {
         TutorialStep.Graduation,
     )
 
+    /**
+     * The curriculum for a player whose auto-mark setting is [autoMark].
+     *
+     * Two steps go when it is off, and both have to. [TutorialStep.AutoMark] is
+     * a card saying "every square that dog rules out was crossed off for you"
+     * pointed at squares that were not, and it would still show: its trigger is
+     * `Tap`, so [TutorialRunner.frameFor] does not skip it for having nothing to
+     * light. [TutorialStep.PlaceAndWatch] exists only to set that up — "then
+     * watch what the board does", on a board that is about to do nothing —
+     * and placing a dog was already taught by [TutorialStep.PlaceDog].
+     *
+     * A filter rather than a second list. The order and the copy are the same
+     * lesson either way, and two scripts would drift.
+     */
+    fun scriptFor(autoMark: Boolean): List<TutorialStep> =
+        if (autoMark) Script else Script - TaughtByAutoMark
+
+    /** The lessons that have nothing to teach with auto-mark switched off. */
+    private val TaughtByAutoMark = setOf(TutorialStep.PlaceAndWatch, TutorialStep.AutoMark)
+
     fun triggerFor(step: TutorialStep): TutorialTrigger = when (step) {
         TutorialStep.MarkSquare -> TutorialTrigger.Marked
         TutorialStep.PlaceDog, TutorialStep.PlaceAndWatch -> TutorialTrigger.Placed
@@ -117,12 +137,17 @@ object Tutorial {
      * [justMarked] is the auto-marks that appeared with the placement that got
      * us here, and only [TutorialStep.AutoMark] uses it — it is the whole point
      * of that step.
+     *
+     * [visibleMarks] is `GameState.visibleAutoMarks` and not the deduction behind
+     * it. Every use of it here is about what the square *looks* like: a lesson
+     * must not light a square that already reads as crossed off, and with
+     * auto-mark switched off none of them do.
      */
     fun cellsFor(
         step: TutorialStep,
         level: LevelDefinition,
         placed: Solution,
-        autoMarks: Set<Int>,
+        visibleMarks: Set<Int>,
         justMarked: Set<Int>,
     ): Set<Int> = when (step) {
         TutorialStep.StarterDog -> setOfNotNull(starterCell(placed))
@@ -141,10 +166,10 @@ object Tutorial {
             .orEmpty()
         TutorialStep.MarkSquare,
         TutorialStep.TryAWrongOne,
-        -> setOfNotNull(freeWrongCell(level, placed, autoMarks))
+        -> setOfNotNull(freeWrongCell(level, placed, visibleMarks))
         TutorialStep.PlaceDog,
         TutorialStep.PlaceAndWatch,
-        -> setOfNotNull(nextCorrectCell(level, placed, autoMarks))
+        -> setOfNotNull(nextCorrectCell(level, placed, visibleMarks))
         TutorialStep.AutoMark -> justMarked
         else -> emptySet()
     }
@@ -163,15 +188,16 @@ object Tutorial {
     /**
      * A square with no dog in it that the player can still act on.
      *
-     * Auto-marked squares are excluded because the game ignores taps on them,
-     * so lighting one would show a square that does nothing.
+     * Squares that already show a cross are excluded: both steps that ask for
+     * one ask the player to *make a mark there*, and lighting a square that is
+     * already marked is an instruction with nothing to do.
      */
     private fun freeWrongCell(
         level: LevelDefinition,
         placed: Solution,
-        autoMarks: Set<Int>,
+        visibleMarks: Set<Int>,
     ): Int? = (0 until level.board.cellCount).firstOrNull { cell ->
-        cell !in autoMarks &&
+        cell !in visibleMarks &&
             cell !in placed.cells().toSet() &&
             level.board.colOf(cell) != level.solution[level.board.rowOf(cell)]
     }
@@ -180,9 +206,9 @@ object Tutorial {
     private fun nextCorrectCell(
         level: LevelDefinition,
         placed: Solution,
-        autoMarks: Set<Int>,
+        visibleMarks: Set<Int>,
     ): Int? = (0 until level.size)
         .firstOrNull { row -> placed[row] == Solution.UNPLACED }
         ?.let { row -> level.board.cellAt(row, level.solution[row]) }
-        ?.takeIf { it !in autoMarks }
+        ?.takeIf { it !in visibleMarks }
 }

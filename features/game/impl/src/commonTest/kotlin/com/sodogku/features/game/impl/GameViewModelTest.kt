@@ -58,6 +58,7 @@ import com.sodogku.libraries.achievements.AchievementsRepository
 import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.achievements.Stat
+import com.sodogku.libraries.puzzle.autoMarkedCells
 import com.sodogku.libraries.scoring.ScoringConfig
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -127,6 +128,138 @@ class GameViewModelTest : CoroutineTest() {
         assertTrue((0 until board.size).filter { it != col }.all { board.cellAt(row, it) in marks })
         assertTrue((0 until board.size).filter { it != row }.all { board.cellAt(it, col) in marks })
         assertTrue(board.neighborsOf(cell).all { it in marks })
+    }
+
+    // ---- R8: what the game knows vs what the player is shown. ---------------
+    //
+    // The setting is presentation only. Every test below asserts one half of
+    // that sentence: the board stops drawing the cascade, and nothing that
+    // reasons about the puzzle notices.
+
+    @Test
+    fun withAutoMarkOffNothingIsDrawnAndTheDeductionIsUntouched() = runUnitTest {
+        val vm = viewModel(cache = puristCache())
+        val cell = cellFor(row = 0)
+
+        vm.commit(cell)
+
+        // The exact set the difficulty engine rated this level against. Asserted
+        // by equality rather than by "not empty", because the claim is that the
+        // setting cannot move a baked difficulty — and the deduction the engine
+        // walks is this function's answer.
+        val ruledOut = level.board.autoMarkedCells(vm.state.placed)
+        assertTrue(ruledOut.isNotEmpty(), "a placement that rules nothing out is not a fixture")
+        assertEquals(ruledOut, vm.state.autoMarks, "the game stopped deducting, not just drawing")
+        assertTrue(vm.state.visibleAutoMarks.isEmpty(), "squares were crossed off anyway")
+    }
+
+    @Test
+    fun withAutoMarkOnTheDrawnSetIsTheDeduction() = runUnitTest {
+        // The companion to the test above, and the reason it is not vacuous:
+        // both sets are non-empty here, so `visibleAutoMarks` emptying there is
+        // the setting and not an empty board.
+        val vm = viewModel()
+
+        vm.commit(cellFor(row = 0))
+
+        assertTrue(vm.state.autoMarks.isNotEmpty())
+        assertEquals(vm.state.autoMarks, vm.state.visibleAutoMarks)
+    }
+
+    @Test
+    fun aBoardIsStillWinnableTheWayAPuristActuallyPlaysIt() = runUnitTest {
+        // Played the way the setting asks for: place a dog, cross its
+        // eliminations off by hand, carry on. `solve` alone would not exercise
+        // this — the answer squares are never in the cascade, so a board can be
+        // solved without ever touching one of these squares and the manual
+        // marking path would go unchecked on the winning route.
+        val vm = viewModel(cache = puristCache())
+        vm.commit(cellFor(row = 0))
+        val byHand = vm.state.autoMarks.filter { it !in vm.state.placedCells }.take(3)
+        assertEquals(3, byHand.size, "the placement ruled out too little to mark")
+        byHand.forEach { vm.note(it) }
+        assertTrue(byHand.all { it in vm.state.manualMarks }, "the crosses were never made")
+
+        (1 until level.size).forEach { row -> vm.commit(cellFor(row)) }
+
+        assertEquals(GamePhase.Won, vm.state.phase)
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining, "a clean solve cost a bone")
+    }
+
+    @Test
+    fun theSettingSurvivesStartingTheBoardOver() = runUnitTest {
+        // `startAttempt` builds a whole fresh `GameState`, so every display
+        // setting has to be carried across by hand. The board that opens with
+        // the ViewModel is covered by the settings flow landing a moment later;
+        // a retry, the next level and a jump from the pane all happen long after
+        // that flow has settled and `distinctUntilChanged` will not re-emit, so
+        // a setting dropped here comes back on and nothing else notices.
+        val vm = viewModel(cache = puristCache())
+
+        vm.takeAction(GameAction.Retry)
+        settle()
+        vm.commit(cellFor(row = 0))
+
+        assertTrue(vm.state.autoMarks.isNotEmpty(), "the fresh board deduced nothing")
+        assertTrue(vm.state.visibleAutoMarks.isEmpty(), "starting over turned the crosses back on")
+    }
+
+    @Test
+    fun aSniffGivesTheSameAdviceWhicheverWayTheSettingIsSet() = runUnitTest {
+        // The failure this exists to catch is silent. If the hint reasoned from
+        // what is *drawn* rather than from what is *true*, turning the setting
+        // off would quietly buy worse advice — worse advice for asking for less
+        // help, which is the one trade this feature must not make.
+        val shown = viewModel()
+        val hidden = viewModel(cache = puristCache())
+        listOf(shown, hidden).forEach { vm ->
+            vm.commit(cellFor(row = 0))
+            vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+            vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        }
+
+        assertTrue(shown.state.hintCells.isNotEmpty(), "the sniff showed nothing to compare")
+        assertEquals(shown.state.hintCells, hidden.state.hintCells)
+        assertEquals(shown.state.sniffs, hidden.state.sniffs, "one of them paid a different price")
+    }
+
+    @Test
+    fun withAutoMarkOffATapOnARuledOutSquareWritesThePlayersOwnCross() = runUnitTest {
+        // With the crosses drawn, a tap on one of these clears it. With them
+        // hidden the square reads as empty, so a tap has to do what a tap on an
+        // empty square does — otherwise a whole swathe of the board silently
+        // refuses the only free gesture in the game.
+        val vm = viewModel(cache = puristCache())
+        vm.commit(cellFor(row = 0))
+        val ruledOut = vm.state.autoMarks.first { it !in vm.state.placedCells }
+
+        vm.note(ruledOut)
+
+        assertTrue(ruledOut in vm.state.manualMarks, "the tap did nothing")
+        assertTrue(ruledOut !in vm.state.clearedMarks, "it cleared a cross that was never drawn")
+    }
+
+    @Test
+    fun flippingTheSettingMidBoardChangesWhatIsDrawnAndNothingElse() = runUnitTest {
+        // Observed rather than read once when the board opens: the gear opens a
+        // real screen, so a player flips this and comes straight back.
+        val cache = InMemoryAppCache()
+        val vm = viewModel(cache = cache)
+        vm.commit(cellFor(row = 0))
+        val deduced = vm.state.autoMarks
+        assertTrue(deduced.isNotEmpty())
+        assertEquals(deduced, vm.state.visibleAutoMarks, "nothing was crossed off to begin with")
+
+        cache.set(cache.get().copy(autoMarkEnabled = false))
+        settle()
+
+        assertTrue(vm.state.visibleAutoMarks.isEmpty(), "the crosses stayed on screen")
+        assertEquals(deduced, vm.state.autoMarks, "the deduction moved with the setting")
+
+        cache.set(cache.get().copy(autoMarkEnabled = true))
+        settle()
+
+        assertEquals(deduced, vm.state.visibleAutoMarks, "the crosses did not come back")
     }
 
     @Test
@@ -1902,11 +2035,96 @@ class GameViewModelTest : CoroutineTest() {
         assertTrue(lit.none { it in before }, "these were already marked before the placement")
     }
 
+    @Test
+    fun theTutorialDoesNotTeachAutoMarkToAPlayerWhoTurnedItOff() = runUnitTest {
+        // Replaying from Settings is the one way a player reaches the guided run
+        // having already switched the crosses off, and it is the run that must
+        // not teach a feature they do not have. The AutoMark card would have
+        // shown regardless of the setting: its trigger is `Tap`, so the runner
+        // does not skip it for having nothing to light — it would simply have
+        // said "every square that dog rules out was crossed off for you" over a
+        // board where none of them were.
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtPuristCache())
+        val seen = mutableListOf<TutorialStep>()
+
+        var guard = 0
+        while (vm.state.tutorial != null && guard++ < StepBudget) {
+            val step = assertNotNull(vm.state.tutorial)
+            seen += step
+            vm.perform(step)
+        }
+
+        assertTrue(seen.isNotEmpty(), "the guided run never started, so this asserts nothing")
+        assertTrue(TutorialStep.AutoMark !in seen, "taught a feature the player switched off")
+        assertTrue(TutorialStep.PlaceAndWatch !in seen, "asked them to watch a board do nothing")
+        // The lessons that are still true have to survive the filter, or this
+        // passes by teaching nothing at all.
+        assertTrue(TutorialStep.MarkSquare in seen, "the cross gesture went with them")
+        assertTrue(TutorialStep.PlaceDog in seen, "the placement gesture went with them")
+        assertTrue(TutorialStep.Graduation in seen, "the run did not reach the end")
+        assertFalse(vm.state.isRehearsal, "the player was left on the practice board")
+        assertEquals(FirstGuidedLevel, vm.state.level?.id, "they were not handed level 1")
+    }
+
+    @Test
+    fun aLessonPointsAtWhatTheBoardLooksLikeRatherThanAtWhatItKnows() = runUnitTest {
+        // "Cross a square off" must never light a square that already shows a
+        // cross — there would be nothing to do on it. With auto-mark off no
+        // square shows one, so the lesson is free to pick a square the cascade
+        // rules out, and that is the *better* square to pick: it is a deduction
+        // the player now has to make for themselves.
+        //
+        // Which makes this the assertion that the lesson is handed the drawing
+        // and not the deduction. Handed the deduction it would quietly skip the
+        // most useful square on the board.
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtPuristCache())
+
+        vm.driveTo(TutorialStep.MarkSquare)
+
+        assertTrue(vm.state.autoMarks.isNotEmpty(), "the starter dog ruled nothing out")
+        assertTrue(vm.state.visibleAutoMarks.isEmpty(), "something was crossed off after all")
+        assertTrue(
+            vm.state.tutorialCells.single() in vm.state.autoMarks,
+            "the lesson avoided a square the player has not been shown is ruled out",
+        )
+    }
+
+    @Test
+    fun theTutorialStillTeachesAutoMarkToEveryoneElse() = runUnitTest {
+        // The other half, so the filter above is a filter and not a deletion.
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+        val seen = mutableListOf<TutorialStep>()
+
+        var guard = 0
+        while (vm.state.tutorial != null && guard++ < StepBudget) {
+            val step = assertNotNull(vm.state.tutorial)
+            seen += step
+            vm.perform(step)
+        }
+
+        assertTrue(TutorialStep.AutoMark in seen)
+        assertTrue(TutorialStep.PlaceAndWatch in seen)
+    }
+
     private val clock = TestTimeSource()
 
     /** A player who chose "Teach me how", which is the tutorial's entry condition. */
     private suspend fun untaughtCache(): InMemoryAppCache =
         InMemoryAppCache().apply { set(AppData(hasCompletedTutorial = false)) }
+
+    /**
+     * A player who has turned the crosses off, and been taught already.
+     *
+     * `hasCompletedTutorial` is not incidental at any call site that opens a
+     * real board: a default cache is a fresh install, and a fresh install on
+     * level 1 gets the rehearsal board in front of it.
+     */
+    private suspend fun puristCache(): InMemoryAppCache = InMemoryAppCache()
+        .apply { set(AppData(autoMarkEnabled = false, hasCompletedTutorial = true)) }
+
+    /** Untaught *and* a purist, which is what "replay the tutorial" produces. */
+    private suspend fun untaughtPuristCache(): InMemoryAppCache = InMemoryAppCache()
+        .apply { set(AppData(autoMarkEnabled = false, hasCompletedTutorial = false)) }
 
     /**
      * A player who has already been taught, so level 1 opens as level 1.

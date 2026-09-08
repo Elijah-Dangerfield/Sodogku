@@ -136,9 +136,9 @@ a session join.
 
 | Event | Attributes | Fires |
 |---|---|---|
-| `game.level_started` | `level_id`, `size`, `difficulty`, `attempt_number`, `mode` | Every attempt, including a retry after a loss and a jump from the level pane. Not on resume from background |
-| `game.level_completed` | `level_id`, `size`, `difficulty`, `duration_ms`, `score`, `paws`, `strikes_used`, `sniffs_used`, `treats_used`, `attempt_number`, `mode` | The last dog lands. `duration_ms` is monotonic from the attempt's start, so backgrounding does not inflate it. `score` is what was **banked** — net of the boosters `sniffs_used` and `treats_used` count, and the same number the record and the lifetime total get. Without those two, a fall in median score reads as a difficulty change when it may be players leaning harder on hints, and the two want opposite fixes. `strikes_used` is wrong guesses **this attempt**, counted rather than derived from the bone holding — bones are global now, so a mid-board refill would otherwise report a clean sheet |
-| `game.level_failed` | `level_id`, `difficulty`, `duration_ms`, `dogs_placed`, `attempt_number`, `mode` | The last bone goes. `dogs_placed` is how far they got, which is the difference between "too hard" and "unlucky". Since bones went global this is not always the *third* strike of the attempt: a board opened at zero can end on the first |
+| `game.level_started` | `level_id`, `size`, `difficulty`, `attempt_number`, `mode`, `auto_mark` | Every attempt, including a retry after a loss and a jump from the level pane. Not on resume from background |
+| `game.level_completed` | `level_id`, `size`, `difficulty`, `duration_ms`, `score`, `paws`, `strikes_used`, `sniffs_used`, `treats_used`, `attempt_number`, `mode`, `auto_mark` | The last dog lands. `duration_ms` is monotonic from the attempt's start, so backgrounding does not inflate it. `score` is what was **banked** — net of the boosters `sniffs_used` and `treats_used` count, and the same number the record and the lifetime total get. Without those two, a fall in median score reads as a difficulty change when it may be players leaning harder on hints, and the two want opposite fixes. `strikes_used` is wrong guesses **this attempt**, counted rather than derived from the bone holding — bones are global now, so a mid-board refill would otherwise report a clean sheet |
+| `game.level_failed` | `level_id`, `difficulty`, `duration_ms`, `dogs_placed`, `attempt_number`, `mode`, `auto_mark` | The last bone goes. `dogs_placed` is how far they got, which is the difference between "too hard" and "unlucky". Since bones went global this is not always the *third* strike of the attempt: a board opened at zero can end on the first |
 | `daily.started` | `date`, `streak` | Today's board is opened from the card. `level_id` is deliberately absent: it is a position in the daily pool and means nothing next to a campaign id |
 | `daily.completed` | `date`, `streak`, `score` | A daily clear is written. `streak` is the number *after* the write, so it is the run the player just extended |
 | `daily.forfeited` | `date`, `dogs_placed` | The player gave today's board up from the lose sheet and confirmed it. **The only thing that writes a daily loss.** Leaving the sheet used to do it silently, so a count here is now a count of people who *chose* to close the day rather than of people who navigated away — the two answer completely different questions and the old event answered neither |
@@ -151,6 +151,15 @@ a session join.
 | `game.booster_refilled` | `booster`, `to` | An ad topped a consumable up. `to` is the resulting holding, not the amount granted — refills never reduce, so the two differ for anyone above the floor |
 | `game.level_reward_granted` | `level_id`, `booster` (always `treat`), `held` | A **first** clear on a level `boosters.treatSchedule` pays on paid out. A replay pays nothing and emits nothing, so counting these counts rewards and not clears. `held` is the resulting holding, which is what tells you whether the reward is accumulating into a stash or being spent as fast as it arrives |
 | `game.level_skipped` | `level_id`, `attempt_number`, `skips_left_today` | A rewarded ad bought a way past a level. `attempt_number` is how many goes it took before giving up, which is the number that says whether the level is hard or broken. `skips_left_today` at 0 marks the players the daily cap is actually binding on |
+
+`auto_mark` is `AppData.autoMarkEnabled` — whether the board was crossing squares off for the
+player (R8). It rides the three board-lifecycle events and `game.commit` rather than only the
+completion, because the question it exists to answer is a **comparison between two populations**:
+do players who take the bookkeeping back clear more or fewer levels, faster or slower, with more or
+fewer retries, and do they come back. Every one of those is a ratio against the attempts that
+started, so the attribute has to be on the denominator as well as the numerator. It is deliberately
+absent from the booster and ad events: those are one-off spends and splitting them by a setting
+neither gates nor prices would be a segment nobody asked a question of.
 
 `mode` is `campaign` or `daily`, and it is on every game event rather than only the daily ones
 because level ids are ambiguous without it — the two packs share a number line, so `level_id: 7`
@@ -201,7 +210,7 @@ combination — a dashboard that treats it as an anomaly has the rule backwards.
 | `iap.purchase_result` | `outcome`, `error_kind`, `trigger` | A purchase flow ends, in any way |
 | `purchase.failed` | `product_id`, `error`, `attempt`, `final` | A store call failed and is being retried. `final` marks the attempt that gave up |
 
-| `game.commit` | `level_id`, `correct`, `on_marked`, `mode` | Every deliberate placement, the second of two taps. `on_marked` says the square was already crossed off — a rise there is a *legibility* problem, the crosses not reading as "ruled out", rather than a difficulty one |
+| `game.commit` | `level_id`, `correct`, `on_marked`, `mode`, `auto_mark` | Every deliberate placement, the second of two taps. `on_marked` says the square was already **drawing** a cross — a rise there is a *legibility* problem, the crosses not reading as "ruled out", rather than a difficulty one. It is the drawn set and not the deduction behind it, so a square whose cross the player tapped away does not count, and with `auto_mark=false` it can only ever be a cross the player drew. Read the two attributes together or the series means two different things at once |
 
 ### The one that pays for itself
 

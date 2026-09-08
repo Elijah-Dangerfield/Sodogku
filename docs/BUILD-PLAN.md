@@ -1351,7 +1351,7 @@ per-call-site concern and nothing failed when a call site forgot.
 | R5 | A background on the welcome screen — **blocked, files not on disk** | |
 | R6 | A dialog when the dog counter (1/4) is tapped | |
 | R7 | Achievements: the earned border is clipped by the card's own shape; the detail dialog does not animate; grow the catalog toward ~75; more of them hidden until earned | **DONE** (2026-09-08) |
-| R8 | Placing a dog auto-crosses too much and does the player's reasoning for them | |
+| R8 | Placing a dog auto-crosses too much and does the player's reasoning for them | **DONE** (2026-09-08) — see below |
 | R9 | Confirm the daily is fully separate from the campaign, explain that in a first-run dialog, and settle whether any completed board feeds the streak or only the daily | |
 | R10 | Level rewards are too frequent. Front-load them and thin out as levels climb | **DONE** (2026-09-08) |
 | R11 | Run the beta workflow locally for a TestFlight build. Needs an App Store Connect record and a working `xcode-select` | |
@@ -1841,3 +1841,60 @@ catch — a scalar key whose type went missing also lands in the unprotected set
 and appending it would look like the same routine update. Verified that retyping
 a scalar as `json` now fails `ConfigManifestRegistryDriftTest` instead, which is
 the layer that owns registry-versus-declaration agreement.
+
+### R8 · Auto-mark is a setting, not a trimmed rule — **DONE** (2026-09-08)
+
+"Maybe placing a dog shouldn't auto X a bunch of stuff. That makes it too easy for
+the user."
+
+The instinct was to trim part of the cascade — keep the mechanical rules, drop the
+insightful one. It was measured across all 500 campaign levels instead, counting
+the cells each rule *newly* rules out per placement, deduped against everything
+earlier placements had already ruled out. The row and the column are the whole
+story; the region is about one cell and the diagonals half a cell, flat across
+board sizes. The table is in `decisions.md`, because it is the sort of thing that
+gets re-litigated from intuition otherwise.
+
+So there is no partial version to ship. Dropping adjacency or the region is
+invisible to the player; dropping the line means X-ing seven cells by hand after
+every placement on a 10x10, which is bookkeeping rather than thinking. Auto-mark
+is all-or-nothing, which makes the right answer a player setting: **Cross off
+squares for me**, first row in Settings → Playing, defaulting on. On by default
+because it is what every existing player has and because the tutorial teaches
+auto-mark as a step, which a default of off would turn into a lie on first launch.
+
+**The work was separating what the game knows from what the player has been
+shown.** Those used to be one set. `GameState.autoMarks` is now the deduction and
+is computed from the placements on every move whatever the setting says;
+`GameState.visibleAutoMarks` is the subset the board draws. `CandidateGrid` and
+`Board.autoMarkedCells` are untouched, and a test asserts the ViewModel's cascade
+equals `autoMarkedCells` with the setting off — the setting cannot move a baked
+difficulty. The hint is the one that would have failed silently: had `useSniff`
+reasoned from the drawing, a player with the crosses off would have bought *worse
+advice* by asking for less help.
+
+**The tutorial drops two lessons rather than lying.** `AutoMark` would have shown
+regardless — its trigger is `Tap`, so the runner does not skip it for having
+nothing to point at — and `PlaceAndWatch` exists only to set it up.
+`Tutorial.scriptFor(autoMark)` filters both and `StarterDog` gets a second body
+string. Reachable in practice: Settings has a Replay the tutorial row.
+
+**Accessibility.** `placeAt` now tests the drawn set, so a screen-reader player
+with auto-mark off is offered a placement on every empty square instead of being
+locked out of a row, column, region and ring per dog with no announcement saying
+why. It also fixes a pre-existing case: an auto-mark the player tapped away read
+as empty but still refused the action.
+
+**Telemetry.** `auto_mark` on `game.level_started` / `level_completed` /
+`level_failed` / `commit`. On the denominator as well as the numerator, because
+the question is a comparison between two populations rather than a fact about one
+attempt. On `commit` it is required rather than nice: without it `on_marked` means
+two different things in one series.
+
+**No config key.** Argued in `decisions.md` and rejected — the persisted field
+cannot distinguish "never touched" from "explicitly on" without going nullable,
+the key's only safe value is `true` because of the tutorial, and SPEC 4.4 already
+puts anything the tutorial and level 1 need in the binary.
+
+**Not verified:** iOS. The Kotlin target compiles and every change is
+`commonMain`, but nothing has run on a simulator on this machine.

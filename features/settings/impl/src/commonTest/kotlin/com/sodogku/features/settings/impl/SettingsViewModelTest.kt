@@ -36,6 +36,31 @@ class SettingsViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun autoMarkIsOnByDefaultAndTogglesAndPersists() = runUnitTest {
+        // On by default is the load-bearing half. It is what every existing
+        // player already has, and the tutorial teaches auto-mark as a step — a
+        // default of off would make that lesson a lie on first launch.
+        val cache = InMemoryAppCache()
+        val vm = viewModel(cache)
+        assertTrue(vm.state.autoMarkEnabled, "the board crosses squares off by default")
+        assertTrue(cache.get().autoMarkEnabled, "and a fresh install is stored that way")
+
+        vm.takeAction(SettingsAction.ToggleAutoMark)
+
+        assertFalse(vm.state.autoMarkEnabled)
+        assertFalse(cache.get().autoMarkEnabled)
+    }
+
+    @Test
+    fun autoMarkOpensShowingWhatIsAlreadySaved() = runUnitTest {
+        val cache = InMemoryAppCache(AppData(autoMarkEnabled = false))
+
+        val vm = viewModel(cache)
+
+        assertFalse(vm.state.autoMarkEnabled, "the screen forgot a choice the player made")
+    }
+
+    @Test
     fun hapticsTogglesAndPersists() = runUnitTest {
         val cache = InMemoryAppCache()
         val vm = viewModel(cache)

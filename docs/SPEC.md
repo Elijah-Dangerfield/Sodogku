@@ -70,6 +70,14 @@ board is already X'd. This is what makes a 9x9 tractable and it is the single bi
 difference between a good implementation and a bad one. It is a settings toggle for purists, but
 the default is on and the tutorial teaches it.
 
+**The toggle is presentation only** (R8). `GameState.autoMarks` is the cascade, computed from the
+placements on every move whatever the setting says; `GameState.visibleAutoMarks` is the subset the
+board actually draws. The sniff, the difficulty engine and the shipped packs all reason over the
+first, so turning the crosses off changes what is on screen and nothing about the puzzle — and in
+particular never buys a player worse hints for asking for less help. Every reader of either set
+picks one deliberately; `decisions.md` has the measurement that says why this is a setting rather
+than a trimmed rule.
+
 Manual X-marking on top of auto-mark is what lets a careful player record their own deductions on
 the cells auto-mark cannot rule out.
 
@@ -982,9 +990,12 @@ was told "it's in settings".
 
 **Shipped (C11):**
 
-- **Playing:** vibration, reduce animations, shapes on colors. Each row toggles on tap anywhere,
-  not only on the switch, and writes straight through to `AppData` — there is no save button, so
-  there is nothing to hang a deferred commit off.
+- **Playing:** cross off squares for me, vibration, reduce animations, shapes on colors. Each row
+  toggles on tap anywhere, not only on the switch, and writes straight through to `AppData` —
+  there is no save button, so there is nothing to hang a deferred commit off. Auto-mark leads the
+  section because it is the one row that changes how the puzzle is played rather than how it
+  looks; it defaults **on**, and the tutorial drops the two lessons that teach it for a player who
+  has turned it off.
 - **About:** send feedback, terms of service, privacy policy, version. The legal URLs come from
   `legal.termsUrl` / `legal.privacyUrl` in remote config and open in a browser, because the pages
   are hosted (GitHub Pages, from `pages/`). Version is text, not a row you can tap.
@@ -1001,7 +1012,7 @@ and it is the one row on this screen that navigates away from it. It clears
 flag once as its ViewModel loads.
 
 **Still to land**, mostly gated on chunks that own the state they toggle: sound (no audio yet),
-auto-mark and show-timer toggles, achievements on/off (C10), reset progress with a real
+the show-timer toggle, achievements on/off (C10), reset progress with a real
 confirmation, the Pro row with **Restore Purchases** (C8), ad partners and
 reopening the consent form (C8), and rate-the-app (`:libraries:review`). Report-a-bug still exists
 as the template's Sentry-backed flow, reachable from the shake gesture and from error screens, and
@@ -1271,8 +1282,12 @@ The board is playable with one. Every square is a labelled, activatable node.
   same name (the rotor on iOS). It is not the sighted gesture: a second tap inside 320ms is
   consumed by the reader and never reaches the app, so a board with descriptions and nothing else
   can be marked and unmarked and never played.
-- **A square the board has already ruled out offers no placement.** Announcing an action that
-  does nothing is worse than announcing none.
+- **A square that is drawing a cross the board put there offers no placement.** Announcing an
+  action that does nothing is worse than announcing none. It is the *drawn* set and not the
+  deduction (R8): with auto-mark off nothing is crossed off, so every empty square offers the
+  action and a reader user is not silently locked out of most of the board — a whole row, column,
+  region and ring per dog. An auto-mark the player tapped away reads as empty and offers it too,
+  which it did not before.
 - **The board vanishes from the tree while anything covers it** — a spotlight, the outcome sheet,
   the level pane — because the scrim that swallows a sighted player's taps is a drawing and stops
   nothing else.

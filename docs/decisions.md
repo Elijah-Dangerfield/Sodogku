@@ -6,6 +6,88 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-08 — Auto-mark is a setting, not a trimmed rule
+
+**Decision:** "Cross off squares for me" is a Settings toggle, defaulting **on**, that changes what
+the board draws and nothing else. `CandidateGrid.place` and `Board.autoMarkedCells` are untouched.
+
+**The ask was "placing a dog shouldn't auto X a bunch of stuff, that makes it too easy".** The
+first instinct was to trim part of the cascade — keep the mechanical rules, drop the insightful
+one — so it was measured across all 500 campaign levels instead. Each rule was counted for the
+cells it *newly* rules out per placement, deduped against everything earlier placements had
+already ruled out:
+
+| Size | Line (row + column) | Region | Diagonal | Total |
+|---|---|---|---|---|
+| 4 | 2.3 | 0.1 | 0.7 | 3.0 |
+| 5 | 3.1 | 0.3 | 0.5 | 4.0 |
+| 6 | 4.0 | 0.5 | 0.5 | 5.0 |
+| 7 | 4.8 | 0.7 | 0.5 | 6.0 |
+| 8 | 5.6 | 0.9 | 0.5 | 7.0 |
+| 9 | 6.4 | 1.1 | 0.5 | 8.0 |
+| 10 | 7.2 | 1.3 | 0.5 | 9.0 |
+
+"Diagonal" is the neighbours not already on the line.
+
+**That kills the partial approach**, and it is worth writing down because the alternative is
+someone re-litigating it from intuition. The row and the column are the overwhelming bulk. The
+region is about one cell and the diagonals half a cell, flat across board sizes — dropping either
+is invisible to the player, so it buys nothing. Dropping the line is the only trim that would
+register, and X-ing seven cells by hand after every placement on a 10x10 is bookkeeping rather
+than thinking. It would make the game more tedious, not more thoughtful. Auto-mark is effectively
+all-or-nothing, which is what makes the right answer a player setting.
+
+**Default on, and that is not a hedge.** It is what every existing player already has, and the
+tutorial teaches auto-mark as a step — with a default of off that lesson would be a lie on first
+launch. A player who turns it off later has made the choice knowingly. SPEC 1.2 already said this;
+the toggle is what was missing.
+
+**The real design work is separating what the game knows from what the player has been shown.**
+Those were one set. `GameState.autoMarks` is now the deduction, computed from the placements on
+every move whatever the setting says, and `GameState.visibleAutoMarks` is the subset the board
+draws. Every reader picks one on purpose:
+
+| Reader | Reads | Because |
+|---|---|---|
+| `useSniff`'s `known` filter | `autoMarks` | The hint reasons from the deduction. Reading the drawing would mean a player with the crosses off got *different advice* on the same board — worse advice for asking for less help, which is the one trade this feature must not make |
+| `cellState`, `placeAt` | `visibleAutoMarks` | Questions about the screen. `placeAt` is the accessibility half: a reader user with auto-mark off must be offered a placement on every empty square, or a whole row, column, region and ring per dog silently stops being playable |
+| `game.commit`'s `on_marked` | `visibleAutoMarks` | It is a *legibility* metric — "did the crosses fail to read as ruled out" — so a cross that was never drawn cannot count |
+| Tutorial `cellsFor` / `advanceTutorial` | `visibleAutoMarks` | A lesson points at squares on a screen. With the crosses off, "cross a square off" is now free to light one the cascade rules out, which is the better square to ask for: it is a deduction the player has to make themselves |
+| `place`, `startAttempt` | `autoMarks` | The cascade the difficulty engine rated the level against. A setting about what is on screen may not move a baked difficulty, and `GameViewModelTest` asserts the two are equal by construction |
+
+Note that the sniff is protected twice: `HintFinder.ruledOutCells` builds its own `CandidateGrid`
+and excludes the cascade before returning anything, so the `known` filter's `autoMarks` half is
+belt and braces. It is kept and commented anyway, because the next person to touch either end
+should not have to rediscover that the safety is coming from somewhere else.
+
+**The tutorial drops two steps rather than lying.** `AutoMark` is a card reading "every square
+that dog rules out was crossed off for you", and it would still have shown with the setting off:
+its trigger is `Tap`, so `TutorialRunner` does not skip it for having nothing to point at.
+`PlaceAndWatch` exists only to set that up. `Tutorial.scriptFor(autoMark)` filters both, and
+`StarterDog` gets a second body string for the same reason. This is reachable in practice —
+Settings has a Replay the tutorial row, which is exactly how a purist meets the guided run.
+
+**Rejected: a `game.autoMarkDefault` remote-config key.** It was argued properly, because a
+default that can be flipped without a release is normally the right shape and SPEC 4.1 says config
+owns switches. Three things sink it. The persisted field cannot tell "never touched" from
+"explicitly on" unless it is nullable, which is the exact trap `AppData.sniffs` documents — a
+record that already says `true` is indistinguishable from a player who chose `true`. The key's
+only safe value is `true` anyway, because the tutorial teaches auto-mark and a flip to off would
+make that lesson a lie for every new install, so it is a lever nobody could ever pull. And SPEC
+4.4 already puts "anything needed before first config fetch — onboarding, tutorial, level 1"
+in the binary, which is precisely where this lands. An inert key is the failure
+`ConfigValuesAreReadTest` exists to catch, so the right number of new keys here is zero.
+
+**Telemetry: `auto_mark` goes on four events**, not one. `game.level_started`,
+`game.level_completed`, `game.level_failed` and `game.commit`. It splits the funnel rather than
+describing an attempt — the question is whether players who turn it off retain better or worse,
+and that is a comparison of clear rate, time, score and retries between two populations. A segment
+that only existed on the completion event could not answer it. On `game.commit` it is not optional:
+without it `on_marked` means two different things in one series, since with auto-mark off it can
+only ever be a cross the player drew themselves.
+
+---
+
 ## 2026-09-08 — The tutorial teaches on a board that is not in the game
 
 **Decision:** the guided run happens on `TutorialBoard`, a hand-authored 5x5 in no pack with id

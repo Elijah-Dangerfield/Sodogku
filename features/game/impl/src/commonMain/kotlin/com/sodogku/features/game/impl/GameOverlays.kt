@@ -62,6 +62,7 @@ import sodogku.libraries.resources.generated.resources.tutorial_skip
 import sodogku.libraries.resources.generated.resources.tutorial_sniff_body
 import sodogku.libraries.resources.generated.resources.tutorial_sniff_title
 import sodogku.libraries.resources.generated.resources.tutorial_starter_dog_body
+import sodogku.libraries.resources.generated.resources.tutorial_starter_dog_body_manual
 import sodogku.libraries.resources.generated.resources.tutorial_starter_dog_title
 import sodogku.libraries.resources.generated.resources.tutorial_target_action
 import sodogku.libraries.resources.generated.resources.tutorial_treat_body
@@ -203,7 +204,7 @@ fun BoxScope.TutorialCoachMark(state: GameState, onAction: (GameAction) -> Unit)
         CoachMark(
             anchor = anchor,
             title = stringResource(titleOf(shown)),
-            body = stringResource(bodyOf(shown)),
+            body = stringResource(bodyOf(shown, state.autoMarkVisible)),
             confirmLabel = stringResource(Res.string.tutorial_got_it).takeIf { !live },
             onConfirm = { onAction(GameAction.TutorialAdvance) },
             skipLabel = stringResource(Res.string.tutorial_skip),
@@ -293,8 +294,20 @@ private fun titleOf(step: TutorialStep): StringResource = when (step) {
     TutorialStep.Graduation -> Res.string.tutorial_graduation_title
 }
 
-private fun bodyOf(step: TutorialStep): StringResource = when (step) {
-    TutorialStep.StarterDog -> Res.string.tutorial_starter_dog_body
+/**
+ * [autoMark] reaches exactly one lesson.
+ *
+ * `Tutorial.scriptFor` drops the two steps that are *about* auto-mark when it is
+ * off, but [TutorialStep.StarterDog] survives and its copy ends "and every
+ * square it rules out is crossed off" — pointed at a board where none of them
+ * are. Every other card here says the same thing either way.
+ */
+private fun bodyOf(step: TutorialStep, autoMark: Boolean): StringResource = when (step) {
+    TutorialStep.StarterDog -> if (autoMark) {
+        Res.string.tutorial_starter_dog_body
+    } else {
+        Res.string.tutorial_starter_dog_body_manual
+    }
     TutorialStep.RuleRegion -> Res.string.tutorial_rule_region_body
     TutorialStep.RuleLine -> Res.string.tutorial_rule_line_body
     TutorialStep.RuleTouching -> Res.string.tutorial_rule_touching_body

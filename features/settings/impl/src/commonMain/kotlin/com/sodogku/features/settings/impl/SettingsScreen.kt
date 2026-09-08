@@ -22,6 +22,8 @@ import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.settings_achievements
 import sodogku.libraries.resources.generated.resources.settings_achievements_show
 import sodogku.libraries.resources.generated.resources.settings_achievements_show_body
+import sodogku.libraries.resources.generated.resources.settings_auto_mark
+import sodogku.libraries.resources.generated.resources.settings_auto_mark_body
 import sodogku.libraries.resources.generated.resources.settings_colorblind
 import sodogku.libraries.resources.generated.resources.settings_colorblind_body
 import sodogku.libraries.resources.generated.resources.settings_feedback
@@ -87,6 +89,14 @@ fun SettingsScreen(
             ListSection(
                 title = stringResource(Res.string.settings_section_play),
                 items = listOf(
+                    // First, because it is the only row in this section that
+                    // changes how the puzzle is played rather than how it looks.
+                    toggleItem(
+                        headline = stringResource(Res.string.settings_auto_mark),
+                        supporting = stringResource(Res.string.settings_auto_mark_body),
+                        checked = state.autoMarkEnabled,
+                        onToggle = { onAction(SettingsAction.ToggleAutoMark) },
+                    ),
                     toggleItem(
                         headline = stringResource(Res.string.settings_haptics),
                         supporting = stringResource(Res.string.settings_haptics_body),
@@ -229,6 +239,7 @@ private fun SettingsScreenPreview() {
     PreviewContent {
         SettingsScreen(
             state = SettingsState(
+                autoMarkEnabled = true,
                 hapticsEnabled = true,
                 reduceAnimations = false,
                 colorblindMode = true,

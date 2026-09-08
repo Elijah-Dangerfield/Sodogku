@@ -212,6 +212,22 @@ class GameViewModel(
     private var rehearsing = false
 
     /**
+     * `AppData.autoMarkEnabled`, mirrored into [GameState.autoMarkVisible] for
+     * the screen.
+     *
+     * Held in a field as well because [startAttempt] needs it *before* its own
+     * `updateState` lands: `tutorial.begin` picks the curriculum from it and
+     * `tutorial.openingFrame` needs the marks the player can see, and `state`
+     * is a derived flow that lags `updateState` by a dispatch. Same reason
+     * [rehearsing] is a field.
+     *
+     * It changes **nothing about the deduction**. [GameState.autoMarks] is
+     * computed from the placements either way; this only decides whether the
+     * board draws them.
+     */
+    private var autoMark = true
+
+    /**
      * The level's history as it stood *before* this attempt touched it.
      *
      * Read at the start, because `onCompleted` overwrites it and the achievement
@@ -238,11 +254,18 @@ class GameViewModel(
         // once meant the switch moved and the board did not change until the
         // next launch. Measured on a device: zero pixels changed.
         //
-        // Only the three that change what is on screen. The consumable counts
+        // Only the four that change what is on screen. The consumable counts
         // are deliberately absent: this ViewModel is their writer, and echoing
         // its own writes back in would fight the spend it just made.
         appCache.updates
-            .map { DisplaySettings(it.colorblindMode, it.hapticsEnabled, it.reduceAnimations) }
+            .map {
+                DisplaySettings(
+                    it.colorblindMode,
+                    it.hapticsEnabled,
+                    it.reduceAnimations,
+                    it.autoMarkEnabled,
+                )
+            }
             .distinctUntilChanged()
             .onEach { display ->
                 takeAction(GameAction.DisplaySettingsChanged(display))
@@ -306,12 +329,18 @@ class GameViewModel(
             GameAction.TutorialAdvance -> action.tutorialTapped()
             GameAction.SkipTutorial -> action.skipTutorial()
             is GameAction.TimerTick -> action.updateState { it.copy(elapsedMs = elapsedMs()) }
-            is GameAction.DisplaySettingsChanged -> action.updateState {
-                it.copy(
-                    colorblind = action.settings.colorblind,
-                    haptics = action.settings.haptics,
-                    reduceAnimations = action.settings.reduceAnimations,
-                )
+            is GameAction.DisplaySettingsChanged -> {
+                // The field and the state are written together, and the field
+                // first: it is what the tutorial reads before an update lands.
+                autoMark = action.settings.autoMark
+                action.updateState {
+                    it.copy(
+                        colorblind = action.settings.colorblind,
+                        haptics = action.settings.haptics,
+                        reduceAnimations = action.settings.reduceAnimations,
+                        autoMarkVisible = action.settings.autoMark,
+                    )
+                }
             }
         }
     }
@@ -320,10 +349,14 @@ class GameViewModel(
         val settings = Catching { appCache.get() }
             .logOnFailure { "Failed to read game settings" }
             .getOrNull()
+        // Into the field before the update, because `startAttempt` below reads
+        // it and `state` does not carry this write until the next dispatch.
+        autoMark = settings?.autoMarkEnabled != false
         updateState {
             it.copy(
                 colorblind = settings?.colorblindMode == true,
                 haptics = settings?.hapticsEnabled != false,
+                autoMarkVisible = autoMark,
                 reduceAnimations = settings?.reduceAnimations == true,
                 showAchievements = settings?.achievementsVisible != false,
                 isPro = entitlements.isPro.value,
@@ -538,6 +571,14 @@ class GameViewModel(
                 "difficulty" to level.difficulty,
                 "attempt_number" to attemptNumber,
                 "mode" to modeName,
+                // On every board event, because it splits the funnel rather
+                // than describing one attempt. Everything downstream — clear
+                // rate, time, score, retries — is a comparison between the
+                // players who kept the crosses and the players who took the
+                // bookkeeping back, and a segment that only exists on the
+                // completion event cannot answer the retention question that
+                // motivated it.
+                "auto_mark" to autoMark,
             )
         }
         // Recorded when the level opens rather than when it is cleared: an
@@ -571,8 +612,16 @@ class GameViewModel(
             emptySet()
         }
 
-        if (rehearsal) tutorial.begin()
-        val lesson = tutorial.openingFrame(level, opening, openingMarks)
+        if (rehearsal) tutorial.begin(autoMark)
+        // The frame is handed what the player can see, not the cascade: a
+        // lesson points at squares on screen. `clearedMarks` is empty on a
+        // board that is only now opening, so this is the whole of
+        // `visibleAutoMarks` for it.
+        val lesson = tutorial.openingFrame(
+            level,
+            opening,
+            if (autoMark) openingMarks else emptySet(),
+        )
         grantProBoosters()
         val banked = bankedScores(level)
 
@@ -621,6 +670,7 @@ class GameViewModel(
                 colorblind = it.colorblind,
                 haptics = it.haptics,
                 reduceAnimations = it.reduceAnimations,
+                autoMarkVisible = it.autoMarkVisible,
                 showAchievements = it.showAchievements,
                 boostersEnabled = it.boostersEnabled,
                 refillTo = it.refillTo,
@@ -691,12 +741,16 @@ class GameViewModel(
      * by a dispatch *and* is a moving target across a delay, so reading the
      * board back off it here would point the next lesson at whatever happened
      * during the wait.
+     *
+     * [visibleMarks] is `GameState.visibleAutoMarks` and not the deduction
+     * behind it: a lesson points at squares on a screen, so it has to know what
+     * the screen is showing.
      */
     private suspend fun GameAction.advanceTutorial(
         trigger: TutorialTrigger,
         level: LevelDefinition,
         placed: Solution,
-        autoMarks: Set<Int>,
+        visibleMarks: Set<Int>,
         justMarked: Set<Int> = emptySet(),
     ) {
         val current = tutorial.currentStep ?: return
@@ -711,7 +765,7 @@ class GameViewModel(
         val frame = if (finished) {
             TutorialFrame.None
         } else {
-            tutorial.frameFor(level, placed, autoMarks, justMarked)
+            tutorial.frameFor(level, placed, visibleMarks, justMarked)
         }
         if (frame.step != null) {
             updateState { it.copy(tutorial = frame.step, tutorialCells = frame.cells) }
@@ -724,7 +778,7 @@ class GameViewModel(
     /** The coach mark's own dismissal, and the "Got it" button under it. */
     private suspend fun GameAction.tutorialTapped() {
         val level = state.level ?: return
-        advanceTutorial(TutorialTrigger.Tap, level, state.placed, state.autoMarks)
+        advanceTutorial(TutorialTrigger.Tap, level, state.placed, state.visibleAutoMarks)
     }
 
     /**
@@ -860,11 +914,20 @@ class GameViewModel(
      * [GameState.autoMarks], because auto-marks are recomputed from the
      * placements on every move and anything removed from them would come
      * straight back.
+     *
+     * That branch is gated on the setting rather than on
+     * [GameState.visibleAutoMarks], and the difference is the whole reason both
+     * exist. A cross the player has already tapped away is out of the visible
+     * set but is still an auto-mark, and tapping it again has to put it back —
+     * so this asks "is the board drawing auto-marks at all", not "is this
+     * square currently crossed off". With the setting off, none of these
+     * squares show anything and a tap on one writes the player's own cross like
+     * any other.
      */
     private suspend fun GameAction.toggleMark(cell: Int) {
         // Paid for with a bone. It stays.
         if (cell in state.wrongGuesses) return
-        if (cell in state.autoMarks) {
+        if (state.autoMarkVisible && cell in state.autoMarks) {
             updateBoard {
                 it.copy(
                     clearedMarks = if (cell in it.clearedMarks) {
@@ -878,7 +941,7 @@ class GameViewModel(
         }
         val level = state.level
         val placed = state.placed
-        val marks = state.autoMarks
+        val marks = state.visibleAutoMarks
         sendEvent(GameEvent.Marked(cell))
         updateBoard {
             it.copy(
@@ -923,11 +986,18 @@ class GameViewModel(
                 "game.commit",
                 "level_id" to level.id,
                 "correct" to correct,
-                // Was this square already crossed out when they committed? A rise
-                // here means the auto-marks are not reading as "ruled out", which is
-                // a legibility problem rather than a difficulty one.
-                "on_marked" to (cell in state.autoMarks || cell in state.manualMarks),
+                // Was this square already crossed out **on screen** when they
+                // committed? A rise here means the crosses are not reading as
+                // "ruled out", which is a legibility problem rather than a
+                // difficulty one — so it is the drawn set and not the deduction,
+                // and a square the player tapped the cross off no longer counts.
+                "on_marked" to (cell in state.visibleAutoMarks || cell in state.manualMarks),
                 "mode" to modeName,
+                // Without this, `on_marked` means two different things in one
+                // series: with auto-mark off it can only ever be a cross the
+                // player drew, which is a far rarer event. The legibility signal
+                // is only readable split by this.
+                "auto_mark" to autoMark,
             )
         }
         if (correct) place(cell) else strike(cell)
@@ -941,6 +1011,9 @@ class GameViewModel(
 
         val scored = Scoring.placement(state.score, level.size, since, scoringConfig())
         val placed = state.placed.withPlacement(row, level.board.colOf(cell))
+        // The cascade, computed whether or not the board is drawing it: the
+        // sniff and the level's own difficulty rating both reason over this,
+        // and a setting about what is on screen may not move either.
         val marksBefore = state.autoMarks
         val marks = level.board.autoMarkedCells(placed)
 
@@ -960,12 +1033,20 @@ class GameViewModel(
         // Before the win check, so a placement that both finishes the lesson and
         // finishes the board leaves the coach mark behind rather than under the
         // outcome sheet.
+        //
+        // The lesson is handed the crosses that *appeared on screen*, not the
+        // eliminations that happened. `clearedMarks` survives a placement
+        // untouched and can only ever hold squares that were already marked, so
+        // subtracting `marksBefore` alone leaves exactly the new crosses — and
+        // with auto-mark off there are none, which is why the two steps built on
+        // this are not in that curriculum at all.
+        val visibleMarks = if (autoMark) marks - state.clearedMarks else emptySet()
         advanceTutorial(
             TutorialTrigger.Placed,
             level,
             placed,
-            marks,
-            justMarked = marks - marksBefore,
+            visibleMarks,
+            justMarked = visibleMarks - marksBefore,
         )
 
         // The finished card is handed on rather than re-read from `state`, which
@@ -1002,7 +1083,7 @@ class GameViewModel(
         val forgiven = rehearsing
         val level = state.level
         val placed = state.placed
-        val marks = state.autoMarks
+        val marks = state.visibleAutoMarks
         // Floored, because a board can now legitimately open at zero and a
         // negative holding would be persisted and then refilled *up to* itself.
         val remaining = if (forgiven) {
@@ -1082,6 +1163,7 @@ class GameViewModel(
             "treats_used" to treatsUsed,
             "attempt_number" to attemptNumber,
             "mode" to modeName,
+            "auto_mark" to autoMark,
         )
         val streak = if (isDaily) {
             recordDailyClear(banked, paws, duration)
@@ -1286,6 +1368,7 @@ class GameViewModel(
             "dogs_placed" to state.placed.placedCount,
             "attempt_number" to attemptNumber,
             "mode" to modeName,
+            "auto_mark" to autoMark,
         )
         val duration = elapsedMs()
         // Read, not written. A lost daily is not spent here: the player can still
@@ -1750,6 +1833,14 @@ class GameViewModel(
         // squares they already reasoned out — which is a charge taken for
         // nothing, and it lands on exactly the careful player manual marking was
         // built for.
+        //
+        // `autoMarks` and **not** `visibleAutoMarks`. This is the deduction the
+        // hint reasons from, not the picture on screen, and the two came apart
+        // in R8. Reading the drawn set would mean a player with auto-mark off
+        // got a *different* hint from the same board — worse advice for asking
+        // for less help, which is the exact trade the setting is not making.
+        // `HintFinder` excludes the cascade on its own, so this line is belt and
+        // braces there; it is load-bearing for the other three sets.
         val known = state.autoMarks + state.manualMarks + state.placedCells + state.wrongGuesses
         val ruledOut = HintFinder
             .ruledOutCells(level.board, state.placed, limit = SniffRevealLimit * SniffSearchSlack)
