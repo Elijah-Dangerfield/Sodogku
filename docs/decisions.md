@@ -2012,3 +2012,71 @@ is the point.
 an edit made in Grafana is lost on the next import. Terraform or Grafana's git-sync would fix that
 and both are a larger commitment than six files deserve before anyone has looked at one with real
 data on it.
+
+## 2026-09-08 — the store privacy forms are answered conservatively where the wording is ambiguous
+
+`docs/store/data-safety.md` has two rows whose answer depends on how Google and Apple define
+"linked to the user" rather than on anything our code does. Both are filed the safe way.
+
+Google's definition treats data as linked if it is collected alongside a persistent identifier.
+Apple's "Not Linked to You" requires de-identification and a commitment not to relink to a user
+*or a device*. Everything we send rides with `install_id`, which is exactly a persistent
+device-scoped identifier. So both are filed as **linked**, even though there is no account and
+nothing on the other end can turn an install id into a person.
+
+Same reasoning on **Purchases → Purchase history**. We never see a payment instrument and Play's
+own purchase records are out of scope, but `iap.purchase_result` records against an `install_id`
+that a purchase succeeded or failed. Declaring it costs nothing. Not declaring it is a position
+you would have to defend to a reviewer, and the reviewer is holding the "remove app" button.
+
+The rule this follows: over-declaring is never a violation, under-declaring is. Both answers are
+marked with a confidence level and a pointer to the store's own help page in the document, so the
+next person can tighten them deliberately rather than by accident.
+
+## 2026-09-08 — store screenshots are cropped to 2:1 rather than shot at 9:16
+
+The emulator is 1080x2424, which is 2.24:1. Play rejects a screenshot whose long side is more than
+twice its short side, so the raw frames are not submittable.
+
+Three ways out. Set `wm size 1080x1920` and shoot a true 9:16 pass; scale the frame down and pad
+the sides with cream; or crop. Cropping won.
+
+`wm size` was the technically cleanest and was rejected on process grounds: another agent was
+driving the same emulator, and resizing their device mid-session to take pictures is the kind of
+change that makes someone else's screenshot look like a layout bug. Padding was rejected because
+cream side-bars on a cream app read as a rendering mistake rather than a frame.
+
+So: `sips -c 2160 1080 --cropOffset 150 0`, giving exactly 2:1. 150 rows off the top removes the
+status bar and stops just above the header buttons; the remaining 114 off the bottom removes the
+gesture bar and stops short of the booster pills. Both margins are about 30px, so **a layout change
+moves them** and the recipe in `docs/store/listing.md` says which edges to re-check.
+
+The same pass captured the frames from the emulator's existing state (level 391, a 10x10 board)
+rather than from `launch --fresh`. Fresh would have given an onboarding and tutorial frame, and
+would have wiped the other agent's session to get it. The listing notes the missing frame instead.
+
+## 2026-09-08 — two meanings under one key, decided by line ordering
+
+`ads.gate_shown` emitted its own `is_offline`, and `GrafanaLogTree` stamps an
+`is_offline` on every record. They are not the same thing: the record's is
+`AppState.isOffline`, which is true when our *backend* is unreachable as well as
+when the device is, and the gate's is the OS signal alone, which is the only one
+the offline grace should read.
+
+The event's value won, and only because `forward` applies the per-record stamp
+before the extras loop. Nothing in either file said so. A dashboard reading
+`is_offline` on that event would have been right by accident and wrong the moment
+someone reordered two lines.
+
+The gate's attribute is now `device_offline`. Naming was the whole fix — a
+comment explaining which `is_offline` you were looking at would have needed
+reading at query time, which is exactly when nobody reads comments.
+
+Three attributes the dashboards needed and nothing emitted are now emitted:
+`difficulty` on `game.level_failed` (without it only *clears* report a tier, so a
+board hard enough to lose on is under-represented in every calibration panel —
+the direction a mis-rating hides in), `difficulty` on `game.booster_no_op`, and
+`trigger` on `iap.purchase_result`, which is the question section 14 actually
+asks of the paywall board. `Entitlements.purchasePro` takes the trigger as an
+optional parameter so the test doubles and the QA path did not all have to grow
+an argument they do not care about.

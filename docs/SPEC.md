@@ -1227,7 +1227,15 @@ moderate difficulty so it stays a 3-to-5-minute daily habit rather than a wall.
 - [ ] Which clips are worth sheeting beyond `dog_look`. `flop` for the lose sheet and `bark` for a
       win are the obvious candidates; each costs about 260KB.
 - [ ] **Bone icon** for lives, **paw** for the rating, and icons for the two boosters.
-- [ ] **App icon** (1024x1024), Android adaptive icon layers, notification icon.
+- [ ] **App icon** (1024x1024). The **Android launcher icon is already done** (commit `df270fc`:
+      the dog head, no numerals, on a flat cream adaptive background, safe-zone clean). What is
+      still the template's "YOUR APPS IMAGE HERE" placeholder, and what blocks submission, is the
+      **iOS app icon set** and the **Play 512x512 listing icon**. `docs/store/icons.md` §5 lists
+      every file to replace, at every size. A notification icon is not needed: the app posts none.
+- [ ] **Play feature graphic**, 1024x500. Mandatory for a Play listing and it does not exist.
+- [ ] **iOS screenshots** at 6.9" (1320x2868), and 13" if iPad is supported. Blocked on an iOS
+      simulator, which is blocked on `xcode-select`. The eight Android frames are in
+      `docs/store/screenshots/android-phone/`; they must not be submitted as iPhone screenshots.
 - [ ] **Region palette:** 10 colors plus the colorblind glyph set. I can propose a first pass if
       you would rather react to something than start blank.
 - [ ] **Font choice.**
@@ -1286,9 +1294,28 @@ until the package is added every iOS ad "fails" and the shared Kotlin grants the
 
 - [ ] Privacy policy and terms text, naming AdMob as a data recipient and covering the ad ID. I
       can draft both from the `pages/` scaffolding, but a human should read them before they go live.
-- [ ] Store listing: title, short and long description, keywords.
+      `docs/store/data-safety.md` is the input: it traces every piece of data that leaves the device
+      to the file that sends it. Two paragraphs in it cannot be boilerplate — AdMob as the one third
+      party we share with, and the fact that submitting feedback attaches a session log.
+- [x] ~~Store listing: title, short and long description, keywords.~~ Drafted 2026-09-08 in
+      `docs/store/listing.md`, with character counts against each field's limit. Yours to approve
+      or rewrite; it is a draft to react to rather than a proposal.
 
 ### Decisions
 
-- [ ] Section 7.1, kids versus general audience. Gates the entire ad business model.
+- [ ] Section 7.1, kids versus general audience. Gates the entire ad business model, and now also
+      gates filing either store's privacy form. `docs/store/data-safety.md` §6 sets out what each
+      branch produces. Short version: the general-audience branch is what the code already
+      implements and needs no changes; the Apple Kids Category branch bans third-party analytics
+      and advertising outright, which removes AdMob, Sentry and the Grafana pipeline together and
+      takes the whole rewarded-ad economy in SPEC §5 with them.
+- [ ] **Can a player have their data deleted, and how do they ask?** Play's Data safety form asks
+      this directly and it is currently unanswerable. The only identifier is `install_id`, the app
+      never shows it to anyone, and there is no in-app analytics opt-out. Cheapest fix is showing
+      the install id in Settings plus a support address that accepts requests. See
+      `docs/store/data-safety.md` §7.3.
+- [ ] **Android Auto Backup, on or off?** `allowBackup="true"` with no rules means progress and the
+      install id can survive a reinstall and move to a new phone, which is the opposite of what
+      Settings tells the player. Either add backup rules or change the copy; both are fine, but the
+      app should not say one and do the other. See `docs/store/data-safety.md` §7.1.
 - [ ] Q1 through Q3 above.

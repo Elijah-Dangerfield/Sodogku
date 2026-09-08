@@ -1158,13 +1158,89 @@ handling, and 44pt touch targets verified on the smallest supported device at 10
 
 ---
 
-## C13 · Store prep
+## C13 · Store prep — **PARTLY DONE** (2026-09-08)
 
 **Unblocked by** everything.
 
 **Delivers** icons, screenshots, listings, the Play target-audience questionnaire (per the
 section 7.1 decision), data safety and privacy nutrition labels, IAP product configuration,
 TestFlight and internal track builds.
+
+### Delivered, 2026-09-08
+
+Everything that could be derived from the code without an account, a decision or artwork. Three
+documents under `docs/store/`, plus real screenshots.
+
+- **`docs/store/data-safety.md`.** Both forms answered, one row per data type, every row citing the
+  file and the mechanism. Traced: `AppData.installId` from mint (`CachedInstallIdProvider`) to all
+  three egress points (`X-Install-Id`, the OTLP `install_id` attribute, the Sentry tag) and what
+  the server does with it; the Grafana pipeline's payload and resource attributes; Sentry's scope
+  and its `sendDefaultPii = false`; AdMob's advertising id, UMP and ATT; Play Billing and StoreKit;
+  the feedback path and its session-log attachment; and everything in Room that never leaves. The
+  no-accounts decision is stated as the load-bearing fact it is: `Telemetry.setUser` exists and is
+  never called, so no email or name reaches any third party.
+- **`docs/store/listing.md`.** Title, subtitle, short and long description, App Store keywords with
+  character counts, categorisation, and the screenshot plan with what each frame is meant to prove.
+  Draft copy, written to be argued with.
+- **`docs/store/icons.md`.** What ships today versus what is a template default, and the exact file
+  list to replace when the redraw lands.
+- **`docs/store/screenshots/android-phone/`**, eight frames at 1080x2160. Captured on the emulator
+  with `scripts/dev/drive.py`, cropped to 2:1 because Play rejects anything longer than twice its
+  width and the emulator is 2.24:1.
+
+**The kids-versus-general-audience question was not answered.** `data-safety.md` §6 gives the
+answer set for each branch instead. On the Apple Kids Category branch the label collapses to "Data
+Not Collected" and AdMob, Sentry and the Grafana pipeline all have to come out, so it is not a
+form-filling difference; it is a different app.
+
+### Found while tracing, and not fixed here
+
+This chunk changed no Kotlin. Four of these want someone who owns the code:
+
+1. **`android:allowBackup="true"` contradicts what Settings tells the player.**
+   `AndroidManifest.xml:10`, with no `dataExtractionRules` and no `fullBackupContent`, and
+   `AndroidFileManager` writing to `context.filesDir`. So `app_data` (including `installId`) and
+   the Room tables are eligible for Android Auto Backup and device-to-device transfer. Settings
+   says "levels, streaks and badges do not survive a reinstall or move to a new phone", and
+   `AppCache.kt:92` says the install id "dies with uninstall". On Android neither is reliably true.
+   Needs a decision, then either backup rules or a copy change.
+2. **The paywall's Restore purchases button may be unreachable enough to fail App Review.**
+   SPEC 5.1 says the control "lives in Settings". It does not: Settings has no Pro row, and
+   `PaywallTrigger.Direct` is defined (`RealPaywallCoordinator.kt:66`) and never requested by any
+   UI. The only ways to the paywall are a coordinator offer after a loss or a skip, and the offline
+   block. Apple Guideline 3.1.1 expects a restore path a user can find.
+3. **`android.permission.CAMERA` is a template leftover** (`AndroidManifest.xml:4`). Nothing under
+   `features/` or `apps/` uses `CameraPreview` or `rememberCameraPermissionLauncher`; they exist
+   only as `:libraries:ui` scaffolding, and iOS declares no `NSCameraUsageDescription`. It adds
+   nothing to Data safety and it puts "Camera" on the Play listing of a puzzle game.
+4. **There is no way to serve a deletion request.** The only identifier is `install_id`, and the
+   app never shows it to the player, so a GDPR or CCPA erasure request against Loki or Sentry has
+   no key. There is also no in-app analytics opt-out; `telemetry.appEventsEnabled` is an operator
+   kill switch. Play's Data safety form asks about deletion directly, so this blocks one answer.
+
+Two smaller ones: `apps/server/.../plugins/RateLimits.kt` still registers `DELETE_ACCOUNT_LIMIT`
+and `PLAYER_REPORT_LIMIT` for endpoints deleted in C0, and both the Android manifest and
+`Info.plist` still carry comments describing the Supabase OAuth deep links as live.
+
+### Remaining in C13, and what each is waiting on
+
+| Item | Waiting on |
+|---|---|
+| iOS app icon and the Play 512x512 listing icon | Artwork. Both are still the template's "YOUR APPS IMAGE HERE" placeholder and both are hard submission blockers. `docs/store/icons.md` §5 lists every file. |
+| Play feature graphic, 1024x500 | Artwork. Does not exist. |
+| iOS screenshots (6.9", and 13" if iPad is supported) | An iOS simulator. `xcode-select` still points somewhere that is not Xcode, so iOS has never run. Android renders must not be submitted as iPhone frames. |
+| Onboarding / tutorial screenshot | Ten minutes with a fresh install. Skipped here because `drive.py launch --fresh` wipes app data and another agent was mid-session on the same emulator. |
+| `PrivacyInfo.xcprivacy` | The final iOS SDK set, which is blocked on adding the Google Mobile Ads Swift package. |
+| Filing either form | The SPEC 7.1 decision, plus a deletion-request answer (finding 4). |
+| Play target-audience questionnaire | The SPEC 7.1 decision. |
+| IAP product configuration, TestFlight, internal track | Play Console, App Store Connect and AdMob accounts. SPEC §20 lists what to create and where each value lands. |
+| Privacy policy and terms text | Nobody has written `pages/privacy.html` or `pages/terms.html`. `data-safety.md` is the input for both; the AdMob disclosure and the session-log attachment on feedback are the two paragraphs that cannot be boilerplate. |
+
+**Not verified.** The screenshot crop offsets are tuned to the current layout on a 1080x2424
+emulator; a layout change moves them. No iOS surface in this chunk was verified on a device,
+because none can be. The two "linked to the user" answers in `data-safety.md` are the ones most
+dependent on Google's and Apple's current wording rather than on our code, and both are flagged
+there with a confidence level and where to re-check.
 
 ---
 

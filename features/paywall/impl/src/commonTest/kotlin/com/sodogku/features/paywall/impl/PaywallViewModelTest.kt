@@ -35,14 +35,14 @@ class PaywallViewModelTest : CoroutineTest() {
 
     @Test
     fun thePriceComesFromTheStore() = runUnitTest {
-        val vm = PaywallViewModel(FakeEntitlements(), FakeStore(price = "4,99 €"))
+        val vm = PaywallViewModel(TestTrigger, FakeEntitlements(), FakeStore(price = "4,99 €"))
 
         assertEquals("4,99 €", vm.state.priceLabel)
     }
 
     @Test
     fun anUnreachableStoreLeavesThePriceBlankRatherThanGuessing() = runUnitTest {
-        val vm = PaywallViewModel(FakeEntitlements(), FakeStore(price = null))
+        val vm = PaywallViewModel(TestTrigger, FakeEntitlements(), FakeStore(price = null))
 
         assertNull(
             vm.state.priceLabel,
@@ -53,7 +53,7 @@ class PaywallViewModelTest : CoroutineTest() {
     @Test
     fun aSuccessfulPurchaseFlipsToProAndClosesTheSheet() = runUnitTest {
         val entitlements = FakeEntitlements(purchaseResult = PurchaseOutcome.Success)
-        val vm = PaywallViewModel(entitlements, FakeStore())
+        val vm = PaywallViewModel(TestTrigger, entitlements, FakeStore())
 
         vm.takeAction(PaywallAction.Buy)
 
@@ -66,7 +66,8 @@ class PaywallViewModelTest : CoroutineTest() {
     @Test
     fun aCancelledPurchaseSaysNothing() = runUnitTest {
         val vm = PaywallViewModel(
-            FakeEntitlements(purchaseResult = PurchaseOutcome.Cancelled),
+            trigger = TestTrigger,
+FakeEntitlements(purchaseResult = PurchaseOutcome.Cancelled),
             FakeStore(),
         )
 
@@ -79,7 +80,8 @@ class PaywallViewModelTest : CoroutineTest() {
     @Test
     fun aFailedPurchaseSaysSoAndUnlocksTheButton() = runUnitTest {
         val vm = PaywallViewModel(
-            FakeEntitlements(purchaseResult = PurchaseOutcome.Failed("network")),
+            trigger = TestTrigger,
+FakeEntitlements(purchaseResult = PurchaseOutcome.Failed("network")),
             FakeStore(),
         )
 
@@ -92,17 +94,20 @@ class PaywallViewModelTest : CoroutineTest() {
     @Test
     fun restoreOutcomesMapToDistinctMessages() = runUnitTest {
         val restored = PaywallViewModel(
-            FakeEntitlements(restoreResult = RestoreOutcome.Restored),
+            trigger = TestTrigger,
+FakeEntitlements(restoreResult = RestoreOutcome.Restored),
             FakeStore(),
         ).also { it.takeAction(PaywallAction.Restore) }
 
         val nothing = PaywallViewModel(
-            FakeEntitlements(restoreResult = RestoreOutcome.NothingToRestore),
+            trigger = TestTrigger,
+FakeEntitlements(restoreResult = RestoreOutcome.NothingToRestore),
             FakeStore(),
         ).also { it.takeAction(PaywallAction.Restore) }
 
         val failed = PaywallViewModel(
-            FakeEntitlements(restoreResult = RestoreOutcome.Failed("x")),
+            trigger = TestTrigger,
+FakeEntitlements(restoreResult = RestoreOutcome.Failed("x")),
             FakeStore(),
         ).also { it.takeAction(PaywallAction.Restore) }
 
@@ -160,7 +165,7 @@ class PaywallViewModelTest : CoroutineTest() {
             state.value = value
         }
 
-        override suspend fun purchasePro(): PurchaseOutcome = purchaseResult.also {
+        override suspend fun purchasePro(trigger: String?): PurchaseOutcome = purchaseResult.also {
             if (it is PurchaseOutcome.Success || it is PurchaseOutcome.AlreadyOwned) state.value = true
         }
 
@@ -176,5 +181,10 @@ class PaywallViewModelTest : CoroutineTest() {
 
         override suspend fun restore(productId: String): StoreOwnership = StoreOwnership.NotOwned
         override suspend fun priceLabel(productId: String): String? = price
+    }
+
+    private companion object {
+        /** Any id from `paywall.triggers`; the tests only care that it reaches the event. */
+        const val TestTrigger = "offline_block"
     }
 }

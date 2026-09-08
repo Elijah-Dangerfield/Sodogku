@@ -3,6 +3,7 @@ package com.sodogku.features.paywall.impl
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
+import androidx.navigation.toRoute
 import com.sodogku.features.paywall.OfflineBlockRoute
 import com.sodogku.features.paywall.PaywallRoute
 import com.sodogku.libraries.billing.PaywallTrigger
@@ -20,13 +21,14 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @ContributesBinding(AppScope::class, multibinding = true)
 @Inject
 class PaywallFeatureEntryPoint(
-    private val paywallViewModelFactory: () -> PaywallViewModel,
+    private val paywallViewModelFactory: (trigger: String) -> PaywallViewModel,
     private val offlineBlockViewModelFactory: () -> OfflineBlockViewModel,
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
-        screen<PaywallRoute> {
-            val viewModel: PaywallViewModel = viewModel { paywallViewModelFactory() }
+        screen<PaywallRoute> { backStackEntry ->
+            val route = backStackEntry.toRoute<PaywallRoute>()
+            val viewModel: PaywallViewModel = viewModel { paywallViewModelFactory(route.trigger) }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
 
             viewModel.ObserveEvents { event ->

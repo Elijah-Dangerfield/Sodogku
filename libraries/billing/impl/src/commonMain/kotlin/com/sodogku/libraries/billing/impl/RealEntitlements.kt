@@ -90,7 +90,7 @@ class RealEntitlements(
         }
     }
 
-    override suspend fun purchasePro(): PurchaseOutcome {
+    override suspend fun purchasePro(trigger: String?): PurchaseOutcome {
         val outcome = Catching { store.purchase(ProductIds.pro) }
             .logOnFailure { "Purchase threw" }
             .getOrNull()
@@ -116,6 +116,7 @@ class RealEntitlements(
             "iap.purchase_result",
             "outcome" to result::class.simpleName,
             "error_kind" to (result as? PurchaseOutcome.Failed)?.kind,
+            "trigger" to trigger,
         )
         return result
     }

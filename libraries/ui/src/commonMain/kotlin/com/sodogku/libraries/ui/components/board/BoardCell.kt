@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
@@ -280,6 +281,22 @@ fun BoardCell(
                     true
                 }
                 if (onPlace != null) {
+                    // Offered twice, because the two platforms put the same
+                    // capability in different places. `onLongClick` is a
+                    // *primary* gesture on Android — double-tap and hold, which
+                    // TalkBack announces with the label as a hint — and the
+                    // custom action is the one VoiceOver puts on its rotor and
+                    // TalkBack in its actions menu. Neither is a fallback; a
+                    // player who knows one never needs the other.
+                    //
+                    // This declares two accessibility actions and adds no
+                    // gesture detector: the sighted double tap is still the
+                    // pointer path in `pointerInput` above, untouched and
+                    // unlagged.
+                    onLongClick(label = spoken.placeAction) {
+                        onPlace()
+                        true
+                    }
                     customActions = listOf(
                         CustomAccessibilityAction(spoken.placeAction) {
                             onPlace()

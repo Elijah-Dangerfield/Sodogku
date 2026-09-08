@@ -278,12 +278,12 @@ private class CountingAdGate(private val outcome: RewardOutcome) : AdGate {
 
 private class FreeEntitlements : Entitlements {
     override val isPro: StateFlow<Boolean> = MutableStateFlow(false)
-    override suspend fun purchasePro() = PurchaseOutcome.Unavailable
+    override suspend fun purchasePro(trigger: String?) = PurchaseOutcome.Unavailable
     override suspend fun restore() = RestoreOutcome.NothingToRestore
 }
 
 private class ProEntitlements : Entitlements {
     override val isPro: StateFlow<Boolean> = MutableStateFlow(true)
-    override suspend fun purchasePro() = PurchaseOutcome.AlreadyOwned
+    override suspend fun purchasePro(trigger: String?) = PurchaseOutcome.AlreadyOwned
     override suspend fun restore() = RestoreOutcome.Restored
 }

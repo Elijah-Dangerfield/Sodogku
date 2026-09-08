@@ -950,6 +950,10 @@ class GameViewModel(
         logger.logEvent(
             "game.level_failed",
             "level_id" to level.id,
+            // Without the tier here, only *clears* report one, so a board hard
+            // enough to lose on is under-represented in every calibration panel
+            // — which is the exact direction a mis-rating would hide in.
+            "difficulty" to level.difficulty,
             "duration_ms" to elapsedMs(),
             "dogs_placed" to state.placed.placedCount,
             "attempt_number" to attemptNumber,
@@ -1356,7 +1360,14 @@ class GameViewModel(
         // refuses. If deduction has nothing left to add, close the prompt and
         // keep the sniff.
         if (ruledOut.isEmpty()) {
-            logger.logEvent("game.booster_no_op", "booster" to "sniff", "level_id" to level.id)
+            logger.logEvent(
+                "game.booster_no_op",
+                "booster" to "sniff",
+                "level_id" to level.id,
+                // A rise in this event is a difficulty signal, and without the
+                // tier it cannot say which tier.
+                "difficulty" to level.difficulty,
+            )
             updateState { it.copy(boosterPrompt = null) }
             return
         }

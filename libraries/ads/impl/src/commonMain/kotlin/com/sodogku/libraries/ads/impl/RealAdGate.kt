@@ -131,7 +131,14 @@ class RealAdGate(
         logger.logEvent(
             "ads.gate_shown",
             "placement" to placement.configId,
-            "is_offline" to offline,
+            // `device_offline`, not `is_offline`. Every record already carries
+            // an `is_offline` stamped by GrafanaLogTree, and that one is the
+            // app-wide banner signal — true when the *backend* is unreachable as
+            // well as when the device is. This one is the OS signal alone, which
+            // is the only thing the offline grace reads. Under the same key the
+            // two meanings collided, and which won was decided by the order of
+            // two lines in the log forwarder.
+            "device_offline" to offline,
         )
 
         // Each of these is a reason the reward is free. None of them is a
@@ -251,7 +258,11 @@ class RealAdGate(
             return AdOutcome.NotShown
         }
 
-        logger.logEvent("ads.gate_shown", "placement" to placement.configId, "is_offline" to false)
+        logger.logEvent(
+            "ads.gate_shown",
+            "placement" to placement.configId,
+            "device_offline" to false,
+        )
 
         val started = now()
         network.prepare()

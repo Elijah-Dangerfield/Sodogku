@@ -133,7 +133,7 @@ a session join.
 | `game.continued` | `level_id` | A rewarded continue after a loss, board intact |
 | `game.bones_refilled` | `level_id` | The standing ad offer on the board, or the refill button on the lose sheet |
 | `game.booster_used` | `booster` (`sniff`/`treat`), `level_id` | A charge is actually spent |
-| `game.booster_no_op` | `booster`, `level_id` | A booster was asked for and **declined to spend**, because it had nothing to show. Should be rare; a rise means the hint engine is running out of things to say earlier than it should, which is a difficulty-calibration signal and not a UI one |
+| `game.booster_no_op` | `booster`, `level_id`, `difficulty` | A booster was asked for and **declined to spend**, because it had nothing to show. Should be rare; a rise means the hint engine is running out of things to say earlier than it should, which is a difficulty-calibration signal and not a UI one |
 | `game.booster_refilled` | `booster`, `to` | An ad topped a consumable up. `to` is the resulting holding, not the amount granted — refills never reduce, so the two differ for anyone above the floor |
 | `game.level_reward_granted` | `level_id`, `booster` (always `treat`), `held` | A **first** clear on the `boosters.treatEveryNLevels` cadence paid out. A replay pays nothing and emits nothing, so counting these counts rewards and not clears. `held` is the resulting holding, which is what tells you whether the reward is accumulating into a stash or being spent as fast as it arrives |
 | `game.level_skipped` | `level_id`, `attempt_number`, `skips_left_today` | A rewarded ad bought a way past a level. `attempt_number` is how many goes it took before giving up, which is the number that says whether the level is hard or broken. `skips_left_today` at 0 marks the players the daily cap is actually binding on |
@@ -181,10 +181,10 @@ combination — a dashboard that treats it as an anomaly has the rule backwards.
 
 | Event | Attributes | Fires |
 |---|---|---|
-| `ads.gate_shown` | `placement`, `is_offline` | An ad gate is reached, before any request. Paired with `ads.result` this gives the fill rate per placement without a join to the network's own reporting |
+| `ads.gate_shown` | `placement`, `device_offline` | An ad gate is reached, before any request. Paired with `ads.result` this gives the fill rate per placement without a join to the network's own reporting |
 | `ads.result` | `placement`, `outcome`, `error_kind`, `latency_ms`, `reason`, `grace_levels_used` | Every gate resolves, including the ones that resolved by failing open. `latency_ms` is what tells you whether a rewarded ad is worth preloading |
 | `ads.offline_block` | `placement`, `grace_levels_used` | The offline grace ran out and the block screen went up. Should be rare; a rise means the grace is too tight |
-| `iap.purchase_result` | `outcome`, `error_kind` | A purchase flow ends, in any way |
+| `iap.purchase_result` | `outcome`, `error_kind`, `trigger` | A purchase flow ends, in any way |
 | `purchase.failed` | `product_id`, `error`, `attempt`, `final` | A store call failed and is being retried. `final` marks the attempt that gave up |
 
 ### The one that pays for itself
@@ -240,7 +240,7 @@ where a suppression is still interesting, because it means a reward was paid for
 
 | Event | Attributes | Fires |
 |---|---|---|
-| `ads.gate_shown` | `placement`, `is_offline` | A rewarded gate is entered, or an interstitial passes all three frequency gates. `is_offline` is the **device** signal (`AppState.isDeviceOffline`), not the banner one — our backend being down is not an ad-network outage. No `level_id`: the gate is called from the game and the daily and does not know which |
+| `ads.gate_shown` | `placement`, `device_offline` | A rewarded gate is entered, or an interstitial passes all three frequency gates. `is_offline` is the **device** signal (`AppState.isDeviceOffline`), not the banner one — our backend being down is not an ad-network outage. No `level_id`: the gate is called from the game and the daily and does not know which |
 
 **`ads.gate_shown` is the one event that shadows a per-record key.** `GrafanaLogTree` stamps
 `is_offline` on every record from `AppState.isOffline`; this event then writes its own from
@@ -252,7 +252,7 @@ reordering the stamping, and fix `ops/grafana/ad-funnel.json` in the same change
 | `ads.result` | `placement`, `outcome`, `latency_ms`, `error_kind`, `reason`, `grace_levels_used` | Every terminal state of a gate. `outcome` is an `AdShowResult` name (`Rewarded` / `Dismissed` / `Completed` / `NoFill` / `Offline` / `NotShown` / `Failed`) **or** the synthetic `granted_without_ad`, which carries `reason` (`pro`, `ads_disabled`, `placement_disabled`, `new_user_grace`). `latency_ms` spans prepare-plus-load-plus-watch, so it is dominated by how long the player watched — read its floor, not its mean |
 | `ads.offline_block` | `placement`, `grace_levels_used` | The offline grace is spent and the block screen is requested. One per gate past the grace, so a repeat count is a player stuck offline rather than a bug |
 | `iap.paywall_shown` | `trigger` | An offer the coordinator **accepted** (`continue_level` / `skip_level` / `direct`), or an offline block. Refusals — capped, disabled, already Pro — emit nothing, so the ratio of this to `ads.gate_shown` is the offer rate rather than the attempt rate |
-| `iap.purchase_result` | `outcome`, `error_kind` | `outcome` is the `PurchaseOutcome` class name (`Success` / `Cancelled` / `AlreadyOwned` / `Unavailable` / `Failed`); `error_kind` is present only on `Failed` and is the store's own code (`billing_6`, `storekit_2`, `purchase_pending`) |
+| `iap.purchase_result` | `outcome`, `error_kind`, `trigger` | `outcome` is the `PurchaseOutcome` class name (`Success` / `Cancelled` / `AlreadyOwned` / `Unavailable` / `Failed`); `error_kind` is present only on `Failed` and is the store's own code (`billing_6`, `storekit_2`, `purchase_pending`) |
 | `iap.restore_result` | `outcome` | `Restored` / `NothingToRestore` / `Failed`. A rise in `Failed` is a store-reachability signal, not a customer-support one — it means we could not ask, and the cached entitlement was left alone |
 
 The ad funnel is `ads.gate_shown` → `ads.result`, split by `placement` and platform.

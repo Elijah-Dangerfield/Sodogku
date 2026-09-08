@@ -8,6 +8,7 @@ import com.sodogku.libraries.billing.StoreBilling
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.flowroutines.SEAViewModel
+import me.tatarka.inject.annotations.Assisted
 import me.tatarka.inject.annotations.Inject
 
 /**
@@ -21,6 +22,8 @@ import me.tatarka.inject.annotations.Inject
  */
 @Inject
 class PaywallViewModel(
+    /** The `paywall.triggers` id that opened this sheet, for the purchase event. */
+    @Assisted private val trigger: String,
     private val entitlements: Entitlements,
     private val store: StoreBilling,
 ) : SEAViewModel<PaywallState, PaywallEvent, PaywallAction>(
@@ -51,7 +54,7 @@ class PaywallViewModel(
 
     private suspend fun PaywallAction.Buy.buy() {
         updateState { it.copy(isWorking = true) }
-        val outcome = entitlements.purchasePro()
+        val outcome = entitlements.purchasePro(trigger)
         // `state` lags `updateState` by a dispatch, so the outcome travels as a
         // value rather than being read back off the state that was just written.
         updateState { it.copy(isWorking = false, message = outcome.toMessage()) }

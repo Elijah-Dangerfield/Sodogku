@@ -34,7 +34,17 @@ sealed interface RestoreOutcome {
 interface Entitlements {
     val isPro: StateFlow<Boolean>
 
-    suspend fun purchasePro(): PurchaseOutcome
+    /**
+     * [trigger] is the `paywall.triggers` id that opened the sheet, carried into
+     * the purchase event.
+     *
+     * Optional because most callers are test doubles and the QA path, and a
+     * required parameter would have made every one of them assert something they
+     * do not care about. It is the question SPEC section 14 actually asks of the
+     * paywall board — which moment converts — and without it the board can only
+     * report that *someone* bought.
+     */
+    suspend fun purchasePro(trigger: String? = null): PurchaseOutcome
 
     suspend fun restore(): RestoreOutcome
 }
@@ -48,6 +58,6 @@ interface Entitlements {
 @Inject
 class FreeEntitlements : Entitlements {
     override val isPro: StateFlow<Boolean> = MutableStateFlow(false)
-    override suspend fun purchasePro(): PurchaseOutcome = PurchaseOutcome.Unavailable
+    override suspend fun purchasePro(trigger: String?): PurchaseOutcome = PurchaseOutcome.Unavailable
     override suspend fun restore(): RestoreOutcome = RestoreOutcome.NothingToRestore
 }

@@ -494,7 +494,7 @@ private class FakeAdGate(var outcome: RewardOutcome = RewardOutcome.Rewarded) : 
 
 private class FakeEntitlements(isPro: Boolean) : Entitlements {
     override val isPro: StateFlow<Boolean> = MutableStateFlow(isPro)
-    override suspend fun purchasePro(): PurchaseOutcome = PurchaseOutcome.Unavailable
+    override suspend fun purchasePro(trigger: String?): PurchaseOutcome = PurchaseOutcome.Unavailable
     override suspend fun restore(): RestoreOutcome = RestoreOutcome.NothingToRestore
 }
 

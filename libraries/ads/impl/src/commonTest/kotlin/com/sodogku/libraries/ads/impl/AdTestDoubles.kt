@@ -67,7 +67,7 @@ class FakeEntitlements(isProNow: Boolean = false) : Entitlements {
         state.value = value
     }
 
-    override suspend fun purchasePro(): PurchaseOutcome = PurchaseOutcome.Unavailable
+    override suspend fun purchasePro(trigger: String?): PurchaseOutcome = PurchaseOutcome.Unavailable
     override suspend fun restore(): RestoreOutcome = RestoreOutcome.NothingToRestore
 }
 
