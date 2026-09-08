@@ -81,7 +81,7 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
         )
         PawRating(paws = state.paws)
         Text(
-            text = state.score.total.toString(),
+            text = state.attemptScore.toString(),
             typography = AppTheme.typography.Heading.H600,
             color = AppTheme.colors.accentPrimary,
         )
@@ -115,7 +115,7 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
                     // here.
                     regions = level.board.regions.toList(),
                     timeMs = state.elapsedMs,
-                    score = state.score.total,
+                    score = state.attemptScore,
                     paws = state.paws,
                     bonesRemaining = state.livesRemaining,
                 ),

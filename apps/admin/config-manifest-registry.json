@@ -32,6 +32,7 @@
   { "path": "scoring.speedMaxMultiplier", "type": "double", "default": 1.6, "description": "Speed multiplier for an instant placement." },
   { "path": "scoring.livesBonusRate", "type": "double", "default": 0.5, "description": "What each surviving life adds to the completion bonus." },
   { "path": "scoring.difficultyBonusRate", "type": "double", "default": 0.2, "description": "What each difficulty tier above 1 adds to the completion bonus." },
+  { "path": "scoring.boosterPenaltyRate", "type": "double", "default": 0.15, "description": "What one booster spent during an attempt costs the score it banks. Multiplicative; 0 makes hints free." },
   { "path": "scoring.twoPawFraction", "type": "double", "default": 0.6, "description": "Fraction of par at which the second paw is awarded." },
   { "path": "scoring.threePawFraction", "type": "double", "default": 0.85, "description": "Fraction of par at which the third paw is awarded." },
   { "path": "scoring.nicePraiseAt", "type": "double", "default": 1.2, "description": "Combined-multiplier cutoff for the Nice praise." },

@@ -2375,3 +2375,36 @@ on a wrapper node rather than on the node carrying `clickable="true"`. A reader
 walking the tree announces it correctly, which is why every label now shows up in
 a dump; but the described node and the pressed node are still two nodes, which is
 exactly what the `Modifier.Node` rewrite would collapse.
+
+## 2026-09-08 — you could not place a dog illegally
+
+Reported from a device: *"I tried to place a dog illegally and it wouldn't let me
+fail. like the double click did nothing."* It did nothing, and said nothing about
+why. `commit` opened with `if (cell in state.autoMarks) return`, and a placed dog
+auto-marks its own row, column, region and neighbours — so the squares where an
+illegal placement actually lives were exactly the ones that could not be reached.
+
+The guard was protective: do not let someone spend a bone on a square the game
+already crossed out for them. But a double tap is a deliberate act rather than a
+slip, and a control that silently refuses is worse than one that costs something.
+A single tap still toggles a mark for free, so the board is not a minefield.
+
+A `game.commit` event now carries whether the square was already marked. A rise in
+that is a legibility problem — the crosses are not reading as "ruled out" — rather
+than a difficulty one, and those want different fixes.
+
+## 2026-09-08 — the board's controls sit on a lip, not under a gloss
+
+The booster buttons drew a gradient with a shaded band and a sheen, and it read as
+a shadow blob under a pill rather than as something with thickness. The user
+recognised what it was reaching for and named the right reference: the buttons in
+their Cards project, which duplicate the background and drop it down.
+
+That mechanism already existed here — `BasicButton` has had a face-on-a-lip since
+C3a, from the same template — and the board's own controls were the only ones not
+using it. `DeepSurface` pulls it out so they can, and two ways of drawing
+"pressable" collapse into one.
+
+`Modifier.glossy` stays for the level pane's reward chip, which is a badge rather
+than a control. A press-in lip on something that cannot be pressed promises a tap
+that does nothing, which is the same class of lie the paragraph above is about.

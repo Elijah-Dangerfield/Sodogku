@@ -28,7 +28,7 @@ import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
 import com.sodogku.system.Radii
-import com.sodogku.libraries.ui.system.glossy
+import com.sodogku.libraries.ui.system.DeepSurface
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.sodogku.system.clip
@@ -259,44 +259,36 @@ fun BoosterButton(
 ) {
     val boosterLabel = stringResource(Res.string.booster_a11y, label, count)
     Box(modifier = modifier) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
+        DeepSurface(
+            // A face on a lip, the same treatment every filled button in the app
+            // gets. The gradient-and-sheen this replaced read as a shadow blob
+            // under a pill rather than as a thing with thickness.
+            color = if (enabled) color else AppTheme.colors.surfaceDisabled.color,
+            enabled = enabled,
+            onClick = onClick,
             modifier = Modifier
                 .padding(BadgeInset)
                 // The count belongs in the name: "Sniff" alone does not say
-                // whether tapping it will do anything. Set here rather than
-                // passed to `bounceClick`, which cannot carry it — see its KDoc.
-                .semantics { contentDescription = boosterLabel }
-                .bounceClick(enabled = enabled, onClick = onClick)
-                // Colour, a lit top and a shaded base. A white pill on a cream
-                // page is a shape you have to look for, and this is the row a
-                // stuck player is already looking at. See `Modifier.glossy`.
-                // Clip *before* the gloss. `glossy` is a `drawBehind`, and a
-                // clip only trims what comes after it in the chain — the other
-                // order left three square-cornered rectangles on the page.
-                .clip(Radii.Round)
-                .glossy(
-                    color = if (enabled) color else AppTheme.colors.surfaceDisabled.color,
-                    enabled = enabled,
-                )
-                .padding(
-                    start = Dimension.D800,
-                    end = Dimension.D800,
-                    top = Dimension.D500,
-                    // Extra below, so the label sits on the lit face rather than
-                    // on the shaded base the gloss draws.
-                    bottom = Dimension.D600,
-                ),
+                // whether tapping it will do anything.
+                .semantics { contentDescription = boosterLabel },
         ) {
-            Text(
-                text = label,
-                typography = AppTheme.typography.Body.B600,
-                color = if (enabled) {
-                    AppTheme.colors.onAccentPrimary
-                } else {
-                    AppTheme.colors.onSurfaceDisabled
-                },
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(
+                    horizontal = Dimension.D800,
+                    vertical = Dimension.D500,
+                ),
+            ) {
+                Text(
+                    text = label,
+                    typography = AppTheme.typography.Body.B600,
+                    color = if (enabled) {
+                        AppTheme.colors.onAccentPrimary
+                    } else {
+                        AppTheme.colors.onSurfaceDisabled
+                    },
+                )
+            }
         }
         Box(
             contentAlignment = Alignment.Center,

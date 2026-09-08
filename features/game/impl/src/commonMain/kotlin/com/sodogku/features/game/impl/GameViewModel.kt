@@ -32,6 +32,7 @@ import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
+import com.sodogku.libraries.progress.LifetimeScore
 import com.sodogku.libraries.progress.daily.DailyRepository
 import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.DeviceTimeZone
@@ -67,6 +68,13 @@ import me.tatarka.inject.annotations.Inject
  * pays is precisely the bug this reward exists to fix.
  */
 internal const val LevelRewardTreats: Int = 1
+
+/**
+ * The lifetime total split in two: everything banked, and the slice of it this
+ * board already holds. Kept apart so an attempt can *replace* its board's
+ * contribution rather than stack on it.
+ */
+private data class BankedScore(val lifetime: Int, val thisBoard: Int)
 
 /**
  * Drives one attempt at one puzzle.
@@ -408,6 +416,7 @@ class GameViewModel(
         freeMistakeAvailable = tutorial.isRunning && level.id == Tutorial.FREE_MISTAKE_LEVEL
         val lesson = tutorial.openingFrame(level, opening, openingMarks)
         grantProBoosters()
+        val banked = bankedScores(level)
 
         updateBoard {
             GameState(
@@ -432,6 +441,12 @@ class GameViewModel(
                     )
                 } ?: ScoreCard.Empty,
                 elapsedMs = resume?.elapsedMs ?: 0L,
+                lifetimeBanked = banked.lifetime,
+                bankedForThisBoard = banked.thisBoard,
+                // A resumed attempt carries the boosters it already spent, so
+                // backgrounding a board cannot launder the help it took.
+                boostersUsed = sniffsUsed + treatsUsed,
+                boosterPenaltyRate = scoringConfig().boosterPenaltyRate,
                 sniffs = it.sniffs,
                 treats = it.treats,
                 explainedBoosters = it.explainedBoosters,
@@ -574,6 +589,39 @@ class GameViewModel(
         ?: LevelRecord.FIRST_LEVEL_ID
 
     /**
+     * The lifetime total as it stands before this attempt, and the part of it
+     * that belongs to the board about to be played.
+     *
+     * Both packs pay into one number — the user's ask was a single score, and a
+     * daily board is a board. Read once per attempt rather than observed: the
+     * only thing that moves it while a board is open is the attempt itself, and
+     * [GameState.lifetimeScore] adds that back without another read.
+     *
+     * A failure to read either half reports zero rather than throwing. A wrong
+     * headline number is a bad frame; a throw here is a level that will not
+     * open.
+     */
+    private suspend fun bankedScores(level: LevelDefinition): BankedScore {
+        val levels = Catching { progress.all() }
+            .logOnFailure { "Failed to read level records for the lifetime score" }
+            .getOrNull()
+            .orEmpty()
+        val days = Catching { daily.history() }
+            .logOnFailure { "Failed to read daily results for the lifetime score" }
+            .getOrNull()
+            .orEmpty()
+        val date = dailyDate
+        return BankedScore(
+            lifetime = LifetimeScore.banked(levels, days),
+            thisBoard = when {
+                !isDaily -> LifetimeScore.bankedForLevel(levels, level.id)
+                date != null -> LifetimeScore.bankedForDaily(days, date)
+                else -> 0
+            },
+        )
+    }
+
+    /**
      * The core interaction, and the reason the safe gesture is the cheap one.
      *
      * A single tap only ever writes or erases the player's own note — it can
@@ -653,12 +701,37 @@ class GameViewModel(
     }
 
     /** The committed guess. This is the only path that can cost a life. */
+    /**
+     * A deliberate placement: the second of two taps inside the double-tap
+     * window.
+     *
+     * An auto-marked square used to return here without doing anything, which
+     * meant a player could not place a dog illegally at all — and those squares
+     * are precisely where an illegal placement lives, since a placed dog
+     * auto-marks its own row, column, region and neighbours. Reported from a
+     * device as "the double click did nothing", which is exactly right: it did
+     * nothing, and said nothing about why.
+     *
+     * The guard was protective — don't let someone spend a bone on a square we
+     * already crossed out for them — but a double tap is a deliberate act, not a
+     * slip, and a control that silently refuses is worse than one that costs
+     * something. A single tap still toggles a mark harmlessly.
+     */
     private suspend fun GameAction.commit(cell: Int) {
         val level = state.level ?: return
-        if (cell in state.autoMarks) return
 
         val row = level.board.rowOf(cell)
         val correct = level.solution[row] == level.board.colOf(cell)
+        logger.logEvent(
+            "game.commit",
+            "level_id" to level.id,
+            "correct" to correct,
+            // Was this square already crossed out when they committed? A rise
+            // here means the auto-marks are not reading as "ruled out", which is
+            // a legibility problem rather than a difficulty one.
+            "on_marked" to (cell in state.autoMarks || cell in state.manualMarks),
+            "mode" to modeName,
+        )
         if (correct) place(cell) else strike(cell)
     }
 
@@ -751,6 +824,11 @@ class GameViewModel(
             state.livesRemaining,
             scoring,
         )
+        // Rated on what the run earned, banked on what it earned *net of help*.
+        // The paw thresholds are fractions of par, and the booster cost is a
+        // multiplier, so rating the pre-penalty total is identical to scaling
+        // par by the same factor — and it keeps three paws reachable for the
+        // player the tutorial has just told to spend a sniff and a treat.
         val paws = Scoring.paws(
             finished.total,
             level.size,
@@ -758,6 +836,8 @@ class GameViewModel(
             completed = true,
             config = scoring,
         )
+        val boostersUsed = sniffsUsed + treatsUsed
+        val banked = Scoring.afterBoosters(finished.total, boostersUsed, scoring.boosterPenaltyRate)
         val duration = elapsedMs()
 
         logger.logEvent(
@@ -766,21 +846,26 @@ class GameViewModel(
             "size" to level.size,
             "difficulty" to level.difficulty,
             "duration_ms" to duration,
-            "score" to finished.total,
+            "score" to banked,
             "paws" to paws,
             "strikes_used" to (ScoringConfig.MAX_LIVES - state.livesRemaining),
+            // What the score above is net of. Without them a drop in median
+            // score reads as a difficulty change rather than as players leaning
+            // harder on hints, and the two want opposite fixes.
+            "sniffs_used" to sniffsUsed,
+            "treats_used" to treatsUsed,
             "attempt_number" to attemptNumber,
             "mode" to modeName,
         )
         val streak = if (isDaily) {
-            recordDailyClear(finished.total, paws, duration)
+            recordDailyClear(banked, paws, duration)
         } else {
             // Every metric here is a *best*, not a last: the repository keeps the
             // better of what it holds and what this attempt scored, so a replay
             // can never cost the player a three-paw clear. It also opens the next
             // level, which is why nothing else writes an unlock — and why a daily
             // must not come through here at all.
-            Catching { progress.onCompleted(level.id, finished.total, paws, duration) }
+            Catching { progress.onCompleted(level.id, banked, paws, duration) }
                 .logOnFailure { "Failed to record the clear of level ${level.id}" }
             NoStreak
         }
@@ -788,6 +873,7 @@ class GameViewModel(
         val earnedBadges = recordAttempt(
             level,
             finished,
+            banked,
             paws,
             duration,
             completed = true,
@@ -805,6 +891,11 @@ class GameViewModel(
             it.copy(
                 phase = GamePhase.Won,
                 score = finished,
+                // The rate this clear was priced at, so the sheet's number and
+                // the row just written to disk cannot disagree because config
+                // moved mid-attempt.
+                boostersUsed = boostersUsed,
+                boosterPenaltyRate = scoring.boosterPenaltyRate,
                 paws = paws,
                 elapsedMs = duration,
                 unlockedThrough = maxOf(it.unlockedThrough, unlocked),
@@ -903,6 +994,12 @@ class GameViewModel(
     private suspend fun recordAttempt(
         level: LevelDefinition,
         card: ScoreCard,
+        /**
+         * The attempt's score net of the boosters it spent — the same number
+         * that reaches the record — rather than [ScoreCard.total], so a badge
+         * for a big score cannot be bought with treats.
+         */
+        score: Int,
         paws: Int,
         duration: Long,
         completed: Boolean,
@@ -915,7 +1012,7 @@ class GameViewModel(
             mode = if (isDaily) PlayMode.Daily else PlayMode.Campaign,
             size = level.size,
             completed = completed,
-            score = card.total,
+            score = score,
             paws = paws,
             timeMs = duration,
             strikes = ScoringConfig.MAX_LIVES - livesRemaining,
@@ -968,9 +1065,11 @@ class GameViewModel(
         // The streak itself is unaffected either way — a run through yesterday
         // stands all day today, including after today has been played and lost.
         val streak = if (isDaily) currentStreak() else NoStreak
+        val lost = Scoring.strike(state.score)
         val earnedBadges = recordAttempt(
             level,
-            Scoring.strike(state.score),
+            lost,
+            Scoring.afterBoosters(lost.total, sniffsUsed + treatsUsed, state.boosterPenaltyRate),
             paws = 0,
             duration,
             completed = false,
@@ -1378,6 +1477,10 @@ class GameViewModel(
         updateState {
             it.copy(
                 sniffs = it.sniffs - 1,
+                // Counted from the fields rather than incremented in state:
+                // these two are the same number, and a `+ 1` here would drift
+                // from the count the win writes.
+                boostersUsed = sniffsUsed + treatsUsed,
                 boosterPrompt = null,
                 hintCells = ruledOut,
             )
@@ -1395,7 +1498,15 @@ class GameViewModel(
         logger.logEvent("game.booster_used", "booster" to "treat", "level_id" to level.id)
         treatsUsed++
         persistCounts(Consumable.Treat, state.treats - 1)
-        updateState { it.copy(treats = it.treats - 1, boosterPrompt = null) }
+        updateState {
+            it.copy(
+                treats = it.treats - 1,
+                boostersUsed = sniffsUsed + treatsUsed,
+                boosterPrompt = null,
+            )
+        }
+        // After the count, so the placement this treat pays for is already
+        // priced as bought help by the time it lands on the board.
         place(cell)
     }
 

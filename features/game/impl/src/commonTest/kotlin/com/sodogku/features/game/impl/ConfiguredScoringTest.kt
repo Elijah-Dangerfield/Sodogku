@@ -2,6 +2,7 @@ package com.sodogku.features.game.impl
 
 import com.sodogku.libraries.config.AppConfigMap
 import com.sodogku.libraries.config.values.ScoringBasePerPlacement
+import com.sodogku.libraries.config.values.ScoringBoosterPenaltyRate
 import com.sodogku.libraries.config.values.ScoringComboMax
 import com.sodogku.libraries.config.values.ScoringComboStep
 import com.sodogku.libraries.config.values.ScoringCompletionBase
@@ -21,7 +22,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
 /**
- * The fourteen `scoring.*` keys, and the one thing that can go wrong with them
+ * The fifteen `scoring.*` keys, and the one thing that can go wrong with them
  * that nothing else in the config layer can: `ScoringConfig` validates in its
  * `init` and **throws**. Every other configured value is a number the caller
  * uses as-is.
@@ -41,9 +42,9 @@ class ConfiguredScoringTest {
     @Test
     fun everyKeyIsActuallyRead() {
         // One assertion per key, because the failure this guards against is a
-        // single field left off the constructor call — which fourteen keys and
+        // single field left off the constructor call — which fifteen keys and
         // a copy-pasted list makes very easy. A test that only checked one
-        // coefficient would pass with the other thirteen ignored.
+        // coefficient would pass with the other fourteen ignored.
         val tuned = scoringFrom(
             configOf(
                 "scoring.basePerPlacement" to 111,
@@ -54,6 +55,7 @@ class ConfiguredScoringTest {
                 "scoring.speedMaxMultiplier" to 2.5,
                 "scoring.livesBonusRate" to 0.75,
                 "scoring.difficultyBonusRate" to 0.33,
+                "scoring.boosterPenaltyRate" to 0.42,
                 "scoring.twoPawFraction" to 0.4,
                 "scoring.threePawFraction" to 0.9,
                 "scoring.nicePraiseAt" to 1.1,
@@ -71,6 +73,7 @@ class ConfiguredScoringTest {
         assertEquals(2.5, tuned.speedMaxMultiplier)
         assertEquals(0.75, tuned.livesBonusRate)
         assertEquals(0.33, tuned.difficultyBonusRate)
+        assertEquals(0.42, tuned.boosterPenaltyRate)
         assertEquals(0.4, tuned.twoPawFraction)
         assertEquals(0.9, tuned.threePawFraction)
         assertEquals(1.1, tuned.nicePraiseAt)
@@ -137,6 +140,7 @@ class ConfiguredScoringTest {
         ScoringSpeedMaxMultiplier(config),
         ScoringLivesBonusRate(config),
         ScoringDifficultyBonusRate(config),
+        ScoringBoosterPenaltyRate(config),
         ScoringTwoPawFraction(config),
         ScoringThreePawFraction(config),
         ScoringNicePraiseAt(config),

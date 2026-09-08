@@ -1,6 +1,7 @@
 package com.sodogku.features.game.impl
 
 import com.sodogku.libraries.config.values.ScoringBasePerPlacement
+import com.sodogku.libraries.config.values.ScoringBoosterPenaltyRate
 import com.sodogku.libraries.config.values.ScoringComboMax
 import com.sodogku.libraries.config.values.ScoringComboStep
 import com.sodogku.libraries.config.values.ScoringCompletionBase
@@ -22,7 +23,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
 /**
- * The fourteen `scoring.*` keys, assembled into the [ScoringConfig] the formula
+ * The fifteen `scoring.*` keys, assembled into the [ScoringConfig] the formula
  * takes.
  *
  * Every key is resolved on each call rather than captured into a field at
@@ -51,6 +52,7 @@ class ConfiguredScoring(
     private val speedMaxMultiplier: ScoringSpeedMaxMultiplier,
     private val livesBonusRate: ScoringLivesBonusRate,
     private val difficultyBonusRate: ScoringDifficultyBonusRate,
+    private val boosterPenaltyRate: ScoringBoosterPenaltyRate,
     private val twoPawFraction: ScoringTwoPawFraction,
     private val threePawFraction: ScoringThreePawFraction,
     private val nicePraiseAt: ScoringNicePraiseAt,
@@ -77,6 +79,7 @@ class ConfiguredScoring(
             speedMaxMultiplier = speedMaxMultiplier(),
             livesBonusRate = livesBonusRate(),
             difficultyBonusRate = difficultyBonusRate(),
+            boosterPenaltyRate = boosterPenaltyRate(),
             twoPawFraction = twoPawFraction(),
             threePawFraction = threePawFraction(),
             nicePraiseAt = nicePraiseAt(),

@@ -4,11 +4,13 @@ import com.sodogku.libraries.achievements.Achievement
 import com.sodogku.libraries.achievements.AchievementsRepository
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.progress.LevelRecord
+import com.sodogku.libraries.progress.LifetimeScore
 import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.FreezeResult
 import com.sodogku.libraries.puzzle.Solution
 import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.scoring.ScoreCard
+import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.ScoringConfig
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -67,7 +69,36 @@ data class GameState(
      */
     val wrongGuesses: Set<Int> = emptySet(),
     val livesRemaining: Int = ScoringConfig.MAX_LIVES,
+
+    /** What this attempt has earned, before the boosters it leaned on. */
     val score: ScoreCard = ScoreCard.Empty,
+
+    /**
+     * Every point the player has banked, this board's own contribution
+     * included. Read when the board opens and not touched again — the attempt
+     * on screen is added by [lifetimeScore] rather than folded in here.
+     */
+    val lifetimeBanked: Int = 0,
+
+    /**
+     * What *this* board had already banked when the attempt opened: the level's
+     * best score, or today's daily result. Held apart from [lifetimeBanked] so
+     * a replay can replace it instead of adding to it.
+     */
+    val bankedForThisBoard: Int = 0,
+
+    /** Sniffs and treats spent this attempt, which is what they cost. */
+    val boostersUsed: Int = 0,
+
+    /**
+     * `scoring.boosterPenaltyRate` as it stood for this attempt.
+     *
+     * Zero by default rather than the config default, for the reason
+     * [treatEveryNLevels] is: a board built before config has been read — a
+     * preview, a test, the first frame — must not price help the operator has
+     * not confirmed.
+     */
+    val boosterPenaltyRate: Double = 0.0,
     val paws: Int = 0,
     val elapsedMs: Long = 0,
     val sniffs: Int = 0,
@@ -202,6 +233,32 @@ data class GameState(
      */
     val treatAwarded: Boolean = false,
 ) {
+    /**
+     * What this attempt would bank: what it earned, less the boosters it spent.
+     * The win sheet and the share text both show this rather than [score],
+     * because it is the number that reaches the player's record.
+     */
+    val attemptScore: Int
+        get() = Scoring.afterBoosters(score.total, boostersUsed, boosterPenaltyRate)
+
+    /**
+     * The one score in the game, as it stands right now.
+     *
+     * Everything the player has banked, with this board counted **once**: an
+     * attempt only moves the number by however much it beats this board's own
+     * best, so replaying a cleared level cannot pay twice.
+     *
+     * A lost attempt banks nothing, so it contributes nothing — the number
+     * falls back to what was already earned the moment the bones run out,
+     * rather than leaving points on screen that no record will ever hold.
+     */
+    val lifetimeScore: Int
+        get() = LifetimeScore.withAttempt(
+            banked = lifetimeBanked,
+            bankedForThisBoard = bankedForThisBoard,
+            attemptScore = if (phase == GamePhase.Lost) 0 else attemptScore,
+        )
+
     val placedCells: Set<Int> get() = placed.cells().toSet()
 
     val dogsPlaced: Int get() = placed.placedCount

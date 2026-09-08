@@ -28,6 +28,13 @@ import androidx.compose.ui.graphics.Color
  * Call it before `clip` so the rounded shape trims all three, and give the
  * caller's padding enough bottom room for [baseHeightFraction] or the label
  * sits on the shaded band.
+ *
+ * **For things that are not pressed.** The buttons that used this moved to
+ * [com.sodogku.libraries.ui.system.DeepSurface], which puts a face on a lip the
+ * press actually drops onto; a static gloss on a control reads as a shadow blob
+ * under a pill rather than as something with thickness. What is left here is the
+ * level pane's reward chip, which is a badge — giving that a press-in lip would
+ * promise a tap that does nothing.
  */
 fun Modifier.glossy(
     color: Color,

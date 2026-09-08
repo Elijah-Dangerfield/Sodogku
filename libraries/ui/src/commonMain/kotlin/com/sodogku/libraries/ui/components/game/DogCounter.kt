@@ -14,6 +14,10 @@ import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.sodogku.libraries.ui.bounceClick
+import sodogku.libraries.resources.generated.resources.dogs_a11y
 import com.sodogku.system.Radii
 import com.sodogku.system.clip
 import org.jetbrains.compose.resources.stringResource
@@ -32,11 +36,17 @@ fun DogCounter(
     found: Int,
     total: Int,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
+    val label = stringResource(Res.string.dogs_a11y, found, total)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
         modifier = modifier
+            // Named before the click, which is the only order that reaches the
+            // accessibility tree — see `Modifier.bounceClick`.
+            .semantics { contentDescription = label }
+            .then(if (onClick != null) Modifier.bounceClick(onClick = onClick) else Modifier)
             .clip(Radii.Round)
             .background(AppTheme.colors.surfacePrimary.color)
             .padding(horizontal = Dimension.D500, vertical = Dimension.D200),

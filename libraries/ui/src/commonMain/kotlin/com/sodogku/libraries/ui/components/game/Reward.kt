@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.sodogku.libraries.ui.bounceClick
-import com.sodogku.libraries.ui.system.glossy
+import com.sodogku.libraries.ui.system.DeepSurface
 import com.sodogku.libraries.ui.components.icon.Icon
 import com.sodogku.libraries.ui.components.icon.IconSize
 import com.sodogku.libraries.ui.components.icon.Icons
@@ -76,42 +76,39 @@ fun RewardButton(
     } else {
         AppTheme.colors.onSurfaceDisabled
     }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
+    DeepSurface(
+        // The same face-on-a-lip as the boosters beside it. An offer that looked
+        // different from its neighbours would read as the one control on the row
+        // that is switched off.
+        color = if (enabled) color else AppTheme.colors.surfaceDisabled.color,
+        enabled = enabled,
+        onClick = onClick,
         modifier = modifier
-            // Named here rather than via `bounceClick`, which cannot carry it.
             .semantics { contentDescription = label }
-            .bounceClick(enabled = enabled, onClick = onClick)
             .graphicsLayer {
                 scaleX = pulse.value
                 scaleY = pulse.value
-            }
-            // Same candy treatment as the boosters beside it. An offer that
-            // looked flat next to two glossy buttons would read as the one
-            // control on the row that is switched off.
-            .clip(Radii.Round)
-            .glossy(
-                color = if (enabled) color else AppTheme.colors.surfaceDisabled.color,
-                enabled = enabled,
-            )
-            .padding(
-                start = Dimension.D500,
-                end = Dimension.D500,
-                top = Dimension.D300,
-                bottom = Dimension.D400,
-            ),
+            },
     ) {
-        Icon(
-            icon = Icons.PlayCircle.decorative,
-            size = IconSize.Small,
-            color = content,
-        )
-        Text(
-            text = label,
-            typography = AppTheme.typography.Body.B500,
-            color = content,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
+            modifier = Modifier.padding(
+                horizontal = Dimension.D500,
+                vertical = Dimension.D300,
+            ),
+        ) {
+            Icon(
+                icon = Icons.PlayCircle.decorative,
+                size = IconSize.Small,
+                color = content,
+            )
+            Text(
+                text = label,
+                typography = AppTheme.typography.Body.B500,
+                color = content,
+            )
+        }
     }
 }
 

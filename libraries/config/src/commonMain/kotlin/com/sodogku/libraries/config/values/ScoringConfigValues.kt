@@ -131,6 +131,27 @@ class ScoringDifficultyBonusRate(appConfigMap: AppConfigMap) : DoubleConfigValue
 }
 
 /**
+ * What one booster spent during an attempt costs the score it banks.
+ *
+ * Multiplicative, so at 0.15 one sniff banks 0.85 of the run and two bank 0.72,
+ * and no number of them can drive a score negative. Set it to 0 to make hints
+ * free again, which is also the direction a mistyped value falls: a non-numeric
+ * string resolves to the default rather than to a cost nobody chose.
+ *
+ * It deliberately does **not** move the paw rating — see `Scoring.afterBoosters`
+ * for why, and note that the tutorial itself asks the player to spend a sniff
+ * and a treat.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class ScoringBoosterPenaltyRate(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
+    override val name = "Booster penalty rate"
+    override val path = "scoring.boosterPenaltyRate"
+    override val default = 0.15
+}
+
+/**
  * Fraction of par at which the second paw is awarded. Finishing at all earns the
  * first, so there is no threshold for it; par is derived at runtime from size and
  * difficulty rather than stored in the pack, which is what makes retuning a
@@ -213,6 +234,7 @@ fun scoringConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>> = 
     ScoringSpeedMaxMultiplier(appConfigMap),
     ScoringLivesBonusRate(appConfigMap),
     ScoringDifficultyBonusRate(appConfigMap),
+    ScoringBoosterPenaltyRate(appConfigMap),
     ScoringTwoPawFraction(appConfigMap),
     ScoringThreePawFraction(appConfigMap),
     ScoringNicePraiseAt(appConfigMap),

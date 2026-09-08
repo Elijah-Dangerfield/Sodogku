@@ -60,6 +60,8 @@
 
     <string name="score_explainer_title">Score</string>
     <string name="score_explainer_body">Every dog you place is worth points, and a bigger board pays more per dog. Land them one after another without a wrong guess and a combo multiplier builds; land them quickly and a speed bonus stacks on top. Finishing pays a bonus of its own, worth more on a hard board and more again for every bone you still have.</string>
+    <string name="score_explainer_total">The number up top is everything you have earned, from every board you have finished — campaign levels and daily boards alike. Replaying a board you have already cleared only moves it once you beat your old score there, and then only by the difference.</string>
+    <string name="score_explainer_boosters">Sniffs and treats come out of what the board pays. They never cost you paws.</string>
     <string name="score_explainer_paws">The paws at the end measure your score against par — what a clean, quick run on this board is worth. Three paws means you got close to it.</string>
 
     <string name="levels_title">Levels</string>
@@ -350,4 +352,7 @@
     <string name="settings_restore_failed">Could not reach the store. Try again in a moment.</string>
     <string name="game_bones_remaining">%1$d bones left</string>
     <string name="booster_a11y">%1$s, %2$d left</string>
+    <string name="dogs_title">Dogs found</string>
+    <string name="dogs_body">You have placed %1$d of the %2$d dogs this board needs. One per colour, one per row, one per column — so a %3$d-dog board is a %3$d by %3$d grid.</string>
+    <string name="dogs_a11y">%1$d of %2$d dogs found</string>
 </resources>

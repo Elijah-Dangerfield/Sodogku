@@ -1355,6 +1355,9 @@ per-call-site concern and nothing failed when a call site forgot.
 | R9 | Confirm the daily is fully separate from the campaign, explain that in a first-run dialog, and settle whether any completed board feeds the streak or only the daily | |
 | R10 | Level rewards are too frequent. Front-load them and thin out as levels climb | |
 | R11 | Run the beta workflow locally for a TestFlight build. Needs an App Store Connect record and a working `xcode-select` | |
+| R12 | The iOS splash is ugly. Just the still dog head, in the exact spot it sits on the first-launch screen, with the paw-print background fading in behind it — so launch reads as one continuous render rather than a splash then a screen | |
+| R13 | Make sure the daily rolls at local midnight and the streak respects time zones. Add a way to restore a broken streak, which probably wants a config key | |
+| R14 | **A deliberate illegal placement did nothing.** `commit` returned early on any auto-marked square, and a placed dog auto-marks its own row, column, region and neighbours — so exactly the squares where an illegal placement lives were unreachable, silently. Fixed. The wider ask stands: the board is the most important screen and wants heavier review, tests and telemetry | |
 
 **Still blocked on files that never reached disk.** The sad dog, the bone artwork
 and now the welcome backgrounds. Four sets described in chat, none on the

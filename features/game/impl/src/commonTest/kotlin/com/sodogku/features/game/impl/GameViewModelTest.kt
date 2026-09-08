@@ -18,6 +18,7 @@ import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.FeatureBoosters
 import com.sodogku.libraries.config.values.ProgressionSkipAfterFailedAttempts
 import com.sodogku.libraries.config.values.ScoringBasePerPlacement
+import com.sodogku.libraries.config.values.ScoringBoosterPenaltyRate
 import com.sodogku.libraries.config.values.ScoringComboMax
 import com.sodogku.libraries.config.values.ScoringComboStep
 import com.sodogku.libraries.config.values.ScoringCompletionBase
@@ -118,6 +119,40 @@ class GameViewModelTest : CoroutineTest() {
         assertTrue((0 until board.size).filter { it != col }.all { board.cellAt(row, it) in marks })
         assertTrue((0 until board.size).filter { it != row }.all { board.cellAt(it, col) in marks })
         assertTrue(board.neighborsOf(cell).all { it in marks })
+    }
+
+    @Test
+    fun aDeliberatePlacementOnACrossedOffSquareStillCosts() = runUnitTest {
+        // Reported from a device: "I tried to place a dog illegally and it
+        // wouldn't let me fail, the double click did nothing." It did nothing,
+        // silently, because `commit` returned early on any auto-marked square —
+        // and a placed dog auto-marks its own row, column, region and
+        // neighbours, which is exactly where an illegal placement lives.
+        val vm = viewModel()
+        vm.commit(cellFor(row = 0))
+        val marked = vm.state.autoMarks.first { it !in vm.state.placedCells }
+        val livesBefore = vm.state.livesRemaining
+
+        vm.commit(marked)
+
+        assertEquals(livesBefore - 1, vm.state.livesRemaining, "a deliberate illegal placement has to cost")
+        assertTrue(marked in vm.state.wrongGuesses, "and leave the square red")
+    }
+
+    @Test
+    fun aSingleTapOnACrossedOffSquareStillCostsNothing() = runUnitTest {
+        // The companion. Only the *deliberate* second tap is allowed to spend a
+        // bone; a stray single tap must stay free, or the board becomes a
+        // minefield.
+        val vm = viewModel()
+        vm.commit(cellFor(row = 0))
+        val marked = vm.state.autoMarks.first { it !in vm.state.placedCells }
+        val livesBefore = vm.state.livesRemaining
+
+        vm.note(marked)
+
+        assertEquals(livesBefore, vm.state.livesRemaining)
+        assertTrue(marked !in vm.state.wrongGuesses)
     }
 
     @Test
@@ -866,7 +901,7 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(PlayMode.Campaign, recorded.mode)
         assertEquals(level.size, recorded.size)
         assertTrue(recorded.completed)
-        assertEquals(vm.state.score.total, recorded.score)
+        assertEquals(vm.state.attemptScore, recorded.score)
         assertEquals(vm.state.paws, recorded.paws)
         assertEquals(0, recorded.strikes, "a clean run has no strikes")
         assertEquals(level.size, recorded.bestCombo, "an unbroken run is the whole board")
@@ -976,7 +1011,7 @@ class GameViewModelTest : CoroutineTest() {
         val written = daily.writes.single()
         assertEquals(DailyDate, written.date)
         assertEquals(DailyOutcome.Completed, written.outcome)
-        assertEquals(vm.state.score.total, written.score)
+        assertEquals(vm.state.attemptScore, written.score)
         assertEquals(vm.state.paws, written.paws)
 
         assertTrue(
@@ -1856,6 +1891,188 @@ class GameViewModelTest : CoroutineTest() {
         assertTrue(vm.state.skip?.free == true)
     }
 
+    @Test
+    fun theHeaderCarriesEveryBoardEverPaidFor() = runUnitTest {
+        // The bug this whole item is about: the header showed the *attempt's*
+        // score, so every campaign level opened at zero and the player
+        // concluded scoring was broken.
+        val progress = InMemoryProgress()
+        progress.onCompleted(StarterDogLevel, score = 5_000, paws = 2, timeMs = 9_000)
+        val daily = FakeDaily(history = listOf(day(dayOfMonth = 1, score = 4_000)))
+
+        val vm = viewModel(progress = progress, daily = daily)
+
+        assertEquals(0, vm.state.score.total, "a fresh attempt has earned nothing yet")
+        assertEquals(
+            9_000,
+            vm.state.lifetimeScore,
+            "one score: a cleared level and a daily board both pay into it",
+        )
+    }
+
+    @Test
+    fun theHeaderClimbsWithEveryDogPlaced() = runUnitTest {
+        val progress = InMemoryProgress()
+        progress.onCompleted(StarterDogLevel, score = 5_000, paws = 2, timeMs = 9_000)
+        val vm = viewModel(progress = progress)
+
+        vm.commit(cellFor(row = 0))
+
+        assertTrue(vm.state.attemptScore > 0, "the fixture has to actually score")
+        assertEquals(5_000 + vm.state.attemptScore, vm.state.lifetimeScore)
+    }
+
+    @Test
+    fun replayingAClearedLevelCannotBankItTwice() = runUnitTest {
+        // The failure worth guarding: adding the attempt to the banked total
+        // would make replaying one easy level the fastest way to earn in the
+        // game. The number may only move by however much this run beats the
+        // old best on the same board.
+        val vm = viewModel()
+        solve(vm)
+        val afterFirstClear = vm.state.lifetimeScore
+        assertTrue(afterFirstClear > 0, "the first clear has to bank something")
+
+        vm.takeAction(GameAction.Retry)
+        assertEquals(
+            afterFirstClear,
+            vm.state.lifetimeScore,
+            "a fresh attempt starts from what is already banked, not from it plus itself",
+        )
+
+        solve(vm)
+
+        assertEquals(maxOf(afterFirstClear, vm.state.attemptScore), vm.state.lifetimeScore)
+        assertTrue(
+            vm.state.lifetimeScore < afterFirstClear + vm.state.attemptScore,
+            "the same board was counted twice: ${vm.state.lifetimeScore}",
+        )
+    }
+
+    @Test
+    fun beatingAnOldScoreMovesTheTotalByTheDifferenceAndNoMore() = runUnitTest {
+        // The other half of the same rule, and the one a "just ignore replays"
+        // implementation would fail: a better run does have to move the number.
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 1, paws = 1, timeMs = 9_000)
+        val vm = viewModel(progress = progress)
+        assertEquals(1, vm.state.lifetimeScore)
+
+        solve(vm)
+
+        assertEquals(vm.state.attemptScore, vm.state.lifetimeScore)
+        assertEquals(vm.state.attemptScore, progress.record(PlainLevel).bestScore)
+    }
+
+    @Test
+    fun aLostAttemptBanksNothing() = runUnitTest {
+        val progress = InMemoryProgress()
+        progress.onCompleted(StarterDogLevel, score = 5_000, paws = 2, timeMs = 9_000)
+        val vm = viewModel(progress = progress)
+        vm.commit(cellFor(row = 0))
+        assertTrue(vm.state.lifetimeScore > 5_000, "the attempt was climbing")
+
+        repeat(ScoringConfig.MAX_LIVES) { vm.commit(tappableWrongCell(vm)) }
+
+        assertEquals(GamePhase.Lost, vm.state.phase)
+        assertEquals(
+            5_000,
+            vm.state.lifetimeScore,
+            "an attempt that banked nothing may not leave points on the header",
+        )
+    }
+
+    @Test
+    fun aDailyClearPaysIntoTheSameTotalAsTheCampaign() = runUnitTest {
+        val progress = InMemoryProgress()
+        progress.onCompleted(StarterDogLevel, score = 5_000, paws = 2, timeMs = 9_000)
+        val daily = FakeDaily(levelId = DailyLevel)
+        val vm = viewModel(isDaily = true, daily = daily, progress = progress)
+
+        solveCurrent(vm)
+
+        val written = daily.writes.single()
+        assertEquals(vm.state.attemptScore, written.score)
+        assertEquals(5_000 + written.score, vm.state.lifetimeScore)
+    }
+
+    @Test
+    fun aSniffCostsPointsButNeverPaws() = runUnitTest {
+        // "How many hints they used" is half the user's ask. The control run is
+        // the load-bearing part: asserting only that a sniffed run scores
+        // *something* would pass with the cost switched off entirely.
+        val control = viewModel()
+        solve(control)
+        val unaided = control.state.attemptScore
+
+        val progress = InMemoryProgress()
+        val vm = viewModel(progress = progress)
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        assertEquals(1, vm.state.boostersUsed, "the fixture has to actually spend a sniff")
+        solve(vm)
+
+        assertEquals(unaided, vm.state.score.total, "the same run earned the same points")
+        assertTrue(
+            vm.state.attemptScore < unaided,
+            "a hint has to cost something: banked ${vm.state.attemptScore} against $unaided",
+        )
+        assertEquals(
+            vm.state.attemptScore,
+            progress.record(PlainLevel).bestScore,
+            "the cost has to reach the record, not just the sheet",
+        )
+        assertEquals(control.state.paws, vm.state.paws, "help must not put a paw out of reach")
+    }
+
+    @Test
+    fun twoBoostersCostMoreThanOne() = runUnitTest {
+        // A per-attempt flag rather than a count would pass every test above.
+        val one = viewModel()
+        one.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        one.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        solve(one)
+
+        val two = viewModel()
+        two.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        repeat(2) { two.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff)) }
+        assertEquals(2, two.state.boostersUsed)
+        solve(two)
+
+        assertEquals(one.state.score.total, two.state.score.total, "both runs earned the same")
+        assertTrue(two.state.attemptScore < one.state.attemptScore)
+    }
+
+    @Test
+    fun theBoosterCostIsAConfigValueTheGameActuallyReads() = runUnitTest {
+        // The off switch, driven end to end from a config map rather than from
+        // `ConfiguredScoring` in isolation — the failure `ConfigValuesAreReadTest`
+        // exists for is a key that resolves correctly and reaches no decision.
+        val control = viewModel()
+        solve(control)
+
+        val free = viewModel(config = configOf("scoring.boosterPenaltyRate" to 0.0))
+        free.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        free.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        solve(free)
+
+        assertEquals(1, free.state.boostersUsed)
+        assertEquals(
+            control.state.attemptScore,
+            free.state.attemptScore,
+            "at a rate of zero a hint is free again",
+        )
+    }
+
+    private fun day(dayOfMonth: Int, score: Int): DailyResult = DailyResult(
+        date = LocalDate(2026, 9, dayOfMonth),
+        levelIndex = dayOfMonth,
+        outcome = DailyOutcome.Completed,
+        score = score,
+        paws = 3,
+        timeMs = 90_000,
+    )
+
     private fun viewModel(
         levelId: Int = PlainLevel,
         isDaily: Boolean = false,
@@ -1904,6 +2121,7 @@ class GameViewModelTest : CoroutineTest() {
         ScoringSpeedMaxMultiplier(config),
         ScoringLivesBonusRate(config),
         ScoringDifficultyBonusRate(config),
+        ScoringBoosterPenaltyRate(config),
         ScoringTwoPawFraction(config),
         ScoringThreePawFraction(config),
         ScoringNicePraiseAt(config),
@@ -2069,12 +2287,14 @@ class GameViewModelTest : CoroutineTest() {
         streak: Int = OpeningStreak,
         enabled: Boolean = true,
         result: DailyResult? = null,
+        /** Days already in the bag, for anything that folds over the history. */
+        history: List<DailyResult> = emptyList(),
         freezeOffer: FreezeOffer? = null,
         private val freezeResult: FreezeResult = FreezeResult.NothingToFreeze,
         private val freezeThrows: Boolean = false,
     ) : DailyRepository {
 
-        val writes = mutableListOf<DailyResult>()
+        val writes = history.toMutableList()
         var freezesRequested = 0
             private set
 

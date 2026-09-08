@@ -103,6 +103,7 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
         "speedMaxMultiplier" to 1.6,
         "livesBonusRate" to 0.5,
         "difficultyBonusRate" to 0.2,
+        "boosterPenaltyRate" to 0.15,
         "twoPawFraction" to 0.60,
         "threePawFraction" to 0.85,
         "nicePraiseAt" to 1.2,

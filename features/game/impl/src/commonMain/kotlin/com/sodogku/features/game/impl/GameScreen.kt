@@ -111,6 +111,7 @@ fun GameScreen(
                 onOpenLevels = { onAction(GameAction.LevelsOpened) },
                 onSettings = { onAction(GameAction.OpenSettings) },
                 onExplainBones = { onAction(GameAction.BoosterTapped(Consumable.Bone)) },
+                onExplainDogs = { dialog = GameDialog.Dogs },
                 onExplainLevel = { dialog = GameDialog.Level },
                 onExplainScore = { dialog = GameDialog.Score },
             )
@@ -244,6 +245,7 @@ private fun GameHeader(
     onOpenLevels: () -> Unit,
     onSettings: () -> Unit,
     onExplainBones: () -> Unit,
+    onExplainDogs: () -> Unit,
     onExplainLevel: () -> Unit,
     onExplainScore: () -> Unit,
 ) {
@@ -282,7 +284,7 @@ private fun GameHeader(
                 label = stringResource(Res.string.game_score_label),
                 value = null,
                 onClick = onExplainScore,
-                content = { ScoreCounter(score = state.score.total) },
+                content = { ScoreCounter(score = state.lifetimeScore) },
             )
         }
 
@@ -302,7 +304,11 @@ private fun GameHeader(
         horizontalArrangement = Arrangement.spacedBy(Dimension.D400, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DogCounter(found = state.dogsPlaced, total = state.dogsRequired)
+        DogCounter(
+            found = state.dogsPlaced,
+            total = state.dogsRequired,
+            onClick = onExplainDogs,
+        )
         // The bones are drawn, not written, so merging descendants finds
         // nothing to merge — this is the one pill that has to state its own
         // name. It is also the number a player most wants read back to them.

@@ -19,6 +19,10 @@ import com.sodogku.libraries.ui.components.game.drawBone
 import com.sodogku.libraries.ui.components.game.drawRuleDiagram
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.system.color.RegionPalette
+import com.sodogku.libraries.ui.components.dog.Dog
+import com.sodogku.libraries.ui.components.dog.DogPose
+import sodogku.libraries.resources.generated.resources.dogs_body
+import sodogku.libraries.resources.generated.resources.dogs_title
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import org.jetbrains.compose.resources.StringResource
@@ -47,11 +51,13 @@ import sodogku.libraries.resources.generated.resources.rules_region_body
 import sodogku.libraries.resources.generated.resources.rules_title
 import sodogku.libraries.resources.generated.resources.rules_touch_body
 import sodogku.libraries.resources.generated.resources.score_explainer_body
+import sodogku.libraries.resources.generated.resources.score_explainer_boosters
 import sodogku.libraries.resources.generated.resources.score_explainer_paws
 import sodogku.libraries.resources.generated.resources.score_explainer_title
+import sodogku.libraries.resources.generated.resources.score_explainer_total
 
 /** Which explainer is open, if any. */
-enum class GameDialog { Rules, Bones, Level, Score }
+enum class GameDialog { Rules, Bones, Dogs, Level, Score }
 
 /**
  * Everything the board can put in front of the player.
@@ -84,6 +90,7 @@ fun GameDialogHost(
             when (dialog) {
                 GameDialog.Rules -> RulesContent()
                 GameDialog.Bones -> BonesContent()
+                GameDialog.Dogs -> DogsContent(state)
                 GameDialog.Level -> LevelContent(state)
                 GameDialog.Score -> ScoreContent()
             }
@@ -191,7 +198,12 @@ private const val DifficultyTricky = 3
 private const val DifficultyTough = 4
 
 /**
- * How the score is built, in the order a player earns it.
+ * How the score is built: what the header's number is, then how a board adds
+ * to it.
+ *
+ * The lifetime total goes first because it is the number on screen behind this
+ * dialog, and "why is my score not zero on a new level" is the question the
+ * player opened this to ask.
  *
  * Deliberately no numbers: every coefficient is remote config (`scoring.*`), so
  * a copied-in "100 points per dog" is a sentence that goes stale the first time
@@ -203,7 +215,9 @@ private fun ScoreContent() {
         text = stringResource(Res.string.score_explainer_title),
         typography = AppTheme.typography.Heading.H700,
     )
+    Body(stringResource(Res.string.score_explainer_total))
     Body(stringResource(Res.string.score_explainer_body))
+    Body(stringResource(Res.string.score_explainer_boosters))
     Body(stringResource(Res.string.score_explainer_paws))
 }
 
@@ -211,6 +225,29 @@ private fun ScoreContent() {
 private fun Body(text: String) {
     Text(
         text = text,
+        typography = AppTheme.typography.Body.B500,
+        color = AppTheme.colors.textSecondary,
+    )
+}
+
+/**
+ * What the counter pill means.
+ *
+ * Worth its own dialog because "1/4" is the least self-explanatory thing on the
+ * board: it looks like a score, and a player who reads it that way thinks they
+ * are losing.
+ */
+@Composable
+private fun DogsContent(state: GameState) {
+    Dog(pose = DogPose.Still)
+    Text(text = stringResource(Res.string.dogs_title), typography = AppTheme.typography.Heading.H700)
+    Text(
+        text = stringResource(
+            Res.string.dogs_body,
+            state.dogsPlaced,
+            state.dogsRequired,
+            state.dogsRequired,
+        ),
         typography = AppTheme.typography.Body.B500,
         color = AppTheme.colors.textSecondary,
     )
