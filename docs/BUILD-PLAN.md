@@ -2062,7 +2062,7 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 |---|---|---|
 | S1 | **Feedback loop, end to end.** Swipe in from the right on iOS in debug and TestFlight builds to slide out a feedback form. Sends to Sentry, with a screenshot and a checkbox to attach a tail of in-memory logs. Owner feedback is a **directive**: a triage skill scans Sentry for these and files them as TODOs, and a worker routine picks items off that list. `Workspace/Cards` has a version of this to copy from | **DONE** (2026-09-08) |
 | S2 | Tapping a dog that is already correctly placed could play the shake animation | |
-| S3 | **Puzzle timer.** Persist elapsed time per puzzle, counting only while foregrounded. Show the completion time on the win dialog and in the level pane list | |
+| S3 | **Puzzle timer.** Persist elapsed time per puzzle, counting only while foregrounded. Show the completion time on the win dialog and in the level pane list | **DONE** (2026-09-08) |
 | S4 | **Three paws feel unreachable.** Solving fast still lands on 2/3. Work out whether par, the thresholds or the multipliers are wrong | |
 | S5 | **A fake interstitial in debug builds**, so it is visible when a real one would show. A black screen saying "Ads go here" is enough, and it must be skippable. Separately: when an ad fails to load, fall back to a Sodogku Pro self-promo with a short forced dwell | |
 | S6 | **The Pro screen's entrance is wrong.** It slides up over Settings while Settings slides out to the left, and coming back Settings slides up from the bottom so it reads as the Pro screen moving. Settings should stay put and only the Pro screen should move | **DONE** (2026-09-08) — see below |
@@ -2070,7 +2070,7 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S8 | A trophy icon with a badge count beside the settings gear on the puzzle screen, the badge persisting until the player opens it | |
 | S9 | Tapping the bones bounces but does nothing | **CONFIRMED FIXED** on device (2026-09-08) |
 | S10 | **Some cells still refuse a double tap**, so a deliberate wrong placement is impossible. Losing the bone is the preferred outcome. Only a square that already holds a dog, or one that already failed, should refuse. Also worth exploring: telling the player *why* a placement failed | **CONFIRMED FIXED** on device (2026-09-08); the "why" already exists as the broken-rule highlight, and making it flashier is S21 |
-| S11 | **Win celebration.** Golden paws zip up into the score and the score counts up on an odometer. `Workspace/Cards` `PlayPokerScreen` has the pattern | |
+| S11 | **Win celebration.** Golden paws zip up into the score and the score counts up on an odometer. `Workspace/Cards` `PlayPokerScreen` has the pattern | **DONE** (2026-09-08) |
 | S12 | **Streaks, properly.** After the first few puzzles, a full-screen non-skippable "tap the paws to start your streak" that fills in a greyed-out thing. A streak page that appears on crossing a threshold and animates the day filling in, with haptics. The streak visible somewhere in the app — a flame icon as a small circular button with a badge, which `Workspace/Virtu` already has. Tapping it opens the streak page with no animation. Longest streak shown there. A weekly present for keeping it. Possibly the Duolingo trick of decaying the iOS app icon as the streak dies | |
 | S13 | Game Center on iOS | |
 | S14 | **Ads only for bones and sniffs**, nothing else. That constrains how generously streaks and rewards can be handed out, especially with a weekly prize in play | **DONE** (2026-09-08) — see below |
@@ -2086,10 +2086,10 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S24 | **Rework the booster row to the competitor's shape** (screenshot 2026-09-08): circular white buttons in a row, each with a picture and a label underneath. They call Sniff "Locate", which is a better word. Use pictures where we can: a paw, a bone, a dog. Consider adding a Clear button | **DONE** (2026-09-08) — Clear deliberately not added, see the commit |
 | S25 | **Meowdoku's hint works differently and better.** It picks a cat, highlights that cat's row, column and touching cells, paints an X into every one of them, and offers an **Apply** button. Ours reveals ruled-out squares with no confirm step | **DONE** (2026-09-08) |
 | S26 | Drag across the board to cross off several squares in one gesture | |
-| S27 | **"Cross off squares for me" should default to off.** Reverses the call made when the setting was added | |
-| S28 | "Progress lives on this device" should not sit inside the achievements card. Its own card with an info icon, or drop it | |
-| S29 | The board controls can be smaller with less padding, so the picture takes up more of the circle | |
-| S30 | The attractor should fire when the player is **actually struggling**, not merely after one wrong guess | |
+| S27 | **"Cross off squares for me" should default to off.** Reverses the call made when the setting was added | **DONE** (2026-09-08) |
+| S28 | "Progress lives on this device" should not sit inside the achievements card. Its own card with an info icon, or drop it | **DONE** (2026-09-08) |
+| S29 | The board controls can be smaller with less padding, so the picture takes up more of the circle | **DONE** (2026-09-08) |
+| S30 | The attractor should fire when the player is **actually struggling**, not merely after one wrong guess | **DONE** (2026-09-08) |
 
 ### Notes taken while logging these
 
