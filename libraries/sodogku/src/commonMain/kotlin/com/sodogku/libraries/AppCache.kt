@@ -60,18 +60,28 @@ data class AppData(
     val achievementsVisible: Boolean = true,
 
     /**
-     * Held consumables. These are *not* capped at three — a refill tops up to
+     * Bones held, and **the only place the count lives** (SPEC 1.4).
+     *
+     * One number across the campaign and the daily. It used to be per-attempt,
+     * reset to three by every `startAttempt`, which meant starting anything
+     * refilled it for free — reported from a device as bones coming back on the
+     * way out of a lost board. Not nullable like [sniffs] and [treats] because
+     * no config key opens the game with a different number: three strikes is a
+     * game rule, and the seed is the same constant the refill tops back up to.
+     */
+    val bones: Int = ConsumableRefillTo,
+
+    /**
+     * The other two held consumables. Not capped at three — a refill tops up to
      * `boosters.refillTo`, but clearing levels grants extra, so the store is a
      * reward for playing rather than a meter that only ever empties.
      *
-     * [sniffs] and [treats] are null until the player has been granted any.
-     * The opening handful is `boosters.startingSniffs` / `startingTreats`, and
-     * a default written here instead would be a second answer to the same
-     * question — one an operator cannot change, and the one that would win,
-     * because a record that already says "3" is indistinguishable from a player
-     * who spent down to three.
+     * Null until the player has been granted any. The opening handful is
+     * `boosters.startingSniffs` / `startingTreats`, and a default written here
+     * instead would be a second answer to the same question — one an operator
+     * cannot change, and the one that would win, because a record that already
+     * says "3" is indistinguishable from a player who spent down to three.
      */
-    val bones: Int = ConsumableRefillTo,
     val sniffs: Int? = null,
     val treats: Int? = null,
 

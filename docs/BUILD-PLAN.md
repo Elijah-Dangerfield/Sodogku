@@ -1359,8 +1359,8 @@ per-call-site concern and nothing failed when a call site forgot.
 | R13 | Make sure the daily rolls at local midnight and the streak respects time zones. Add a way to restore a broken streak, which probably wants a config key | |
 | R14 | **A deliberate illegal placement did nothing.** `commit` returned early on any auto-marked square, and a placed dog auto-marks its own row, column, region and neighbours — so exactly the squares where an illegal placement lives were unreachable, silently. Fixed. The wider ask stands: the board is the most important screen and wants heavier review, tests and telemetry | |
 
-| R15 | **The bone economy is per-attempt, and it should be global.** `GameState.livesRemaining` resets to three on every `startAttempt`, so bones come back free by starting anything. Three symptoms from one cause: a "keep going" that hands a bone back for nothing; leaving a board and returning with a full three; and the daily and the campaign each having their own three. Bones should be one count, held across boards and refilled by watching an ad | |
-| R16 | **Leaving a lost daily silently forfeits it.** Tapping Levels on a lost daily writes `onFailed`, which spends the day — so the player lands in the campaign and cannot reopen the daily. Writing on leave rather than on the third bone is deliberate (an ad revive can still earn the clear, and `daily_result` is insert-only), but forfeiting has to be a choice the player makes, not a side effect of navigating | |
+| R15 | **The bone economy is per-attempt, and it should be global.** `GameState.livesRemaining` resets to three on every `startAttempt`, so bones come back free by starting anything. Three symptoms from one cause: a "keep going" that hands a bone back for nothing; leaving a board and returning with a full three; and the daily and the campaign each having their own three. Bones should be one count, held across boards and refilled by watching an ad | done — see below |
+| R16 | **Leaving a lost daily silently forfeits it.** Tapping Levels on a lost daily writes `onFailed`, which spends the day — so the player lands in the campaign and cannot reopen the daily. Writing on leave rather than on the third bone is deliberate (an ad revive can still earn the clear, and `daily_result` is insert-only), but forfeiting has to be a choice the player makes, not a side effect of navigating | done — see below |
 
 **Still blocked on files that never reached disk.** The sad dog, the bone artwork
 and now the welcome backgrounds. Four sets described in chat, none on the
@@ -1553,3 +1553,86 @@ the layout only ever gets roomier.
 unit tests only. iOS runtime, as ever (compiles, has never run). And the emulator is shared with a
 concurrent chunk, so the run above was interrupted twice by that chunk's maintenance and
 force-update gates firing mid-level.
+
+### R15 · One bone count, held across boards — **DONE** (2026-09-08)
+
+`AppData.bones` existed and was already *written* by the booster refill. Nothing
+read it. `startAttempt` set `livesRemaining = ScoringConfig.MAX_LIVES` instead,
+so every start of every board was a free refill — one line, three reported
+symptoms.
+
+It is now the count. `load()` reads it, `startAttempt` carries whatever state
+holds, a wrong guess decrements and persists in the same breath, and the refill
+tops up and persists. The bug this closes is the whole of the reported one.
+
+**At zero the wall is the game, so the door has to be reliable.** The refill goes
+through `AdGate.showRewarded`, which returns `Dismissed` on exactly one path (the
+player closing the ad) and grants on every other — no fill, no network, a thrown
+SDK, `ads.enabled` false, a config server nobody can reach. SPEC 4.2's fail-open
+rule was already there; it is now the only thing standing between a player at
+zero and a locked game, so a test walks every non-dismissal outcome and asserts
+the write to disk as well as the state. **Verified on the emulator with wifi and
+mobile data off**: three bones back, board in play. A board opened at zero shows
+the offer straight away rather than waiting for the guess that ends it.
+
+**"Keep going" is gone.** It bought one bone with the same ad as the button
+directly above it, which bought three. Strictly dominated, and free by accident
+in a build with no inventory, which is exactly what got reported. One revive now,
+restoring the whole set, on `continue_level` from the lose sheet and
+`booster_grant` from the standing offer.
+
+**Pro gets no bone floor**, and that is the one place the three consumables
+diverge. Reasoning in `decisions.md`; the short version is that a floor is a
+starting hand for something you choose to spend, and bones are only spent by
+being wrong.
+
+**The knock-on that was not obvious.** `MAX_LIVES - livesRemaining` was how the
+completion bonus, the achievement fold and the share card asked "how cleanly did
+this go", and a global count stops answering that — a mid-board refill would
+report a clean sheet and a stash would be worth points. `strikesThisAttempt` now
+answers it, carried through a process death by `BoardSnapshot.strikesTaken`,
+which replaces the snapshot's `livesRemaining`.
+
+**And one more.** Two boards are live at once whenever the daily is open over a
+campaign level, so the ViewModel underneath now follows `AppData.bones` rather
+than trusting the count it was left with. Without that its next strike writes a
+stale number back over what the daily spent.
+
+### R16 · Forfeiting a daily is a decision — **DONE** (2026-09-08)
+
+`Leave` wrote `daily.onFailed`. Tapping Levels on a lost daily was a forfeit.
+
+The write did **not** move to the third bone — `daily_result` is insert-only and
+that would lock the day against a clear an ad revive can still earn, which is the
+reasoning the original write was built on. What moved is the trigger: a **Give up
+on today** control, the quietest thing on the lose sheet, behind a confirmation
+whose filled button is *Keep today open*. Plain `Leave` writes nothing at all,
+and the sheet says so above the control.
+
+**The lost daily board is kept** so leaving and coming back hands the position
+back rather than a blank board — a blank board would be the fresh run that
+one-attempt-per-day exists to refuse, and with the elapsed clock reset it would
+be the *better* one. Campaign losses still clear the slot; they have Start over.
+
+**A spent day opens on its result.** `todaysBoard()` returned null once the day
+had a row and `load()` turned that into a `NavigateBack`, so the route popped
+itself into the campaign with no explanation. `GamePhase.Recap` renders the
+stored result over the day's own board, and the drawer's card offers it as "See
+today's result".
+
+**Fixed on the way.** `saveBoard` refused every write when the in-progress slot
+belonged to another board, which meant a daily opened over an unfinished campaign
+level could never save its own loss. A real snapshot takes the slot now; only a
+clearing write is held back.
+
+**Seen on the emulator, fresh install, before and after.** Before: play the
+daily, run out, tap Levels, land on campaign level 1 with three full bones and a
+daily card reading "Out of bones for today" with nothing to tap. After: the same
+path lands on campaign level 1 with **zero** bones drawn and the daily card still
+offering today's board; reopening it restores the lost position and the refill
+prompt; giving up asks first, and the spent day then opens on its recap.
+
+**Not verified:** iOS runtime (Kotlin compiles, as ever). Pro's free revive, which
+needs a purchase and is covered by unit tests only. And the ad shown in the runs
+above was AdMob's test unit resolving instantly, so the *offline* leg was tested
+by turning the radios off rather than by a real no-fill.

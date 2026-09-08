@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * recomputed from [placements] on restore, because they are a function of it and
  * a stored copy is a second source of truth that can disagree. Everything else
  * here is either a choice ([manualMarks]) or a cost already paid
- * ([wrongGuesses], [livesRemaining], [score]) and cannot be recovered any other
+ * ([wrongGuesses], [strikesTaken], [score]) and cannot be recovered any other
  * way.
  *
  * Deliberately on [AppData] rather than in Room. It is one small blob, there is
@@ -35,7 +35,21 @@ data class BoardSnapshot(
     /** Squares that cost a bone. These stay red, so they have to survive too. */
     val wrongGuesses: Set<Int>,
 
-    val livesRemaining: Int,
+    /**
+     * Wrong guesses this attempt has made, which is **not** the same question as
+     * how many bones are left.
+     *
+     * Bones are one count held in [AppData.bones] and spent across every board,
+     * so the holding is already on disk and does not belong here twice. What a
+     * snapshot has to carry is the per-attempt number the completion bonus and
+     * the achievement log are priced on — resume without it and a board finished
+     * after a relaunch scores as if it had been cleared cleanly.
+     *
+     * Defaulted rather than required, so a snapshot written before bones went
+     * global decodes as an attempt with a clean sheet instead of failing to
+     * restore at all.
+     */
+    val strikesTaken: Int = 0,
     val score: Int,
     val combo: Int,
     val bestCombo: Int,

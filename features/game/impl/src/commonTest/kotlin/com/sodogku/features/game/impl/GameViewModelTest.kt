@@ -75,6 +75,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.test.TestScope
 
 class GameViewModelTest : CoroutineTest() {
 
@@ -188,6 +191,153 @@ class GameViewModelTest : CoroutineTest() {
 
         assertEquals(GamePhase.Lost, vm.state.phase)
         assertEquals(0, vm.state.livesRemaining)
+    }
+
+    @Test
+    fun aWrongGuessSpendsAPersistedBone() = runUnitTest {
+        // The count on disk is the count, so a strike has to reach it. Without
+        // this write nothing else in R15 holds: a relaunch, a second board or a
+        // process death would all hand the bone straight back.
+        val cache = InMemoryAppCache()
+        val vm = viewModel(cache = cache)
+        assertEquals(ConsumableRefillTo, cache.get().bones)
+
+        vm.commit(wrongCellIn(row = 0))
+
+        assertEquals(ConsumableRefillTo - 1, vm.state.livesRemaining)
+        assertEquals(ConsumableRefillTo - 1, cache.get().bones)
+    }
+
+    @Test
+    fun bonesDoNotComeBackByStartingALevel() = runUnitTest {
+        // R15's headline. `startAttempt` set `livesRemaining` to `MAX_LIVES`
+        // every time it ran, so the next level, a retry, a jump from the pane
+        // and the daily each handed out a free set of three.
+        val cache = InMemoryAppCache()
+        val vm = viewModel(cache = cache)
+        repeat(2) { vm.commit(wrongCellIn(row = it)) }
+        val left = vm.state.livesRemaining
+        assertEquals(ConsumableRefillTo - 2, left, "the fixture has to actually cost bones")
+
+        // Backwards, because the frontier is wherever this board is and a jump
+        // forward would be refused before `startAttempt` ever ran.
+        vm.takeAction(GameAction.GoToLevel(PlainLevel - 1))
+
+        assertEquals(PlainLevel - 1, vm.state.level?.id, "and the level has to actually change")
+        assertEquals(left, vm.state.livesRemaining, "a fresh board is not a refill")
+        assertEquals(left, cache.get().bones)
+    }
+
+    @Test
+    fun aFreshBoardOpensWithWhateverIsOnDisk() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(bones = 1))
+
+        val vm = viewModel(cache = cache)
+
+        assertEquals(1, vm.state.livesRemaining)
+    }
+
+    @Test
+    fun aBoardOpenedAtZeroMeetsTheOfferRatherThanTheNextWrongGuess() = runUnitTest {
+        // Being at zero is a wall, and a wall the player only discovers by
+        // losing a board to it is indistinguishable from a bug. The prompt it
+        // opens is the same one the bone button shows, whose refill cannot fail
+        // closed.
+        val cache = InMemoryAppCache()
+        cache.set(AppData(bones = 0))
+
+        val vm = viewModel(cache = cache)
+
+        assertEquals(GamePhase.Playing, vm.state.phase, "the board is still markable")
+        assertEquals(Consumable.Bone, vm.state.boosterPrompt)
+    }
+
+    @Test
+    fun aStrikeAtZeroDoesNotDriveTheCountNegative() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(bones = 0))
+        val vm = viewModel(cache = cache)
+        vm.takeAction(GameAction.DismissBoosterPrompt)
+
+        vm.commit(wrongCellIn(row = 0))
+
+        assertEquals(GamePhase.Lost, vm.state.phase)
+        assertEquals(0, vm.state.livesRemaining)
+        assertEquals(0, cache.get().bones, "a negative holding would refill up to itself")
+    }
+
+    @Test
+    fun aBoardFollowsTheCountAnotherBoardSpent() = runUnitTest {
+        // The daily opens on its own route, so the campaign board sits on the
+        // backstack while it is played. Two live ViewModels, one economy: the
+        // one underneath has to follow, or its next strike writes a stale count
+        // back over what the daily spent.
+        val cache = InMemoryAppCache()
+        val campaign = viewModel(cache = cache)
+        val onTop = viewModel(isDaily = true, daily = FakeDaily(levelId = DailyLevel), cache = cache)
+
+        loseCurrent(onTop)
+
+        assertEquals(0, onTop.state.livesRemaining)
+        assertEquals(0, campaign.state.livesRemaining, "the board underneath has to follow")
+    }
+
+    @Test
+    fun aDailyAndACampaignStrikeSpendTheSamePool() = runUnitTest {
+        val cache = InMemoryAppCache()
+        val campaign = viewModel(cache = cache)
+        campaign.commit(wrongCellIn(row = 0))
+
+        val today = viewModel(isDaily = true, daily = FakeDaily(levelId = DailyLevel), cache = cache)
+
+        assertEquals(
+            ConsumableRefillTo - 1,
+            today.state.livesRemaining,
+            "the daily used to open with three of its own",
+        )
+        val board = assertNotNull(today.state.level)
+        val wrongCol = (0 until board.size).first { it != board.solution[0] }
+        today.commit(board.board.cellAt(0, wrongCol))
+
+        assertEquals(ConsumableRefillTo - 2, cache.get().bones)
+    }
+
+    @Test
+    fun theCompletionBonusIsPricedOnThisAttemptRatherThanTheStash() = runUnitTest {
+        // With one global count, `MAX_LIVES - livesRemaining` stops being "how
+        // cleanly did this go". A player who refills mid-board would finish
+        // reading as a clean sheet, worth a bigger completion bonus and a badge
+        // they did not earn.
+        val badges = RecordingAchievements()
+        val vm = viewModel(achievements = badges)
+        val level = assertNotNull(vm.state.level)
+        vm.commit(tappableWrongCell(vm))
+        vm.takeAction(GameAction.RefillBones)
+        assertEquals(ConsumableRefillTo, vm.state.livesRemaining, "the refill has to land")
+
+        (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
+
+        assertEquals(GamePhase.Won, vm.state.phase)
+        assertEquals(1, badges.recorded.single().strikes, "the wrong guess still happened")
+        assertEquals(1, vm.state.strikesThisAttempt)
+        assertEquals(ConsumableRefillTo - 1, vm.state.bonesUnspent, "and the share card says so")
+    }
+
+    @Test
+    fun aResumedAttemptRemembersTheStrikesItTook() = runUnitTest {
+        // The snapshot used to carry `livesRemaining`, which now lives on disk
+        // as a global. Without a per-attempt count in its place, a board
+        // finished after a relaunch scores as a clean sheet.
+        val cache = InMemoryAppCache()
+        val first = viewModel(cache = cache)
+        first.commit(wrongCellIn(row = 0))
+        assertEquals(1, first.state.strikesThisAttempt)
+
+        val resumed = viewModel(cache = cache)
+
+        assertEquals(1, resumed.state.strikesThisAttempt)
+        assertEquals(ConsumableRefillTo - 1, resumed.state.bonesUnspent)
     }
 
     @Test
@@ -400,7 +550,7 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun continueAfterLossRestoresOneLifeAndKeepsTheBoard() = runUnitTest {
+    fun theReviveRestoresEveryBoneAndKeepsTheBoard() = runUnitTest {
         val vm = viewModel()
         vm.commit(cellFor(row = 0))
         repeat(ScoringConfig.MAX_LIVES) {
@@ -408,40 +558,57 @@ class GameViewModelTest : CoroutineTest() {
         }
         assertEquals(GamePhase.Lost, vm.state.phase)
 
-        vm.takeAction(GameAction.ContinueAfterLoss)
+        vm.takeAction(GameAction.RefillBones)
 
         assertEquals(GamePhase.Playing, vm.state.phase)
-        assertEquals(1, vm.state.livesRemaining)
+        assertEquals(
+            ConsumableRefillTo,
+            vm.state.livesRemaining,
+            "one bone would put the player straight back on this sheet",
+        )
         assertEquals(1, vm.state.dogsPlaced, "the board the player earned must survive")
     }
 
     @Test
-    fun aFailedAdStillGrantsTheContinue() = runUnitTest {
-        // The load-bearing rule of the whole ad layer: only a deliberate
-        // dismissal withholds a reward. An empty ad network must never be the
-        // reason someone cannot finish a puzzle.
+    fun aPlayerAtZeroWithNoNetworkIsNeverStuck() = runUnitTest {
+        // The load-bearing rule of the whole ad layer, and since bones went
+        // global it is the only thing standing between a player at zero and a
+        // wall across the entire game. Only a deliberate dismissal withholds;
+        // no fill, no route to the network and an SDK that threw all pay.
         listOf(
             RewardOutcome.NoFill,
             RewardOutcome.Offline,
             RewardOutcome.Failed("boom"),
         ).forEach { outcome ->
-            val vm = viewModel(adGate = FixedAdGate(outcome))
-            repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
+            val cache = InMemoryAppCache()
+            cache.set(AppData(bones = 0))
+            val vm = viewModel(adGate = FixedAdGate(outcome), cache = cache)
+            assertEquals(0, vm.state.livesRemaining, "the fixture has to open at zero")
 
-            vm.takeAction(GameAction.ContinueAfterLoss)
+            vm.takeAction(GameAction.RefillBones)
 
-            assertEquals(GamePhase.Playing, vm.state.phase, "outcome $outcome blocked the continue")
+            assertEquals(
+                ConsumableRefillTo,
+                vm.state.livesRemaining,
+                "outcome $outcome left the player with nothing to spend",
+            )
+            assertEquals(
+                ConsumableRefillTo,
+                cache.get().bones,
+                "and the refill has to reach disk, or the next board opens at zero again",
+            )
         }
     }
 
     @Test
-    fun dismissingTheAdWithholdsTheContinue() = runUnitTest {
+    fun dismissingTheAdWithholdsTheRevive() = runUnitTest {
         val vm = viewModel(adGate = FixedAdGate(RewardOutcome.Dismissed))
         repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
 
-        vm.takeAction(GameAction.ContinueAfterLoss)
+        vm.takeAction(GameAction.RefillBones)
 
         assertEquals(GamePhase.Lost, vm.state.phase)
+        assertEquals(0, vm.state.livesRemaining)
     }
 
     @Test
@@ -450,14 +617,17 @@ class GameViewModelTest : CoroutineTest() {
         val vm = viewModel(adGate = gate, entitlements = ProEntitlements())
         repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
 
-        vm.takeAction(GameAction.ContinueAfterLoss)
+        vm.takeAction(GameAction.RefillBones)
 
         assertEquals(GamePhase.Playing, vm.state.phase)
         assertEquals(0, gate.rewardedShown, "Pro must not be asked to watch anything")
     }
 
     @Test
-    fun retryClearsTheBoardAndRestoresEveryLife() = runUnitTest {
+    fun retryClearsTheBoardAndDoesNotHandBackABone() = runUnitTest {
+        // Half of R15 in one assertion. Start over used to run through
+        // `startAttempt`, which reset the count to three, so the cheapest refill
+        // in the game was the button that costs nothing.
         val vm = viewModel()
         vm.commit(cellFor(row = 0))
         repeat(ScoringConfig.MAX_LIVES) {
@@ -467,7 +637,7 @@ class GameViewModelTest : CoroutineTest() {
         vm.takeAction(GameAction.Retry)
 
         assertEquals(GamePhase.Playing, vm.state.phase)
-        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+        assertEquals(0, vm.state.livesRemaining, "a retry is not a refill")
         assertEquals(0, vm.state.score.total)
         assertEquals(0, vm.state.dogsPlaced)
     }
@@ -736,7 +906,8 @@ class GameViewModelTest : CoroutineTest() {
         vm.takeAction(GameAction.Retry)
 
         assertTrue(vm.state.wrongGuesses.isEmpty(), "a retry starts clean")
-        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+        assertEquals(0, vm.state.strikesThisAttempt, "and the attempt is priced fresh")
+        assertEquals(0, vm.state.livesRemaining, "but the bones it cost are gone for good")
     }
 
     @Test
@@ -854,7 +1025,8 @@ class GameViewModelTest : CoroutineTest() {
         vm.takeAction(GameAction.GoToLevel(level.id))
 
         assertEquals(GamePhase.Playing, vm.state.phase)
-        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+        assertEquals(0, vm.state.strikesThisAttempt)
+        assertEquals(0, vm.state.livesRemaining, "restarting is not a way to buy bones")
     }
 
     @Test
@@ -987,15 +1159,24 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun aSpentDayDoesNotOpen() = runUnitTest {
-        // One attempt per day. The repository would refuse the write anyway, so
-        // opening the board would hand someone a run whose score can never land.
+    fun aSpentDayCannotBePlayedAgain() = runUnitTest {
+        // One attempt per day still holds — the board opens on its result rather
+        // than in play, and nothing on it can reach the repository. What changed
+        // is that it opens at all: refusing outright is what left a player
+        // dumped into the campaign with no way back to the daily.
         val daily = FakeDaily(result = completedToday())
 
         val vm = viewModel(isDaily = true, daily = daily)
 
-        assertEquals(null, vm.state.level)
-        assertEquals(GamePhase.Loading, vm.state.phase)
+        assertEquals(GamePhase.Recap, vm.state.phase)
+        assertTrue(daily.writes.isEmpty())
+
+        vm.commit(cellFor(row = 0))
+        vm.takeAction(GameAction.Retry)
+        vm.takeAction(GameAction.RefillBones)
+
+        assertEquals(GamePhase.Recap, vm.state.phase, "nothing on a spent day is a control")
+        assertEquals(0, vm.state.dogsPlaced)
         assertTrue(daily.writes.isEmpty())
     }
 
@@ -1070,10 +1251,10 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun aLostDailyIsSpentOnlyWhenThePlayerWalksAway() = runUnitTest {
-        // Writing the loss the moment the bones run out would lock the day
-        // against the clear an ad revive could still earn — `daily_result` takes
-        // one row per date and never updates it.
+    fun leavingALostDailyDoesNotSpendTheDay() = runUnitTest {
+        // R16, and the whole of it. Tapping Levels on a lost daily wrote
+        // `onFailed`, which spends the day — so the player landed in the
+        // campaign with today closed behind them and nothing said about it.
         val daily = FakeDaily(levelId = DailyLevel)
         val vm = viewModel(isDaily = true, daily = daily)
 
@@ -1083,9 +1264,78 @@ class GameViewModelTest : CoroutineTest() {
 
         vm.takeAction(GameAction.Leave)
 
+        assertTrue(daily.writes.isEmpty(), "walking away is not a forfeit")
+        assertEquals(null, daily.status().result, "and the day is still open")
+    }
+
+    @Test
+    fun aLostDailyIsSpentOnlyWhenThePlayerSaysSo() = runUnitTest {
+        // Writing the loss the moment the bones run out would lock the day
+        // against the clear an ad revive could still earn — `daily_result` takes
+        // one row per date and never updates it. So the write waits, and the
+        // only thing that fires it is the player choosing to.
+        val daily = FakeDaily(levelId = DailyLevel)
+        val vm = viewModel(isDaily = true, daily = daily)
+        loseCurrent(vm)
+
+        vm.takeAction(GameAction.ForfeitDailyRequested)
+        assertTrue(vm.state.forfeitPrompt, "an irreversible write asks first")
+        assertTrue(daily.writes.isEmpty(), "and asking is not doing")
+
+        vm.takeAction(GameAction.ForfeitDailyConfirmed)
+
         val written = daily.writes.single()
         assertEquals(DailyOutcome.Failed, written.outcome)
         assertEquals(DailyDate, written.date)
+    }
+
+    @Test
+    fun backingOutOfTheForfeitWritesNothing() = runUnitTest {
+        val daily = FakeDaily(levelId = DailyLevel)
+        val vm = viewModel(isDaily = true, daily = daily)
+        loseCurrent(vm)
+
+        vm.takeAction(GameAction.ForfeitDailyRequested)
+        vm.takeAction(GameAction.DismissForfeitPrompt)
+
+        assertFalse(vm.state.forfeitPrompt)
+        assertTrue(daily.writes.isEmpty())
+    }
+
+    @Test
+    fun aDailyCannotBeForfeitedFromABoardStillInPlay() = runUnitTest {
+        // The confirmation is only ever reachable from the lose sheet, but the
+        // action is public and a stale tap must not spend a day the player is
+        // still winning.
+        val daily = FakeDaily(levelId = DailyLevel)
+        val vm = viewModel(isDaily = true, daily = daily)
+
+        vm.takeAction(GameAction.ForfeitDailyConfirmed)
+
+        assertTrue(daily.writes.isEmpty())
+    }
+
+    @Test
+    fun aLostDailyComesBackWhereItWasLeft() = runUnitTest {
+        // The other half of leaving without forfeiting: the day stays open, so
+        // reopening it has to hand back the *position*. A blank board would be
+        // the fresh run one-attempt-per-day exists to refuse.
+        val cache = InMemoryAppCache()
+        val daily = FakeDaily(levelId = DailyLevel)
+        val first = viewModel(isDaily = true, daily = daily, cache = cache)
+        val board = assertNotNull(first.state.level)
+        first.commit(board.board.cellAt(0, board.solution[0]))
+        loseCurrent(first)
+        val red = first.state.wrongGuesses
+        val placed = first.state.placedCells
+        first.takeAction(GameAction.Leave)
+
+        val reopened = viewModel(isDaily = true, daily = daily, cache = cache)
+
+        assertEquals(GamePhase.Playing, reopened.state.phase)
+        assertEquals(placed, reopened.state.placedCells, "the dogs have to come back")
+        assertEquals(red, reopened.state.wrongGuesses, "and the squares that cost bones")
+        assertEquals(0, reopened.state.livesRemaining, "but not the bones they cost")
     }
 
     @Test
@@ -1094,11 +1344,78 @@ class GameViewModelTest : CoroutineTest() {
         val vm = viewModel(isDaily = true, daily = daily)
         loseCurrent(vm)
 
-        vm.takeAction(GameAction.ContinueAfterLoss)
+        vm.takeAction(GameAction.RefillBones)
         assertEquals(GamePhase.Playing, vm.state.phase)
         solveCurrent(vm)
 
         assertEquals(DailyOutcome.Completed, daily.writes.single().outcome)
+    }
+
+    @Test
+    fun aSpentDailyOpensOnItsResultRatherThanBouncingTheRoute() = runUnitTest {
+        // The symptom the player actually reported: "I couldn't open back up the
+        // daily board." `todaysBoard()` returned null once the day had a result,
+        // so the route popped itself and dropped them into the campaign.
+        val done = DailyResult(
+            date = DailyDate,
+            levelIndex = DailyLevel - 1,
+            outcome = DailyOutcome.Completed,
+            score = 4_200,
+            paws = 3,
+            timeMs = 90_000,
+        )
+        val vm = viewModel(
+            isDaily = true,
+            daily = FakeDaily(levelId = DailyLevel, result = done),
+        )
+
+        assertEquals(GamePhase.Recap, vm.state.phase)
+        assertEquals(done, vm.state.dailyRecap)
+        assertEquals(DailyLevel, vm.state.level?.id, "the day's own board, not a placeholder")
+        assertEquals(3, vm.state.paws)
+    }
+
+    @Test
+    fun aForfeitedDailyReopensOnTheForfeit() = runUnitTest {
+        val cache = InMemoryAppCache()
+        val daily = FakeDaily(levelId = DailyLevel)
+        val first = viewModel(isDaily = true, daily = daily, cache = cache)
+        loseCurrent(first)
+        first.takeAction(GameAction.ForfeitDailyConfirmed)
+        assertEquals(null, cache.get().boardInProgress, "a spent day holds no slot")
+
+        val reopened = viewModel(isDaily = true, daily = daily, cache = cache)
+
+        assertEquals(GamePhase.Recap, reopened.state.phase)
+        assertEquals(DailyOutcome.Failed, reopened.state.dailyRecap?.outcome)
+    }
+
+    @Test
+    fun theCardStillOffersASpentDay() = runUnitTest {
+        // The drawer's half. `playDaily` refused once the day was over, so the
+        // card went inert and there was no route back in at all.
+        val vm = viewModel(
+            daily = FakeDaily(levelId = DailyLevel, result = completedToday()),
+        )
+        val events = eventsOf(vm)
+        vm.takeAction(GameAction.LevelsOpened)
+
+        vm.takeAction(GameAction.PlayDaily)
+
+        assertEquals(GameEvent.OpenDaily(DailyLevel), events.lastOrNull())
+        assertFalse(vm.state.drawerOpen, "the pane still closes")
+    }
+
+    @Test
+    fun aDailyThatIsSwitchedOffOpensNothing() = runUnitTest {
+        val vm = viewModel(daily = FakeDaily(levelId = DailyLevel, enabled = false))
+        val events = eventsOf(vm)
+        vm.takeAction(GameAction.LevelsOpened)
+
+        vm.takeAction(GameAction.PlayDaily)
+
+        assertTrue(events.none { it is GameEvent.OpenDaily }, "the kill switch still kills")
+        assertTrue(vm.state.drawerOpen, "and the pane stays put rather than closing on nothing")
     }
 
     @Test
@@ -2111,6 +2428,19 @@ class GameViewModelTest : CoroutineTest() {
         achievementsEnabled = FeatureAchievements(config),
         boostersEnabled = FeatureBoosters(config),
     )
+
+    /**
+     * Every [GameEvent] the ViewModel emits from here on, in order.
+     *
+     * Collected into `backgroundScope` rather than asserted one at a time: the
+     * event channel is unbounded, so anything sent before the collector starts
+     * still arrives, and a list reads better than a receive per assertion.
+     */
+    private fun TestScope.eventsOf(vm: GameViewModel): List<GameEvent> {
+        val seen = mutableListOf<GameEvent>()
+        vm.eventFlow.onEach { seen += it }.launchIn(backgroundScope)
+        return seen
+    }
 
     private fun scoringFrom(config: AppConfigMap) = ConfiguredScoring(
         ScoringBasePerPlacement(config),

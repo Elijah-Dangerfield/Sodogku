@@ -5,6 +5,7 @@ import com.sodogku.libraries.achievements.AchievementsRepository
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LifetimeScore
+import com.sodogku.libraries.progress.daily.DailyResult
 import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.FreezeResult
 import com.sodogku.libraries.puzzle.Solution
@@ -25,8 +26,15 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  * scrolling past how it does it.
  */
 
-/** Where the attempt is. Everything the screen renders keys off this. */
-enum class GamePhase { Loading, Playing, Won, Lost }
+/**
+ * Where the attempt is. Everything the screen renders keys off this.
+ *
+ * [Recap] is the odd one out: it is not an attempt at all. It is the daily route
+ * opened on a day that has already been played, so the player can get back to a
+ * board they finished or gave up on instead of being bounced into the campaign.
+ * Nothing on it is interactive.
+ */
+enum class GamePhase { Loading, Playing, Won, Lost, Recap }
 
 data class GameState(
     val level: LevelDefinition? = null,
@@ -68,7 +76,27 @@ data class GameState(
      * red: a square someone paid for reads differently from one they worked out.
      */
     val wrongGuesses: Set<Int> = emptySet(),
+
+    /**
+     * Bones held, which is **one count across every board** (SPEC 1.4) and lives
+     * on `AppData.bones`. Mirrored here so the header can draw it; the board
+     * never owns it, and opening a level does not top it up.
+     *
+     * The default is what a board built before the cache has been read shows —
+     * a preview or a test — not a grant.
+     */
     val livesRemaining: Int = ScoringConfig.MAX_LIVES,
+
+    /**
+     * Wrong guesses *this attempt*, which since bones went global is a different
+     * question from [livesRemaining].
+     *
+     * The completion bonus, the paw rating and the achievement log are all
+     * priced on how cleanly this board was solved, so they read this. Pricing
+     * them on the holding instead would make the stash worth points and turn an
+     * ad refill into a score multiplier.
+     */
+    val strikesThisAttempt: Int = 0,
 
     /** What this attempt has earned, before the boosters it leaned on. */
     val score: ScoreCard = ScoreCard.Empty,
@@ -222,6 +250,22 @@ data class GameState(
     val freezeMessage: FreezeMessage? = null,
 
     /**
+     * The stored result of a day that is already spent, set only in
+     * [GamePhase.Recap]. This is what the daily route shows instead of refusing
+     * to open, which is what used to strand a player in the campaign.
+     */
+    val dailyRecap: DailyResult? = null,
+
+    /**
+     * True while the "give up on today" confirmation is up.
+     *
+     * Forfeiting writes an insert-only row and cannot be undone, so it asks.
+     * That is the whole point of R16: the day is spent by a decision, never by
+     * navigating away.
+     */
+    val forfeitPrompt: Boolean = false,
+
+    /**
      * The Skip option, or null when this attempt has not earned one. Set on the
      * loss that qualifies, and gone again the moment a fresh attempt opens.
      */
@@ -259,6 +303,16 @@ data class GameState(
             attemptScore = if (phase == GamePhase.Lost) 0 else attemptScore,
         )
 
+    /**
+     * Bones this attempt did not spend, which is what the share card draws.
+     *
+     * Derived from [strikesThisAttempt] rather than read off [livesRemaining],
+     * because the holding is global: a player who refilled mid-board would
+     * otherwise share three intact bones after a run that cost them three.
+     */
+    val bonesUnspent: Int
+        get() = (ScoringConfig.MAX_LIVES - strikesThisAttempt).coerceAtLeast(0)
+
     val placedCells: Set<Int> get() = placed.cells().toSet()
 
     val dogsPlaced: Int get() = placed.placedCount
@@ -282,8 +336,10 @@ data class GameState(
             drawerOpen ||
             boosterPrompt != null ||
             freezeMessage != null ||
+            forfeitPrompt ||
             phase == GamePhase.Won ||
-            phase == GamePhase.Lost
+            phase == GamePhase.Lost ||
+            phase == GamePhase.Recap
 }
 
 /**
@@ -376,10 +432,27 @@ sealed interface GameAction {
 
     data object DismissBoosterPrompt : GameAction
     data object Retry : GameAction
-    data object ContinueAfterLoss : GameAction
+
+    /** Back to wherever this board was opened from. Never spends anything. */
     data object Leave : GameAction
     data object DismissWarning : GameAction
+
+    /**
+     * Trade an ad for a full set of bones. The one way back from zero, from the
+     * lose sheet and from the standing offer on the board alike.
+     */
     data object RefillBones : GameAction
+
+    /** The persisted bone count moved, here or on another open board. */
+    data class BonesChanged(val bones: Int) : GameAction
+
+    /** "Give up on today" was tapped. Opens the confirmation, writes nothing. */
+    data object ForfeitDailyRequested : GameAction
+
+    /** Confirmed: spend the day, then leave. */
+    data object ForfeitDailyConfirmed : GameAction
+
+    data object DismissForfeitPrompt : GameAction
 
     /** Trade an ad for the level, after enough attempts have failed. */
     data object SkipLevel : GameAction

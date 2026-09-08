@@ -149,30 +149,57 @@ Finishing at all earns one paw; the second and third are fractions of par (0.60 
 
 Records kept per level: `best_score`, `best_time_ms`, `best_paws`.
 
-### 1.4 Lives, failure, and continuing
+### 1.4 Bones, failure, and continuing
 
-Three lives per attempt, shown as bone icons in the header (the competitor uses fish; bones are
-the dog equivalent). Lives do **not** persist across attempts and do **not** regenerate on a
-timer. Every retry starts with three.
+Three bones, shown in the header (the competitor uses fish; bones are the dog equivalent). They
+are **one count across the whole game**, persisted in `AppData.bones`, and they do **not**
+regenerate on a timer.
+
+The reversal from the original spec is deliberate and came from a device report. Bones used to be
+per-attempt, granted by `startAttempt`, and that one fact produced three separate symptoms: a
+free refill by starting anything, a full three on returning to a board, and the daily and the
+campaign each having their own three. So: a wrong guess on any board spends from one pool, a
+retry does not hand any back, and the daily and the campaign share the same three.
 
 On the third strike the attempt ends. The board dims, the answer is **not** revealed, and the
 player is offered:
 
 | Option | Cost |
 |---|---|
-| Continue from here with one life restored | Rewarded ad, or free for Pro. Board state is preserved. |
-| Retry from scratch | Free, always. |
+| Watch an ad for a full set of bones, keeping the board | Rewarded ad, or free for Pro. |
+| Retry from scratch (campaign only) | Free, and grants no bones. |
 | Back to the level map | Free. |
 
-This is the "continue" pattern from endless runners and it is what casual puzzle games actually
-ship. It converts better than a hard lock and it never strands a player.
+**There is exactly one revive, and it restores the whole set.** The lose sheet also carried a
+"Keep going" that restored a single bone for the same ad — strictly the worse of two buttons
+sitting directly under the better one, and with no ad inventory in the build it read as a free
+bone for nothing. It is gone. Handing someone who has already run out a single bone puts them
+right back on the sheet on the next guess.
+
+**Opening a board at zero** shows the refill offer immediately rather than waiting for the guess
+that ends the attempt. The board is still fully markable while it is dismissed; only a committed
+placement can cost anything.
+
+**At zero, the wall is the whole game, and it must never be a lock** (§4.2). The refill goes
+through `AdGate.showRewarded`, where every outcome except a deliberate `Dismissed` grants: no
+fill, no network, an SDK that threw, ads switched off in config, a config server nobody can
+reach. The only way to leave the sheet with nothing is to close the ad yourself, and the offer is
+still there on the next tap. **Pro gets no per-attempt bone floor** — unlike Sniffs and Treats
+(§5.1), where the floor is a starting hand. Pro's bone benefit is that the revive costs no ad,
+which is unlimited bones without a second mechanism; a floor would make bones per-attempt again
+for the one cohort most likely to notice.
 
 `ads.failureMode` in remote config switches between `CONTINUE` (above, the default) and `LOCK`
 (the competitor's harsher model: the level locks and a rewarded ad is required to reopen it). We
 ship `CONTINUE` and keep `LOCK` behind the flag so it can be A/B tested without a release.
 
+**Scoring is priced on the attempt, not the holding.** The completion bonus, the paw rating and
+every "without losing a bone" badge read wrong guesses *this attempt* (`GameState.strikesThisAttempt`,
+carried through a process death by `BoardSnapshot.strikesTaken`), never `MAX_LIVES - held`.
+Pricing them on the holding would turn a mid-board refill into a score multiplier.
+
 The failure state, whatever the mode, is **written to disk the moment the third strike lands**,
-before any animation. Force-quitting the app is the first thing a motivated player tries.
+before any animation — with one exception, the daily, whose reasons are in §2.
 
 ### 1.5 The three consumables
 
@@ -186,10 +213,16 @@ things to learn before the puzzle.
 | **Treat** | Places one correct dog, free, with no bone at risk. | The Treat button |
 
 - All three start at **3**.
-- All three **refill to 3** for a rewarded ad.
+- All three **refill to `boosters.refillTo`** (3) for a rewarded ad.
+- All three are **held across boards**, in `AppData`. None of them is granted by starting an
+  attempt. Bones were the last holdout and are not any more (§1.4).
 - All three may be **held above 3**. Clearing levels grants extra, so a stash is a reward for
   playing rather than a meter that only ever empties. The cap is on the *refill*, not the holding,
   and a refill never reduces a holding.
+
+The one place the three diverge is Pro's per-attempt floor, which covers Sniffs and Treats and
+not Bones. A floor is a starting hand for something you choose to spend; bones are only ever
+spent by being wrong, so a bone floor would be a difficulty setting rather than a hand. See §1.4.
 
 **The level reward, concretely.** Clearing a level whose id is a multiple of
 `boosters.treatEveryNLevels` (default 5) grants **one Treat**, on the **first clear only**. A
@@ -299,18 +332,33 @@ in the genre and it costs almost nothing given a bundled pack.
 - **Selection.** `dailyIndex = (daysSinceEpoch(localDate) + daily.poolOffset) % poolSize`. Local
   device date, no server. Someone can time-travel by changing their clock; that costs us nothing,
   and nothing tries to stop them — see `decisions.md` for what *is* defended.
-- **One attempt shape.** Same three lives, same boosters, same scoring. Once completed or failed,
-  the day's result is locked in. A failed daily can be continued with a rewarded ad exactly like
-  a campaign level, but only once. The lock is the `daily_result` primary key, so it holds
-  whatever the clock is set to. The result is recorded against the date whose board was played,
-  so an attempt that runs through midnight counts for the day it started and leaves the new day
-  unplayed. A clear is written the moment it happens; a **loss is written when the player leaves
-  the loss sheet**. This is the one place §1.4's "write the failure the moment the third bone
-  lands" cannot hold: `daily_result` takes one row per date and never updates it, so a failure
-  written at the third bone would lock the day against the clear a revive can still earn. The cost
-  is that force-quitting at the loss sheet leaves the day open — accepted, for the same reason
-  nothing else in the daily defends against a moved clock. See `decisions.md`.
-  Starting the board over is not offered on the daily at all.
+- **One attempt shape.** Same bones — literally the same ones, out of the global count in §1.4 —
+  same boosters, same scoring. Once completed or given up on, the day's result is locked in. A
+  failed daily can be revived with a rewarded ad exactly like a campaign level. The lock is the
+  `daily_result` primary key, so it holds whatever the clock is set to. The result is recorded
+  against the date whose board was played, so an attempt that runs through midnight counts for
+  the day it started and leaves the new day unplayed. Starting the board over is not offered on
+  the daily at all.
+- **A loss does not spend the day. Giving up does.** A clear is written the moment it happens. A
+  loss is written only when the player taps **Give up on today** and confirms it. This is the one
+  place §1.4's "write the failure the moment the third bone lands" cannot hold: `daily_result`
+  takes one row per date and never updates it, so a failure written at the third bone would lock
+  the day against the clear a revive can still earn.
+
+  The write used to happen on *leave*, which was the same reasoning applied one step too far:
+  tapping Levels on a lost daily spent the day, so a player who wanted to go and look at
+  something landed in the campaign with today closed behind them and nothing said about why.
+  Reported from a device. Forfeiting is a decision now, with a confirmation in front of it,
+  because the write cannot be taken back.
+
+  The cost is that leaving, force-quitting or letting the clock roll all leave the day open. The
+  **lost board is kept** (`AppData.boardInProgress` survives a `Lost` phase on the daily and only
+  there), so reopening the day hands back the position rather than a fresh run — which is what
+  makes one-attempt-per-day hold without the write. Bones do not come back with it.
+- **A spent day still opens**, on its result rather than its board: date, outcome, paws and score
+  if it was cleared, and the streak. The daily card in the drawer offers it as *See today's
+  result*. Refusing to open the route at all is what left a player with no way back to a daily
+  they had just been thrown out of.
 - **Streak.** Consecutive days with a completed daily, **recomputed from the stored results on
   every read** rather than counted. Local. A missed day resets it. Today does not have to be done
   yet — a run through yesterday stands all day, including after today has been played and lost.
@@ -539,7 +587,8 @@ it non-consumable. It grants:
 
 - No ads, ever.
 - Unlimited offline play.
-- Free continues, free skips (still under the daily skip cap), free streak freezes.
+- Free continues, free skips (still under the daily skip cap), free streak freezes. The continue
+  is how Pro gets unlimited bones; there is deliberately no per-attempt bone floor (§1.4).
 - 3 Sniffs and 3 Treats at the start of every attempt (`boosters.proSniffsPerAttempt` /
   `boosters.proTreatsPerAttempt`). The table in §4.3 and the paywall copy have said 3 and 3 since
   the config landed; this line said 1 Treat and was the stale copy, the same way §4.3 was the
@@ -610,8 +659,8 @@ is not what shipped casual puzzle games do. The normal shape:
 | Placement | Type | Trigger |
 |---|---|---|
 | `level_complete` | Interstitial | Fires **automatically** after a level, subject to the N-levels / cooldown / session-cap triple gate. The player never waits on it to advance and never opts in. |
-| `continue_level` | Rewarded | Third strike, restore a life, keep the board. |
-| `booster_grant` | Rewarded | Earn a Sniff or a Treat. |
+| `continue_level` | Rewarded | Third strike, restore the whole set of bones, keep the board. The lose sheet's one revive. |
+| `booster_grant` | Rewarded | Earn a Sniff or a Treat, or top bones up from the standing offer on a board still in play. |
 | `skip_level` | Rewarded | After 2 failed attempts. |
 | `streak_freeze` | Rewarded | Cover a missed daily. |
 | `app_open` | App Open | Cold start, off by default. |
@@ -1002,15 +1051,25 @@ Counters are **not** stored. See section 8.
 
 ### 13.3 In-progress board
 
-Saved separately: placements, marks, lives, score, combo, elapsed. Backgrounding mid-level and
-returning an hour later resumes exactly where you were. Puzzle players expect this and its
-absence reads as a bug.
+Saved separately (`AppData.boardInProgress`): placements, marks, wrong guesses, strikes taken,
+score, combo, elapsed. Backgrounding mid-level and returning an hour later resumes exactly where
+you were. Puzzle players expect this and its absence reads as a bug.
+
+It stores `strikesTaken`, not bones remaining. Bones are a global holding on `AppData` and are
+already on disk; what a resumed attempt cannot recover any other way is how cleanly *it* was
+going, which is what the completion bonus and the badges are priced on.
+
+One slot, and the newest real board takes it. A **clearing** write is held back when the slot
+belongs to another board, because opening a fresh level produces an empty snapshot on its first
+frame and writing that unconditionally threw away the half-finished level the player had left
+behind. The slot survives a lost board on the **daily only** — see §2 for why the day needs its
+position back and the campaign, which has Start over, does not.
 
 ### 13.4 `AppData`
 
 `currentLevel`, `hasCompletedTutorial`, `soundEnabled`, `hapticsEnabled`, `autoMarkEnabled`,
 `achievementsEnabled`, `colorblindMode`, `showTimer`, `acceptedTermsVersion`,
-`acceptedPrivacyVersion`, `cachedAdFreeEntitlement`, `sniffCount`, `treatCount`,
+`acceptedPrivacyVersion`, `cachedAdFreeEntitlement`, `bones`, `sniffCount`, `treatCount`,
 `skipsUsedToday`, `skipsDate`,
 `adGrantsToday`, `adGrantsDate`, `levelsSinceLastInterstitial`, `lastInterstitialAt`,
 `interstitialsThisSession`, `offlineGraceLevelsUsed`, `offlineGraceStartedAt`,

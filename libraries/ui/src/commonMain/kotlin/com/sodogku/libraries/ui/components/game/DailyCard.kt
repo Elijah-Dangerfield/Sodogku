@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
+import com.sodogku.libraries.ui.components.button.ButtonSecondary
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.text.Text
@@ -31,6 +32,7 @@ import sodogku.libraries.resources.generated.resources.daily_out_of_bones
 import sodogku.libraries.resources.generated.resources.daily_play
 import sodogku.libraries.resources.generated.resources.daily_resets_hours
 import sodogku.libraries.resources.generated.resources.daily_resets_minutes
+import sodogku.libraries.resources.generated.resources.daily_review
 import sodogku.libraries.resources.generated.resources.daily_streak
 import sodogku.libraries.resources.generated.resources.daily_streak_none
 import sodogku.libraries.resources.generated.resources.daily_title
@@ -71,6 +73,11 @@ fun DailyCard(
     paws: Int,
     resetsIn: Duration,
     modifier: Modifier = Modifier,
+    /**
+     * Whether a finished day offers a way back into it. Off for the board
+     * already on screen, which has nowhere to go.
+     */
+    canReview: Boolean = false,
     freezesRemaining: Int? = null,
     onPlay: () -> Unit = {},
     onFreeze: () -> Unit = {},
@@ -149,6 +156,16 @@ fun DailyCard(
                 typography = AppTheme.typography.Body.B500,
                 color = AppTheme.colors.textSecondary,
             )
+        }
+
+        // A finished day still opens, on its result rather than its board. The
+        // card used to go inert the moment the day was over, so a player who
+        // left a daily and wanted back in found a card that did nothing and said
+        // nothing.
+        if (canReview) {
+            ButtonSecondary(onClick = onPlay, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(Res.string.daily_review))
+            }
         }
 
         Text(

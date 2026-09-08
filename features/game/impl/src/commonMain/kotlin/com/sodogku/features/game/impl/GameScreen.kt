@@ -18,7 +18,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.ui.components.game.RewardButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -146,8 +145,9 @@ fun GameScreen(
 
             // The outcome covers the board rather than replacing it: the player
             // should still see the grid they just finished (or ran out of bones
-            // on) behind the sheet.
-            if (state.phase == GamePhase.Won || state.phase == GamePhase.Lost) {
+            // on) behind the sheet. A daily recap covers it too — the day is
+            // over, so the board underneath is a backdrop and not a puzzle.
+            if (state.phase != GamePhase.Playing && state.phase != GamePhase.Loading) {
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
@@ -207,6 +207,13 @@ fun GameScreen(
             FreezeMessageDialog(
                 message = message,
                 onDismiss = { onAction(GameAction.DismissFreezeMessage) },
+            )
+        }
+
+        if (state.forfeitPrompt) {
+            ForfeitDailyDialog(
+                onConfirm = { onAction(GameAction.ForfeitDailyConfirmed) },
+                onDismiss = { onAction(GameAction.DismissForfeitPrompt) },
             )
         }
 
@@ -319,7 +326,14 @@ private fun GameHeader(
                 .semantics { contentDescription = bones }
                 .bounceClick(onClick = onExplainBones),
         ) {
-            LifeRow(remaining = state.livesRemaining)
+            // The row is as long as the holding when the holding is bigger than
+            // the usual three. `boosters.refillTo` is a config number, so an
+            // operator raising it must not leave the header drawing three bones
+            // over a count of five.
+            LifeRow(
+                remaining = state.livesRemaining,
+                total = maxOf(state.livesRemaining, state.refillTo),
+            )
         }
     }
 }
@@ -589,7 +603,10 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
         RewardButton(
             label = stringResource(Res.string.game_free_bones),
             color = AdOfferColor,
-            enabled = state.livesRemaining < ScoringConfig.MAX_LIVES,
+            // Against `boosters.refillTo`, not the compile-time three: the
+            // refill tops up to the config number, so comparing with a constant
+            // would grey the offer out while an ad still had something to give.
+            enabled = state.phase != GamePhase.Recap && state.livesRemaining < state.refillTo,
             onClick = { onAction(GameAction.RefillBones) },
         )
     }

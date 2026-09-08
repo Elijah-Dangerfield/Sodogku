@@ -13,6 +13,9 @@ import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.button.ButtonGhost
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.button.ButtonSecondary
+import com.sodogku.libraries.progress.daily.DailyOutcome
+import com.sodogku.libraries.progress.daily.DailyResult
+import com.sodogku.libraries.ui.components.dialog.Dialog
 import com.sodogku.libraries.ui.components.dialog.ModalDialogDefaults
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
@@ -27,13 +30,22 @@ import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Radii
 import com.sodogku.system.clip
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.number
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.daily_date
+import sodogku.libraries.resources.generated.resources.daily_done
+import sodogku.libraries.resources.generated.resources.daily_forfeit_body
+import sodogku.libraries.resources.generated.resources.daily_forfeit_cancel
+import sodogku.libraries.resources.generated.resources.daily_forfeit_confirm
+import sodogku.libraries.resources.generated.resources.daily_forfeit_cta
+import sodogku.libraries.resources.generated.resources.daily_forfeit_note
+import sodogku.libraries.resources.generated.resources.daily_forfeit_title
+import sodogku.libraries.resources.generated.resources.daily_out_of_bones
 import sodogku.libraries.resources.generated.resources.daily_streak
 import sodogku.libraries.resources.generated.resources.game_back_to_levels
-import sodogku.libraries.resources.generated.resources.game_continue
 import sodogku.libraries.resources.generated.resources.game_lost_title
 import sodogku.libraries.resources.generated.resources.game_next_level
 import sodogku.libraries.resources.generated.resources.game_watch_ad_badge
@@ -66,6 +78,7 @@ fun GameOutcomeSheet(
     when (state.phase) {
         GamePhase.Won -> WonSheet(state, onAction, modifier)
         GamePhase.Lost -> LostSheet(state, onAction, modifier)
+        GamePhase.Recap -> DailyRecapSheet(state, onAction, modifier)
         GamePhase.Loading, GamePhase.Playing -> Unit
     }
 }
@@ -117,7 +130,11 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
                     timeMs = state.elapsedMs,
                     score = state.attemptScore,
                     paws = state.paws,
-                    bonesRemaining = state.livesRemaining,
+                    // What this run did not spend, not what the player holds.
+                    // Bones are one global count now, so a refill mid-board
+                    // would otherwise share three intact bones after a clear
+                    // that cost three.
+                    bonesRemaining = state.bonesUnspent,
                 ),
                 labels = ShareLabels(
                     title = shareTitle(state, level.id),
@@ -180,23 +197,21 @@ private fun LostSheet(state: GameState, onAction: (GameAction) -> Unit, modifier
             typography = AppTheme.typography.Heading.H700,
             textAlign = TextAlign.Center,
         )
+        // The one revive, and the only control on this sheet that can put bones
+        // back. It used to sit above a "Keep going" that bought a single bone
+        // for the same ad, which is strictly the worse of two buttons and read
+        // as a free bone in a build with no ad inventory.
         ButtonPrimary(
             onClick = { onAction(GameAction.RefillBones) },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(stringResource(Res.string.game_refill_bones))
+            Text(stringResource(Res.string.game_refill_bones, state.refillTo))
             // Refilling always costs an ad, so this one is badged unconditionally
             // — unlike Next level, where an ad is only sometimes due.
             RewardBadge(modifier = Modifier.padding(start = Dimension.D300))
         }
-        ButtonSecondary(
-            onClick = { onAction(GameAction.ContinueAfterLoss) },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(Res.string.game_continue))
-        }
-        // No starting over on the daily: one attempt per day, and the two ad
-        // revives above already give a stuck player a way back into *this* one.
+        // No starting over on the daily: one attempt per day, and the revive
+        // above already gives a stuck player a way back into *this* one.
         if (!state.isDaily) {
             ButtonSecondary(
                 onClick = { onAction(GameAction.Retry) },
@@ -205,16 +220,133 @@ private fun LostSheet(state: GameState, onAction: (GameAction) -> Unit, modifier
                 Text(stringResource(Res.string.game_retry))
             }
         }
-        // Under both revives and Start over, deliberately. This board is still
-        // winnable and the offer to move past it should be the last thing read,
-        // not the first — SPEC 1.6 wants a rescue, not an invitation to stop
-        // thinking.
+        // Under both the revive and Start over, deliberately. This board is
+        // still winnable and the offer to move past it should be the last thing
+        // read, not the first — SPEC 1.6 wants a rescue, not an invitation to
+        // stop thinking.
         state.skip?.let { skip -> SkipButton(skip, onAction) }
         ButtonGhost(
             onClick = { onAction(GameAction.Leave) },
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.game_back_to_levels))
+        }
+        // Only the daily has a day to give up, and the note above the control is
+        // the point of it: this button used to be the *other* one. Tapping
+        // Levels on a lost daily wrote the failure and closed the day, so the
+        // sheet now says out loud that leaving costs nothing.
+        if (state.isDaily) {
+            Text(
+                text = stringResource(Res.string.daily_forfeit_note),
+                typography = AppTheme.typography.Caption.C300,
+                color = AppTheme.colors.textSecondary,
+                textAlign = TextAlign.Center,
+            )
+            ButtonGhost(
+                onClick = { onAction(GameAction.ForfeitDailyRequested) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(Res.string.daily_forfeit_cta))
+            }
+        }
+    }
+}
+
+/**
+ * The day already played, opened rather than refused.
+ *
+ * Reaching a spent daily used to resolve to a null board and bounce the route,
+ * which dropped the player into the campaign with the daily closed behind them
+ * and nothing said about why. Nothing here is interactive: the day is over, and
+ * the sheet exists so it can be *seen* to be over.
+ */
+@Composable
+private fun DailyRecapSheet(state: GameState, onAction: (GameAction) -> Unit, modifier: Modifier) {
+    val recap = state.dailyRecap
+    OutcomeLayout(modifier) {
+        val cleared = recap?.outcome != DailyOutcome.Failed
+        Dog(pose = if (cleared) DogPose.Solved else DogPose.HardMode)
+        Text(
+            text = stringResource(
+                if (cleared) Res.string.daily_done else Res.string.daily_out_of_bones,
+            ),
+            typography = AppTheme.typography.Heading.H700,
+            textAlign = TextAlign.Center,
+        )
+        if (recap != null) {
+            Text(
+                text = stringResource(
+                    Res.string.daily_date,
+                    stringResource(MonthNames[recap.date.month.number - 1]),
+                    recap.date.day,
+                ),
+                typography = AppTheme.typography.Caption.C300,
+                color = AppTheme.colors.textSecondary,
+            )
+            // Recalled, not awarded. A day that was given up on has neither, and
+            // three empty paws would read as a nought-out-of-three score.
+            if (recap.paws > 0) PawRating(paws = recap.paws, animated = false)
+            if (recap.score > 0) {
+                Text(
+                    text = recap.score.toString(),
+                    typography = AppTheme.typography.Heading.H600,
+                    color = AppTheme.colors.accentPrimary,
+                )
+            }
+        }
+        if (state.dailyStreak > 0) {
+            Text(
+                text = stringResource(Res.string.daily_streak, state.dailyStreak),
+                typography = AppTheme.typography.Body.B600,
+                color = AppTheme.colors.textSecondary,
+            )
+        }
+        ButtonPrimary(
+            onClick = { onAction(GameAction.Leave) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(Res.string.game_back_to_levels))
+        }
+    }
+}
+
+/**
+ * The confirmation in front of a forfeit.
+ *
+ * `daily_result` is insert-only and takes one row per date, so this write can
+ * never be taken back. A one-tap control for something irreversible is how the
+ * old behaviour looked from the outside, which is the failure this whole change
+ * is about — the tap that spent a day was a navigation.
+ */
+@Composable
+fun ForfeitDailyDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Dimension.D500),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Dog(pose = DogPose.HardMode)
+            Text(
+                text = stringResource(Res.string.daily_forfeit_title),
+                typography = AppTheme.typography.Heading.H700,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(Res.string.daily_forfeit_body),
+                typography = AppTheme.typography.Body.B500,
+                color = AppTheme.colors.textSecondary,
+                textAlign = TextAlign.Center,
+            )
+            // Keeping the day is the filled button. The destructive answer is
+            // the quiet one, which is the opposite of how the old accidental
+            // path was weighted.
+            ButtonPrimary(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(Res.string.daily_forfeit_cancel))
+            }
+            ButtonGhost(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(Res.string.daily_forfeit_confirm))
+            }
         }
     }
 }
@@ -300,6 +432,40 @@ private fun WonSheetPreview() {
 private fun LostSheetPreview() {
     PreviewContent {
         GameOutcomeSheet(state = GameState(phase = GamePhase.Lost), onAction = {})
+    }
+}
+
+@Preview
+@Composable
+private fun LostDailySheetPreview() {
+    PreviewContent {
+        GameOutcomeSheet(
+            state = GameState(phase = GamePhase.Lost, isDaily = true, refillTo = 3),
+            onAction = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun DailyRecapSheetPreview() {
+    PreviewContent {
+        GameOutcomeSheet(
+            state = GameState(
+                phase = GamePhase.Recap,
+                isDaily = true,
+                dailyStreak = 12,
+                dailyRecap = DailyResult(
+                    date = LocalDate(2026, 9, 8),
+                    levelIndex = 41,
+                    outcome = DailyOutcome.Completed,
+                    score = 4_200,
+                    paws = 3,
+                    timeMs = 90_000,
+                ),
+            ),
+            onAction = {},
+        )
     }
 }
 

@@ -15,14 +15,13 @@
     <string name="game_treat">Treat</string>
     <string name="game_won_title">Good dog!</string>
     <string name="game_lost_title">Out of bones</string>
-    <string name="game_continue">Keep going</string>
     <string name="game_retry">Start over</string>
     <string name="game_back_to_levels">Levels</string>
     <string name="game_next_level">Next level</string>
     <string name="home_temporary_launcher">Temporary launcher. The level map replaces this in C5.</string>
     <string name="game_last_bone_title">One chance left</string>
     <string name="game_last_bone_body">Tap anywhere to keep going.</string>
-    <string name="game_refill_bones">Watch an ad for 3 bones</string>
+    <string name="game_refill_bones">Watch an ad for %1$d bones</string>
     <string name="game_settings">Settings</string>
     <string name="game_levels_menu">Levels</string>
     <string name="settings_colorblind">Shapes on colors</string>
@@ -44,7 +43,7 @@
     <string name="rules_touch_body">No two dogs may touch, not even corner to corner.</string>
 
     <string name="bones_title">Bones</string>
-    <string name="bones_body">Three bones per attempt. Placing a dog on the wrong square costs one. Run out and the attempt ends — but you can watch an ad for three more, or start the puzzle over.\n\nCrossing squares off is always free.</string>
+    <string name="bones_body">You have three bones, and they are the same three on every board. Placing a dog on the wrong square costs one, and they do not come back when you start a new puzzle.\n\nRun out and the attempt ends. Watch an ad to get all three back.\n\nCrossing squares off is always free.</string>
 
     <string name="level_explainer_title">Level %1$d</string>
     <string name="level_explainer_body">Number %1$d of %2$d in the campaign. Clearing it unlocks the next one.</string>
@@ -133,7 +132,7 @@
     <string name="booster_treat_title">Give a treat</string>
     <string name="booster_treat_body">Places one dog correctly, free. No bone at risk.</string>
     <string name="booster_bone_title">Bones</string>
-    <string name="booster_bone_body">A wrong guess costs a bone. Run out and the attempt ends.</string>
+    <string name="booster_bone_body">A wrong guess costs a bone. The same three carry across every board, so a new puzzle does not hand you any. Run out and the attempt ends.</string>
     <string name="booster_use">Use one</string>
     <string name="booster_watch_ad">Watch an ad for %1$d</string>
     <string name="booster_not_now">Not now</string>
@@ -157,8 +156,8 @@
     <string name="tutorial_mark_square_body">One tap marks a square as empty. It costs nothing, so mark freely. Try the lit square.</string>
     <string name="tutorial_place_dog_title">Two taps places a dog</string>
     <string name="tutorial_place_dog_body">Tap the lit square twice, quickly. A dog belongs here.</string>
-    <string name="tutorial_bones_title">Three bones an attempt</string>
-    <string name="tutorial_bones_body">Putting a dog on the wrong square costs one. Crossing squares off never does. Now finish the board.</string>
+    <string name="tutorial_bones_title">Three bones, for keeps</string>
+    <string name="tutorial_bones_body">Putting a dog on the wrong square costs one, and a new board does not give you more. Crossing squares off never costs anything. Now finish the board.</string>
     <string name="tutorial_place_and_watch_title">Place this one</string>
     <string name="tutorial_place_and_watch_body">Two quick taps on the lit square, then watch what the board does.</string>
     <string name="tutorial_auto_mark_title">The board marks for you</string>
@@ -198,6 +197,13 @@
     <string name="daily_today">Today’s board</string>
     <string name="daily_resets_hours">New board in %1$dh %2$dm</string>
     <string name="daily_resets_minutes">New board in %1$dm</string>
+    <string name="daily_review">See today’s result</string>
+    <string name="daily_forfeit_cta">Give up on today</string>
+    <string name="daily_forfeit_note">Leave and today’s board is waiting where you left it.</string>
+    <string name="daily_forfeit_title">Give up on today’s board?</string>
+    <string name="daily_forfeit_body">Today counts as played and the board closes. There is one board a day, so this one will not come back.</string>
+    <string name="daily_forfeit_confirm">Give up</string>
+    <string name="daily_forfeit_cancel">Keep today open</string>
     <string name="daily_freeze_cta">Save your streak</string>
     <string name="daily_freeze_remaining">%1$d left this month</string>
     <string name="daily_freeze_applied_title">Streak saved</string>

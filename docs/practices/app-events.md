@@ -125,13 +125,14 @@ a session join.
 | Event | Attributes | Fires |
 |---|---|---|
 | `game.level_started` | `level_id`, `size`, `difficulty`, `attempt_number`, `mode` | Every attempt, including a retry after a loss and a jump from the level pane. Not on resume from background |
-| `game.level_completed` | `level_id`, `size`, `difficulty`, `duration_ms`, `score`, `paws`, `strikes_used`, `sniffs_used`, `treats_used`, `attempt_number`, `mode` | The last dog lands. `duration_ms` is monotonic from the attempt's start, so backgrounding does not inflate it. `score` is what was **banked** — net of the boosters `sniffs_used` and `treats_used` count, and the same number the record and the lifetime total get. Without those two, a fall in median score reads as a difficulty change when it may be players leaning harder on hints, and the two want opposite fixes |
-| `game.level_failed` | `level_id`, `duration_ms`, `dogs_placed`, `attempt_number`, `mode` | The third bone goes. `dogs_placed` is how far they got, which is the difference between "too hard" and "unlucky" |
+| `game.level_completed` | `level_id`, `size`, `difficulty`, `duration_ms`, `score`, `paws`, `strikes_used`, `sniffs_used`, `treats_used`, `attempt_number`, `mode` | The last dog lands. `duration_ms` is monotonic from the attempt's start, so backgrounding does not inflate it. `score` is what was **banked** — net of the boosters `sniffs_used` and `treats_used` count, and the same number the record and the lifetime total get. Without those two, a fall in median score reads as a difficulty change when it may be players leaning harder on hints, and the two want opposite fixes. `strikes_used` is wrong guesses **this attempt**, counted rather than derived from the bone holding — bones are global now, so a mid-board refill would otherwise report a clean sheet |
+| `game.level_failed` | `level_id`, `difficulty`, `duration_ms`, `dogs_placed`, `attempt_number`, `mode` | The last bone goes. `dogs_placed` is how far they got, which is the difference between "too hard" and "unlucky". Since bones went global this is not always the *third* strike of the attempt: a board opened at zero can end on the first |
 | `daily.started` | `date`, `streak` | Today's board is opened from the card. `level_id` is deliberately absent: it is a position in the daily pool and means nothing next to a campaign id |
 | `daily.completed` | `date`, `streak`, `score` | A daily clear is written. `streak` is the number *after* the write, so it is the run the player just extended |
+| `daily.forfeited` | `date`, `dogs_placed` | The player gave today's board up from the lose sheet and confirmed it. **The only thing that writes a daily loss.** Leaving the sheet used to do it silently, so a count here is now a count of people who *chose* to close the day rather than of people who navigated away — the two answer completely different questions and the old event answered neither |
+| `daily.reviewed` | `date`, `outcome` | A day that was already played was reopened on its result. Deliberately not `daily.started`: a visit to a finished day is not an attempt, and folding it into the start event would inflate every daily funnel |
 | `daily.freeze_used` | `streak` | A rewarded ad covered a missed day |
-| `game.continued` | `level_id` | A rewarded continue after a loss, board intact |
-| `game.bones_refilled` | `level_id` | The standing ad offer on the board, or the refill button on the lose sheet |
+| `game.bones_refilled` | `level_id`, `to`, `placement` | The one way back from zero: the standing ad offer on the board, or the revive on the lose sheet. `to` is the resulting holding, not the amount granted — the refill never reduces, so the two differ above the floor. `placement` distinguishes the two call sites (`ContinueLevel` from the lose sheet, `BoosterGrant` from the board), which is the split the rewarded-placement config gates on. Replaced `game.continued`, whose button granted a single bone for the same ad and is gone |
 | `game.booster_used` | `booster` (`sniff`/`treat`), `level_id` | A charge is actually spent |
 | `game.booster_no_op` | `booster`, `level_id`, `difficulty` | A booster was asked for and **declined to spend**, because it had nothing to show. Should be rare; a rise means the hint engine is running out of things to say earlier than it should, which is a difficulty-calibration signal and not a UI one |
 | `game.booster_refilled` | `booster`, `to` | An ad topped a consumable up. `to` is the resulting holding, not the amount granted — refills never reduce, so the two differ for anyone above the floor |
@@ -208,12 +209,11 @@ to exist before it renders anything.
 
 `ops/grafana/` is written against this page, and a query is held to it by
 `DashboardQueryContractTest` — a panel referencing an attribute nothing emits fails the build
-rather than rendering an empty chart that reads as "nobody has played yet". Three things the
+rather than rendering an empty chart that reads as "nobody has played yet". Two things the
 boards want are genuinely missing, and each is a one-line addition at a named site:
 
 | Wanted | Where it belongs | What it unlocks |
 |---|---|---|
-| `difficulty` on `game.level_failed` | `GameViewModel.lose()` — the tier is already on the `level` in hand | A true **fail rate per tier**. Only clears report a tier today, so a tier hard enough that people mostly *lose* on it is under-represented in every calibration panel. The board falls back to mean attempts-per-clear, which is a proxy |
 | `trigger` on `iap.purchase_result` | `RealEntitlements.purchase()` — the coordinator knows which offer opened | **Conversion by trigger**, which is the question SPEC §14 asks of the paywall board. `iap.paywall_shown` splits by trigger and the buy side does not, so conversion is one blended number |
 | `difficulty` on `game.booster_no_op` | `GameViewModel`, both booster paths | Hint-engine exhaustion **per tier** rather than per booster. The doc already calls a rise here a difficulty signal; without the tier it cannot say which tier |
 

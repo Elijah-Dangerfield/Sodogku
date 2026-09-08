@@ -34,6 +34,7 @@ import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
 import com.sodogku.libraries.progress.LifetimeScore
 import com.sodogku.libraries.progress.daily.DailyRepository
+import com.sodogku.libraries.progress.daily.DailyResult
 import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.DeviceTimeZone
 import com.sodogku.libraries.progress.daily.FreezeResult
@@ -52,6 +53,7 @@ import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.BoardSnapshot
+import com.sodogku.libraries.sodogku.ConsumableRefillTo
 import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
 import me.tatarka.inject.annotations.Assisted
@@ -75,6 +77,20 @@ internal const val LevelRewardTreats: Int = 1
  * contribution rather than stack on it.
  */
 private data class BankedScore(val lifetime: Int, val thisBoard: Int)
+
+/**
+ * One read of the daily repository, carrying everything the route needs: which
+ * board today is, which date it will be recorded against, and whether the day
+ * has already been spent. Held together so the board and the date can never come
+ * from two sides of midnight.
+ */
+private data class DailyBoard(
+    val level: LevelDefinition,
+    val date: LocalDate,
+    /** Non-null once the day is played, cleared or given up on. */
+    val result: DailyResult?,
+    val streak: Int,
+)
 
 /**
  * Drives one attempt at one puzzle.
@@ -160,6 +176,19 @@ class GameViewModel(
     private var treatsUsed = 0
 
     /**
+     * Wrong guesses *this attempt*, which stopped being derivable from the bone
+     * count the moment bones went global.
+     *
+     * `MAX_LIVES - livesRemaining` used to answer this. It cannot any more: the
+     * holding crosses boards and an ad refill moves it, so a player who topped
+     * up mid-level would finish reading as a clean sheet — worth a bigger
+     * completion bonus and a Perfect Form badge they did not earn. Held in a
+     * field rather than read back off `state`, for the reason everything else in
+     * this file is.
+     */
+    private var strikesThisAttempt = 0
+
+    /**
      * The guided run over levels 1 to 3.
      *
      * All of this is held in fields rather than read back off [state], which
@@ -215,6 +244,18 @@ class GameViewModel(
                 takeAction(GameAction.DisplaySettingsChanged(display))
             }
             .launchIn(viewModelScope)
+        // Bones are the exception to the paragraph above, and they have to be.
+        // The daily opens on its own route, so a campaign board sits on the
+        // backstack while it is played — two live ViewModels over one economy.
+        // Without this the backstacked board keeps the count it had when it was
+        // left, and its next strike writes that stale number back over whatever
+        // the daily spent. Echoing our own write costs nothing: `persistCounts`
+        // stores the value state already holds, so the round trip is a no-op.
+        appCache.updates
+            .map { it.bones }
+            .distinctUntilChanged()
+            .onEach { bones -> takeAction(GameAction.BonesChanged(bones)) }
+            .launchIn(viewModelScope)
         // The card lives in the drawer of every board, daily or not, and the
         // repository re-emits at local midnight — so a drawer left open past
         // midnight picks up the new board without this screen watching a clock.
@@ -230,12 +271,17 @@ class GameViewModel(
             is GameAction.BoosterRefillRequested -> action.refill(action.consumable)
             GameAction.DismissBoosterPrompt -> action.updateState { it.copy(boosterPrompt = null) }
             GameAction.Retry -> action.restart()
-            GameAction.ContinueAfterLoss -> action.continueAfterLoss()
-            GameAction.Leave -> action.leave()
+            GameAction.Leave -> sendEvent(GameEvent.NavigateBack)
             GameAction.DismissWarning -> action.updateState {
                 it.copy(warning = null, hintCells = emptySet())
             }
             GameAction.RefillBones -> action.refillBones()
+            is GameAction.BonesChanged -> action.updateState {
+                it.copy(livesRemaining = action.bones)
+            }
+            GameAction.ForfeitDailyRequested -> action.updateState { it.copy(forfeitPrompt = true) }
+            GameAction.ForfeitDailyConfirmed -> action.forfeitDaily()
+            GameAction.DismissForfeitPrompt -> action.updateState { it.copy(forfeitPrompt = false) }
             GameAction.SkipLevel -> action.skipLevel()
             GameAction.ToggleColorblind -> action.toggleColorblind()
             GameAction.ToggleHaptics -> action.toggleHaptics()
@@ -284,6 +330,11 @@ class GameViewModel(
                 // than from a default baked into the record that stores it.
                 sniffs = settings?.sniffs ?: startingSniffs(),
                 treats = settings?.treats ?: startingTreats(),
+                // Read, never granted. Bones are one count across every board,
+                // so opening one is not an occasion to hand any out — that was
+                // the whole of the bug, and `startAttempt` used to be where it
+                // lived.
+                livesRemaining = settings?.bones ?: ConsumableRefillTo,
                 explainedBoosters = settings?.explainedBoosters
                     ?.mapNotNull { name -> Consumable.entries.firstOrNull { it.name == name } }
                     ?.toSet()
@@ -296,7 +347,11 @@ class GameViewModel(
         // level runs before that write has any chance to land.
         tutorial.arm(hasCompletedTutorial = settings?.hasCompletedTutorial == true, isDaily = isDaily)
 
-        val level = if (isDaily) todaysBoard() else LevelPacks.campaign.byId(levelId)
+        if (isDaily) {
+            loadDaily()
+            return
+        }
+        val level = LevelPacks.campaign.byId(levelId)
         if (level == null) {
             logger.e { "No level $levelId in the $modeName pack" }
             sendEvent(GameEvent.NavigateBack)
@@ -306,29 +361,82 @@ class GameViewModel(
     }
 
     /**
+     * Today's board, or today's result if the day is already spent.
+     *
+     * A spent day used to resolve to null here and bounce the route straight
+     * back, which is what put a player who tapped Levels on a lost daily into
+     * the campaign with no way back in. One attempt per day is still the rule —
+     * the repository refuses a second write regardless — but "you cannot play
+     * this again" and "you cannot look at it again" are different sentences and
+     * only the first one was meant.
+     */
+    private suspend fun GameAction.loadDaily() {
+        val today = dailyBoard()
+        if (today == null) {
+            logger.e { "No daily board to open" }
+            sendEvent(GameEvent.NavigateBack)
+            return
+        }
+        dailyDate = today.date
+        val spent = today.result
+        if (spent != null) {
+            showDailyRecap(today.level, spent, today.streak)
+            return
+        }
+        startAttempt(today.level, resume = savedBoardFor(today.level))
+    }
+
+    /**
      * The daily board, resolved from the repository rather than from [levelId].
      *
      * The route's id came from a card that was drawn at some earlier moment, and
      * the board and the date the result is written against have to come from one
      * snapshot of the clock — otherwise a screen opened a second before midnight
-     * records yesterday's board against today.
-     *
-     * Returns null when the day is already spent. One attempt per day is the
-     * repository's rule and it would refuse the write anyway, but letting someone
-     * play a board whose score can never be recorded is worse than not opening
-     * it.
+     * records yesterday's board against today. Everything the caller needs comes
+     * out of that one snapshot rather than from a second `status()` call.
      */
-    private suspend fun todaysBoard(): LevelDefinition? {
+    private suspend fun dailyBoard(): DailyBoard? {
         val status = Catching { daily.status() }
             .logOnFailure { "Failed to read the daily status" }
             .getOrNull()
             ?: return null
-        if (!status.playable) {
-            logger.i { "The daily for ${status.date} is already spent" }
-            return null
+        val level = LevelPacks.daily.byId(status.levelId) ?: return null
+        return DailyBoard(level, status.date, status.result, status.streak)
+    }
+
+    /**
+     * A day that has already been played, rendered rather than replayed.
+     *
+     * Plain `updateState`, not [updateBoard]: there is no attempt here and the
+     * saved-board slot must not be touched. A day that was forfeited has already
+     * had its snapshot cleared, and a day that was cleared never had one.
+     */
+    private suspend fun GameAction.showDailyRecap(
+        level: LevelDefinition,
+        result: DailyResult,
+        streak: Int,
+    ) {
+        val banked = bankedScores(level)
+        logger.logEvent(
+            "daily.reviewed",
+            "date" to result.date.toString(),
+            "outcome" to result.outcome.name,
+        )
+        updateState {
+            it.copy(
+                level = level,
+                placed = Solution.empty(level.size),
+                autoMarks = emptySet(),
+                phase = GamePhase.Recap,
+                isDaily = true,
+                dailyRecap = result,
+                dailyStreak = streak,
+                paws = result.paws,
+                elapsedMs = result.timeMs,
+                lifetimeBanked = banked.lifetime,
+                bankedForThisBoard = banked.thisBoard,
+            )
         }
-        dailyDate = status.date
-        return LevelPacks.daily.byId(status.levelId)
     }
 
     /**
@@ -360,6 +468,7 @@ class GameViewModel(
         warnedAboutLastBone = false
         sniffsUsed = resume?.sniffsUsed ?: 0
         treatsUsed = resume?.treatsUsed ?: 0
+        strikesThisAttempt = resume?.strikesTaken ?: 0
         elapsedBeforeResume = resume?.elapsedMs ?: 0L
         attemptNumber = resume?.attemptNumber ?: attemptNumber
         // Campaign progress is keyed on level id alone, and the two packs share
@@ -431,7 +540,17 @@ class GameViewModel(
                 phase = GamePhase.Playing,
                 manualMarks = resume?.manualMarks.orEmpty(),
                 wrongGuesses = resume?.wrongGuesses.orEmpty(),
-                livesRemaining = resume?.livesRemaining ?: ScoringConfig.MAX_LIVES,
+                // Carried, not granted. This is the line the whole of R15 turns
+                // on: it used to read `ScoringConfig.MAX_LIVES`, so every start
+                // of every board — a retry, the next level, a jump from the
+                // pane, the daily — handed out a free set of three.
+                livesRemaining = it.livesRemaining,
+                strikesThisAttempt = strikesThisAttempt,
+                // A board opened with nothing to spend meets the offer straight
+                // away rather than on the guess that ends it. The prompt's
+                // refill goes through the same fail-open ad path as every other
+                // one, so this is a wall with a door in it and never a lock.
+                boosterPrompt = if (it.livesRemaining <= 0) Consumable.Bone else null,
                 score = resume?.let { saved ->
                     ScoreCard(
                         total = saved.score,
@@ -780,6 +899,10 @@ class GameViewModel(
      * A wrong guess. The cell is left *marked*, not cleared: the player has just
      * proved no dog goes there, and throwing that away would make the strike
      * cost information as well as a life.
+     *
+     * The bone comes out of the one global count and is written to disk in the
+     * same breath. A campaign strike and a daily strike spend the same pool,
+     * which is the point: the two used to have three each.
      */
     private suspend fun GameAction.strike(cell: Int) {
         // The guided level asks the player to get one wrong on purpose, so that
@@ -791,20 +914,30 @@ class GameViewModel(
         val level = state.level
         val placed = state.placed
         val marks = state.autoMarks
-        val remaining = if (forgiven) state.livesRemaining else state.livesRemaining - 1
+        // Floored, because a board can now legitimately open at zero and a
+        // negative holding would be persisted and then refilled *up to* itself.
+        val remaining = if (forgiven) {
+            state.livesRemaining
+        } else {
+            (state.livesRemaining - 1).coerceAtLeast(0)
+        }
+        if (!forgiven) strikesThisAttempt++
+        val strikes = strikesThisAttempt
         updateBoard {
             it.copy(
                 score = Scoring.strike(it.score),
                 livesRemaining = remaining,
+                strikesThisAttempt = strikes,
                 wrongGuesses = it.wrongGuesses + cell,
                 strikeCell = cell,
                 strikeNonce = it.strikeNonce + 1,
             )
         }
+        if (!forgiven) persistCounts(Consumable.Bone, remaining)
         sendEvent(GameEvent.Struck(cell))
         if (level != null) advanceTutorial(TutorialTrigger.Struck, level, placed, marks)
         when {
-            remaining <= 0 -> lose(remaining)
+            remaining <= 0 -> lose(strikes)
             remaining == 1 && !warnedAboutLastBone -> {
                 warnedAboutLastBone = true
                 updateBoard { it.copy(warning = GameWarning.LastBone) }
@@ -817,11 +950,15 @@ class GameViewModel(
         // against a par derived from these same numbers, so asking twice could
         // rate a run against coefficients it was never played under.
         val scoring = scoringConfig()
+        // Bones *this attempt* did not spend, not bones held. The holding
+        // crosses boards and an ad moves it, so pricing the completion bonus on
+        // it would make a refill a score multiplier and a stash worth points.
+        val bonesUnspent = (ScoringConfig.MAX_LIVES - strikesThisAttempt).coerceAtLeast(0)
         val finished = Scoring.complete(
             earned,
             level.size,
             level.difficulty,
-            state.livesRemaining,
+            bonesUnspent,
             scoring,
         )
         // Rated on what the run earned, banked on what it earned *net of help*.
@@ -848,7 +985,7 @@ class GameViewModel(
             "duration_ms" to duration,
             "score" to banked,
             "paws" to paws,
-            "strikes_used" to (ScoringConfig.MAX_LIVES - state.livesRemaining),
+            "strikes_used" to strikesThisAttempt,
             // What the score above is net of. Without them a drop in median
             // score reads as a difficulty change rather than as players leaning
             // harder on hints, and the two want opposite fixes.
@@ -877,7 +1014,7 @@ class GameViewModel(
             paws,
             duration,
             completed = true,
-            livesRemaining = state.livesRemaining,
+            strikes = strikesThisAttempt,
             dailyStreakDays = streak,
         )
         // Before the sheet is built, so the sheet can say so and the count it
@@ -1003,7 +1140,13 @@ class GameViewModel(
         paws: Int,
         duration: Long,
         completed: Boolean,
-        livesRemaining: Int,
+        /**
+         * Wrong guesses this attempt made. Passed rather than derived from the
+         * bone count, which since R15 is a global holding and says nothing about
+         * how cleanly *this* board was played — every "without losing a bone"
+         * badge hangs off this number.
+         */
+        strikes: Int,
         dailyStreakDays: Int,
     ): List<Achievement> {
         val now = wallClock.now()
@@ -1015,7 +1158,7 @@ class GameViewModel(
             score = score,
             paws = paws,
             timeMs = duration,
-            strikes = ScoringConfig.MAX_LIVES - livesRemaining,
+            strikes = strikes,
             bestCombo = card.bestCombo,
             sniffsUsed = sniffsUsed,
             treatsUsed = treatsUsed,
@@ -1037,12 +1180,12 @@ class GameViewModel(
     }
 
     /**
-     * [livesRemaining] is passed in rather than read back off `state`. The
-     * caller's `updateState` has not landed yet — `state` reads a derived flow
-     * that lags it by a dispatch — so reading it here reported one strike fewer
-     * than the player actually took, which the achievement log then believed.
+     * [strikes] is passed in rather than read back off `state`. The caller's
+     * `updateState` has not landed yet — `state` reads a derived flow that lags
+     * it by a dispatch — so reading it here reported one strike fewer than the
+     * player actually took, which the achievement log then believed.
      */
-    private suspend fun GameAction.lose(livesRemaining: Int) {
+    private suspend fun GameAction.lose(strikes: Int) {
         val level = state.level ?: return
         logger.logEvent(
             "game.level_failed",
@@ -1060,7 +1203,9 @@ class GameViewModel(
         // Read, not written. A lost daily is not spent here: the player can still
         // trade an ad for the board back, and `daily_result` takes one row per
         // day, so writing the failure now would lock a loss over a clear they
-        // went on to earn. The day is spent by [leave] instead.
+        // went on to earn. Nor is it spent on the way out any more — [leave]
+        // used to write it, which turned tapping Levels into a forfeit nobody
+        // asked for. Only [forfeitDaily] spends the day.
         //
         // The streak itself is unaffected either way — a run through yesterday
         // stands all day today, including after today has been played and lost.
@@ -1073,7 +1218,7 @@ class GameViewModel(
             paws = 0,
             duration,
             completed = false,
-            livesRemaining = livesRemaining,
+            strikes = strikes,
             dailyStreakDays = streak,
         )
         val skip = skipOffer(level)
@@ -1156,69 +1301,95 @@ class GameViewModel(
     }
 
     /**
-     * Leaving, and the moment a lost daily becomes a spent one.
+     * Gives today's board up, which is the **only** way a lost daily is spent.
      *
-     * Walking away from the loss sheet is the player declining the revive, and it
-     * is the only point at which a failed daily is final. Force-quitting there
-     * instead leaves the day open, which is a loophole and a deliberate one: the
-     * daily is device-local with no leaderboard, and nothing else in it tries to
-     * stop someone cheating themselves either.
+     * It used to be [GameAction.Leave], and that is the bug: tapping Levels on a
+     * lost daily wrote `onFailed`, which spends the day, so a player who wanted
+     * to go and look at something landed in the campaign with the daily closed
+     * behind them. `daily_result` is insert-only and the write is final, so the
+     * decision has to be one the player makes on purpose — hence the
+     * confirmation in front of this, and a plain [GameAction.Leave] that writes
+     * nothing at all.
+     *
+     * The saved board goes with it. Nothing will ever resume a day that is
+     * spent, and a snapshot left behind holds the one in-progress slot against
+     * whatever board the player opens next.
      */
-    private suspend fun GameAction.leave() {
+    private suspend fun GameAction.forfeitDaily() {
         val date = dailyDate
-        if (isDaily && state.phase == GamePhase.Lost && date != null) {
-            Catching { daily.onFailed(date, elapsedMs()) }
-                .logOnFailure { "Failed to record the daily loss for $date" }
-        }
+        val level = state.level
+        if (!isDaily || date == null || level == null) return
+        if (state.phase != GamePhase.Lost) return
+
+        val dogsPlaced = state.placed.placedCount
+        Catching { daily.onFailed(date, elapsedMs()) }
+            .logOnFailure { "Failed to record the daily loss for $date" }
+        logger.logEvent(
+            "daily.forfeited",
+            "date" to date.toString(),
+            "dogs_placed" to dogsPlaced,
+        )
+        clearSavedBoard(level.id)
+        updateState { it.copy(forfeitPrompt = false) }
         sendEvent(GameEvent.NavigateBack)
-    }
-
-    /**
-     * Restores one life and hands the board back untouched.
-     *
-     * Every non-dismissal outcome grants the continue. An ad network with no
-     * inventory, or a player on a train, must never be the reason someone
-     * cannot finish a puzzle they are most of the way through.
-     */
-    private suspend fun GameAction.continueAfterLoss() {
-        val granted = if (entitlements.isPro.value) {
-            true
-        } else {
-            when (adGate.showRewarded(AdPlacement.ContinueLevel)) {
-                RewardOutcome.Dismissed -> false
-                else -> true
-            }
-        }
-        if (!granted) return
-
-        lastPlacementAt = clock.markNow()
-        logger.logEvent("game.continued", "level_id" to (state.level?.id ?: 0))
-        updateBoard { it.copy(phase = GamePhase.Playing, livesRemaining = 1) }
     }
 
     /**
      * Trades an ad for a full set of bones and puts the board back in play.
      *
-     * Deliberately restores *all* of them rather than one, unlike the continue:
-     * this is the offer made to someone who has already run out, and handing
-     * them a single bone would put them right back here on the next guess.
+     * **The one way back from zero**, and the reason there is only one. The lose
+     * sheet used to carry this *and* a "Keep going" that restored a single bone
+     * for the same ad — strictly the worse of two buttons sitting directly under
+     * the better one, and in a build with no ad inventory it read as a free bone
+     * for nothing, which is exactly what a player reported. Restoring the whole
+     * set is what the offer has to do anyway: handing someone who has already
+     * run out a single bone puts them right back here on the next guess.
+     *
+     * **It cannot fail closed** (SPEC 4.2). Every non-dismissal outcome grants —
+     * no fill, no network, no SDK, ads switched off in config, a config server
+     * nobody can reach. With one global count that guarantee stops being
+     * politeness and becomes the thing that keeps a player at zero from being
+     * stuck across the whole game, so the only way to leave this without bones
+     * is to close the ad yourself.
      */
     private suspend fun GameAction.refillBones() {
+        // Nothing to revive on a day that is already spent.
+        if (state.phase == GamePhase.Recap) return
+        val levelId = state.level?.id ?: 0
+        // SPEC 5.3 names `continue_level` as "third strike, restore, keep the
+        // board", and that is precisely what this is from the lose sheet. The
+        // standing offer on a board still in play is a booster grant.
+        val placement = if (state.phase == GamePhase.Lost) {
+            AdPlacement.ContinueLevel
+        } else {
+            AdPlacement.BoosterGrant
+        }
         val granted = entitlements.isPro.value ||
-            adGate.showRewarded(AdPlacement.BoosterGrant) != RewardOutcome.Dismissed
+            adGate.showRewarded(placement) != RewardOutcome.Dismissed
         if (!granted) return
 
         lastPlacementAt = clock.markNow()
         warnedAboutLastBone = false
-        logger.logEvent("game.bones_refilled", "level_id" to (state.level?.id ?: 0))
+        var topped = 0
         updateBoard {
+            // Never downward, matching `refill` and Pro's opening boosters: a
+            // player holding more than the floor is not punished for watching
+            // an ad. Captured inside the transform, because `state` lags this
+            // by a dispatch and reading it back would persist the old count.
+            topped = maxOf(it.livesRemaining, refillTo())
             it.copy(
                 phase = GamePhase.Playing,
-                // Never downward, matching `refill`: a player holding more than
-                // the floor should not be punished for watching an ad.
-                livesRemaining = maxOf(it.livesRemaining, ScoringConfig.MAX_LIVES),
+                livesRemaining = topped,
+                boosterPrompt = null,
             )
         }
+        persistCounts(Consumable.Bone, topped)
+        logger.logEvent(
+            "game.bones_refilled",
+            "level_id" to levelId,
+            "to" to topped,
+            "placement" to placement.name,
+        )
     }
 
     private suspend fun GameAction.toggleColorblind() {
@@ -1317,12 +1488,30 @@ class GameViewModel(
         startAttempt(target, resume = savedBoardFor(target))
     }
 
-    /** Opens today's board on its own route, from the card in the drawer. */
+    /**
+     * Opens the daily on its own route, from the card in the drawer.
+     *
+     * A spent day opens too, on its result rather than its board. The refusal
+     * that used to live here was the second half of R16: the card stopped doing
+     * anything the moment the day was over, so a player thrown out of a daily by
+     * the old forfeit-on-leave had no way back into it and no explanation. The
+     * kill switch is still honoured — a daily that is switched off has no route
+     * to open.
+     */
     private suspend fun GameAction.playDaily() {
         val status = state.daily ?: return
-        if (!status.playable) return
+        if (!status.enabled) return
         updateState { it.copy(drawerOpen = false) }
-        logger.logEvent("daily.started", "date" to status.date.toString(), "streak" to status.streak)
+        // Only a real attempt is a start. Reviewing a finished day emits
+        // `daily.reviewed` from the route instead, so the funnel keeps counting
+        // attempts rather than visits.
+        if (status.playable) {
+            logger.logEvent(
+                "daily.started",
+                "date" to status.date.toString(),
+                "streak" to status.streak,
+            )
+        }
         sendEvent(GameEvent.OpenDaily(status.levelId))
     }
 
@@ -1572,7 +1761,14 @@ class GameViewModel(
      */
     private suspend fun saveBoard(state: GameState) {
         val level = state.level
-        val snapshot = if (level == null || state.phase != GamePhase.Playing) {
+        // A **lost daily** is kept, unlike a lost campaign level. Leaving the
+        // loss sheet no longer spends the day, so the position has to survive
+        // the walk out — otherwise reopening the daily hands back an empty
+        // board, which is the fresh run one-attempt-per-day exists to refuse.
+        // The campaign has Start over and nothing to protect.
+        val worthKeeping = state.phase == GamePhase.Playing ||
+            (state.phase == GamePhase.Lost && isDaily)
+        val snapshot = if (level == null || !worthKeeping) {
             null
         } else {
             BoardSnapshot(
@@ -1581,7 +1777,7 @@ class GameViewModel(
                 placements = state.placed.columnByRow.toList(),
                 manualMarks = state.manualMarks,
                 wrongGuesses = state.wrongGuesses,
-                livesRemaining = state.livesRemaining,
+                strikesTaken = state.strikesThisAttempt,
                 score = state.score.total,
                 combo = state.score.combo,
                 bestCombo = state.score.bestCombo,
@@ -1594,17 +1790,41 @@ class GameViewModel(
         }
         Catching {
             appCache.update { data ->
-                // Only ever write over this board's own slot. Opening a fresh
-                // level produces a `null` snapshot on its first frame, and
-                // writing that unconditionally threw away the half-finished
-                // level the player had left behind — which is the thing the
-                // whole feature exists to keep.
                 val held = data.boardInProgress
                 val ours = held == null ||
                     (held.levelId == level?.id && held.isDaily == isDaily)
-                if (ours) data.copy(boardInProgress = snapshot) else data
+                // A real board always takes the slot; only a **clearing** write
+                // is held back when the slot belongs to somebody else. The
+                // guard used to cover both, which fixed one bug and opened
+                // another: opening a fresh level produces a `null` snapshot on
+                // its first frame and writing that unconditionally threw away
+                // the half-finished level the player had left behind — but
+                // refusing every write meant the new board was never saved at
+                // all while the old snapshot sat there. Found holding onto R16:
+                // a daily opened over an unfinished campaign level could not
+                // save its own loss, so the day had nothing to come back to.
+                if (snapshot != null || ours) data.copy(boardInProgress = snapshot) else data
             }
         }.logOnFailure { "Failed to save the board" }
+    }
+
+    /**
+     * Drops the saved board, but only if it is this one's.
+     *
+     * There is one slot for the whole app, so a ViewModel that cleared it
+     * blindly would throw away whatever board another route had left in it.
+     */
+    private suspend fun clearSavedBoard(levelId: Int) {
+        Catching {
+            appCache.update { data ->
+                val held = data.boardInProgress
+                if (held?.levelId == levelId && held.isDaily == isDaily) {
+                    data.copy(boardInProgress = null)
+                } else {
+                    data
+                }
+            }
+        }.logOnFailure { "Failed to clear the saved board" }
     }
 
     private val modeName: String get() = if (isDaily) "daily" else "campaign"

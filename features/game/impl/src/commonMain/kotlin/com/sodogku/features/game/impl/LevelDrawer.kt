@@ -217,6 +217,10 @@ private fun DailyCardSlot(
         },
         paws = status.result?.paws ?: 0,
         resetsIn = status.resetsIn,
+        // A spent day is still worth opening — on its result, not its board.
+        // Not offered when the recap is already what is on screen, which would
+        // push a second copy of the same route onto the backstack.
+        canReview = status.result != null && !isCurrentBoard,
         freezesRemaining = status.freezeOffer?.freezesRemaining,
         onPlay = onPlay,
         onFreeze = onFreeze,

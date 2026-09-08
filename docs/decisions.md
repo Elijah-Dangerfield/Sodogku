@@ -2599,3 +2599,122 @@ completion bonus by `1 + (difficulty - 1) × difficultyBonusRate`, so a tier-4
 board pays 1.6x a tier-1 board of the same size, and grid size scales every
 placement on top of that. The user's "how complex the table was" is already
 priced; a second difficulty term would have double-counted it.
+
+## 2026-09-08 — bones are one global count, and everything else follows from that
+
+Reported from a device, three symptoms in one message: a "keep going" button that
+handed a bone back, all three bones returning after leaving a lost board, and the
+daily and the campaign each having their own three. One cause. `startAttempt` set
+`GameState.livesRemaining = ScoringConfig.MAX_LIVES`, so every start of every
+board — the next level, a retry, a jump from the pane, opening the daily — was a
+free refill.
+
+`AppData.bones` already existed and was already written by the booster refill.
+Nothing ever read it. The fix is that the field is now the count: `load()` reads
+it, `startAttempt` carries whatever state holds, a strike decrements and
+persists, and the refill tops up and persists. Same shape as sniffs and treats,
+which is the point — SPEC 1.5's "one shape" now actually covers all three.
+
+**What happens at zero, and why it cannot strand anyone.** Running out is a wall
+across the whole game rather than the end of one attempt, so the way out has to
+be reliable in a way it did not have to be before. It is: the refill goes through
+`AdGate.showRewarded`, where `RealAdGate` returns `Dismissed` on exactly one
+path — the player closing the ad — and grants on every other, including no fill,
+no route to the network, an SDK that threw, `ads.enabled` false and a config
+server nobody can reach. SPEC 4.2's fail-open rule was already load-bearing; it
+is now the only thing between a player at zero and a locked game, so it is pinned
+by a test that walks every non-dismissal outcome and asserts both the state and
+the write to disk. **Verified on the emulator with wifi and mobile data off**: the
+refill granted three and put the board back in play.
+
+A board opened at zero shows the offer immediately rather than waiting for the
+guess that ends it. A wall a player only meets by losing a board to it is
+indistinguishable from a bug.
+
+**The "keep going" button is gone.** It restored one bone for the same ad as the
+button directly above it, which restored three — strictly dominated, and in a
+build where no ad inventory is served it read as a free bone for nothing, which
+is what got reported. Two controls where one is always worse is not a choice.
+There is now exactly one revive, it restores the whole set, and it keeps SPEC
+5.3's `continue_level` placement when it fires from the lose sheet and
+`booster_grant` when it fires from the standing offer on a board still in play.
+
+**Pro gets no per-attempt bone floor**, deliberately, and this is the one place
+the three consumables diverge. The floor for sniffs and treats (2026-09-07) is a
+starting *hand* for something you choose to spend. Bones are only ever spent by
+being wrong, so a bone floor would be a difficulty setting, and it would make
+bones per-attempt again for the cohort most likely to notice the difference.
+Pro's bone benefit is already specced and already implemented: the revive costs
+them no ad, which is unlimited bones through one mechanism instead of two.
+
+**Scoring had to stop reading the holding.** `MAX_LIVES - livesRemaining` was how
+the completion bonus, the achievement log and the share card all asked "how
+cleanly did this go", and with a global count it stops answering that: a player
+who refilled mid-board would finish reading as a clean sheet, worth a bigger
+bonus and a Perfect Form badge they did not earn, and a large stash would be
+worth points. So `strikesThisAttempt` is counted in a field, mirrored into state
+for the UI, and carried through a process death by `BoardSnapshot.strikesTaken`,
+which replaces the snapshot's `livesRemaining` — that number is on `AppData` now
+and does not belong in two places.
+
+**Every open board follows the count, not just the one being played.** The daily
+opens on its own route, so a campaign board sits on the backstack while it is
+played: two live ViewModels over one economy. Without an observer the board
+underneath keeps the count it had when it was left and its next strike writes
+that stale number back over whatever the daily spent. `GameViewModel` now watches
+`AppData.bones`. The comment saying the consumable counts are deliberately absent
+from the settings observer still holds for sniffs and treats and was wrong about
+bones for exactly this reason; echoing our own write is a no-op, because
+`persistCounts` stores the value state already holds.
+
+**Seen on the emulator, fresh install, before and after.** Before: lose the
+daily, tap Levels, land on campaign level 1 with three full bones and a daily
+card reading "Out of bones for today" with no control on it. After: the same
+path lands on campaign level 1 with **zero** bones drawn in the header and the
+daily card still offering today's board.
+
+## 2026-09-08 — leaving a lost daily is not forfeiting it
+
+`GameAction.Leave` wrote `daily.onFailed`, which spends the day. Tapping Levels
+on a lost daily was therefore a forfeit, and the player who reported it landed in
+the campaign unable to reopen the daily and with no idea what had closed it.
+
+**The write does not move to the third bone**, which is the obvious fix and the
+wrong one. `daily_result` is insert-only with the date as the primary key
+(2026-09-07), so a failure written at the third bone locks the day against the
+clear an ad revive can still earn. That reasoning was right; applying it to
+*leaving* was the mistake, because leaving is a navigation and the day is a
+resource.
+
+So forfeiting is a control: **Give up on today**, the quietest thing on the lose
+sheet, behind a confirmation, with a line above it saying that leaving costs
+nothing. The confirmation's filled button is *Keep today open* and the
+destructive answer is the ghost — the opposite of how the accidental path was
+weighted before.
+
+**The lost board is kept, on the daily only.** Without that, leaving without
+forfeiting hands back a blank board on the way in, which is the fresh run
+one-attempt-per-day exists to refuse — and a fresh run is *better* than the
+position they left, since the elapsed clock resets. So `saveBoard` keeps the
+snapshot through a `Lost` phase when `isDaily`. The campaign has Start over and
+nothing to protect. Bones do not come back with the board, which is what stops
+this being a way to farm anything.
+
+**A spent day opens on its result.** `todaysBoard()` returned null once the day
+had a row, and `load()` turned that into `NavigateBack` — so the route popped
+itself and the player ended up in the campaign with no explanation. One attempt
+per day and one *look* per day are different rules and only the first was
+intended. `GamePhase.Recap` renders the stored `DailyResult` over the day's own
+board: date, outcome, paws and score if it was cleared, and the streak. Nothing
+on it is interactive. The drawer's card offers it as "See today's result",
+because a card that goes inert the moment the day ends is how a player learns
+there is no way back.
+
+**A fix found holding onto this one.** `saveBoard` refused *every* write when the
+in-progress slot belonged to another board. That was over-correction on a real
+bug (opening a fresh level produced an empty snapshot on its first frame and
+writing it threw away the half-finished level behind it), and it meant the new
+board was never saved at all while the old snapshot sat there. A daily opened
+over an unfinished campaign level could not save its own loss, so the day had
+nothing to come back to. Now a real snapshot always takes the slot and only a
+*clearing* write is held back.
