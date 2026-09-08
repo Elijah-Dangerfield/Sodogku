@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -497,7 +499,7 @@ private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Uni
  * Null on a square the board has already ruled out for itself — `commit` refuses
  * those, so offering the action would announce a control that does nothing.
  */
-private fun placeAt(
+internal fun placeAt(
     state: GameState,
     cell: Int,
     onAction: (GameAction) -> Unit,
@@ -530,11 +532,17 @@ private fun cellState(state: GameState, cell: Int): BoardCellState = when {
  * bones are full, because selling an ad for nothing is worse than not offering
  * one.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimension.D600),
+    // A `Row` at the largest system font ran the three controls off the edge and
+    // broke "Free bones" across two lines as "Free bone / s". Nothing here is
+    // ordered or paired, so the honest answer to not fitting is to wrap onto a
+    // second line rather than to shrink the labels or clip the offer.
+    FlowRow(
+        verticalArrangement = Arrangement.spacedBy(Dimension.D400),
+        horizontalArrangement = Arrangement.spacedBy(Dimension.D600, Alignment.CenterHorizontally),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         BoosterButton(
             label = stringResource(Res.string.game_sniff),

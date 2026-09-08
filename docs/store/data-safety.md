@@ -46,7 +46,7 @@ the code currently implements (`AdMobAdNetwork.kt:161`, `TAG_FOR_CHILD_DIRECTED_
 | **What** | A random UUID v4, app-generated. Not a hardware id, not the advertising id, not derived from anything about the device. |
 | **Minted** | `libraries/sodogku/impl/src/commonMain/kotlin/com/sodogku/libraries/sodogku/impl/CachedInstallIdProvider.kt:57` — `Uuid.random()` on first read, then persisted. |
 | **Stored** | `AppData.installId`, `libraries/sodogku/src/commonMain/kotlin/com/sodogku/libraries/AppCache.kt:97`, written to `<filesDir>/app_data` by `CacheFactory.persistent` (`AppCache.kt:168`). |
-| **Leaves the device, 1** | `X-Install-Id` request header on every call to our own server. Assembled at `libraries/networking/impl/.../DefaultClientHeadersProvider.kt:46`, attached at `libraries/networking/impl/.../NetworkClientImpl.kt:159`, header name at `libraries/networking/src/.../ClientHeaders.kt:48`. The only endpoint the shipping client calls is `GET /v1/app-config` (`libraries/config/impl/.../RemoteConfigRemoteDataSource.kt:57`). |
+| **Leaves the device, 1** | `X-Install-Id` request header on every call to our own server. Assembled at `libraries/networking/impl/.../DefaultClientHeadersProvider.kt:46`, attached at `libraries/networking/impl/.../NetworkClientImpl.kt:159`, header name at `libraries/networking/src/.../ClientHeaders.kt:48`. The only endpoint the shipping client calls is `GET /v1/app-config` (`libraries/config/impl/.../RemoteConfigRemoteDataSource.kt:55`). |
 | **Leaves the device, 2** | As the `install_id` attribute on **every** OTLP log record sent to Grafana Cloud. `libraries/telemetry/impl/.../GrafanaLogTree.kt:116` and `:169`. |
 | **Leaves the device, 3** | As a Sentry scope **tag** named `install_id`. `AppTelemetry.kt:150-153`, wired on session start by `libraries/sodogku/impl/.../SessionTelemetryBinder.kt:55`. Because it is on the scope, a native crash symbolicated on the next launch still carries it. |
 | **What our server does with it** | Read into `ClientContext` (`apps/server/src/main/kotlin/com/sodogku/server/http/ClientContext.kt:77`); used as the bucketing key for config rollouts and allow/deny targeting (`apps/server/.../data/AppConfigTargetingEngine.kt:79-98`); lifted into logging MDC (`plugins/Observability.kt:48`), onto OTel spans (`plugins/Tracing.kt:90`) and onto the server's Sentry scope (`plugins/Sentry.kt:57`). It is not written to Postgres. |
@@ -157,8 +157,9 @@ Collected by the Google Mobile Ads SDK, not by our code. We never read it direct
 
 ### 2.8 Locale and country, and what is *not* location
 
-- `X-Country-Code` and `Accept-Language` are sent to our config endpoint
-  (`ClientHeaders.kt:44-45`). Both come from the OS locale the user set:
+- `X-Country-Code` (`ClientHeaders.kt:47`) and the standard `Accept-Language` header
+  (`ClientHeaders.kt:26`, attached in `NetworkClientImpl`) are sent to our config endpoint. Both
+  come from the OS locale the user set:
   `Locale.getDefault().country` on Android
   (`libraries/networking/impl/src/androidMain/.../LocaleSource.android.kt`) and
   `NSLocale.currentLocale.countryCode` on iOS (`LocaleSource.ios.kt`).
@@ -168,7 +169,7 @@ Collected by the Google Mobile Ads SDK, not by our code. We never read it direct
 ### 2.9 IP address
 
 - Our server reads the client IP as an in-memory rate-limit bucket key only
-  (`apps/server/src/main/kotlin/com/sodogku/server/plugins/RateLimits.kt:66-73`). It is not stored
+  (`apps/server/src/main/kotlin/com/sodogku/server/plugins/RateLimits.kt:68-73`). It is not stored
   and not used to derive location.
 - AdMob, Sentry and Grafana Cloud necessarily observe the IP as the origin of the requests they
   receive. That is disclosed in the privacy policy rather than as a Data safety data type: Play's

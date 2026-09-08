@@ -337,4 +337,14 @@
     <string name="notice_legal_action">Read</string>
     <string name="notice_soft_update">There is a newer Sodogku waiting for you.</string>
     <string name="notice_soft_update_action">Update</string>
+    <string name="settings_section_pro">Sodogku Pro</string>
+    <string name="settings_pro_get">Get Sodogku Pro</string>
+    <string name="settings_pro_get_body">No ads, unlimited offline play, and extra boosters every attempt.</string>
+    <string name="settings_pro_active">You have Sodogku Pro</string>
+    <string name="settings_pro_active_body">Thank you. No ads, and the boosters are on the house.</string>
+    <string name="settings_restore">Restore purchases</string>
+    <string name="settings_restore_working">Asking the store…</string>
+    <string name="settings_restore_restored">Restored. Pro is back on this device.</string>
+    <string name="settings_restore_nothing">The store has no Sodogku Pro purchase for this account.</string>
+    <string name="settings_restore_failed">Could not reach the store. Try again in a moment.</string>
 </resources>

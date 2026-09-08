@@ -9,11 +9,15 @@ import com.sodogku.libraries.flowroutines.testing.CoroutineTest
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
 import kotlin.test.Test
+import com.sodogku.libraries.billing.Entitlements
+import com.sodogku.libraries.billing.PurchaseOutcome
+import com.sodogku.libraries.billing.RestoreOutcome
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 
 class SettingsViewModelTest : CoroutineTest() {
@@ -210,12 +214,70 @@ class SettingsViewModelTest : CoroutineTest() {
         assertEquals(SettingsEvent.OpenFeedback, vm.eventFlow.first())
     }
 
-    private fun viewModel(cache: AppCache, config: AppConfigMap = this.config) = SettingsViewModel(
+    private fun viewModel(
+        cache: AppCache,
+        config: AppConfigMap = this.config,
+        entitlements: Entitlements = FakeEntitlements(),
+    ) = SettingsViewModel(
         appCache = cache,
         termsUrl = LegalTermsUrl(config),
         privacyUrl = LegalPrivacyUrl(config),
         achievementsEnabled = FeatureAchievements(config),
+        entitlements = entitlements,
     )
+
+    @Test
+    fun restoringReportsEveryOutcomeIncludingTheBoringOne() = runUnitTest {
+        // A restore that silently does nothing is the commonest reason this
+        // control gets reported as broken: the player cannot tell "you never
+        // bought it" from "we could not ask". Every branch has to say something.
+        val seen = listOf(
+            RestoreOutcome.Restored to RestoreMessage.Restored,
+            RestoreOutcome.NothingToRestore to RestoreMessage.NothingToRestore,
+            RestoreOutcome.Failed("store") to RestoreMessage.Failed,
+        ).map { (outcome, expected) ->
+            val vm = viewModel(InMemoryAppCache(), entitlements = FakeEntitlements(restore = outcome))
+            vm.takeAction(SettingsAction.RestorePurchases)
+            vm.state.restoreMessage to expected
+        }
+
+        seen.forEach { (actual, expected) -> assertEquals(expected, actual) }
+    }
+
+    @Test
+    fun aSuccessfulRestoreTurnsProOn() = runUnitTest {
+        val entitlements = FakeEntitlements(restore = RestoreOutcome.Restored, proAfterRestore = true)
+        val vm = viewModel(InMemoryAppCache(), entitlements = entitlements)
+        assertFalse(vm.state.isPro, "the fixture has to start un-Pro or this proves nothing")
+
+        vm.takeAction(SettingsAction.RestorePurchases)
+
+        assertTrue(vm.state.isPro)
+    }
+
+    @Test
+    fun theStoreRowIsReachableWhetherOrNotYouAlreadyPaid() = runUnitTest {
+        // Apple rejects a non-consumable app with no visible restore control, so
+        // this is a submission requirement rather than a nicety.
+        val vm = viewModel(InMemoryAppCache())
+
+        vm.takeAction(SettingsAction.OpenPaywall)
+
+        assertEquals(SettingsEvent.OpenPaywall, vm.eventFlow.first())
+    }
+
+    private class FakeEntitlements(
+        private val restore: RestoreOutcome = RestoreOutcome.NothingToRestore,
+        private val proAfterRestore: Boolean = false,
+    ) : Entitlements {
+        private val pro = MutableStateFlow(false)
+        override val isPro: StateFlow<Boolean> = pro
+        override suspend fun purchasePro(trigger: String?) = PurchaseOutcome.Unavailable
+        override suspend fun restore(): RestoreOutcome {
+            if (proAfterRestore) pro.value = true
+            return restore
+        }
+    }
 
     private val config = FakeConfigMap(
         mapOf("legal" to mapOf("termsUrl" to TERMS_URL, "privacyUrl" to PRIVACY_URL)),

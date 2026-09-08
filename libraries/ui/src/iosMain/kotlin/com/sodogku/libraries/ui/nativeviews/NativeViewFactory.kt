@@ -34,14 +34,6 @@ interface NativeViewFactory {
         onTap: () -> Unit
     )
 
-    @Throws(Exception::class)
-    fun createCameraPreview(): UIView
-
-    fun startCameraPreview(view: UIView)
-
-    fun stopCameraPreview(view: UIView)
-
-    fun capturePhoto(view: UIView, onCaptured: (ByteArray?) -> Unit)
     
     /**
      * Toggle flash/torch on the camera preview.

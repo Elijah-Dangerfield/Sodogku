@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -39,7 +41,9 @@ import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.dialog
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -88,9 +92,36 @@ fun Dialog(
         scrimColor = scrimColor,
         contentAlignment = contentAlignment
     ) {
+        // The host measures the card with an unbounded height — it is inside the
+        // dialog host's own overlay, under an `AnimatedVisibility` — so a scroll
+        // container here has nothing to scroll *within* and throws on the first
+        // frame. The window is the bound; taking it from `LocalWindowInfo` works
+        // wherever the card is hung rather than depending on a parent to pass
+        // finite constraints down.
+        val windowHeight = with(LocalDensity.current) {
+            LocalWindowInfo.current.containerSize.height.toDp()
+        }
         Box(
             modifier = Modifier
+                // At the largest system font the score explainer grew past the
+                // screen: its title ran under the clock and its only button was
+                // cut in half by the gesture bar, with no way to reach either.
+                // The inset and the cap keep the card inside what the window
+                // can show. They belong here rather than at a call site — a
+                // dialog does not get to decide whether it is short enough
+                // today, and the one that overflows is always the one nobody
+                // previewed at 200%.
+                //
+                // The card deliberately does *not* scroll: the content that
+                // needs to already does, and a scroll here hands that inner one
+                // an unbounded height and crashes the first dialog anybody
+                // opens. What the cap does is give the inner scroll a bound it
+                // never had — before this it was a scroll container the length
+                // of its own content, which is a scroll container that never
+                // scrolls.
+                .safeDrawingPadding()
                 .fillMaxWidth(ModalDialogDefaults.WidthFraction)
+                .heightIn(max = windowHeight)
                 .animateContentSize()
                 // clip to the *shape*, not the bounds: with a rectangular clip a
                 // full-width button at the bottom of the card squared off the

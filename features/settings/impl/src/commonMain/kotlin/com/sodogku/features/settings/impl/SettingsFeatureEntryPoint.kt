@@ -4,6 +4,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import com.sodogku.features.achievements.AchievementsRoute
+import com.sodogku.features.paywall.PaywallRoute
+import com.sodogku.libraries.billing.PaywallTrigger
 import com.sodogku.features.game.GameRoute
 import com.sodogku.features.home.FeedbackRoute
 import com.sodogku.features.settings.SettingsRoute
@@ -38,6 +40,12 @@ class SettingsFeatureEntryPoint(
                     SettingsEvent.NavigateBack -> router.goBack()
                     SettingsEvent.OpenFeedback -> router.navigate(FeedbackRoute())
                     SettingsEvent.OpenAchievements -> router.navigate(AchievementsRoute())
+                    // `Direct` is the one trigger exempt from the trigger list
+                    // and the session cap: refusing to sell to someone who
+                    // walked into the shop would be absurd.
+                    SettingsEvent.OpenPaywall -> router.navigate(
+                        PaywallRoute(trigger = PaywallTrigger.Direct.id),
+                    )
                     // The back stack goes with it. Coming back from a replayed
                     // tutorial should land on the board, not on the settings
                     // page the player left three levels ago.

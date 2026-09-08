@@ -2080,3 +2080,32 @@ the direction a mis-rating hides in), `difficulty` on `game.booster_no_op`, and
 asks of the paywall board. `Entitlements.purchasePro` takes the trigger as an
 optional parameter so the test doubles and the QA path did not all have to grow
 an argument they do not care about.
+
+## 2026-09-08 — three things a store submission would have caught
+
+Tracing the app for the Play Data Safety form turned up three problems that were
+only visible from the store's point of view.
+
+**Restore Purchases was unreachable.** SPEC 5.1 says it lives in Settings; it did
+not. `PaywallTrigger.Direct` was defined and requested by no UI, so the only
+routes to the paywall were a post-loss offer and the offline block. Apple rejects
+a non-consumable app with no visible restore control, and on a device with no
+account a reinstall is the only way a paying player gets their purchase back.
+Settings now has a Pro section with both, and every restore outcome says
+something — a restore that silently does nothing is the commonest reason this
+control is reported as broken, because the player cannot tell "you never bought
+it" from "we could not ask".
+
+**`allowBackup` was on, and Settings says the opposite.** The copy tells the
+player progress does not survive a reinstall or a move to a new phone. Auto
+Backup would have made that false *sometimes*, which is the worst of both — a
+restore that may or may not happen is not something anyone can plan around. It
+would also have carried `installId` to a second device, which is the one thing
+that identifier exists not to do. Off, with the reasoning in the manifest.
+
+**A puzzle game was asking for the camera.** `CAMERA`, a `camera` uses-feature,
+and a whole `CameraPreview` expect/actual came from the template with no caller
+anywhere in Sodogku. It would have put "Camera" on the Play listing. Removed,
+along with the camera methods on the iOS `NativeViewFactory` — the Swift
+implementations in `IOSNativeViewFactory.swift` are now unused and should go with
+them the next time anyone can build iOS, which is not from here.

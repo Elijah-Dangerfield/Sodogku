@@ -122,12 +122,42 @@ data class BoardCellLabels(
  * to keep its numbers.
  */
 internal fun String.fill(vararg args: Any): String {
-    var out = this
-    args.forEachIndexed { index, arg ->
-        val value = arg.toString()
-        out = out.replace("%${index + 1}\$s", value).replace("%${index + 1}\$d", value)
+    // One left-to-right pass, not one `replace` per argument. Replacing in turn
+    // re-reads what the previous argument wrote, so a value that happens to look
+    // like a placeholder gets expanded a second time and lands the wrong word in
+    // the sentence. None of this app's arguments contain a `%` today; the ones
+    // that do would be somebody's translated region name tomorrow.
+    val out = StringBuilder(length)
+    var index = 0
+    while (index < length) {
+        val token = placeholderAt(index)
+        if (token == null) {
+            out.append(this[index])
+            index++
+        } else {
+            args.getOrNull(token.argument - 1)?.let { out.append(it.toString()) }
+            index = token.end
+        }
     }
-    return out
+    return out.toString()
+}
+
+private class Placeholder(val argument: Int, val end: Int)
+
+/** The `%<n>$<s|d>` starting at [start], or null if one does not. */
+private fun String.placeholderAt(start: Int): Placeholder? {
+    if (this[start] != '%') return null
+    var cursor = start + 1
+    var argument = 0
+    while (cursor < length && this[cursor].isDigit()) {
+        argument = argument * 10 + this[cursor].digitToInt()
+        cursor++
+    }
+    if (cursor == start + 1) return null
+    if (cursor >= length || this[cursor] != '$') return null
+    cursor++
+    if (cursor >= length || (this[cursor] != 's' && this[cursor] != 'd')) return null
+    return Placeholder(argument, cursor + 1)
 }
 
 /**

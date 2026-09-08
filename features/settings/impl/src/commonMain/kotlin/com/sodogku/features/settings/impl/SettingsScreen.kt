@@ -15,6 +15,7 @@ import com.sodogku.libraries.ui.components.header.TopBar
 import com.sodogku.libraries.ui.screenContentPadding
 import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.system.VerticalSpacerD800
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
@@ -35,6 +36,16 @@ import sodogku.libraries.resources.generated.resources.settings_rerun_tutorial
 import sodogku.libraries.resources.generated.resources.settings_rerun_tutorial_body
 import sodogku.libraries.resources.generated.resources.settings_section_about
 import sodogku.libraries.resources.generated.resources.settings_section_play
+import sodogku.libraries.resources.generated.resources.settings_pro_active
+import sodogku.libraries.resources.generated.resources.settings_pro_active_body
+import sodogku.libraries.resources.generated.resources.settings_pro_get
+import sodogku.libraries.resources.generated.resources.settings_pro_get_body
+import sodogku.libraries.resources.generated.resources.settings_restore
+import sodogku.libraries.resources.generated.resources.settings_restore_failed
+import sodogku.libraries.resources.generated.resources.settings_restore_nothing
+import sodogku.libraries.resources.generated.resources.settings_restore_restored
+import sodogku.libraries.resources.generated.resources.settings_restore_working
+import sodogku.libraries.resources.generated.resources.settings_section_pro
 import sodogku.libraries.resources.generated.resources.settings_terms
 import sodogku.libraries.resources.generated.resources.settings_title
 import sodogku.libraries.resources.generated.resources.settings_version_label
@@ -136,6 +147,37 @@ fun SettingsScreen(
             VerticalSpacerD800()
 
             ListSection(
+                title = stringResource(Res.string.settings_section_pro),
+                items = listOf(
+                    ListSectionItem(
+                        headlineText = if (state.isPro) {
+                            stringResource(Res.string.settings_pro_active)
+                        } else {
+                            stringResource(Res.string.settings_pro_get)
+                        },
+                        supportingText = if (state.isPro) {
+                            stringResource(Res.string.settings_pro_active_body)
+                        } else {
+                            stringResource(Res.string.settings_pro_get_body)
+                        },
+                        accessory = if (state.isPro) ListItemAccessory.None else ListItemAccessory.Chevron,
+                        onClick = { onAction(SettingsAction.OpenPaywall) }.takeIf { !state.isPro },
+                    ),
+                    // Always present, Pro or not. Apple requires a visible
+                    // restore control for a non-consumable and rejects for its
+                    // absence, and on a device with no account a reinstall is
+                    // the only way a paying player gets their purchase back.
+                    ListSectionItem(
+                        headlineText = stringResource(Res.string.settings_restore),
+                        supportingText = state.restoreMessage?.let { stringResource(it.body()) },
+                        onClick = { onAction(SettingsAction.RestorePurchases) },
+                    ),
+                ),
+            )
+
+            VerticalSpacerD800()
+
+            ListSection(
                 title = stringResource(Res.string.settings_section_about),
                 items = listOf(
                     ListSectionItem(
@@ -196,4 +238,18 @@ private fun SettingsScreenPreview() {
             onAction = {},
         )
     }
+}
+
+/**
+ * The line under Restore Purchases.
+ *
+ * Every outcome says something, including the boring one. A restore that
+ * silently does nothing is the commonest reason this control is reported as
+ * broken: the player cannot tell "you never bought it" from "we could not ask".
+ */
+private fun RestoreMessage.body(): StringResource = when (this) {
+    RestoreMessage.Working -> Res.string.settings_restore_working
+    RestoreMessage.Restored -> Res.string.settings_restore_restored
+    RestoreMessage.NothingToRestore -> Res.string.settings_restore_nothing
+    RestoreMessage.Failed -> Res.string.settings_restore_failed
 }

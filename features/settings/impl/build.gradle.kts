@@ -25,6 +25,8 @@ kotlin {
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.resources)
             implementation(projects.libraries.config)
+            implementation(projects.libraries.billing)
+            implementation(projects.features.paywall)
 
             // Compose dependencies (navigation and lifecycle provided by sodogku.feature plugin)
             implementation(compose.runtime)
@@ -40,6 +42,8 @@ kotlin {
             implementation(projects.libraries.core)
             implementation(projects.libraries.sodogku)
             implementation(projects.libraries.config)
+            implementation(projects.libraries.billing)
+            implementation(projects.features.paywall)
             implementation(libs.kotlinx.coroutines.test)
         }
     }

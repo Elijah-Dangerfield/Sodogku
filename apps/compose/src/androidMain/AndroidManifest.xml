@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.CAMERA" />
-
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-
+    <!--
+    allowBackup is off, and that is a decision rather than an oversight. Settings
+    tells the player in as many words that progress does not survive a reinstall
+    or a move to a new phone, because there are no accounts. Auto Backup would
+    have made that copy false *sometimes*, which is the worst of both — a restore
+    that may or may not happen is not something a player can plan around. It
+    would also have carried the install id to a second device, which is the one
+    thing that identifier is supposed to never do.
+    -->
     <application
         android:name=".SodogkuApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
