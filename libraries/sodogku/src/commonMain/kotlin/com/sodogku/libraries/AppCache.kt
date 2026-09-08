@@ -44,6 +44,17 @@ data class AppData(
     val hapticsEnabled: Boolean = true,
 
     /**
+     * True once the daily's one-time explainer has been shown.
+     *
+     * Separate from [hasUserOnboarded] because a player can reach the daily
+     * without having been near onboarding recently, and separate from
+     * [hasCompletedTutorial] because the thing it explains is not a rule of the
+     * puzzle. It answers the question players actually ask about the daily:
+     * whether today's board costs them anything in the campaign.
+     */
+    val hasSeenDailyIntro: Boolean = false,
+
+    /**
      * Whether a placed dog crosses off the squares it rules out.
      *
      * **Display only.** The game keeps deducting either way — the sniff, the

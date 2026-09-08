@@ -1352,7 +1352,7 @@ per-call-site concern and nothing failed when a call site forgot.
 | R6 | A dialog when the dog counter (1/4) is tapped | **DONE** — `GameDialog.Dogs`, verified on device |
 | R7 | Achievements: the earned border is clipped by the card's own shape; the detail dialog does not animate; grow the catalog toward ~75; more of them hidden until earned | **DONE** (2026-09-08) |
 | R8 | Placing a dog auto-crosses too much and does the player's reasoning for them | **DONE** (2026-09-08) — see below |
-| R9 | Confirm the daily is fully separate from the campaign, explain that in a first-run dialog, and settle whether any completed board feeds the streak or only the daily | |
+| R9 | Confirm the daily is fully separate from the campaign, explain that in a first-run dialog, and settle whether any completed board feeds the streak or only the daily | **DONE** (2026-09-08) — see below |
 | R10 | Level rewards are too frequent. Front-load them and thin out as levels climb | **DONE** (2026-09-08) |
 | R11 | Run the beta workflow locally for a TestFlight build. Needs an App Store Connect record and a working `xcode-select` | |
 | R12 | The iOS splash is ugly. Just the still dog head, in the exact spot it sits on the first-launch screen, with the paw-print background fading in behind it — so launch reads as one continuous render rather than a splash then a screen | done except the paw print — see below |
@@ -1934,3 +1934,30 @@ either rule. Mutation-checked both ways.
 It needed a build change to work at all. This module's test task declared only
 Kotlin as its input, so an edit to `strings.xml` left the task UP-TO-DATE and
 the test never ran. That is the same hole the iOS tests had.
+
+
+### R9 · Saying out loud that the daily costs you nothing — **DONE** (2026-09-08)
+
+The factual half was already true and had been confirmed in code: the daily and
+the campaign are separate packs with their own ids, `daily_result` is its own
+table, and the streak folds over daily rows only. Clearing campaign levels does
+not feed it. Nothing needed changing.
+
+What was missing was saying so. The question a player asks about a daily is
+whether today's board costs them anything in the campaign, and until they ask it
+they tend to assume it might. A one-time dialog on the first daily visit answers
+it, and answering it once is cheaper than a support reply later.
+
+Shown on the recap route as well as the play route: a player whose first visit is
+a board they already finished has the same question.
+
+It exposed the same trap that caught R8's auto-mark setting. `startAttempt` builds
+a fresh `GameState` rather than copying one, enumerating by hand every field that
+carries over, so `showDailyIntro` was silently reset before the first frame and
+the dialog never appeared. The field list in that builder is now the third place
+this has happened, and it is worth remembering that anything added to `GameState`
+which must survive a retry has to be named there too.
+
+Mutation-checked three ways: dropping the carry-over, showing it on every board
+rather than the daily, and dropping the persist. Verified on a device, including
+that it does not come back on the next launch.

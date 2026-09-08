@@ -319,6 +319,7 @@ class GameViewModel(
             is GameAction.GoToLevel -> action.goToLevel(action.levelId)
             is GameAction.DailyChanged -> action.updateState { it.copy(daily = action.status) }
             GameAction.PlayDaily -> action.playDaily()
+            GameAction.DailyIntroDismissed -> action.dismissDailyIntro()
             GameAction.UseFreeze -> action.useFreeze()
             GameAction.RestoreStreak -> action.restoreStreak()
             GameAction.DismissFreezeMessage -> action.updateState { it.copy(freezeMessage = null) }
@@ -377,6 +378,10 @@ class GameViewModel(
                     ?.mapNotNull { name -> Consumable.entries.firstOrNull { it.name == name } }
                     ?.toSet()
                     .orEmpty(),
+                // Once ever, and on the recap route as well as the play route:
+                // a player whose first daily visit is a board they already
+                // finished has the same question about it.
+                showDailyIntro = isDaily && settings?.hasSeenDailyIntro != true,
             )
         }
 
@@ -680,6 +685,11 @@ class GameViewModel(
                 unlockedThrough = campaignFrontier(unlocked, level.id),
                 daily = it.daily,
                 isDaily = isDaily,
+                // Carried, because this builds a fresh GameState rather than
+                // copying one: anything not named here is silently reset. The
+                // explainer is set in `load` and would otherwise vanish before
+                // the first frame, and come back on the next retry.
+                showDailyIntro = it.showDailyIntro,
                 isRehearsal = rehearsal,
                 tutorial = lesson.step,
                 tutorialCells = lesson.cells,
@@ -1684,6 +1694,19 @@ class GameViewModel(
             )
         }
         sendEvent(GameEvent.OpenDaily(status.levelId))
+    }
+
+    /**
+     * Closes the daily explainer and makes sure it never comes back.
+     *
+     * The write is the whole point, so it is not fire-and-forget: a failure
+     * here means the player is told the same thing again next time, which is
+     * mildly annoying rather than harmful, and worth a log line either way.
+     */
+    private suspend fun GameAction.dismissDailyIntro() {
+        updateState { it.copy(showDailyIntro = false) }
+        Catching { appCache.update { it.copy(hasSeenDailyIntro = true) } }
+            .logOnFailure { "Failed to record the daily explainer as seen" }
     }
 
     /**

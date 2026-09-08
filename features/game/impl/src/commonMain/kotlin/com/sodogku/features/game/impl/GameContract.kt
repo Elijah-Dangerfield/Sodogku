@@ -264,6 +264,16 @@ data class GameState(
     val isDaily: Boolean = false,
 
     /**
+     * Whether to explain the daily, which happens exactly once ever.
+     *
+     * Held in state rather than as local dialog state like the header
+     * explainers, because those open on a tap and this one opens on a fact
+     * about the player that only the ViewModel can see. It is also the one
+     * dialog here whose dismissal writes something down.
+     */
+    val showDailyIntro: Boolean = false,
+
+    /**
      * Whether the board on screen is [TutorialBoard] rather than a level.
      *
      * The screen needs to know for one reason and the state for another. The
@@ -552,6 +562,9 @@ sealed interface GameAction {
     data class DailyChanged(val status: DailyStatus) : GameAction
 
     data object PlayDaily : GameAction
+
+    /** The daily explainer was closed. Writes the flag, so it never returns. */
+    data object DailyIntroDismissed : GameAction
     data object UseFreeze : GameAction
     data object RestoreStreak : GameAction
     data object DismissFreezeMessage : GameAction

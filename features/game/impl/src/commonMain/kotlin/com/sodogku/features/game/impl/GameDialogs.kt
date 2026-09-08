@@ -22,6 +22,10 @@ import com.sodogku.libraries.ui.system.color.RegionPalette
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import sodogku.libraries.resources.generated.resources.dogs_body
+import sodogku.libraries.resources.generated.resources.daily_intro_title
+import sodogku.libraries.resources.generated.resources.daily_intro_body
+import sodogku.libraries.resources.generated.resources.daily_intro_streak
+import sodogku.libraries.resources.generated.resources.daily_intro_confirm
 import sodogku.libraries.resources.generated.resources.dogs_title
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
@@ -57,7 +61,19 @@ import sodogku.libraries.resources.generated.resources.score_explainer_title
 import sodogku.libraries.resources.generated.resources.score_explainer_total
 
 /** Which explainer is open, if any. */
-enum class GameDialog { Rules, Bones, Dogs, Level, Score }
+enum class GameDialog {
+    Rules,
+    Bones,
+    Dogs,
+    Level,
+    Score,
+
+    /**
+     * The daily's one-time explainer. Unlike the others it is not opened by a
+     * tap, and closing it writes a flag — see `GameState.showDailyIntro`.
+     */
+    DailyIntro,
+}
 
 /**
  * Everything the board can put in front of the player.
@@ -93,9 +109,21 @@ fun GameDialogHost(
                 GameDialog.Dogs -> DogsContent(state)
                 GameDialog.Level -> LevelContent(state)
                 GameDialog.Score -> ScoreContent()
+                GameDialog.DailyIntro -> DailyIntroContent()
             }
             ButtonPrimary(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(Res.string.common_close))
+                Text(
+                    // "Close" is right for something you opened. The daily
+                    // explainer opened itself, so it gets an acknowledgement
+                    // rather than a dismissal.
+                    stringResource(
+                        if (dialog == GameDialog.DailyIntro) {
+                            Res.string.daily_intro_confirm
+                        } else {
+                            Res.string.common_close
+                        },
+                    ),
+                )
             }
         }
     }
@@ -237,6 +265,24 @@ private fun Body(text: String) {
  * board: it looks like a score, and a player who reads it that way thinks they
  * are losing.
  */
+@Composable
+private fun DailyIntroContent() {
+    // The glasses dog, the same one the daily card wears, so the dialog is
+    // visibly about the thing the player just tapped.
+    Dog(pose = DogPose.Thinking)
+    Text(text = stringResource(Res.string.daily_intro_title), typography = AppTheme.typography.Heading.H700)
+    Text(
+        text = stringResource(Res.string.daily_intro_body),
+        typography = AppTheme.typography.Body.B500,
+        color = AppTheme.colors.textSecondary,
+    )
+    Text(
+        text = stringResource(Res.string.daily_intro_streak),
+        typography = AppTheme.typography.Body.B500,
+        color = AppTheme.colors.textSecondary,
+    )
+}
+
 @Composable
 private fun DogsContent(state: GameState) {
     Dog(pose = DogPose.Still)

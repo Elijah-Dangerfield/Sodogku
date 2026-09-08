@@ -492,6 +492,15 @@
     <string name="settings_restore_failed">Could not reach the store. Try again in a moment.</string>
     <string name="game_bones_remaining">%1$d bones left</string>
     <string name="booster_a11y">%1$s, %2$d left</string>
+    <!-- Shown once, the first time the daily board opens. The question it
+         answers is one players actually ask: whether today's board costs them
+         anything in the campaign. It does not, and saying so up front is
+         cheaper than a support reply later. -->
+    <string name="daily_intro_title">Today’s board</string>
+    <string name="daily_intro_body">A fresh puzzle every day, the same one for everyone. It is completely separate from the campaign: your level, your score and your best times there are untouched by how today goes.</string>
+    <string name="daily_intro_streak">Only the daily builds your streak. Clearing campaign levels does not, so play today’s board each day to keep it going.</string>
+    <string name="daily_intro_confirm">Got it</string>
+
     <string name="dogs_title">Dogs found</string>
     <string name="dogs_body">You have placed %1$d of the %2$d dogs this board needs. One per color, one per row, one per column, so a %3$d-dog board is a %3$d by %3$d grid.</string>
     <string name="dogs_a11y">%1$d of %2$d dogs found</string>

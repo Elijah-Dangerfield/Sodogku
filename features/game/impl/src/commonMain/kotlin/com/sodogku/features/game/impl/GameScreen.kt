@@ -233,11 +233,22 @@ fun GameScreen(
             )
         }
 
+        // The daily explainer wins over anything the player opened themselves.
+        // It cannot collide in practice — it is shown as the board loads, before
+        // there is anything to tap — but one host draws one dialog, and leaving
+        // the precedence implicit would make that a coincidence rather than a
+        // rule.
         GameDialogHost(
-            dialog = dialog,
+            dialog = if (state.showDailyIntro) GameDialog.DailyIntro else dialog,
             state = state,
             onAction = onAction,
-            onDismiss = { dialog = null },
+            onDismiss = {
+                if (state.showDailyIntro) {
+                    onAction(GameAction.DailyIntroDismissed)
+                } else {
+                    dialog = null
+                }
+            },
             onOpenPrivacy = { onAction(GameAction.OpenPrivacy) },
             onOpenTerms = { onAction(GameAction.OpenTerms) },
             onOpenFeedback = { onAction(GameAction.OpenFeedback) },

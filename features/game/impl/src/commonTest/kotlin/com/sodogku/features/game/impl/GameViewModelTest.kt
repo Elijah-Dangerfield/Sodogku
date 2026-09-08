@@ -422,6 +422,48 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun theFirstDailyVisitExplainsItselfAndTheSecondDoesNot() = runUnitTest {
+        // The explainer answers the question players actually ask about the
+        // daily: whether today's board costs them anything in the campaign. It
+        // is worth showing once and actively annoying to show twice.
+        val cache = InMemoryAppCache()
+
+        val first = viewModel(isDaily = true, daily = FakeDaily(levelId = DailyLevel), cache = cache)
+        assertTrue(first.state.showDailyIntro, "a player who has never seen the daily was told nothing")
+        first.takeAction(GameAction.DailyIntroDismissed)
+        assertFalse(first.state.showDailyIntro, "closing it left it open")
+
+        val second = viewModel(isDaily = true, daily = FakeDaily(levelId = DailyLevel), cache = cache)
+        assertFalse(second.state.showDailyIntro, "the explainer came back on the next visit")
+    }
+
+    @Test
+    fun theCampaignNeverExplainsTheDaily() = runUnitTest {
+        // The other half. A flag that opened the dialog on every board would
+        // pass the test above on its first two assertions.
+        val vm = viewModel(cache = InMemoryAppCache())
+
+        assertFalse(vm.state.showDailyIntro, "a campaign level explained the daily")
+    }
+
+    @Test
+    fun theExplainerSurvivesAFailedWrite() = runUnitTest {
+        // Persisting is the only thing dismissal does, so a cache that refuses
+        // must still close the dialog. Showing it forever because a write failed
+        // would turn a storage hiccup into an unplayable daily.
+        val vm = viewModel(
+            isDaily = true,
+            daily = FakeDaily(levelId = DailyLevel),
+            cache = ThrowingAppCache(),
+        )
+        assertTrue(vm.state.showDailyIntro)
+
+        vm.takeAction(GameAction.DailyIntroDismissed)
+
+        assertFalse(vm.state.showDailyIntro, "a failed write left the player stuck behind the dialog")
+    }
+
+    @Test
     fun aDailyAndACampaignStrikeSpendTheSamePool() = runUnitTest {
         val cache = InMemoryAppCache()
         val campaign = viewModel(cache = cache)
@@ -3129,6 +3171,21 @@ class GameViewModelTest : CoroutineTest() {
         override suspend fun get(): AppData = state.value
         override suspend fun set(value: AppData) { state.value = value }
         override suspend fun clear() { state.value = AppData() }
+    }
+
+    /**
+     * A cache whose writes fail.
+     *
+     * Reads still work, so a board opens normally and only the persisting half
+     * breaks. That is the shape of a real storage failure, and it is the one
+     * that turns "we remembered that for you" into "you are stuck".
+     */
+    private class ThrowingAppCache : AppCache {
+        private val state = MutableStateFlow(AppData())
+        override val updates: Flow<AppData> = state
+        override suspend fun get(): AppData = state.value
+        override suspend fun set(value: AppData): Unit = error("disk is full")
+        override suspend fun clear(): Unit = error("disk is full")
     }
 
     /**
