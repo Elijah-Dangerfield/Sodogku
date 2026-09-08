@@ -282,6 +282,8 @@
     <string name="settings_achievements">Achievements</string>
     <string name="settings_achievements_show">Show achievements</string>
     <string name="settings_achievements_show_body">Badges and unlock toasts. Turning this off keeps recording in the background, so switching it back on shows real history rather than a blank grid.</string>
+    <string name="settings_leaderboards">Leaderboards</string>
+    <string name="settings_leaderboards_body">See where your lifetime score and longest streak sit against everyone else.</string>
     <string name="settings_progress_local_title">Progress lives on this device</string>
     <string name="settings_progress_local_body">There are no accounts, so levels, streaks and badges do not survive a reinstall or move to a new phone.</string>
 

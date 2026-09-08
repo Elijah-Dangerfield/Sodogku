@@ -29,6 +29,8 @@ import sodogku.libraries.resources.generated.resources.settings_colorblind_body
 import sodogku.libraries.resources.generated.resources.settings_feedback
 import sodogku.libraries.resources.generated.resources.settings_haptics
 import sodogku.libraries.resources.generated.resources.settings_haptics_body
+import sodogku.libraries.resources.generated.resources.settings_leaderboards
+import sodogku.libraries.resources.generated.resources.settings_leaderboards_body
 import sodogku.libraries.resources.generated.resources.settings_privacy
 import sodogku.libraries.resources.generated.resources.settings_progress_local_body
 import sodogku.libraries.resources.generated.resources.settings_progress_local_title
@@ -150,6 +152,20 @@ fun SettingsScreen(
                         checked = state.achievementsVisible,
                         onToggle = { onAction(SettingsAction.ToggleAchievements) },
                     ).takeIf { state.achievementsAvailable },
+                    // In this card rather than one of its own, because to a
+                    // player badges and standings are the same question. It is
+                    // also only ever drawn on iOS, and a lone row floating
+                    // between two cards on one platform is worse than a third
+                    // row on a card that is already there.
+                    //
+                    // Hidden entirely when the platform has nothing to show,
+                    // not disabled: there is no state in which explaining why
+                    // this is greyed out would help.
+                    ListSectionItem(
+                        headlineText = stringResource(Res.string.settings_leaderboards),
+                        supportingText = stringResource(Res.string.settings_leaderboards_body),
+                        onClick = { onAction(SettingsAction.OpenLeaderboards) },
+                    ).takeIf { state.leaderboardsOfferable },
                 ),
             )
 

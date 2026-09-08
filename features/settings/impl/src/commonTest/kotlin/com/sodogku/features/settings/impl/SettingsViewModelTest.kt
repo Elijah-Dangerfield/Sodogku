@@ -6,6 +6,9 @@ import com.sodogku.libraries.config.values.LegalPrivacyUrl
 import com.sodogku.libraries.config.values.LegalTermsUrl
 import com.sodogku.libraries.core.BuildInfo
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
+import com.sodogku.libraries.leaderboards.Leaderboard
+import com.sodogku.libraries.leaderboards.Leaderboards
+import com.sodogku.libraries.leaderboards.NoLeaderboards
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
 import kotlin.test.Test
@@ -14,6 +17,7 @@ import com.sodogku.libraries.billing.PurchaseOutcome
 import com.sodogku.libraries.billing.RestoreOutcome
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -245,13 +249,82 @@ class SettingsViewModelTest : CoroutineTest() {
         cache: AppCache,
         config: AppConfigMap = this.config,
         entitlements: Entitlements = FakeEntitlements(),
+        leaderboards: Leaderboards = NoLeaderboards(),
     ) = SettingsViewModel(
         appCache = cache,
         termsUrl = LegalTermsUrl(config),
         privacyUrl = LegalPrivacyUrl(config),
         achievementsEnabled = FeatureAchievements(config),
         entitlements = entitlements,
+        leaderboards = leaderboards,
     )
+
+    /**
+     * A [Leaderboards] that says it is offerable and records the one call this
+     * screen can make.
+     *
+     * Not a mock of the whole interface: `submit` is a no-op here on purpose,
+     * because Settings has no business submitting a score and a double that
+     * recorded it would let a test pass that should not exist.
+     */
+    private class OfferedLeaderboards : Leaderboards {
+        private val offerable = MutableStateFlow(true)
+        override val isOfferable: StateFlow<Boolean> = offerable.asStateFlow()
+        var opened = 0
+            private set
+
+        override fun submit(board: Leaderboard, value: Long) = Unit
+        override fun openDashboard(board: Leaderboard?) {
+            opened++
+        }
+
+        fun withdraw() {
+            offerable.value = false
+        }
+
+        fun offer() {
+            offerable.value = true
+        }
+    }
+
+    @Test
+    fun theLeaderboardRowIsOnlyOfferedWhenItLeadsSomewhere() = runUnitTest {
+        // The whole point of `isOfferable`. On Android, signed out, or before
+        // Game Center has answered, this row would open nothing, and a control
+        // that does nothing is worse than an absent one.
+        val absent = viewModel(InMemoryAppCache())
+        assertFalse(absent.state.leaderboardsOfferable, "a row was offered with nothing behind it")
+
+        val present = viewModel(InMemoryAppCache(), leaderboards = OfferedLeaderboards())
+        assertTrue(present.state.leaderboardsOfferable, "the row never appeared")
+    }
+
+    @Test
+    fun theRowAppearsWhenGameCenterAnswersLate() = runUnitTest {
+        // Authentication resolves after launch, so this can flip while the
+        // screen is already open. Read once in `load` it would stay false until
+        // the player left and came back, which reads as a broken row.
+        val platform = OfferedLeaderboards()
+        platform.withdraw()
+        val vm = viewModel(InMemoryAppCache(), leaderboards = platform)
+        assertFalse(vm.state.leaderboardsOfferable)
+
+        platform.offer()
+
+        assertTrue(vm.state.leaderboardsOfferable, "the screen stopped watching after the first value")
+    }
+
+    @Test
+    fun tappingTheRowOpensThePlatformDashboard() = runUnitTest {
+        // No event is sent: the dashboard is presented by the platform over
+        // whatever is on screen, so there is no route for navigation to take.
+        val platform = OfferedLeaderboards()
+        val vm = viewModel(InMemoryAppCache(), leaderboards = platform)
+
+        vm.takeAction(SettingsAction.OpenLeaderboards)
+
+        assertEquals(1, platform.opened, "the tap did not reach the platform")
+    }
 
     @Test
     fun restoringReportsEveryOutcomeIncludingTheBoringOne() = runUnitTest {

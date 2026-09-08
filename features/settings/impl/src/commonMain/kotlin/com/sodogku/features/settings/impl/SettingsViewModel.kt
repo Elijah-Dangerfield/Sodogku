@@ -1,5 +1,6 @@
 package com.sodogku.features.settings.impl
 
+import androidx.lifecycle.viewModelScope
 import com.sodogku.libraries.billing.Entitlements
 import com.sodogku.libraries.billing.RestoreOutcome
 import com.sodogku.libraries.config.values.FeatureAchievements
@@ -10,6 +11,8 @@ import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.versionString
 import com.sodogku.libraries.flowroutines.SEAViewModel
+import com.sodogku.libraries.flowroutines.collectIn
+import com.sodogku.libraries.leaderboards.Leaderboards
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
 import me.tatarka.inject.annotations.Inject
@@ -32,12 +35,25 @@ class SettingsViewModel(
     private val privacyUrl: LegalPrivacyUrl,
     private val achievementsEnabled: FeatureAchievements,
     private val entitlements: Entitlements,
+    /**
+     * Read for [Leaderboards.isOfferable] and to open the dashboard. Nothing
+     * here waits on it or branches on a result, because the interface does not
+     * offer one: see its KDoc.
+     */
+    private val leaderboards: Leaderboards,
 ) : SEAViewModel<SettingsState, SettingsEvent, SettingsAction>(
     initialStateArg = SettingsState(appVersion = BuildInfo.versionString()),
 ) {
 
     init {
         takeAction(SettingsAction.Load)
+        // Collected rather than read once in `load`. Game Center resolves
+        // authentication after launch, so the value can flip from false to true
+        // while this screen is already open, and a row that only appeared on
+        // the second visit would look like a bug.
+        leaderboards.isOfferable.collectIn(viewModelScope) {
+            takeAction(SettingsAction.LeaderboardsOfferable(it))
+        }
     }
 
     override suspend fun handleAction(action: SettingsAction) {
@@ -51,6 +67,10 @@ class SettingsViewModel(
             SettingsAction.ToggleAchievements -> action.toggleAchievements()
             SettingsAction.RerunTutorial -> action.rerunTutorial()
             SettingsAction.OpenAchievements -> sendEvent(SettingsEvent.OpenAchievements)
+            SettingsAction.OpenLeaderboards -> leaderboards.openDashboard()
+            is SettingsAction.LeaderboardsOfferable -> action.updateState {
+                it.copy(leaderboardsOfferable = action.offerable)
+            }
             SettingsAction.OpenTerms -> sendEvent(SettingsEvent.OpenLink(termsUrl()))
             SettingsAction.OpenPrivacy -> sendEvent(SettingsEvent.OpenLink(privacyUrl()))
             SettingsAction.OpenFeedback -> sendEvent(SettingsEvent.OpenFeedback)
@@ -225,6 +245,15 @@ data class SettingsState(
      * which is the fail-open direction SPEC 4.2 asks for.
      */
     val achievementsAvailable: Boolean = true,
+
+    /**
+     * Whether to draw a way into the platform's leaderboards.
+     *
+     * False on Android, and false on iOS until Game Center has answered, so it
+     * starts false and is only ever turned on by an observed value. Drawing a
+     * row that opened nothing would be worse than not having one.
+     */
+    val leaderboardsOfferable: Boolean = false,
     val appVersion: String = "",
 )
 
@@ -256,6 +285,20 @@ sealed interface SettingsAction {
     data object ToggleAchievements : SettingsAction
     data object RerunTutorial : SettingsAction
     data object OpenAchievements : SettingsAction
+
+    /**
+     * Opens the platform's leaderboard dashboard.
+     *
+     * Sends no event: the dashboard is presented by the platform over whatever
+     * is on screen, not by a route this app owns, so there is nothing for
+     * navigation to do. It is also the one leaderboard call allowed to put
+     * something in front of the player, and only from a tap.
+     */
+    data object OpenLeaderboards : SettingsAction
+
+    /** `Leaderboards.isOfferable` changed. Decides whether the row is drawn. */
+    data class LeaderboardsOfferable(val offerable: Boolean) : SettingsAction
+
     data object OpenPaywall : SettingsAction
 
     /**

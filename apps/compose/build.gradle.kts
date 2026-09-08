@@ -97,6 +97,14 @@ kotlin {
             implementation(projects.libraries.achievements.impl)
             implementation(projects.libraries.sharing)
             implementation(projects.libraries.sharing.impl)
+            // The impl is what turns leaderboards on: `RealLeaderboards`
+            // declares `replaces = [NoLeaderboards::class]`, so without this
+            // line the graph silently keeps the no-op and every submission
+            // goes nowhere. Android has no game service behind it and binds
+            // `NoGameServices`, which is the fail-open path working as
+            // designed rather than something missing.
+            implementation(projects.libraries.leaderboards)
+            implementation(projects.libraries.leaderboards.impl)
 
             implementation(projects.libraries.storage)
             implementation(projects.libraries.storage.impl)
