@@ -43,7 +43,7 @@ fun showDebugSnackBar(
     actionLabel: String? = null,
     duration: SnackbarDuration = SnackbarDuration.Short,
     withDismissAction: Boolean = true,
-    icon: IconResource = Icons.Bug(null),
+    icon: IconResource = Icons.Bug.decorative,
     onAction: (() -> Unit)? = null,
     onDismiss: (() -> Unit)? = null,
 ): Boolean {

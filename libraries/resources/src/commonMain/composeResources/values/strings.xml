@@ -88,6 +88,43 @@
     <string name="feedback_done">Done</string>
 
     <string name="common_close">Close</string>
+
+    <!-- Board accessibility (SPEC 16). Every one of these is spoken, never
+         drawn, so they are written to be *heard* — short, and in the order a
+         player needs them: where the square is, which colour it belongs to,
+         and what is on it. The region names double as the vocabulary a player
+         uses talking to a sighted friend, so they are colour words rather than
+         region numbers. In colourblind mode the glyph names replace them,
+         because the glyph is what is on the square. -->
+    <string name="board_cell_format">Row %1$d, column %2$d, %3$s</string>
+    <string name="board_cell_empty">empty</string>
+    <string name="board_cell_marked">crossed off</string>
+    <string name="board_cell_wrong">wrong guess, cost a bone</string>
+    <string name="board_cell_dog">dog</string>
+    <string name="board_action_mark">Cross off</string>
+    <string name="board_action_clear">Clear</string>
+    <string name="board_action_place">Place a dog</string>
+    <string name="board_grid_format">Puzzle board, %1$d by %2$d</string>
+    <string name="board_region_0">pink</string>
+    <string name="board_region_1">yellow</string>
+    <string name="board_region_2">periwinkle</string>
+    <string name="board_region_3">lime</string>
+    <string name="board_region_4">lilac</string>
+    <string name="board_region_5">teal</string>
+    <string name="board_region_6">coral</string>
+    <string name="board_region_7">sky blue</string>
+    <string name="board_region_8">green</string>
+    <string name="board_region_9">orchid</string>
+    <string name="board_glyph_0">circle</string>
+    <string name="board_glyph_1">ring</string>
+    <string name="board_glyph_2">square</string>
+    <string name="board_glyph_3">diamond</string>
+    <string name="board_glyph_4">triangle up</string>
+    <string name="board_glyph_5">triangle down</string>
+    <string name="board_glyph_6">plus</string>
+    <string name="board_glyph_7">bar</string>
+    <string name="board_glyph_8">double bar</string>
+    <string name="board_glyph_9">chevron</string>
     <string name="booster_sniff_title">Sniff it out</string>
     <string name="booster_sniff_body">Your dog sniffs around and rules out a few squares for you. It never tells you where a dog goes — that part is still yours.</string>
     <string name="booster_treat_title">Give a treat</string>

@@ -23,7 +23,10 @@ import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.HorizontalSpacerD400
 import com.sodogku.system.Radii
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.common_close
 
 /**
  * A white card that floats over whatever the player was doing and says one thing.
@@ -92,24 +95,13 @@ fun NoticeBanner(
             }
 
             IconButton(
-                icon = Icons.Close(NoticeBannerDefaults.DismissDescription),
+                icon = Icons.Close(stringResource(Res.string.common_close)),
                 onClick = onDismiss,
                 iconColor = AppTheme.colors.textSecondary,
                 size = IconButton.Size.Smallest,
             )
         }
     }
-}
-
-object NoticeBannerDefaults {
-    /**
-     * The close button's accessibility label. A raw string rather than a
-     * `StringResource`: `:libraries:ui` holds no copy (that is
-     * `:libraries:resources`' job) and a content description with no visible
-     * text has nothing for `VerifyStrings` to catch. Callers that care about
-     * translating it pass their own icon.
-     */
-    const val DismissDescription: String = "Dismiss"
 }
 
 @Preview

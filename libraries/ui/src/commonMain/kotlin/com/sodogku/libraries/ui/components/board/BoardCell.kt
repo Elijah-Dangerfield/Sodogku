@@ -22,6 +22,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sodogku.libraries.ui.PreviewContent
@@ -79,11 +86,24 @@ enum class BoardCellState {
  *   is a dog appearing; with it, it is a deduction landing on two lines.
  * - **Strike** — [strikeNonce] shakes the cell and flashes a red cross. A nonce
  *   rather than a boolean, so the same cell can be got wrong twice running.
+ *
+ * ### What it says
+ *
+ * Because none of the above is a composable, none of it is in the semantics
+ * tree either, and a screen reader met a hundred anonymous boxes. Everything a
+ * player needs is a parameter here already, so the cell states its own meaning:
+ * where it is, which region it belongs to, and what is on it. See
+ * [BoardCellLabels] for the wording and [onPlace] for the half that content
+ * descriptions alone would have got wrong.
  */
 @Composable
 fun BoardCell(
     region: Int,
     state: BoardCellState,
+    /** Zero-based, for the spoken position. */
+    row: Int,
+    /** Zero-based, for the spoken position. */
+    column: Int,
     modifier: Modifier = Modifier,
     size: Dp = DefaultCellSize,
     colorblind: Boolean = false,
@@ -102,8 +122,28 @@ fun BoardCell(
     animated: Boolean = true,
     enabled: Boolean = true,
     onTap: () -> Unit = {},
+    /**
+     * Commit a guess here, for a player who cannot make the tap that does it.
+     *
+     * The sighted gesture is a second tap inside 320ms, recognised upstream. A
+     * screen reader eats the double tap and delivers one activation, so a board
+     * with content descriptions and nothing else is a board that can be marked
+     * and unmarked and never played. This is the placement as an *action* the
+     * reader can offer by name instead of by timing.
+     *
+     * Null where a placement is not on offer — a square the board has already
+     * ruled out, where committing would do nothing and announcing it would be a
+     * lie.
+     */
+    onPlace: (() -> Unit)? = null,
+    labels: BoardCellLabels? = LocalBoardCellLabels.current,
 ) {
     val style = RegionPalette[region]
+    // Resolved here only when nobody hoisted them, which means a preview or a
+    // lone cell. Fourteen `stringResource` call sites per cell is exactly the
+    // cost `LocalBoardCellLabels` exists to keep off a hundred-cell board, and
+    // `BoardSurface` provides it for every real one.
+    val spoken = labels ?: rememberBoardCellLabels()
 
     val entrance = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
@@ -218,6 +258,35 @@ fun BoardCell(
                 // most. The second tap is recognised upstream instead, so the
                 // cross appears instantly and converts if another tap follows.
                 detectTapGestures(onTap = { onTap() })
+            }
+            // Last in the chain, and the whole block runs lazily: the platform
+            // only asks for these properties when an accessibility service is
+            // reading the tree, so a board nobody is listening to builds no
+            // strings and allocates no action list.
+            .semantics {
+                contentDescription = spoken.describe(row, column, region, colorblind)
+                stateDescription = spoken.stateOf(state)
+                if (!enabled) {
+                    disabled()
+                    return@semantics
+                }
+                onClick(
+                    label = when (state) {
+                        BoardCellState.Empty -> spoken.markAction
+                        else -> spoken.clearAction
+                    },
+                ) {
+                    onTap()
+                    true
+                }
+                if (onPlace != null) {
+                    customActions = listOf(
+                        CustomAccessibilityAction(spoken.placeAction) {
+                            onPlace()
+                            true
+                        },
+                    )
+                }
             },
     ) {
         if (pop.value > 0f) {
@@ -320,11 +389,11 @@ private fun BoardCellStatesPreview() {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(8.dp),
         ) {
-            BoardCell(region = 0, state = BoardCellState.Empty, size = 48.dp)
-            BoardCell(region = 3, state = BoardCellState.Marked, size = 48.dp)
-            BoardCell(region = 6, state = BoardCellState.Occupied, size = 48.dp)
-            BoardCell(region = 2, state = BoardCellState.Empty, size = 48.dp, colorblind = true)
-            BoardCell(region = 8, state = BoardCellState.Marked, size = 48.dp, colorblind = true)
+            BoardCell(region = 0, state = BoardCellState.Empty, row = 0, column = 0, size = 48.dp)
+            BoardCell(region = 3, state = BoardCellState.Marked, row = 0, column = 1, size = 48.dp)
+            BoardCell(region = 6, state = BoardCellState.Occupied, row = 0, column = 2, size = 48.dp)
+            BoardCell(region = 2, state = BoardCellState.Empty, row = 0, column = 3, size = 48.dp, colorblind = true)
+            BoardCell(region = 8, state = BoardCellState.Marked, row = 0, column = 4, size = 48.dp, colorblind = true)
         }
     }
 }

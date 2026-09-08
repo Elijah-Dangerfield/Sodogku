@@ -52,6 +52,7 @@ import kotlinx.datetime.number
 import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.daily_date
+import sodogku.libraries.resources.generated.resources.levels_locked
 import sodogku.libraries.resources.generated.resources.levels_reward_claimed
 import sodogku.libraries.resources.generated.resources.levels_reward_treat
 import sodogku.libraries.resources.generated.resources.levels_size
@@ -249,7 +250,13 @@ private fun LevelRow(
         if (unlocked) {
             Dog(pose = DogPose.Still, size = Dimension.D1100)
         } else {
-            Icon(icon = Icons.Lock(null), color = AppTheme.colors.textDisabled)
+            // Not decorative: the padlock is the only thing on the row that says
+            // this level cannot be opened. The dog beside an unlocked one is,
+            // because the row's own state is what it means and the row says it.
+            Icon(
+                icon = Icons.Lock(stringResource(Res.string.levels_locked)),
+                color = AppTheme.colors.textDisabled,
+            )
         }
         Column(modifier = Modifier.weight(RowFill)) {
             Text(

@@ -205,6 +205,9 @@ androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 androidx-room-gradlePlugin = { group = "androidx.room", name = "room-gradle-plugin", version.ref = "roomGradlePlugin" }
 androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
+# The JVM variant, for host unit tests: the Android artifact ships .so files for
+# device ABIs and cannot load in a plain JVM.
+androidx-sqlite-bundled-jvm = { module = "androidx.sqlite:sqlite-bundled-jvm", version.ref = "sqlite" }
 buildconfig-gradlePlugin = { module = "com.github.gmazzo.buildconfig:plugin", version.ref = "buildconfig" }
 
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }

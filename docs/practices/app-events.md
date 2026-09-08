@@ -6,7 +6,11 @@ the normal KLog tree system: it lands in logcat/os_log, as a Sentry breadcrumb, 
 `GrafanaLogTree` in `:libraries:telemetry:impl` — as an OTLP log record in Grafana Cloud Loki.
 Query conventions are in [`observability.md`](observability.md).
 
-Dashboard queries treat this page as the source of truth for names and attributes. Names are
+Dashboard queries treat this page as the source of truth for names and attributes — the
+dashboards themselves are committed in [`ops/grafana/`](../../ops/grafana/), and
+`DashboardQueryContractTest` holds every one of their queries against the `logEvent` calls that
+feed it, so a rename on either side fails the build rather than quietly emptying a panel. **When
+this page and the code disagree, the code wins**, and this page is what gets fixed. Names are
 dot-namespaced snake_case; every record automatically carries `session_id` + `install_id` +
 `is_offline` (per-record) plus resource attributes (`service.name="sodogku-client"`,
 deployment environment, version, platform). `is_offline` is `AppState.isOffline` captured **at
@@ -60,6 +64,8 @@ a ledger.
 | `app.launched` | `cold_start` (always true), `previous_exit` (clean/crash/anr/oom/unknown) | Once per cold start, on the boot foreground (`AppLaunchedEmitter`) — after the session tracker rolls session #1, so it shares the boot's `session_id` with every other event (it used to fire at DI init and land orphaned on a pre-rollover id). Doubles as the pipeline smoke test. `previous_exit` comes from Android's historical exit reasons (API 30+; older devices report `unknown`); **iOS derives it from MetricKit**, day-granular and up to 24h late — most iOS launches say `unknown`. Always segment by platform before reading exit rates |
 | `app.foregrounded` | `cold_start` | Every foreground (`LifecycleAppEventLogger`); `cold_start=true` on the boot foreground. Count users/sessions from this event, not `app.launched` |
 | `app.backgrounded` | `session_duration_sec` | Every background; whole seconds since the matching foreground (monotonic clock), so session length is a direct query — no span join. Omitted in the (shouldn't-happen) case of a background with no prior foreground |
+| `app.startup` | `startup_ms` | Once per cold start (`StartupReporter`), from OS process creation to the first frame a player can act on — not from the first line of our Kotlin, because a large share of a cold start is process fork and Application init. **Android only**: iOS has no process-start clock readable without a required-reason API declaration, so `IosProcessStartTimeProvider` reports nothing rather than a lookalike measured from a later moment. "Startups" over 30s are dropped at the source — those are the system starting our process in the background hours before anyone opened the app |
+| `app.jank` | `screen`, `frames`, `janky_frames`, `jank_pct`, `worst_frame_ms` | One per screen visit, on background (`AndroidJankMonitor` over AndroidX JankStats). **Android only.** Visits under ~2s are dropped at the source: one janky frame in three is 33% and means only that the screen was barely on show. Read `worst_frame_ms` next to `jank_pct` — a screen at 2% jank whose worst frame took 900ms has a stall in it, and the percentage alone calls it healthy |
 
 ## Reliability from the client's chair
 
@@ -73,8 +79,14 @@ The events that motivated shipping direct-to-Grafana: what never reaches the bac
 
 ## Product funnels
 
-Onboarding emits `onboarding.step_viewed` / `onboarding.auth_selected` / `onboarding.completed` /
-`onboarding.abandoned` (see `OnboardingViewModel`).
+Onboarding, from `OnboardingViewModel`. There is no `onboarding.auth_selected` — Sodogku has no
+accounts, so the template's auth step went with `:libraries:identity` in C0.
+
+| Event | Attributes | Fires |
+|---|---|---|
+| `onboarding.step_viewed` | `step` (always `welcome`) | Entry resolves and the player has not onboarded before. One step, because there is one screen |
+| `onboarding.completed` | `duration_sec`, `skipped_tutorial` | The welcome screen is dismissed toward home. `skipped_tutorial=true` writes `hasCompletedTutorial` immediately, so those players appear nowhere in the tutorial funnel at all — count them here or the funnel describes a self-selected minority |
+| `onboarding.abandoned` | `step` | `onCleared` without having reached home. A process death on the welcome screen looks like this too |
 
 ### Tutorial
 
@@ -94,6 +106,11 @@ funnel keyed on position would silently start comparing two different lessons. D
 
 Replaying from Settings clears the flag and arms the run again, so a small number of repeat
 `tutorial.completed` events per install is expected rather than a bug.
+
+**There is no `tutorial.skipped`**, though SPEC §14 names one. A skip is `tutorial.completed` with
+`skipped=true` and a `last_step`: both endings write `AppData.hasCompletedTutorial` and both are
+the end of the tutorial, so two events for one transition would mean every funnel had to remember
+to union them, and the one that forgot would undercount completion silently.
 
 ## Gameplay
 
@@ -182,6 +199,31 @@ rated harder than they are (`decisions.md`, 2026-09-07), and nothing in the app 
 surfaced it — the pack verification only checks that the stored numbers are in range. A band
 where tier 4 completes faster than tier 3 is the shape to watch for.
 
+`ops/grafana/difficulty-calibration.json` is that panel, and `ops/grafana/README.md` says what has
+to exist before it renders anything.
+
+## What the dashboards ask for and cannot have
+
+`ops/grafana/` is written against this page, and a query is held to it by
+`DashboardQueryContractTest` — a panel referencing an attribute nothing emits fails the build
+rather than rendering an empty chart that reads as "nobody has played yet". Three things the
+boards want are genuinely missing, and each is a one-line addition at a named site:
+
+| Wanted | Where it belongs | What it unlocks |
+|---|---|---|
+| `difficulty` on `game.level_failed` | `GameViewModel.lose()` — the tier is already on the `level` in hand | A true **fail rate per tier**. Only clears report a tier today, so a tier hard enough that people mostly *lose* on it is under-represented in every calibration panel. The board falls back to mean attempts-per-clear, which is a proxy |
+| `trigger` on `iap.purchase_result` | `RealEntitlements.purchase()` — the coordinator knows which offer opened | **Conversion by trigger**, which is the question SPEC §14 asks of the paywall board. `iap.paywall_shown` splits by trigger and the buy side does not, so conversion is one blended number |
+| `difficulty` on `game.booster_no_op` | `GameViewModel`, both booster paths | Hint-engine exhaustion **per tier** rather than per booster. The doc already calls a rise here a difficulty signal; without the tier it cannot say which tier |
+
+Specced in SPEC §14 and emitted by nothing at all: `achievement.unlocked`, `share.tapped`,
+`legal.terms_prompt_shown`, `legal.terms_accepted`, `game.level_abandoned`. The first two belong to
+C10's UI half and the legal pair to C11; `game.level_abandoned` has no trigger on the client, since
+leaving a board is a navigation event and not a state transition the view model is told about. None
+of them has a panel, because a panel for an event nothing emits is a chart that lies.
+
+Two more SPEC §14 names that are deliberately *not* coming, argued elsewhere on this page:
+`daily.streak_broken` and `tutorial.skipped`.
+
 ## Advertising and purchases
 
 Emitted by `RealAdGate` (`:libraries:ads:impl`), `RealPaywallCoordinator` and
@@ -199,6 +241,14 @@ where a suppression is still interesting, because it means a reward was paid for
 | Event | Attributes | Fires |
 |---|---|---|
 | `ads.gate_shown` | `placement`, `is_offline` | A rewarded gate is entered, or an interstitial passes all three frequency gates. `is_offline` is the **device** signal (`AppState.isDeviceOffline`), not the banner one — our backend being down is not an ad-network outage. No `level_id`: the gate is called from the game and the daily and does not know which |
+
+**`ads.gate_shown` is the one event that shadows a per-record key.** `GrafanaLogTree` stamps
+`is_offline` on every record from `AppState.isOffline`; this event then writes its own from
+`isDeviceOffline`, and the event's value wins, because `forward` applies the per-record stamp
+first and the event's extras after. Two different meanings under one key, and which one survives
+is decided by the order of two lines that say nothing about it — so `EventAttributeShadowingTest`
+pins it. If that ever has to change, rename the event's attribute (`device_offline`) rather than
+reordering the stamping, and fix `ops/grafana/ad-funnel.json` in the same change.
 | `ads.result` | `placement`, `outcome`, `latency_ms`, `error_kind`, `reason`, `grace_levels_used` | Every terminal state of a gate. `outcome` is an `AdShowResult` name (`Rewarded` / `Dismissed` / `Completed` / `NoFill` / `Offline` / `NotShown` / `Failed`) **or** the synthetic `granted_without_ad`, which carries `reason` (`pro`, `ads_disabled`, `placement_disabled`, `new_user_grace`). `latency_ms` spans prepare-plus-load-plus-watch, so it is dominated by how long the player watched — read its floor, not its mean |
 | `ads.offline_block` | `placement`, `grace_levels_used` | The offline grace is spent and the block screen is requested. One per gate past the grace, so a repeat count is a player stuck offline rather than a bug |
 | `iap.paywall_shown` | `trigger` | An offer the coordinator **accepted** (`continue_level` / `skip_level` / `direct`), or an offline block. Refusals — capped, disabled, already Pro — emit nothing, so the ratio of this to `ads.gate_shown` is the offer rate rather than the attempt rate |

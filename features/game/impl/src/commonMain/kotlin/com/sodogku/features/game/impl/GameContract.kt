@@ -207,6 +207,26 @@ data class GameState(
     val dogsPlaced: Int get() = placed.placedCount
 
     val dogsRequired: Int get() = level?.size ?: 0
+
+    /**
+     * Whether something is on top of the board.
+     *
+     * Every one of these draws over the grid and takes its taps — the spotlights
+     * through `FocusScrim`, the outcome sheet and the level pane by covering it.
+     * None of that reaches semantics, so a screen reader would keep offering a
+     * hundred squares that a thumb cannot touch. Listed exhaustively rather than
+     * summarised, because the failure of a missing entry is silent: the board
+     * simply stays reachable when it should not.
+     */
+    val isCovered: Boolean
+        get() = warning != null ||
+            tutorial != null ||
+            hintCells.isNotEmpty() ||
+            drawerOpen ||
+            boosterPrompt != null ||
+            freezeMessage != null ||
+            phase == GamePhase.Won ||
+            phase == GamePhase.Lost
 }
 
 /**

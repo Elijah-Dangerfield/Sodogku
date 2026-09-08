@@ -806,6 +806,70 @@ pays for itself.
 **Done when** a full playthrough on a device produces the expected event stream in Loki, filtered
 by `session_id`, and every dashboard renders with real data.
 
+### The dashboards — **WRITTEN, NOT VERIFIED** (2026-09-08)
+
+The six dashboards SPEC §14 names are committed as JSON under `ops/grafana/`, one file each, plus
+a README covering import and prerequisites. **They have never rendered a single real data point,
+and cannot until the OTLP credentials exist** (SPEC §20 — `GRAFANA_OTLP_ENDPOINT` /
+`GRAFANA_OTLP_TOKEN` are still on the to-provide list). No Sodogku build has shipped telemetry, so
+there is no Sodogku data in any Loki anywhere. This half of C9 is queries written and statically
+checked, not queries seen working.
+
+| Dashboard | Answers |
+|---|---|
+| `level-drop-off.json` | How far players get, and which level stops them. Distinct installs per level, clear rate per level, furthest-level histogram, skips per level |
+| `difficulty-calibration.json` | **The one that pays for itself.** Clear time, strikes, attempts and paws per designed tier, plus a per-level drill-down. Built to show an inverted step between adjacent tiers — the shape the 2026-09-07 guard bug would have made |
+| `ad-funnel.json` | `gate_shown` → `result` by placement and platform: fill rate, no-fill (the giveaway cost), free grants by reason, latency, offline blocks |
+| `paywall-conversion.json` | Offers by trigger, conversion, failure codes, restore outcomes, offer rate against ad gates |
+| `daily-retention.json` | DAU on the daily, completion rate, streak-length distribution, freeze usage |
+| `tutorial-funnel.json` | Step drop-off across the guided first three levels, and where the skippers gave up |
+
+**What is blocked on the credentials, precisely.** Everything about *rendering*: whether a panel
+type suits its data, whether a threshold is set at a sensible number, whether the histogram bucket
+sizes are right, whether any query is too expensive at real volume, and whether the LogQL is
+accepted by Grafana Cloud's Loki as written. What is **not** blocked and has been done: every file
+parses, every query names an event and attributes that a `logEvent` call actually emits, and the
+datasource uid (`grafanacloud-logs`) was read off a live Grafana Cloud stack rather than guessed.
+
+**The test that makes a rename fail.** `DashboardQueryContractTest`
+(`:libraries:telemetry:impl`, androidUnitTest) parses every query in `ops/grafana/` and every
+`logEvent(...)` in the source tree, and fails if a dashboard references an event or attribute
+nothing emits. A panel filtering `strikes_used` against an app emitting `strikes` renders **empty**
+and nothing else in the toolchain notices — Loki accepts it, the build passes, and the blank chart
+is indistinguishable from "nobody has played yet". Mutation-checked in both directions: renaming
+the attribute in the dashboard fails, and renaming it in `GameViewModel` fails.
+
+It is a source scan, because the emitters live in `:features:game:impl` and two `:libraries:*:impl`
+modules and only `:apps:*` may depend on an impl — no unit test anywhere can construct a
+`GameViewModel` and watch it. So it proves the key is *spelled* the same at both ends, not that the
+code path runs. The LogQL reader throws on any construct it does not understand rather than
+extracting nothing from it, which is what stops the whole check passing vacuously.
+
+**Three attributes the dashboards need and nothing emits.** Each is a one-line addition at a named
+site, listed with what it unlocks in `docs/practices/app-events.md` → "What the dashboards ask for
+and cannot have": `difficulty` on `game.level_failed` (blocks a true fail rate per tier — today the
+calibration board only sees clears), `trigger` on `iap.purchase_result` (blocks conversion by
+trigger, which is the question SPEC §14 asks of the paywall board), and `difficulty` on
+`game.booster_no_op`. None was added here — `features/game/impl` and the billing impl were being
+edited by other work.
+
+**Doc drift found and fixed.** `app.startup` and `app.jank` are emitted and were in
+`app-events.md` nowhere at all, on a page that calls itself the source of truth for dashboard
+queries. `onboarding.auth_selected` was listed and does not exist — it went with
+`:libraries:identity` in C0. Onboarding's real attributes (`duration_sec`, `skipped_tutorial`) were
+undocumented, and `skipped_tutorial` is load-bearing for the tutorial funnel's denominator.
+
+**One live bug documented, not fixed.** `ads.gate_shown` emits its own `is_offline` (the *device*
+signal) and `GrafanaLogTree` stamps `is_offline` on every record (the app-wide banner signal). The
+event's value wins, only because `forward` applies the per-record stamp before the event's extras.
+Two meanings, one key, and the ordering that decides it says nothing about itself.
+`EventAttributeShadowingTest` now pins it. The right fix is to rename the event's attribute to
+`device_offline`, which is a change at an emit site in `:libraries:ads:impl` and so was left alone.
+
+**Still open for the rest of C9:** the events themselves are only as complete as C8 left them, and
+"a full playthrough produces the expected event stream in Loki, filtered by `session_id`" has not
+been attempted, because that also needs the credentials.
+
 ---
 
 ## C10 · Achievements and sharing

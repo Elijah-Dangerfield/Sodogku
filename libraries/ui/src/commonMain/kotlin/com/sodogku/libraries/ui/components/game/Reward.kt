@@ -99,7 +99,7 @@ fun RewardButton(
             ),
     ) {
         Icon(
-            icon = Icons.PlayCircle(contentDescription = null),
+            icon = Icons.PlayCircle.decorative,
             size = IconSize.Small,
             color = content,
         )

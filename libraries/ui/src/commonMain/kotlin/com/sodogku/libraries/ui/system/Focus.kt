@@ -30,6 +30,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.unit.Dp
@@ -214,6 +216,23 @@ fun BoxScope.FocusScrim(
         content(lit.map { it.second }.union())
     }
 }
+
+/**
+ * Takes this subtree out of the accessibility tree while something covers it.
+ *
+ * A scrim is a drawing, and drawings are invisible to semantics: everything
+ * under [FocusScrim], under a sheet, under the level pane stays focusable to a
+ * screen reader and stays *activatable*, even though the scrim swallows every
+ * touch before it can reach the thing underneath. Without this, a screen-reader
+ * player can place a dog through a coach mark that a sighted player cannot even
+ * tap — the overlay is not blocking them, it is only hiding the board.
+ *
+ * Applied to what is being covered, not to the cover. Compose has no way for a
+ * sibling to reach back over the ones it was drawn on top of, so the screen that
+ * knows an overlay is up is the one that has to say so.
+ */
+fun Modifier.coveredByOverlay(covered: Boolean): Modifier =
+    if (covered) semantics { hideFromAccessibility() } else this
 
 /** The single box around every lit rectangle, or [Rect.Zero] when nothing is lit. */
 private fun List<Rect>.union(): Rect = fold(null as Rect?) { box, rect ->

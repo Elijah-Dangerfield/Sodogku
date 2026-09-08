@@ -47,6 +47,7 @@ import com.sodogku.libraries.ui.components.game.RuleDiagram
 import com.sodogku.libraries.ui.components.game.ScoreCounter
 import com.sodogku.libraries.ui.components.icon.IconButton
 import com.sodogku.libraries.ui.components.icon.Icons
+import com.sodogku.libraries.ui.system.coveredByOverlay
 import com.sodogku.libraries.ui.system.focusTarget
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.scoring.Praise
@@ -61,6 +62,8 @@ import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.achievements_unlocked_toast
 import sodogku.libraries.resources.generated.resources.daily_streak_label
 import sodogku.libraries.resources.generated.resources.game_level_label
+import sodogku.libraries.resources.generated.resources.game_levels_menu
+import sodogku.libraries.resources.generated.resources.game_settings
 import sodogku.libraries.resources.generated.resources.game_score_label
 import sodogku.libraries.resources.generated.resources.game_rule_no_touching
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_line
@@ -94,7 +97,8 @@ fun GameScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = Dimension.D500),
+                .padding(horizontal = Dimension.D500)
+                .coveredByOverlay(state.isCovered),
         ) {
             GameHeader(
                 state = state,
@@ -247,7 +251,7 @@ private fun GameHeader(
         // floating on a page read as decoration; the same icons on discs read
         // as the two things on this screen that are buttons.
         IconButton(
-            icon = Icons.Menu(null),
+            icon = Icons.Menu(stringResource(Res.string.game_levels_menu)),
             onClick = onOpenLevels,
             backgroundColor = AppTheme.colors.surfacePrimary,
         )
@@ -278,7 +282,7 @@ private fun GameHeader(
         }
 
         IconButton(
-            icon = Icons.Settings(null),
+            icon = Icons.Settings(stringResource(Res.string.game_settings)),
             onClick = onSettings,
             backgroundColor = AppTheme.colors.surfacePrimary,
         )
@@ -421,7 +425,7 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
     val level = state.level ?: return
     val size = level.size
 
-    BoardSurface { BoardRows(state = state, size = size, onAction = onAction) }
+    BoardSurface(size = size) { BoardRows(state = state, size = size, onAction = onAction) }
 }
 
 @Composable
@@ -449,6 +453,8 @@ private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Uni
                             },
                             region = level.board.regionAt(index),
                             state = cellState(state, index),
+                            row = row,
+                            column = col,
                             size = cell,
                             colorblind = state.colorblind,
                             strikeNonce = if (state.strikeCell == index) state.strikeNonce else 0,
@@ -463,11 +469,44 @@ private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Uni
                             animated = !state.reduceAnimations,
                             enabled = state.phase == GamePhase.Playing,
                             onTap = { onAction(GameAction.CellTapped(index)) },
+                            onPlace = placeAt(state, index, onAction),
                         )
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * The screen-reader placement action for one square, or null where there is
+ * nothing to place.
+ *
+ * **Two `CellTapped`s, not a new action.** The double tap is not a gesture the
+ * ViewModel is told about — it is two ordinary taps that happened to arrive
+ * close together, measured against a clock in `GameViewModel.tap`. Sending both
+ * halves is therefore not a trick played on the state machine, it is the same
+ * input a thumb produces: the mark is made and then converted, the same events
+ * fire, the same tutorial triggers advance, and a wrong guess costs the same
+ * bone. Nothing here needs the ViewModel to know that a screen reader exists.
+ *
+ * Actions are handled in order off one channel, so the second lands microseconds
+ * after the first and always inside the 320ms window. If that window ever moves
+ * to a place a synthetic pair cannot reach, this becomes an action of its own.
+ *
+ * Null on a square the board has already ruled out for itself — `commit` refuses
+ * those, so offering the action would announce a control that does nothing.
+ */
+private fun placeAt(
+    state: GameState,
+    cell: Int,
+    onAction: (GameAction) -> Unit,
+): (() -> Unit)? {
+    if (state.phase != GamePhase.Playing) return null
+    if (cell in state.autoMarks || cell in state.placedCells || cell in state.wrongGuesses) return null
+    return {
+        onAction(GameAction.CellTapped(cell))
+        onAction(GameAction.CellTapped(cell))
     }
 }
 

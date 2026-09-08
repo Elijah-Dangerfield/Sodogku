@@ -1626,6 +1626,34 @@ What *was* there and unused: `dog_idle.webp` and `dog_bark.webp`. `idle` is now 
 fifth placed-dog loop. `bark` is a reaction rather than an idle, so it is being
 kept for the win moment rather than added to the loop rotation.
 
+## 2026-09-08 — and a test that proves the saves survive
+
+The migration policy above was implemented and unproven: `AutoMigration` was
+declared, Room generated the classes, and nothing ran them against a database
+with a row in it. "The generated code exists" is not the claim that matters.
+
+`AppDatabaseMigrationTest` builds a genuine v6 database — the tables exactly as
+`6.json` declares them, `user_version = 6`, a real `level_progress` row — and
+runs the generated migrations over it. The DDL is written out in the test rather
+than read from `6.json`, so the fixture and the migrations have independent
+origins: `MigrationTestHelper` reads the same exported schema the migrations are
+generated *from*, and a mistake in the export would be invisible to it.
+
+Three mutations, each failing exactly one thing: reinstating the unrestricted
+destructive fallback, a migration that drops the old table, and bumping
+`@Database(version = …)` without adding a migration.
+
+The third took two attempts and is the useful lesson. The first version compared
+`FIRST_PLAYER_DATA_VERSION + migrations.size` against a `CURRENT_VERSION`
+constant declared *in the test file*, so bumping the real version left it green —
+a guard written against itself. It now reads the highest exported schema JSON,
+which Room writes on every build, so the two sides come from different places.
+
+One build detail worth knowing: the test needs `androidx.sqlite:sqlite-bundled-jvm`,
+not the plain artifact. The Android variant ships `.so` files for device ABIs and
+cannot load in a host JVM, which is why previous attempts here concluded Room's
+SQL was untestable off-device. It is not; it just needs the right variant.
+
 ## 2026-09-07 — the database stopped dropping itself
 
 `RealAppDatabaseProvider` built with `fallbackToDestructiveMigration(dropAllTables = true)`.
@@ -1948,3 +1976,39 @@ test file resolves against a fixed shared level, so used on any other board its
 cells are wrong and a "commit" lands as a strike. The board therefore held only
 its starter dog before and after, and the assertion compared nothing to nothing.
 Mutation-checking is what caught it: reverting the fix left the test green.
+
+## 2026-09-08 — dashboards live in the repo, and a test holds their queries to the code
+
+The six SPEC §14 dashboards are committed JSON under `ops/grafana/`, imported by hand, rather than
+created in Grafana and left there.
+
+The immediate reason is that the only Grafana stack this session could reach belongs to a
+different project, and writing to it is not ours to do. But the arrangement is the right one
+regardless, because of what a broken dashboard looks like. A panel that filters on `strikes_used`
+against an app that emits `strikes` is not an error anywhere: Loki accepts the query, the panel
+renders, and it renders **empty** — which is exactly what a healthy panel looks like before launch.
+The person who finds it is whoever eventually asks the dashboard a question and believes the blank
+answer. A dashboard that lives only in Grafana has no way to be wrong in a build.
+
+So `DashboardQueryContractTest` parses every committed query and every `logEvent(...)` in the
+source tree and fails when a dashboard names an event or attribute nothing emits. Renaming either
+end goes red; mutation-checked both ways.
+
+**Why a text scan.** The emitters are in `:features:game:impl`, `:libraries:ads:impl` and
+`:libraries:billing:impl`, and only `:apps:*` may depend on an impl module — so no unit test can
+construct a `GameViewModel` and watch what it emits. Both ends are read as text instead. That
+proves the key is spelled the same at both ends and nothing more: a `logEvent` in dead code counts
+as emitted. It is the same trade `ConfigValuesAreReadTest` already makes, for the same reason, and
+it closes the mistake people actually make.
+
+**The LogQL reader throws instead of shrugging.** It understands the stream selector, label filters
+and `unwrap`, and rejects everything else. A looser regex reader would have extracted nothing from
+a `| json` panel and reported no violations, which is how a check like this passes while proving
+nothing — the failure mode that had three tests in this repo green against a stub returning an
+empty list. A construct we want has to be taught to the reader first. That is a real cost and it
+is the point.
+
+**What this does not do.** Nothing provisions these dashboards, and nothing syncs UI edits back —
+an edit made in Grafana is lost on the next import. Terraform or Grafana's git-sync would fix that
+and both are a larger commitment than six files deserve before anyone has looked at one with real
+data on it.

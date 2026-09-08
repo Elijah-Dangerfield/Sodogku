@@ -184,7 +184,7 @@ private fun PreviewSnackbarDebug() {
                 message = "This is some text that describes something that takes up a lot of space.".repeat(
                     2
                 ),
-                icon = Icons.Bug(null),
+                icon = Icons.Bug.decorative,
                 actionLabel = "Do something",
                 withDismissAction = true,
             )
@@ -216,7 +216,7 @@ private fun PreviewSnackbarDeveloper() {
         Snackbar(
             podawanSnackbarData = snackBarData(
                 message = "Hello World",
-                icon = Icons.Bug(null)
+                icon = Icons.Bug.decorative
             )
         )
     }

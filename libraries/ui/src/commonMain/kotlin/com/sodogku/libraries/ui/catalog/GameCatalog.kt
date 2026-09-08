@@ -53,10 +53,10 @@ fun RegionPaletteCatalog(modifier: Modifier = Modifier) {
                 horizontalArrangement = Arrangement.spacedBy(Dimension.D400),
                 modifier = Modifier.padding(vertical = Dimension.D200),
             ) {
-                BoardCell(region = index, state = BoardCellState.Empty)
-                BoardCell(region = index, state = BoardCellState.Empty, colorblind = true)
-                BoardCell(region = index, state = BoardCellState.Marked)
-                BoardCell(region = index, state = BoardCellState.Occupied)
+                BoardCell(region = index, state = BoardCellState.Empty, row = index, column = 0)
+                BoardCell(region = index, state = BoardCellState.Empty, row = index, column = 1, colorblind = true)
+                BoardCell(region = index, state = BoardCellState.Marked, row = index, column = 2)
+                BoardCell(region = index, state = BoardCellState.Occupied, row = index, column = 3)
                 Text(
                     text = "Region $index",
                     typography = AppTheme.typography.Body.B400,
@@ -82,9 +82,9 @@ fun BoardCellCatalog(modifier: Modifier = Modifier) {
         modifier = modifier,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D400)) {
-            BoardCell(region = 0, state = BoardCellState.Empty)
-            BoardCell(region = 0, state = BoardCellState.Marked)
-            BoardCell(region = 0, state = BoardCellState.Occupied)
+            BoardCell(region = 0, state = BoardCellState.Empty, row = 0, column = 0)
+            BoardCell(region = 0, state = BoardCellState.Marked, row = 0, column = 1)
+            BoardCell(region = 0, state = BoardCellState.Occupied, row = 0, column = 2)
         }
     }
 }

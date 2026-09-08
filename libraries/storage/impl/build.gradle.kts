@@ -26,6 +26,14 @@ kotlin {
             implementation(projects.libraries.storage)
             implementation(projects.libraries.flowroutines.testing)
         }
+
+        // The migration test opens a real database file, so it needs a
+        // filesystem and the bundled driver's native library. Both are only
+        // available on the host JVM, which is why it is not in commonTest.
+        androidUnitTest.dependencies {
+            implementation(libs.androidx.room.runtime)
+            implementation(libs.androidx.sqlite.bundled.jvm)
+        }
     }
 }
 

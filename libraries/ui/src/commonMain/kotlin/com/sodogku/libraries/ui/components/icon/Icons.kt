@@ -272,7 +272,21 @@ enum class Icons(
 
     ;
 
-    operator fun invoke(contentDescription: String?): IconResource {
+    /**
+     * This icon, labelled for a screen reader.
+     *
+     * [contentDescription] is not nullable, and that is the whole point. It used
+     * to be, and three call sites passed `null` — including the board's level
+     * drawer and its settings gear, which are the only two buttons on the game
+     * screen. Nothing failed, because a `null` description is also how a genuinely
+     * decorative icon is spelled, so the two cases were indistinguishable at the
+     * call site and at review.
+     *
+     * They are separate spellings now. An icon with nothing to say uses
+     * [decorative], which is a decision somebody made and a word somebody can
+     * grep for; everything else has to produce a label to compile.
+     */
+    operator fun invoke(contentDescription: String): IconResource {
         return IconResource(
             imageVector = default,
             contentDescription = contentDescription,
@@ -280,10 +294,24 @@ enum class Icons(
         )
     }
 
+    /**
+     * This icon with no label, for when the text beside it already says the thing.
+     *
+     * Correct for the play glyph on a button that reads "Free bones", and wrong
+     * for anything a player has to identify by its picture. [IconButton] rejects
+     * it, because an icon button *is* nothing but its picture.
+     */
+    val decorative: IconResource
+        get() = IconResource(
+            imageVector = default,
+            contentDescription = null,
+            identifier = name,
+        )
+
 }
 
 @Composable
-fun Icons.Filled(contentDescription: String?): IconResource {
+fun Icons.Filled(contentDescription: String): IconResource {
     return IconResource(
         imageVector = filled ?: run {
             if (LocalBuildInfo.current.isDebug) throw IllegalStateException("Missing filled icon for $name") else default
@@ -293,7 +321,7 @@ fun Icons.Filled(contentDescription: String?): IconResource {
 }
 
 @Composable
-fun Icons.Outlined(contentDescription: String?, stroke: IconStroke = IconStroke.Regular): IconResource {
+fun Icons.Outlined(contentDescription: String, stroke: IconStroke = IconStroke.Regular): IconResource {
     return IconResource(
         imageVector = when (stroke) {
             IconStroke.Thin -> outlinedThin
@@ -308,7 +336,7 @@ fun Icons.Outlined(contentDescription: String?, stroke: IconStroke = IconStroke.
 }
 
 @Composable
-fun Icons.TwoTone(contentDescription: String?): IconResource {
+fun Icons.TwoTone(contentDescription: String): IconResource {
     return IconResource(
         imageVector = twoTone ?: run {
             if (LocalBuildInfo.current.isDebug) throw IllegalStateException("Missing two tone icon for $name") else default
