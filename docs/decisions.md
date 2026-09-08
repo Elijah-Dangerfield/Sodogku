@@ -2092,13 +2092,26 @@ two halves are split on.
 
 `scripts/dev/drive.py launch` ran `monkey -p <pkg> -c LAUNCHER 1`. Monkey's
 trailing count is the number of *random events* it injects after starting the
-app, so every launch all session fired a stray tap into the first frame. It
-dismissed a banner mid-test twice while an agent was verifying it.
+app, so every launch all session fired a stray event into the first frame. It
+closed a launch-gate banner twice while an agent was verifying it, writing a
+persisted dismissal into `AppData` and making the feature look broken.
 
-This is the worst shape a test-tooling bug can take: it does not fail, it makes
-the app look like it did something it did not, and every screenshot taken through
-it is one interaction ahead of where you think you are. Replaced with
-`am start -W -n <pkg>/<activity>`, which starts the app and does nothing else.
+Replaced with `am start -W -n <pkg>/<activity>`, which starts the app and does
+nothing else.
+
+**Measured on 2026-09-08**, because "it happened twice" is an anecdote and the
+rate is the thing that decides how much to care. Two consecutive `am start`
+launches leave an identical accessibility tree *and* an identical
+`files/app_data.json` — the persisted file being the precise check, since the
+original failure was a write rather than a visual change. The old `monkey` line,
+run 16 times from a clean install, landed somewhere it should not have **once**,
+that time leaving the device on the launcher's search instead of in the app.
+
+Roughly 6% is the interesting number. It is low enough to read as flakiness and
+high enough that a session with dozens of launches hits it several times, which
+is exactly how it went unnoticed for a day. Tooling that fails outright gets
+fixed; tooling that acts on the app occasionally makes every screenshot after it
+one interaction ahead of where you think you are, and the app takes the blame.
 
 ## 2026-09-07 — splitting GameViewModel, as far as it splits cleanly
 

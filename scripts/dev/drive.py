@@ -8,6 +8,23 @@ text matches, retrying until it appears.
     ./scripts/dev/drive.py launch
     ./scripts/dev/drive.py tap "I know how to play"
     ./scripts/dev/drive.py shot /tmp/board.png
+
+`launch` uses `am start`, deliberately, and NOT `monkey -p <pkg> -c LAUNCHER 1`.
+Monkey is the obvious way to start an app by package name, and its trailing
+number is not a repeat count — it is how many pseudo-random input events monkey
+fires *after* the app comes up. So every launch injected one stray event into the
+first frame.
+
+Measured, on this emulator at the onboarding screen: **1 launch in 16** ended up
+somewhere other than where it should have been, once leaving the device on the
+launcher entirely. Low enough to look like flakiness, high enough that a session
+with dozens of launches hits it repeatedly — which is what happened during
+launch-gate verification on 2026-09-07, where it closed a banner twice and wrote
+a persisted dismissal into AppData, making the feature look broken.
+
+That rate is the reason this matters. Tooling that fails outright gets fixed;
+tooling that acts on the app 6% of the time makes every screenshot after it one
+interaction ahead of where you think you are, and you blame the app.
 """
 import re
 import subprocess
@@ -58,11 +75,8 @@ def main() -> int:
         adb("shell", "am", "force-stop", PKG)
         if "--fresh" in sys.argv:
             adb("shell", "pm", "clear", PKG)
-        # `monkey ... 1` launches the app, and monkey's trailing count is the
-        # number of *random events* it then injects — so every launch fired a
-        # stray tap into the first frame. It dismissed a banner mid-test twice
-        # before anyone noticed, which is the worst kind of test tooling bug:
-        # it makes the app look like it did something it did not.
+        # Explicit component, no injected events. See the module docstring for
+        # why `monkey` is not used here.
         adb("shell", "am", "start", "-W",
             "-a", "android.intent.action.MAIN",
             "-c", "android.intent.category.LAUNCHER",
