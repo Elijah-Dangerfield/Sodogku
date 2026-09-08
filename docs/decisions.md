@@ -6,6 +6,135 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — the config registry drift guard is a test in `:apps:integration`, not a generator
+
+`apps/admin/config-manifest-registry.json` is a hand-written transcription of the
+`ConfiguredValue` classes, and until now nothing checked it. The obvious fix is a
+Gradle task that *generates* it, which would make drift impossible rather than
+merely detectable. It was rejected on cost: generating means running
+`:libraries:config` code on the JVM, and that module has only Android and iOS
+targets. Adding a `jvm()` target to it — and to `:libraries:core` and
+`:libraries:flowroutines` underneath it — purely to feed codegen is a much larger
+change than reading the same classes from a test that already has them on its
+classpath. The test prints the exact JSON line to paste, so the ergonomics land
+in the same place.
+
+It lives in `:apps:integration` rather than in `:libraries:config` for a reason
+that only shows up at the end: it is the only test module that can see **both**
+halves of the declared key set. The `telemetry.*` values are declared in
+`:libraries:telemetry:impl`, which `:libraries:config` may not depend on, so a
+test there would have had to pin their paths and defaults as literals — the same
+hand-maintenance it exists to remove. `:apps:integration` is an `:apps:*` module
+and may depend on impls, so it reads them from the real classes. It also happens
+to be the module `apps/admin/build.gradle.kts` named as the intended home when
+this gap was first written down.
+
+The residual seam is unchanged and worth restating: neither `SodogkuConfigValues.all`
+nor the test's three telemetry classes come from the DI graph's
+`Set<QaConfigValue>`, so a value contributed to DI and added to neither list is
+still invisible. No unit test can close that one without an app.
+
+**The non-obvious half is the Gradle wiring, not the Kotlin.** A file read at
+test *runtime* is invisible to the up-to-date check, so editing the registry
+alone left the test task `UP-TO-DATE` and the drift shipped. This was observed,
+not theorised — the first mutation run reported BUILD SUCCESSFUL against a
+registry with a key deleted and three values wrong. `inputs.file(registry)` on
+the `Test` tasks in both `:apps:integration` and `:apps:server` is what makes the
+guard real.
+
+## 2026-09-07 — composite `JsonConfigValue` flags belong in the manifest after all
+
+The registry deliberately omitted them, on the grounds that they aren't targeted
+per version or locale and their defaults are large. Neither holds here:
+`ads.rewardedPlacements` is a four-entry map and `paywall.triggers` a three-entry
+list, and the console's "what did v1.0.1 ship with" view was quietly answering
+that question wrong by two keys. The schema still can't type-check them beyond
+"some JSON" — `ShippedConfigSchemaTest` pins exactly which keys are in that
+state, so a third one can't join them silently — but an unparseable value there
+is caught by `JsonConfigValue`'s decode fallback, which is a fail-open path.
+
+## 2026-09-07 — the console warns; the server does not refuse
+
+SPEC 4.2 says monetization keys fail open, and the admin API can write values
+that run that backwards: `ads.failureMode = "LOCK"`, `ads.offlineGraceLevels = 0`,
+a rewarded placement switched off. The server could reject those outright. It
+doesn't, because SPEC 4.2 is explicit that tightening in *config* is a live-ops
+decision and it is the shipped **defaults** that must fail open — a server that
+refuses the harsher arm also refuses the A/B test the key exists for.
+
+So the guard is a confirm sheet (`dangerousWarning`), which on prod also makes
+the operator type the environment name. That friction is the reason the list is
+short. Raising `paywall.sessionCap` or dropping `ads.interstitialEveryNLevels` to
+1 earns nothing: warning about ordinary retuning would only teach the operator to
+type the environment name without reading the sentence above it.
+
+## 2026-09-07 — a mistyped boolean does not fall back, it becomes `false`
+
+Found while working out what the server's type check is actually protecting.
+`getValueRecursive` resolves a boolean as `rawValue.toString().toBoolean()`, and
+`"banana".toBoolean()` is `false`. So a string on `daily.enabled` or
+`features.sharing` does not resolve to the shipped default and does not log — it
+turns the feature off on every device that fetches it. Numeric keys are luckier:
+an unparseable number resolves to null and falls back.
+
+This is why the registry being incomplete was not a cosmetic problem.
+`ConfigSchema` waves through any path the uploaded manifest doesn't mention, so
+until now every `ads.*`, `daily.*`, `paywall.*` and `features.*` key was one
+mistyped admin write away from being off for everyone.
+
+## 2026-09-07 — `Cache.update` was a read-then-write, and `AppData` has several writers
+
+**The bug:** `Cache.update`'s interface default is `set(transform(get()))`. Two callers that
+overlap each transform a snapshot the other has already replaced, so the second write silently
+reverts the first. `AppData` is one record shared by every toggle, counter and boot-time field, and
+on a cold start the install-id minter, the review coordinator and the navigation tracker are all
+writing it while the first screen is already interactive.
+
+**How it looked from the outside:** flip a setting on a fresh install, send a piece of feedback,
+relaunch — the toggle is off again, `feedbacksGiven` is 0, and `screenVisits` is empty. Three
+unrelated features losing a write at once, which reads like the file never got saved rather than
+like a race.
+
+**Why nothing caught it.** Every unit test for a toggle uses a single-writer in-memory fake, where
+the interleaving cannot occur; the tests are correct and will stay green through the bug. And
+Sodogku had never navigated to a `TrackableRoute` — every reachable route was a plain `Route` — so
+the navigation tracker's `incrementVisit` write had never fired against a live screen. Adding the
+first tracked route is what made a latent race frequent enough to see.
+
+**Fix:** both implementations override `update` atomically (`DataStore.updateData` already
+serialises the read and the write; `InMemoryCache` uses `MutableStateFlow.update`), and the
+interface default carries the reason so the next implementation does not quietly inherit it. The
+alternative — auditing call sites to avoid concurrent writes — was rejected because the writers are
+in different modules and none of them can know about the others.
+
+**This is a template bug**, not a Sodogku one. It belongs in `docs/PORT-CANDIDATES.md` upstream.
+
+## 2026-09-07 — Settings is a screen, and the feedback page moved to it — but its route did not
+
+**Decision:** `:features:settings` owns the settings screen and the feedback page. `FeedbackRoute`
+stays declared in `:features:home`, and `SettingsFeatureEntryPoint` registers a route from another
+feature's api module.
+
+**Why the split is temporary and deliberate:** `:features:game:impl` navigates to
+`com.sodogku.features.home.FeedbackRoute`, and game code was locked for editing while C11 landed.
+Moving the class would have broken a module I could not fix, so the screen moved and the route
+did not. Registering it from settings is still better than the alternatives — leaving the screen in
+`:features:home:impl` splits the C11 surface across two features, and declaring a *second* feedback
+route ships two feedback pages. The fix is one import in `GameFeatureEntryPoint.kt` whenever game
+code is next open.
+
+**Why a screen and not a bottom sheet**, against the general guidance in `AGENTS.md`: settings is
+its own context rather than a transient picker, it holds the legal links a store reviewer has to be
+able to find, and "it's in settings" has to lead somewhere with a back button.
+
+**Feedback goes to Sentry, and that is the whole backend.** `FeedbackRepository` moved to
+`:libraries:sodogku` (both the settings feedback page and home's bug reporter need it, and one
+`impl` may not depend on another's) and forwards to `Telemetry.captureUserFeedback`, which mints a
+carrier event and attaches the note, the build, the commit and the buffered session log. There is no
+Sodogku-owned inbox and, under the no-accounts rule, there will not be one. **A send is never
+reported as failed** — the note is already logged locally, and telling someone their thank-you note
+bounced only invites them to retype it into the same void.
+
 ## 2026-09-07 — The streak is folded from `daily_result`, never counted
 
 **Decision:** there is no stored streak. `DailyRepository` walks the stored results backwards from
@@ -739,3 +868,39 @@ which is a different and much less useful thing — and it would make any future
 Consumable spends are counted per *attempt*, not per session, and reset on retry.
 "Cleared it without help" is a claim about one attempt; a counter that carried
 across retries would make it unearnable for anyone who ever used a hint.
+
+## 2026-09-07 — an unparseable boolean was silently `false`
+
+`getValueRecursive` resolved booleans with `rawValue.toString().toBoolean()`,
+and `"banana".toBoolean()` is `false`. So a string typed into `ads.enabled`,
+`daily.enabled` or any `features.*` flag in the admin console would have turned
+that feature off on every device that fetched it — no log, no fallback, no crash.
+
+This is the one path that could make a monetization key fail *closed*, which is
+the exact guarantee SPEC 4.2 is built around, and the client-side fail-open test
+could not see it: that test reads against an *empty* map, where every key already
+falls back correctly. The hole was in the resolve of a value that was present and
+malformed.
+
+Booleans now resolve only from "true"/"false", case-insensitively, and anything
+else is null so the declared default wins. Casing stays forgiving because the
+console lets an operator type a raw value and "True" is not a mistake worth
+punishing. Numeric keys were already safe — `toDoubleOrNull` returns null rather
+than inventing a zero, which is exactly the shape the boolean case was missing.
+
+The general rule this is an instance of: **a parse that invents an answer is
+worse than no answer.** The default was chosen deliberately and is written down.
+The invented value is whatever the coercion happened to produce.
+
+## 2026-09-07 — the persistent cache's clear() deleted nothing
+
+`DataStoreCache.clear()` called `deleteFile(name)` while the file is written as
+`"$name.json"`, so it removed nothing. Correcting the name would not have been
+enough either: `DataStore` holds the value in memory and serves it from there, so
+even a successful delete would have left every reader on the old value until the
+process died.
+
+It now writes the serializer's default back through `updateData`, which is the
+only write path `DataStore` observes. Nothing called `AppCache.clear()` yet, which
+is why a doubly-broken method sat there unnoticed — the account-switch clearer it
+was written for was deleted along with accounts in C0.

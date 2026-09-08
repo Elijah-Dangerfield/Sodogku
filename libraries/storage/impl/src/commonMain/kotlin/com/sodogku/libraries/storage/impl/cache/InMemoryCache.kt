@@ -2,7 +2,7 @@ package com.sodogku.libraries.storage.impl.cache
 
 import com.sodogku.libraries.storage.Cache
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 
 class InMemoryCache<T : Any>(
     private val initial: () -> T,
@@ -15,11 +15,14 @@ class InMemoryCache<T : Any>(
 
     override suspend fun set(value: T) { state.value = value }
 
-    /** Atomic, for the same reason the persistent cache overrides it. */
-    override suspend fun update(transform: (T) -> T): T {
-        state.update(transform)
-        return state.value
-    }
+    /**
+     * Atomic, for the same reason the persistent cache overrides it.
+     *
+     * `updateAndGet` rather than update-then-read: the second read can see a
+     * *later* writer's value, so the caller would be handed a result its own
+     * transform never produced.
+     */
+    override suspend fun update(transform: (T) -> T): T = state.updateAndGet(transform)
 
     override suspend fun clear() {
         state.value = initial()

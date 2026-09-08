@@ -161,16 +161,26 @@ The registry is a committed, reviewable file: `apps/admin/config-manifest-regist
 (the live `ConfiguredValue` multibinding is Android/iOS-only, so neither this JS
 module nor a JVM build task can read it directly). Two guards keep it from drifting:
 
-- `exportConfigManifest` **structurally validates** it (valid types, unique paths,
-  each default matches its declared type, enum defaults ∈ allowed values) and fails
-  the build on any inconsistency.
-- A drift test that instantiates the **real** scalar `ConfiguredValue` classes and
-  compares them to the registry is the second guard once an integration-test
-  module exists — until then the review discipline is manual.
+- `exportConfigManifest` **structurally validates** it (non-empty, valid types,
+  unique paths, each default matches its declared type, enum defaults ∈ allowed
+  values) and fails the build on any inconsistency.
+- `ConfigManifestRegistryDriftTest` in `:apps:integration` instantiates the
+  **real** `ConfiguredValue` classes and holds this file against them — same
+  paths, same types, same defaults, same allowed values. It runs on
+  `./gradlew testDebugUnitTest` and needs no Docker. When they disagree it
+  prints the exact registry line to paste.
 
-So: when you add, remove, or change a scalar `ConfiguredValue`, update
-`config-manifest-registry.json` in the same change.
-Composite (`JsonConfigValue`) flags are intentionally omitted.
+So: when you add, remove, or change a `ConfiguredValue`, update
+`config-manifest-registry.json` in the same change — the test will tell you what
+to write. Entries are kept in `SodogkuConfigValues.all` order (telemetry last) so
+the diff reads next to the Kotlin; the test compares by path, not by position.
+
+Composite (`JsonConfigValue`) flags are listed too. The schema can only say
+"some JSON" about them, but leaving them out made the "what did v1.0.1 ship
+with" answer quietly incomplete, which is the question this file exists to
+answer. The one thing the drift test cannot see is a value class contributed to
+DI but added to neither `SodogkuConfigValues.all` nor the test's short
+`telemetry.*` list — the same seam `SodogkuConfigValues`' own KDoc names.
 
 ## Why this exists / scope
 

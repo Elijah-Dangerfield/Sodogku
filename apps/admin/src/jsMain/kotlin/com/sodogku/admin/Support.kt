@@ -3,6 +3,10 @@ package com.sodogku.admin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 
 /** A one-line success/error banner shown under the connection panel. */
 internal data class Status(val ok: Boolean, val message: String)
@@ -88,23 +92,93 @@ internal fun csvSet(raw: String): Set<String>? =
 internal fun randomUuid(): String = js("crypto.randomUUID()") as String
 
 /**
- * A confirm prompt for values that hit every user hard — locking them out or
- * forcing an upgrade. Returns the warning to show, or null when the change is
- * routine. Keyed on (path, value) because the danger is value-specific
- * (`maintenanceMode = "blocking"` is a lockout; `"off"` is harmless).
+ * A confirm prompt for values that hit every player at once. Returns the warning
+ * to show, or null when the change is routine. Keyed on (path, value) because
+ * the danger is value-specific: `maintenanceMode = "blocking"` is a lockout,
+ * `"off"` is the all-clear.
+ *
+ * Three things earn a warning:
+ *
+ * 1. It blocks a player, or tells them to upgrade.
+ * 2. It runs SPEC section 4.2's second constraint backwards — monetization keys
+ *    fail *open*, and these are the values that make one fail closed.
+ * 3. It changes what every player sees: a shipped feature disappears, or an ad
+ *    format that ships off appears.
+ *
+ * Ordinary retuning earns nothing. Raising `paywall.sessionCap` or dropping
+ * `ads.interstitialEveryNLevels` to 1 makes the app more aggressive, and SPEC
+ * 4.2 says so in as many words: tightening in *config* is a live-ops decision
+ * and is fine, it is tightening the shipped defaults that is forbidden. On prod
+ * a warning also makes the operator type the environment name, so warning about
+ * everything would only teach them to type it without reading it.
+ *
+ * The value arrives either JSON-encoded (`"blocking"`, `false`) or as the raw
+ * text of a half-typed field, depending on the caller, so nothing here matches
+ * on one spelling of it.
  */
-internal fun dangerousWarning(path: String, value: String): String? {
-    val v = value.trim()
-    return when {
-        path == "upgrade.maintenanceMode" && v == "\"blocking\"" ->
-            "This sets maintenance mode to BLOCKING — it locks ALL users out of the app. Continue?"
-        path == "upgrade.maintenanceMode" && v == "\"banner\"" ->
-            "This shows a maintenance banner to ALL users. Continue?"
-        path == "upgrade.minSupportedVersionCode" ->
-            "Raising the minimum supported version force-upgrades every user below it. Double-check the number. Continue?"
-        else -> null
-    }
+internal fun dangerousWarning(path: String, value: String): String? =
+    blocksPlayers(path, value)
+        ?: defeatsFailOpen(path, value)
+        ?: changesWhatEveryoneSees(path, value)
+
+private fun blocksPlayers(path: String, value: String): String? = when {
+    path == "upgrade.maintenanceMode" && value.asText() == "blocking" ->
+        "This sets maintenance mode to BLOCKING — it locks ALL users out of the app. Continue?"
+    path == "upgrade.maintenanceMode" && value.asText() == "banner" ->
+        "This shows a maintenance banner to ALL users. Continue?"
+    path == "upgrade.minSupportedVersionCode" ->
+        "Raising the minimum supported version force-upgrades every user below it. Double-check the number. Continue?"
+    path == "upgrade.softUpdateVersionCode" && (value.asInt() ?: 0) > 0 ->
+        "Everyone below this build gets an update prompt on launch. It does not block them — " +
+            "upgrade.minSupportedVersionCode is the one that does. Continue?"
+    path == "legal.forceReacceptBelow" && (value.asInt() ?: 0) > 0 ->
+        "This puts a BLOCKING re-acceptance sheet in front of everyone who accepted an older " +
+            "version. Raise it only alongside legal.termsVersion. Continue?"
+    else -> null
 }
+
+private fun defeatsFailOpen(path: String, value: String): String? = when {
+    path == "ads.failureMode" && value.asText() == "LOCK" ->
+        "LOCK is the harsher arm: a third strike locks the level until a rewarded ad reopens it. " +
+            "A player with no connection stays locked. Continue?"
+    path in OfflineGracePaths && value.asInt() == 0 ->
+        "Zero offline grace blocks play at the first ad gate that can't be served, with no " +
+            "warning to the player. Continue?"
+    path == "ads.rewardedPlacements" && value.disablesARewardedPlacement() ->
+        "Turning a rewarded placement off leaves its button on screen doing nothing — the reward " +
+            "is something the player asked for and is owed. Continue?"
+    else -> null
+}
+
+private fun changesWhatEveryoneSees(path: String, value: String): String? = when {
+    path == "ads.enabled" && value.asBoolean() == false ->
+        "This stops every ad call in the app — interstitial, rewarded and app-open — so there is " +
+            "no ad revenue until it is turned back on. Continue?"
+    path == "daily.enabled" && value.asBoolean() == false ->
+        "This removes the Daily Challenge for everyone. It runs off the bundled pool, so an " +
+            "outage is never the reason to do this. Continue?"
+    path.startsWith("features.") && value.asBoolean() == false ->
+        "This hides a shipped feature from every player until it is turned back on. Continue?"
+    path in OptInAdFormatPaths && value.asBoolean() == true ->
+        "This ad format ships off. Turning it on puts an ad in front of every player. Continue?"
+    else -> null
+}
+
+private val OfflineGracePaths = setOf("ads.offlineGraceLevels", "ads.offlineGraceMinutes")
+
+private val OptInAdFormatPaths = setOf("ads.appOpenEnabled", "ads.bannerOnLevelMap")
+
+/** The value as plain text, whether it arrived JSON-encoded or as a half-typed field. */
+private fun String.asText(): String = (parseJsonOrNull(this) as? JsonPrimitive)?.contentOrNull ?: trim()
+
+private fun String.asBoolean(): Boolean? = asText().toBooleanStrictOrNull()
+
+private fun String.asInt(): Int? = asText().toIntOrNull()
+
+/** True when the placement map turns any placement off. */
+private fun String.disablesARewardedPlacement(): Boolean =
+    (parseJsonOrNull(this) as? JsonObject)?.values
+        ?.any { (it as? JsonPrimitive)?.booleanOrNull == false } == true
 
 /** Compact, human-readable rendering of a JSON value for tables (no pretty-print). */
 internal fun JsonElement?.inline(): String = this?.toString() ?: "—"

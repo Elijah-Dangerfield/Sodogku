@@ -79,6 +79,8 @@ per-user targeting and rollout bucketing.
 
 The tree comes from the server's `app_config_values` + `app_config_rules`
 tables (see `apps/server`), managed through the admin console in `apps/admin`.
-When you add a scalar flag, also add it to
-`apps/admin/config-manifest-registry.json` so the admin tool knows the in-code
-default it is overriding.
+When you add a flag, also add it to `apps/admin/config-manifest-registry.json`
+so the admin tool knows the in-code default it is overriding — and so the server
+type-checks writes to it at all, since `ConfigSchema` waves through any path the
+uploaded manifest does not mention. `ConfigManifestRegistryDriftTest` in
+`:apps:integration` fails with the line to paste if you forget.

@@ -33,6 +33,13 @@ kotlin {
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.core)
 
+            // The `telemetry.*` ConfiguredValues live here rather than in
+            // :libraries:config. This is the only test module that can see both
+            // halves of the declared key set at once, which is what makes the
+            // admin registry drift test complete.
+            implementation(projects.libraries.telemetry.impl)
+            implementation(libs.kotlinx.serialization.json)
+
             // Boot a real server on an ephemeral port. Declared here because
             // :apps:server's dependencies are
             // `implementation`-scoped and don't leak to consumers' compile
@@ -54,4 +61,17 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
     }
+}
+
+// ConfigManifestRegistryDriftTest reads a file the repo commits, and an Android
+// unit test's working directory is not worth guessing at — a wrong guess reads
+// nothing and the test passes on an empty registry.
+//
+// The `inputs.file` is the load-bearing half. A file read at test *runtime* is
+// invisible to Gradle's up-to-date check, so without it, editing the registry
+// alone leaves the test task UP-TO-DATE and the drift ships.
+tasks.withType<Test>().configureEach {
+    val registry = rootProject.file("apps/admin/config-manifest-registry.json")
+    inputs.file(registry).withPropertyName("configManifestRegistry")
+    systemProperty("sodogku.configManifestRegistry", registry.absolutePath)
 }

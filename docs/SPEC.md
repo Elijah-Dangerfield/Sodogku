@@ -351,6 +351,20 @@ Config refresh is throttled and offline-first, so a change applies on the next s
 not instantly to a session already in progress. For genuine emergencies, kill switches should be
 checked at the point of use rather than cached in a ViewModel at screen entry.
 
+Both constraints are about *defaults*. Tightening a number in config — more ads, a harsher
+failure mode, a lower grace — is a live-ops decision and is allowed; it is the shipped fallback
+that has to be generous, because that is what an outage resolves to. The admin console puts a
+confirm sheet in front of the writes that block a player or make a monetization key fail closed,
+and on prod that sheet requires typing the environment name. It does not refuse them.
+
+**A mistyped value on a boolean key does not fall back.** The client resolves booleans as
+`rawValue.toString().toBoolean()`, and `"banana".toBoolean()` is `false`, so a string written to
+`daily.enabled` turns the daily off for everyone rather than resolving to the shipped `true`.
+Numeric keys fall back correctly (an unparseable number resolves to null). The server's type
+check is the thing that prevents this, and it only covers keys present in the uploaded manifest —
+which is why `apps/admin/config-manifest-registry.json` must list **every** declared key, and why
+`ConfigManifestRegistryDriftTest` fails the build when it doesn't.
+
 ### 4.3 The key table
 
 **Ads**

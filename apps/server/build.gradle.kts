@@ -82,6 +82,18 @@ dependencies {
     testImplementation(libs.testcontainers.postgres)
 }
 
+// ShippedConfigSchemaTest builds a ConfigSchema from the registry CI actually
+// uploads, rather than from a hand-written stub. Declaring it as an input is
+// what makes editing the registry re-run the tests instead of leaving them
+// UP-TO-DATE; the property is how the test finds it without guessing at a
+// working directory. Only realized when a Test task is in the graph, so the
+// serverOnly Docker build (which has no apps/admin) is unaffected.
+tasks.withType<Test>().configureEach {
+    val registry = rootProject.file("apps/admin/config-manifest-registry.json")
+    inputs.file(registry).withPropertyName("configManifestRegistry")
+    systemProperty("sodogku.configManifestRegistry", registry.absolutePath)
+}
+
 kotlin {
     jvmToolchain(17)
     compilerOptions {

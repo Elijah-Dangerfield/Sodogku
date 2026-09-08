@@ -1,6 +1,7 @@
 package com.sodogku.server.routes
 
 import com.sodogku.server.config.AdminConfig
+import com.sodogku.server.data.shippedRegistryJson
 import com.sodogku.server.domain.AppConfigAdminRepository
 import com.sodogku.server.domain.AppConfigManifestRepository
 import com.sodogku.server.domain.ConfigAuditRecord
@@ -296,6 +297,38 @@ class ConfigAdminRoutesTest {
             }
         }
         assertEquals("social.enabled", notified)
+    }
+
+    /**
+     * The same registry a release uploads, through the real upload route, then
+     * writes against keys it now covers. Before C7 the registry held four
+     * `upgrade.*` entries, so both of these rejections were 200s: an unknown
+     * path is waved through, and `"false"` on a boolean resolves to `false` on
+     * the client rather than falling back to the shipped default.
+     */
+    @Test
+    fun withTheShippedRegistryUploaded_mistypedWritesAreRejected() = runTest {
+        val manifest = FakeManifestRepo()
+        testApp(FakeRepo(), manifest) { client ->
+            val upload = client.put("/v1/admin/config/manifest") {
+                header("X-Admin-Token", token)
+                contentType(ContentType.Application.Json)
+                setBody("""{"versionCode": 1, "appVersion": "0.1.0", "entries": ${shippedRegistryJson()}}""")
+            }
+            assertEquals(HttpStatusCode.OK, upload.status)
+
+            suspend fun write(path: String, value: String) = client.put("/v1/admin/config/flags/$path") {
+                header("X-Admin-Token", token)
+                contentType(ContentType.Application.Json)
+                setBody("""{"value": $value}""")
+            }.status
+
+            assertEquals(HttpStatusCode.BadRequest, write("daily.enabled", "\"false\""))
+            assertEquals(HttpStatusCode.BadRequest, write("ads.failureMode", "\"SHRUG\""))
+            assertEquals(HttpStatusCode.BadRequest, write("ads.offlineGraceLevels", "\"0\""))
+            assertEquals(HttpStatusCode.OK, write("daily.enabled", "false"))
+            assertEquals(HttpStatusCode.OK, write("ads.failureMode", "\"LOCK\""))
+        }
     }
 
     @Test

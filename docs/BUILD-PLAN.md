@@ -537,7 +537,7 @@ these tests cannot see.
 
 ---
 
-## C7 · Remote config
+## C7 · Remote config — **code DONE** (2026-09-07), Fly deploy outstanding
 
 **Unblocked by** C5. Deliberately **before** real ads, so the ad code reads its numbers from
 config from the first line rather than being retrofitted.
@@ -553,6 +553,75 @@ config from the first line rather than being retrofitted.
 
 **Done when** the app is fully playable and correctly gated with the server switched off, and
 flipping a value in the admin console changes app behavior on the next fetch.
+
+**Outcome (2026-09-07) — everything except the Fly deploy.**
+
+Client half: 57 typed `ConfiguredValue` classes across ten namespaces, a complete
+`FallbackConfigMap`, and the two SPEC 4.2 tests (`FallbackConfigCompletenessTest`,
+`MonetizationFailsOpenTest`).
+
+Server and admin half:
+
+- `apps/admin/config-manifest-registry.json` went from **4 entries to 60** — every declared key
+  with its real type, default and allowed values, including the two `JsonConfigValue` composites
+  and the three `telemetry.*` keys. This is what the server type-checks admin writes against, so
+  before this it was checking four `upgrade.*` keys and waving everything else through.
+- `ConfigManifestRegistryDriftTest` (`:apps:integration`) holds the file against the real value
+  classes and prints the line to paste when they disagree. It is the *only* test module that can
+  see both `:libraries:config` and `:libraries:telemetry:impl`, which is why it lives there.
+- `ShippedConfigSchemaTest` (`:apps:server`) builds a `ConfigSchema` from the committed registry
+  and proves the real key set is enforced; `ConfigAdminRoutesTest` uploads the same registry
+  through the real route and checks the rejections end to end.
+- `dangerousWarning` in the console grew from 3 cases to cover lockouts
+  (`legal.forceReacceptBelow`, `upgrade.softUpdateVersionCode`), fail-closed monetization
+  (`ads.failureMode = LOCK`, zero offline grace, a disabled rewarded placement) and
+  everyone-loses-something writes (`ads.enabled`, `daily.enabled`, `features.*`, the opt-in ad
+  formats). Deliberately *not* ordinary retuning — see `decisions.md`.
+
+**Discovered.**
+
+- A mistyped boolean does not fall back to its default; `"banana".toBoolean()` is `false`, so a
+  string on `daily.enabled` turns the daily off for everyone. Written into SPEC 4.2.
+- Declaring the registry as a `Test` task input is load-bearing. Without `inputs.file`, editing
+  the registry left the drift test `UP-TO-DATE` and it passed against a file with a key deleted
+  and three values wrong. Observed, not theorised.
+- `apps/server/DEPLOY.md` still describes Postgres and auth as living on Supabase. Auth was
+  removed in C0 and the server has no user data; the Postgres half is still true but the
+  Supabase framing reads as leftover. Worth a pass before the deploy, not touched here.
+
+**Not verified.**
+
+- **The Postgres tests did not run.** Docker was not running on this machine, so the four
+  `Postgres*`/`DatabaseSchemaTest` classes in `:apps:server:test` and `HarnessSmokeTest` in
+  `:apps:integration` self-skipped. 184 tests ran, 5 skipped, 0 failures. Start Docker and re-run
+  `./gradlew :apps:server:test :apps:integration:testDebugUnitTest`.
+- **`:apps:compose:assembleDebug` and `testDebugUnitTest` could not be run to completion**, because
+  `:features:game:impl` was mid-edit by concurrent work (an `@Assisted` parameter mismatch in
+  `GameViewModel`). `:apps:server:test`, `:apps:admin:build`, `:apps:integration:testDebugUnitTest`,
+  `:libraries:config:impl:testDebugUnitTest` and `detekt` (0 findings) are all green.
+- **Nothing was exercised against a live server.** The admin console's rendering of 60 flags
+  instead of 4 has not been looked at in a browser, and no manifest has been uploaded anywhere.
+
+**Remains: the Fly deploy.** Explicitly out of scope for this session; nothing was deployed and
+no production state was touched. The steps, in order:
+
+1. `fly apps create sodogku-server-dev` and `sodogku-server-prod` (names already set in
+   `apps/server/fly.toml` and `fly.prod.toml`; region `iad`).
+2. Provision a Postgres per environment and `fly secrets set DATABASE_URL=…` on each. Flyway runs
+   the migrations on boot through `Database.connect`. Note the Supabase framing in `DEPLOY.md`
+   above — decide whether the DB is Supabase-hosted or Fly Postgres and correct the doc either way.
+3. `fly secrets set ADMIN_API_TOKEN=…` per app, and put the same values in the GitHub repo
+   secrets `ADMIN_API_TOKEN_DEV` / `ADMIN_API_TOKEN_PROD`. The deploy workflow's manifest upload
+   step warns and skips without them rather than failing, so a mismatch is silent.
+4. `fly tokens create deploy -a sodogku-server-dev` (and `-prod`) → repo secrets
+   `FLY_API_TOKEN_DEV` / `FLY_API_TOKEN_PROD`.
+5. `fly deploy --config apps/server/fly.toml --remote-only` from the repo root, then
+   `curl https://sodogku-server-dev.fly.dev/_health`.
+6. Let the workflow's `Upload config manifest` step run (or PUT
+   `apps/admin/build/config-manifest.json` by hand) and confirm the console lists 60 flags with
+   types, not 4.
+7. Then close the chunk's real acceptance test: flip a value in the console and watch app
+   behaviour change on the next fetch. That is the one thing no test in this repo can prove.
 
 ---
 

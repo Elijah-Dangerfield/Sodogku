@@ -84,4 +84,42 @@
 
     <!-- Stands in for the reward art on the next level to play. Replace the glyph, not the key. -->
     <string name="levels_reward">🦴</string>
+
+    <string name="daily_title">Daily challenge</string>
+    <string name="daily_date">%1$s %2$d</string>
+    <string name="daily_streak">%1$d day streak</string>
+    <string name="daily_streak_label">Streak</string>
+    <string name="daily_streak_none">No streak yet</string>
+    <string name="daily_play">Play today\'s board</string>
+    <string name="daily_done">Today\'s board is done</string>
+    <string name="daily_out_of_bones">Out of bones for today</string>
+    <string name="daily_today">Today\'s board</string>
+    <string name="daily_resets_hours">New board in %1$dh %2$dm</string>
+    <string name="daily_resets_minutes">New board in %1$dm</string>
+    <string name="daily_freeze_cta">Save your streak</string>
+    <string name="daily_freeze_remaining">%1$d left this month</string>
+    <string name="daily_freeze_applied_title">Streak saved</string>
+    <string name="daily_freeze_applied_body">The missed day is covered. Your streak stands at %1$d days.</string>
+    <string name="daily_freeze_declined_title">Streak not saved</string>
+    <string name="daily_freeze_declined_body">The ad closed early, so the freeze was not used. The offer is still here.</string>
+    <string name="daily_freeze_none_left_title">No freezes left</string>
+    <string name="daily_freeze_none_left_body">You have used this month\'s freezes. They come back next month.</string>
+    <string name="daily_freeze_nothing_title">Nothing to freeze</string>
+    <string name="daily_freeze_nothing_body">There is no missed day a freeze would bring back right now.</string>
+    <string name="daily_freeze_unavailable_title">Not right now</string>
+    <string name="daily_freeze_unavailable_body">That did not go through. Give it another try in a moment.</string>
+
+    <!-- Short month names, for the daily card and the share sheet. -->
+    <string name="month_short_1">Jan</string>
+    <string name="month_short_2">Feb</string>
+    <string name="month_short_3">Mar</string>
+    <string name="month_short_4">Apr</string>
+    <string name="month_short_5">May</string>
+    <string name="month_short_6">Jun</string>
+    <string name="month_short_7">Jul</string>
+    <string name="month_short_8">Aug</string>
+    <string name="month_short_9">Sep</string>
+    <string name="month_short_10">Oct</string>
+    <string name="month_short_11">Nov</string>
+    <string name="month_short_12">Dec</string>
 </resources>

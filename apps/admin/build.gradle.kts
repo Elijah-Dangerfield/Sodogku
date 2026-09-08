@@ -52,6 +52,9 @@ val exportConfigManifest = tasks.register("exportConfigManifest") {
         val entries = groovy.json.JsonSlurper().parse(registryFile) as List<Map<String, Any?>>
 
         // Structural guard: a malformed/inconsistent registry fails the build (CI).
+        // An empty file is the one shape that would otherwise sail through every
+        // check below and upload a manifest that type-checks nothing.
+        if (entries.isEmpty()) throw GradleException("registry is empty — nothing to upload")
         val validTypes = setOf("boolean", "int", "long", "double", "string", "json")
         val seen = mutableSetOf<String>()
         entries.forEachIndexed { i, e ->

@@ -82,7 +82,7 @@ class DataStoreCacheFactory (
 
         return DataStoreCache(
             dataStore,
-            deleteFile = { fileManager.deleteFile(name) }
+            defaultValue = { serializer.read(null) },
         )
     }
 
@@ -103,7 +103,7 @@ class DataStoreCacheFactory (
 
 private class DataStoreCache<T : Any>(
     private val dataStore: DataStore<T>,
-    private val deleteFile: () -> Unit,
+    private val defaultValue: suspend () -> T,
 ) : Cache<T> {
 
     override val updates: Flow<T> = dataStore.data
@@ -129,5 +129,20 @@ private class DataStoreCache<T : Any>(
      */
     override suspend fun update(transform: (T) -> T): T = dataStore.updateData(transform)
 
-    override suspend fun clear() { deleteFile() }
+    /**
+     * Writes the default back rather than deleting the file.
+     *
+     * Deleting was both wrong and invisible. Wrong because the path was
+     * `name` while the file is `"$name.json"`, so it removed nothing; invisible
+     * because `DataStore` holds the value in memory and serves it from there —
+     * even a correctly-named delete would have left every reader on the old
+     * value until the process died.
+     *
+     * `updateData` is the only write path that `DataStore` actually observes,
+     * which makes it the only one `clear` can use.
+     */
+    override suspend fun clear() {
+        val fresh = defaultValue()
+        dataStore.updateData { fresh }
+    }
 }

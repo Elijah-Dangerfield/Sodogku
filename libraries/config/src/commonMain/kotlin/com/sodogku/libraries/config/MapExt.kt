@@ -29,7 +29,23 @@ fun <T : Any> Map<String, *>.getValueRecursive(path: List<String>, clazz: KClass
         return Catching {
             when (clazz) {
                 String::class -> rawValue.toString() as? T
-                Boolean::class -> rawValue.toString().toBoolean() as? T
+                // Not `toBoolean()`. That maps *everything* that is not "true"
+                // to `false`, so a string written to `ads.enabled` or
+                // `features.sharing` would turn the feature off on every device
+                // that fetched it — silently, and without falling back to the
+                // declared default. Every monetization key in SPEC 4.2 is
+                // supposed to fail open, and this was the one place that could
+                // quietly make one fail closed instead.
+                //
+                // Case is still forgiving, because the admin console lets an
+                // operator type a raw value and "True" is not a mistake worth
+                // punishing. Anything else resolves to null and the caller's
+                // default wins.
+                Boolean::class -> when (rawValue.toString().lowercase()) {
+                    "true" -> true as T
+                    "false" -> false as T
+                    else -> null
+                }
                 Int::class -> rawValue.toString().toDoubleOrNull()?.toInt() as? T
                 Number::class -> rawValue.toString().toDoubleOrNull() as? T
                 Double::class -> rawValue.toString().toDoubleOrNull() as? T
