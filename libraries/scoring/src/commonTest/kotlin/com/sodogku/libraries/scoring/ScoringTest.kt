@@ -233,6 +233,27 @@ class ScoringTest {
     }
 
     @Test
+    fun theBestComboSurvivesTheStrikeThatEndedIt() {
+        // `combo` answers "what is my run worth right now", which is zero after a
+        // strike. Nothing could answer "how long was your best run", and that is
+        // the question the achievement asks once the attempt is over.
+        var card = ScoreCard.Empty
+        repeat(5) { card = Scoring.placement(card, size = 6, null).card }
+        assertEquals(5, card.combo)
+        assertEquals(5, card.bestCombo)
+
+        card = Scoring.strike(card)
+        assertEquals(0, card.combo, "a strike still ends the run")
+        assertEquals(5, card.bestCombo, "but it does not un-happen it")
+
+        repeat(2) { card = Scoring.placement(card, size = 6, null).card }
+        assertEquals(5, card.bestCombo, "a shorter later run must not lower the mark")
+
+        repeat(5) { card = Scoring.placement(card, size = 6, null).card }
+        assertEquals(7, card.bestCombo, "a longer one must raise it")
+    }
+
+    @Test
     fun configRejectsThresholdsThatCannotBeSatisfied() {
         val failure = runCatching {
             ScoringConfig(twoPawFraction = 0.9, threePawFraction = 0.5)

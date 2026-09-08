@@ -710,3 +710,32 @@ versions 1–5, which are template history no install has ever run. Every additi
 so far is a new table, so Room writes the migrations itself. The value of the
 list is what happens when it *can't* — a renamed or retyped column now fails the
 build rather than the player's save.
+
+## 2026-09-07 — the lagging `state` landmine, third sighting
+
+Wiring the achievement log found it again: `lose()` computed
+`MAX_LIVES - state.livesRemaining` after the caller's `updateState` had set the
+third strike, and got 2. `state` reads a derived `stateIn` flow that lags
+`updateState` by a dispatch, so the read saw the board one strike ago and the
+achievement log believed it.
+
+This is the same shape as the starter-dog bug and the win-scoring bug. The rule
+that keeps coming out of it: **a value that a suspend function computes and then
+needs again must be passed as a parameter, never read back off `state`.** Reading
+it back is always available, always compiles, and is wrong roughly half the time
+depending on dispatch timing — which is why it keeps getting written.
+
+Both `recordAttempt` call sites now take `livesRemaining` explicitly, and the
+loss path passes the strike-adjusted score card rather than re-reading that too.
+
+## 2026-09-07 — losses go in the achievement log
+
+The log records failed attempts as well as clears. A run that ended on the last
+bone is evidence about how someone plays, and some badges are about persistence
+rather than success. Recording only wins would make the log a record of wins,
+which is a different and much less useful thing — and it would make any future
+"attempts per clear" question unanswerable from data we chose not to keep.
+
+Consumable spends are counted per *attempt*, not per session, and reset on retry.
+"Cleared it without help" is a claim about one attempt; a counter that carried
+across retries would make it unearnable for anyone who ever used a hint.

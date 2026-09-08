@@ -13,7 +13,15 @@ import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
 import com.sodogku.libraries.progress.ProgressRepository
+import com.sodogku.libraries.achievements.Achievement
+import com.sodogku.libraries.achievements.AchievementState
+import com.sodogku.libraries.achievements.AchievementsRepository
+import com.sodogku.libraries.achievements.LevelResult
+import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.scoring.ScoringConfig
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
 import com.sodogku.libraries.sodogku.ConsumableRefillTo
@@ -614,6 +622,86 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
     }
 
+    @Test
+    fun aClearIsHandedToTheAchievementLogWithTheFactsTheFoldNeeds() = runUnitTest {
+        val badges = RecordingAchievements()
+        val vm = viewModel(achievements = badges)
+        val level = assertNotNull(vm.state.level)
+
+        (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
+        assertEquals(GamePhase.Won, vm.state.phase, "the fixture has to actually finish")
+
+        val recorded = badges.recorded.single()
+        assertEquals(level.id, recorded.levelId)
+        assertEquals(PlayMode.Campaign, recorded.mode)
+        assertEquals(level.size, recorded.size)
+        assertTrue(recorded.completed)
+        assertEquals(vm.state.score.total, recorded.score)
+        assertEquals(vm.state.paws, recorded.paws)
+        assertEquals(0, recorded.strikes, "a clean run has no strikes")
+        assertEquals(level.size, recorded.bestCombo, "an unbroken run is the whole board")
+        assertEquals(0, recorded.sniffsUsed)
+        assertEquals(0, recorded.treatsUsed)
+        assertTrue(recorded.isFirstClear, "nothing had cleared this level before")
+        assertEquals(0, recorded.previousBestPaws)
+        assertEquals(FixedHour, recorded.localHour)
+    }
+
+    @Test
+    fun aReplayIsNotAFirstClear() = runUnitTest {
+        // The reason this matters: "levels cleared" counts levels. If a replay
+        // read as a first clear, one level replayed a hundred times would earn
+        // the hundred-level badge.
+        val badges = RecordingAchievements()
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 5_000, paws = 2, timeMs = 9_000)
+        val vm = viewModel(progress = progress, achievements = badges)
+        val level = assertNotNull(vm.state.level)
+
+        (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
+
+        val recorded = badges.recorded.single()
+        assertFalse(recorded.isFirstClear)
+        assertEquals(2, recorded.previousBestPaws, "the fold needs the bar this attempt had to beat")
+    }
+
+    @Test
+    fun aFailedAttemptIsRecordedToo() = runUnitTest {
+        // Losses are evidence about how someone plays. Recording only wins would
+        // make the log a record of successes, which is a different thing.
+        val badges = RecordingAchievements()
+        val vm = viewModel(achievements = badges)
+
+        repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
+        assertEquals(GamePhase.Lost, vm.state.phase)
+
+        val recorded = badges.recorded.single()
+        assertFalse(recorded.completed)
+        assertEquals(0, recorded.paws)
+        assertEquals(ScoringConfig.MAX_LIVES, recorded.strikes)
+        assertFalse(recorded.isFirstClear)
+    }
+
+    @Test
+    fun spentBoostersAreCountedPerAttemptAndResetOnRetry() = runUnitTest {
+        val badges = RecordingAchievements()
+        val vm = viewModel(achievements = badges)
+        val level = assertNotNull(vm.state.level)
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Treat))
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Treat))
+        assertEquals(ConsumableRefillTo - 1, vm.state.treats, "the fixture has to actually spend one")
+
+        (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
+        assertEquals(1, badges.recorded.single().treatsUsed)
+
+        // A retry starts a new attempt, and "cleared without help" is a question
+        // about this attempt, not about the session.
+        vm.takeAction(GameAction.Retry)
+        (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
+        assertEquals(0, badges.recorded.last().treatsUsed, "spends must not carry across attempts")
+    }
+
     private val clock = TestTimeSource()
 
     private fun viewModel(
@@ -622,7 +710,21 @@ class GameViewModelTest : CoroutineTest() {
         entitlements: Entitlements = FreeEntitlementsFake(),
         cache: AppCache = InMemoryAppCache(),
         progress: ProgressRepository = InMemoryProgress(),
-    ) = GameViewModel(levelId, adGate, entitlements, clock, cache, progress)
+        achievements: AchievementsRepository = RecordingAchievements(),
+    ) = GameViewModel(
+        levelId,
+        adGate,
+        entitlements,
+        clock,
+        cache,
+        progress,
+        achievements,
+        // Fixed rather than the system clock: `localHour` is an input to the
+        // time-of-day badges, so a test that read the real clock would pass or
+        // fail depending on when it ran.
+        wallClock = FixedClock,
+        deviceTimeZone = { TimeZone.UTC },
+    )
 
     /**
      * Commits a guess: two taps inside the double-tap window. A single tap only
@@ -668,6 +770,13 @@ class GameViewModelTest : CoroutineTest() {
         }
 
     private companion object {
+        const val FixedHour = 12
+
+        /** Arbitrary but fixed: 2026-01-01T12:00:00Z, so `localHour` is 12 in UTC. */
+        val FixedClock = object : Clock {
+            override fun now(): Instant = Instant.parse("2026-01-01T12:00:00Z")
+        }
+
         /** Past the starter-dog band, so the board opens empty. */
         const val PlainLevel = 200
 
@@ -699,6 +808,26 @@ class GameViewModelTest : CoroutineTest() {
      * the *unclamped* `unlockedThrough`, one past the end of the pack after the
      * last level, because clamping that is the game's job.
      */
+    /** Keeps every attempt handed to it, so a test can assert on what was recorded. */
+    private class RecordingAchievements : AchievementsRepository {
+        val recorded = mutableListOf<LevelResult>()
+        private var state = AchievementState.Empty
+
+        override fun observe(): Flow<AchievementState> = flowOf(state)
+
+        override suspend fun state(): AchievementState = state
+
+        override suspend fun record(result: LevelResult): List<Achievement> {
+            recorded += result
+            return emptyList()
+        }
+
+        override suspend fun reset() {
+            recorded.clear()
+            state = AchievementState.Empty
+        }
+    }
+
     private class InMemoryProgress : ProgressRepository {
         private val records = mutableMapOf<Int, LevelRecord>()
 

@@ -11,7 +11,15 @@ import com.sodogku.libraries.core.logging.logEvent
 import com.sodogku.libraries.flowroutines.SEAViewModel
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
+import com.sodogku.libraries.achievements.Achievement
+import com.sodogku.libraries.achievements.AchievementsRepository
+import com.sodogku.libraries.achievements.LevelResult
+import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.progress.LevelRecord
+import com.sodogku.libraries.progress.LevelState
+import com.sodogku.libraries.progress.daily.DeviceTimeZone
+import kotlinx.datetime.Clock
+import kotlinx.datetime.toLocalDateTime
 import com.sodogku.libraries.progress.ProgressRepository
 import com.sodogku.libraries.puzzle.HintFinder
 import com.sodogku.libraries.puzzle.Solution
@@ -52,6 +60,14 @@ class GameViewModel(
     private val clock: TimeSource.WithComparableMarks,
     private val appCache: AppCache,
     private val progress: ProgressRepository,
+    private val achievements: AchievementsRepository,
+    /**
+     * Wall clock, not [clock]. The monotonic one cannot answer "what time of day
+     * is it", which is what the time-of-day badges and the attempt's timestamp
+     * need, and it is not comparable across a process death.
+     */
+    private val wallClock: Clock,
+    private val deviceTimeZone: DeviceTimeZone,
 ) : SEAViewModel<GameState, GameEvent, GameAction>(initialStateArg = GameState()) {
 
     private val logger = KLog.withTag("Game")
@@ -62,6 +78,23 @@ class GameViewModel(
     private var lastTappedCell: Int? = null
     private var warnedAboutLastBone = false
     private var lastTapAt: ComparableTimeMark? = null
+
+    /**
+     * Consumables spent *this attempt*. The holdings in state only ever say what
+     * is left, and "cleared it without help" is a question about what was spent.
+     * Reset by [startAttempt] rather than accumulated across retries.
+     */
+    private var sniffsUsed = 0
+    private var treatsUsed = 0
+
+    /**
+     * The level's history as it stood *before* this attempt touched it.
+     *
+     * Read at the start, because `onCompleted` overwrites it and the achievement
+     * fold needs to know whether this was the first clear. Counting clears rather
+     * than levels would let a replay walk "100 levels" up forever.
+     */
+    private var recordBeforeAttempt: LevelRecord = LevelRecord.unplayed(levelId)
 
     init {
         takeAction(GameAction.Load)
@@ -130,6 +163,13 @@ class GameViewModel(
         lastTappedCell = null
         lastTapAt = null
         warnedAboutLastBone = false
+        sniffsUsed = 0
+        treatsUsed = 0
+        // Before `onAttemptStarted`, so the snapshot is genuinely pre-attempt.
+        recordBeforeAttempt = Catching { progress.record(level.id) }
+            .logOnFailure { "Failed to read the prior record for level ${level.id}" }
+            .getOrNull()
+            ?: LevelRecord.unplayed(level.id)
         logger.logEvent(
             "game.level_started",
             "level_id" to level.id,
@@ -294,7 +334,7 @@ class GameViewModel(
         }
         sendEvent(GameEvent.Struck(cell))
         when {
-            remaining <= 0 -> lose()
+            remaining <= 0 -> lose(remaining)
             remaining == 1 && !warnedAboutLastBone -> {
                 warnedAboutLastBone = true
                 updateState { it.copy(warning = GameWarning.LastBone) }
@@ -330,6 +370,14 @@ class GameViewModel(
         Catching { progress.onCompleted(level.id, finished.total, paws, duration) }
             .logOnFailure { "Failed to record the clear of level ${level.id}" }
         val unlocked = unlockedThrough()
+        val earnedBadges = recordAttempt(
+            level,
+            finished,
+            paws,
+            duration,
+            completed = true,
+            livesRemaining = state.livesRemaining,
+        )
 
         sendEvent(GameEvent.Won)
         updateState {
@@ -339,11 +387,62 @@ class GameViewModel(
                 paws = paws,
                 elapsedMs = duration,
                 unlockedThrough = maxOf(it.unlockedThrough, unlocked),
+                newBadges = earnedBadges,
             )
         }
     }
 
-    private suspend fun GameAction.lose() {
+    /**
+     * Hands the finished attempt to the achievement log and reports what it
+     * unlocked.
+     *
+     * Failed attempts are recorded too. A run that ended on the last bone is
+     * still evidence about how the player plays, and some badges are about
+     * persistence rather than success — dropping the losses would make the log
+     * a record of wins, which is a different and much less useful thing.
+     *
+     * Never throws: a badge is a garnish, and no failure here may cost someone
+     * the level they just cleared.
+     */
+    private suspend fun recordAttempt(
+        level: LevelDefinition,
+        card: ScoreCard,
+        paws: Int,
+        duration: Long,
+        completed: Boolean,
+        livesRemaining: Int,
+    ): List<Achievement> {
+        val now = wallClock.now()
+        val result = LevelResult(
+            levelId = level.id,
+            mode = PlayMode.Campaign,
+            size = level.size,
+            completed = completed,
+            score = card.total,
+            paws = paws,
+            timeMs = duration,
+            strikes = ScoringConfig.MAX_LIVES - livesRemaining,
+            bestCombo = card.bestCombo,
+            sniffsUsed = sniffsUsed,
+            treatsUsed = treatsUsed,
+            isFirstClear = completed && recordBeforeAttempt.state != LevelState.Completed,
+            previousBestPaws = recordBeforeAttempt.bestPaws,
+            localHour = now.toLocalDateTime(deviceTimeZone.current()).hour,
+            finishedAt = now.toEpochMilliseconds(),
+        )
+        return Catching { achievements.record(result) }
+            .logOnFailure { "Failed to record the attempt at level ${level.id}" }
+            .getOrNull()
+            .orEmpty()
+    }
+
+    /**
+     * [livesRemaining] is passed in rather than read back off `state`. The
+     * caller's `updateState` has not landed yet — `state` reads a derived flow
+     * that lags it by a dispatch — so reading it here reported one strike fewer
+     * than the player actually took, which the achievement log then believed.
+     */
+    private suspend fun GameAction.lose(livesRemaining: Int) {
         val level = state.level ?: return
         logger.logEvent(
             "game.level_failed",
@@ -352,7 +451,18 @@ class GameViewModel(
             "dogs_placed" to state.placed.placedCount,
             "attempt_number" to attemptNumber,
         )
-        updateState { it.copy(phase = GamePhase.Lost, elapsedMs = elapsedMs()) }
+        val duration = elapsedMs()
+        val earnedBadges = recordAttempt(
+            level,
+            Scoring.strike(state.score),
+            paws = 0,
+            duration,
+            completed = false,
+            livesRemaining = livesRemaining,
+        )
+        updateState {
+            it.copy(phase = GamePhase.Lost, elapsedMs = duration, newBadges = earnedBadges)
+        }
     }
 
     /**
@@ -571,6 +681,7 @@ class GameViewModel(
         }
 
         logger.logEvent("game.booster_used", "booster" to "sniff", "level_id" to level.id)
+        sniffsUsed++
         persistCounts(Consumable.Sniff, state.sniffs - 1)
         updateState {
             it.copy(
@@ -590,6 +701,7 @@ class GameViewModel(
         }
 
         logger.logEvent("game.booster_used", "booster" to "treat", "level_id" to level.id)
+        treatsUsed++
         persistCounts(Consumable.Treat, state.treats - 1)
         updateState { it.copy(treats = it.treats - 1, boosterPrompt = null) }
         place(cell)
@@ -712,6 +824,12 @@ data class GameState(
 
     /** Squares a sniff has ruled out, spotlit until the player taps away. */
     val hintCells: Set<Int> = emptySet(),
+
+    /**
+     * Badges this attempt just unlocked, in catalog order. Empty is the normal
+     * answer; the outcome sheet shows them and nothing else needs to.
+     */
+    val newBadges: List<Achievement> = emptyList(),
 
     /**
      * Whether the level pane is showing. In state rather than in the screen's

@@ -27,13 +27,18 @@ plugins {
 // (from versions.properties), and writes the upload payload; CI PUTs it to
 // `/v1/admin/config/manifest` after a deploy (see README).
 //
-// The client DI graph that owns the live `Set<ConfiguredValue<*>>` is Android/
-// iOS-only, so it can't be enumerated from this JS module. The registry is a
-// maintained list of the scalar (targetable) flags — keep it in sync with the
-// real ConfiguredValue classes when you add one (a drift test against the DI
-// graph's Set<ConfiguredValue<*>> is the pattern once an integration-test
-// module exists). Composite (JsonConfigValue) flags are intentionally omitted —
-// they aren't targeted per version/locale and their defaults are large.
+// The client value classes are Android/iOS-only, so they can't be enumerated
+// from this JS module — the registry is a committed transcription of them, in
+// `SodogkuConfigValues.all` order. It does not drift silently any more:
+// `ConfigManifestRegistryDriftTest` in `:apps:integration` holds this file
+// against the real `ConfiguredValue` classes (path, type, default,
+// allowedValues) and prints the exact line to paste when they disagree. Edit
+// the Kotlin, run `./gradlew :apps:integration:testDebugUnitTest`, paste.
+//
+// Composite (JsonConfigValue) flags are listed too. They can't be type-checked
+// beyond "some JSON", but leaving them out made the console's "what did 1.0.1
+// ship with" answer quietly incomplete, which is the one question this file
+// exists to answer.
 val exportConfigManifest = tasks.register("exportConfigManifest") {
     description = "Validate config-manifest-registry.json and write the upload payload for CI."
     val versionsFile = rootProject.file("versions.properties")

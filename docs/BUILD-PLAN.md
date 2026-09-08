@@ -665,6 +665,59 @@ settings screen, `pages/privacy.html` and `pages/terms.html`, and the guided tut
 **Done when** bumping `legal.termsVersion` in the admin console triggers the right prompt on the
 next launch, and a fresh install completes the tutorial without a dead end.
 
+### C11a · The settings screen — **DONE** (2026-09-07)
+
+The first half of C11. The legal *gate* (`:libraries:legal`), the hosted pages and the guided
+tutorial are still open.
+
+**Delivers** `:features:settings` (+ impl): a full screen with three toggles (vibration, reduce
+animations, shapes on colors), terms and privacy opening the URLs from `legal.termsUrl` /
+`legal.privacyUrl`, a feedback page, and the version. Plus the feedback page itself, moved out of
+`:features:home:impl` so C11 owns the whole surface. 12 view-model tests.
+
+**Outcome.** Verified on an emulator by driving it: every row toggles from a tap anywhere on the
+row, the value is on disk before the app is force-stopped and is still there on the next launch,
+"Terms of service" hands off to Chrome, and a typed note reaches the confirmation panel and moves
+`feedbacksGiven` to 1.
+
+**No new design-system component was needed**, which is the C3a investment paying off — `ListSection`
++ `ListSectionItem` + `ListItemAccessory.Switch/Text/Chevron` already are a settings row, with the
+bounce, the dividers, the 58dp minimum height and the switch colours built in. The one addition is a
+convention rather than a component: the whole row toggles, not just the switch.
+
+### The bug this chunk found, which was never about settings
+
+**`Cache.update` is a non-atomic read-modify-write, and `AppData` has several writers live at
+once.** Flip a setting on a fresh install, send a piece of feedback, relaunch: the toggle is back
+off, `feedbacksGiven` is 0 and `screenVisits` is empty. The install-id minter and the review
+coordinator write `AppData` during boot from snapshots taken before the screen was up, and whichever
+write lands last reverts everything else.
+
+Two things made it invisible until now. Every unit test that covers a toggle uses a single-writer
+in-memory fake, so the interleaving cannot happen. And Sodogku had never navigated to a
+`TrackableRoute` before — every reachable route was a plain `Route` — so the navigation tracker's
+`incrementVisit` write had never actually fired against a live screen.
+
+Fixed by overriding `update` in both cache implementations (`DataStore.updateData` already
+serialises read and write) and putting the reason on the interface default so the next
+implementation does not inherit it. The same latent bug is in the template.
+
+**Not fully explained:** one relaunch during testing came back with defaults *and a new install id*,
+meaning the boot path read the file as absent or corrupt rather than losing a field to the race. It
+did not reproduce across five subsequent cycles, warm and fresh, and the app is single-process with
+no workers, so a second DataStore holder is ruled out. Worth remembering if progress ever
+mysteriously resets.
+
+### Not done here, and why
+
+- **The board still opens its own settings dialog.** `GameDialog.Settings` in `:features:game:impl`
+  duplicates every row on this screen. It stays until the header's settings button is repointed —
+  `features/game/impl` was locked for editing while this landed.
+- **`FeedbackRoute` still lives in `:features:home`**, for the same reason: `:features:game:impl`
+  imports it by that name. The screen and view model moved to `:features:settings:impl` and the
+  route class did not, which is the one thing about this module that reads wrong. See
+  `docs/decisions.md`.
+
 ---
 
 ## C12 · Art, theme, accessibility

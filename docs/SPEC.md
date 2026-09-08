@@ -685,12 +685,31 @@ casual puzzle games bleed the most installs. Skippable, and re-runnable from Set
 
 ## 11. Settings
 
-- **Game:** sound, haptics, auto-mark, colorblind mode, show timer.
-- **Progress:** achievements on/off, reset progress (with a real confirmation), rerun tutorial.
-- **Sodogku Pro:** buy, or "Pro active" plus **Restore Purchases**.
-- **Legal:** privacy policy, terms, ad partners, reopen consent form.
-- **Support:** report a bug (the template's Sentry-backed flow, which already attaches screenshots
-  and a session log), rate the app (`:libraries:review`), version and build.
+`:features:settings` is a full screen reached from the board's header, not a sheet: it is its own
+context, it holds the legal links the stores require, and it has to be findable by someone who
+was told "it's in settings".
+
+**Shipped (C11):**
+
+- **Playing:** vibration, reduce animations, shapes on colors. Each row toggles on tap anywhere,
+  not only on the switch, and writes straight through to `AppData` — there is no save button, so
+  there is nothing to hang a deferred commit off.
+- **About:** send feedback, terms of service, privacy policy, version. The legal URLs come from
+  `legal.termsUrl` / `legal.privacyUrl` in remote config and open in a browser, because the pages
+  are hosted (GitHub Pages, from `pages/`). Version is text, not a row you can tap.
+
+**Feedback** is its own page: a text field capped at 400 characters, a send button, and a
+confirmation panel that replaces the form rather than a toast fired during a transition. It
+increments `AppData.feedbacksGiven` and forwards the note through `FeedbackRepository` to
+**Sentry** as a user feedback report — there is no Sodogku feedback backend, and the "No accounts"
+rule means there will not be one. A send is never reported as failed; see section 13.4.
+
+**Still to land**, mostly gated on chunks that own the state they toggle: sound (no audio yet),
+auto-mark and show-timer toggles, achievements on/off (C10), reset progress with a real
+confirmation, rerun tutorial, the Pro row with **Restore Purchases** (C8), ad partners and
+reopening the consent form (C8), and rate-the-app (`:libraries:review`). Report-a-bug still exists
+as the template's Sentry-backed flow, reachable from the shake gesture and from error screens, and
+has not been surfaced in settings yet.
 
 ---
 
@@ -796,6 +815,16 @@ absence reads as a bug.
 `dailyStreak`, `lastDailyDate` and `freezesUsedThisMonth` were listed here and are **not** stored.
 All three are derivable from `daily_result`, and a derived number cannot drift out of step with the
 history it claims to summarise.
+
+**Writes to `AppData` must go through `Cache.update`, and that has to be atomic.** Several writers
+are live at once on a cold start — the install-id minter, the review coordinator, the navigation
+tracker's per-route visit counter — and every feature toggle and counter shares the one record. The
+`Cache` interface ships a convenience `update` that reads and then writes, which is not atomic, so
+two overlapping writers each transform a snapshot the other has already replaced and the later one
+silently reverts the earlier. Found in C11 by flipping a setting on a fresh install and watching it,
+the feedback counter and the screen-visit count all come back empty on the next launch. Both cache
+implementations now override `update`; the interface default carries a warning saying why any new
+one must too.
 
 ---
 

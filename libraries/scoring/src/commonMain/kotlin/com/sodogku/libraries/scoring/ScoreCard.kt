@@ -11,6 +11,14 @@ package com.sodogku.libraries.scoring
 data class ScoreCard(
     val total: Int = 0,
     val combo: Int = 0,
+
+    /**
+     * The longest run this attempt reached, which [combo] cannot answer once a
+     * strike has reset it. A high-water mark rather than a running total, so it
+     * is meaningful after the attempt ends — which is when the achievement fold
+     * asks for it.
+     */
+    val bestCombo: Int = 0,
     val placements: Int = 0,
 ) {
     companion object {
@@ -57,6 +65,7 @@ object Scoring {
             card = card.copy(
                 total = card.total + points,
                 combo = card.combo + 1,
+                bestCombo = maxOf(card.bestCombo, card.combo + 1),
                 placements = card.placements + 1,
             ),
             points = points,
@@ -65,7 +74,11 @@ object Scoring {
         )
     }
 
-    /** A wrong tap. Costs the streak; the life is the game's business, not scoring's. */
+    /**
+     * A wrong tap. Costs the streak; the life is the game's business, not
+     * scoring's. [ScoreCard.bestCombo] survives on purpose — a strike ends the
+     * run, it does not un-happen it.
+     */
     fun strike(card: ScoreCard): ScoreCard = card.copy(combo = 0)
 
     /** Adds the completion bonus. Call once, when the last dog lands. */
