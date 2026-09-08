@@ -1117,19 +1117,19 @@ look a lot like Meowdoku. Everything below is feel, not function.
 
 | # | Item | Owner | State |
 |---|---|---|---|
-| P1 | Dialogs have poor padding | dialogs | **DONE** — fixed once in `Dialog`, not per call site |
-| P2 | The level pane needs a real reward indicator, not a bare emoji | economy | **DONE** — `LevelRewardChip` in `:libraries:ui`, glossy and in the Treat's own orange, on **every** row that pays rather than only the frontier, and muted once collected. The bare 🦴 was advertising a reward nothing granted, so the reward was built first; see below |
-| P3 | Dog idle loops read oddly. Keep `idle` and `look`; drop the shake; the rest occasional at most | | |
-| P4 | Some X marks cannot be undone. The red X (paid for) and a placed dog must stay; every other mark must clear | | |
-| P5 | Tapping Level and Score opens an explainer; both labels a size bigger | dialogs | **Dialogs done**, seen on device. The two lines in `GameScreen.kt` that make the stats tappable and bump the label are handed back as a diff — that file was owned by another chunk |
-| P6 | A rounder, more playful display face. Poppins is already everywhere; `FontFamily.kt` names Baloo 2 and Fredoka as drop-in OFL replacements | board look | **DONE** — Fredoka, on Display, Heading and Label. Both candidates were rendered against real strings first; see `decisions.md` for the three reasons, one of which is 260KB against 1.6MB |
-| P7 | A better dialog entrance animation | dialogs | **DONE** — springs up and overshoots on `Motion.Pop`, scrim fades under it, honours `reduceAnimations`. The floating-window nav host turned out not to control this |
-| P8 | Keep checking the app against Meowdoku screenshots | board look | **DONE for the board** — all five items in `docs/reference/meowdoku.md` are landed and `sodogku-board.png` sits next to their screenshot for comparison. What still differs is listed there rather than being called finished |
-| P9 | Propose features, argued both ways, leaning conservative, each with a backend-driven-or-not call | | |
-| P10 | **Board state is lost.** Re-picking the level you are already on from the pane wipes every mark and placement. There is also no in-progress snapshot at all, so backgrounding loses the board — C5 promised one and it was never built | | |
-| P11 | Sniff and Treat buttons want colour and a playful, shiny treatment. Try several, screenshot, judge | board look | **PARTLY** — they are white pills now rather than cream-on-cream, which was the legibility half. The colour-and-shine half is untouched |
-| P12 | Splash: the dog head still, centred, with the loader appearing only after ~5s. Better than today's loader-and-words | | |
-| P13 | Use the supplied backgrounds on onboarding and splash — **blocked, see below** | | |
+| P1 | Dialogs have poor padding | me | done — fixed in the DS, so every dialog gets it |
+| P2 | The level pane needs a real reward indicator, not a bare emoji | me | done — a glossy chip on every level that pays, and the reward it advertises now exists |
+| P3 | Dog idle loops read oddly. Keep `idle` and `look`; drop the shake; the rest occasional at most | me | done — idle and look, with pant occasionally; tilt and flop out |
+| P4 | Some X marks cannot be undone. The red X (paid for) and a placed dog must stay; every other mark must clear | me | done — auto-marks clear on tap; the red X and a placed dog do not |
+| P5 | Tapping Level and Score opens an explainer; both labels a size bigger | me | done — both open explainers, labels legible rather than 8sp |
+| P6 | A rounder, more playful display face. Poppins is already everywhere; `FontFamily.kt` names Baloo 2 and Fredoka as drop-in OFL replacements | me | done — Fredoka on Display, Heading and Label |
+| P7 | A better dialog entrance animation | me | done — spring from 0.82 with the scrim fading under it |
+| P8 | Keep checking the app against Meowdoku screenshots | me | done — `docs/reference/meowdoku.md`, and the board rebuilt against it |
+| P9 | Propose features, argued both ways, leaning conservative, each with a backend-driven-or-not call | me | done — `docs/proposals.md`; four of its findings were bugs and are fixed |
+| P10 | **Board state is lost.** Re-picking the level you are already on from the pane wipes every mark and placement. There is also no in-progress snapshot at all, so backgrounding loses the board — C5 promised one and it was never built | me | done — board persists, and comes back on both a relaunch and a level switch |
+| P11 | Sniff and Treat buttons want colour and a playful, shiny treatment. Try several, screenshot, judge | me | done — `Modifier.glossy`; blue Sniff, orange Treat, purple ad offer |
+| P12 | Splash: the dog head still, centred, with the loader appearing only after ~5s. Better than today's loader-and-words | me | done — the dog alone, spinner only after 5s |
+| P13 | Use the supplied backgrounds on onboarding and splash — **blocked, see below** | me | blocked — the files are not on disk |
 
 **Blocked on files that never reached disk.** Three sets of art have now been described in chat
 and none of them exists in `art/source/`: the sad-dog still, the bone artwork, and these
