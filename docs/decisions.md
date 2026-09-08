@@ -6,6 +6,117 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — the offline grace reads the OS, not `AppState.isOffline`
+
+Running C8 on a device put the offline block screen up on full wifi. `AppState.isOffline`
+is `!osOnline || !backendReachable`, and the dev server is not deployed yet, so every
+launch was permanently "offline" as far as the ad gate could tell. SPEC 6 already said
+what the rule should be — "only the former trips the grace, since ad networks are
+reachable when our own server is down" — and there was simply no flow that expressed it.
+
+`AppState` grew `isDeviceOffline`, the platform connectivity signal on its own, with a
+default of `get() = isOffline` so previews and test doubles that model one signal keep
+compiling. `AppStateImpl` is the only implementation with two things to tell apart.
+`RealAdGate` and `OfflineBlockViewModel` are its only consumers, and they should stay
+its only consumers: anything talking to *our* backend still wants the wider signal.
+
+Worth noticing how this failed. Nothing crashed and no test could have caught it — both
+flows are `StateFlow<Boolean>` with identical types and near-identical names, and the
+fake in the test file had one field standing in for both. `FakeAppState` now models them
+separately, which is what makes `ourOwnBackendBeingDownDoesNotSpendTheOfflineGrace`
+possible at all.
+
+## 2026-09-07 — the ad gate asks for a paywall, it does not navigate to one
+
+`RealAdGate` lives in a library and has no business knowing a route exists. It calls
+`PaywallCoordinator.requestOffer(trigger)`, which answers yes or no against
+`paywall.triggers`, `paywall.sessionCap` and the entitlement; a `PaywallNavigator` in
+`:features:paywall:impl` collects the resulting bus and does the navigating.
+
+The bus has **no replay**, which makes `PaywallNavigator`'s `AutoInit` marker
+load-bearing rather than a performance tweak — a request made before the collector
+attaches is gone. That is the failure mode to watch for if the boot-warm set is ever
+made lazy.
+
+The alternative was `libraries/ads/impl` depending on `:features:paywall` and calling
+`Router.navigate` itself. The module-boundary checker would have allowed it (it only
+forbids feature-api → feature-api and non-app → impl), which is exactly why it was worth
+writing down that we chose not to.
+
+## 2026-09-07 — the paywall is offered *after* the rewarded ad, not instead of it
+
+The ideal shape at a third strike is one sheet with two buttons: watch an ad, or buy Pro
+and never see one again. That needs `GameViewModel` to ask which the player wants, and
+`GameViewModel` was owned by another chunk this session. What shipped instead:
+`showRewarded` requests the offer and then runs the ad exactly as before, so the sheet
+lands on top once the ad closes.
+
+It is deliberately the safe half of the trade. The reward path is untouched, so nothing
+about the offer can withhold a reward, and `paywall.sessionCap` already stops it becoming
+a nag. When the game layer is free, the better version is a choice sheet in
+`GameViewModel` that calls `paywallCoordinator.requestOffer` on one branch and
+`adGate.showRewarded` on the other — the coordinator API already supports it.
+
+## 2026-09-07 — ad frequency state gets its own cache; the entitlement stays in `AppData`
+
+Two persisted things landed in C8 and they went to different places.
+
+The **entitlement** is one boolean in `AppData` (`isProEntitled`), where SPEC 5.2 says it
+goes. It is a fact about the player, it belongs next to the other things a person would
+recognise, and it is exactly the "don't roll a new cache for a single boolean" case
+AGENTS.md names.
+
+The **ad bookkeeping** is a separate `ad_state` cache. Five numbers — first launch,
+last interstitial, levels since, grace start, grace spent — none of which mean anything
+without the config key they are compared against. Putting machinery in the file the whole
+app writes to would make `AppData` harder to read for no gain, and keeping it apart means
+QA can reset the ad state without touching a player's settings.
+
+**Per-session counters are in neither.** The interstitial ceiling and the paywall cap are
+in memory, keyed on `SessionTracker.current.id`. A ceiling that survived a restart would
+mean a player who force-quit twice never saw another interstitial, and one that never
+reset would mean a week-long session never stopped seeing them.
+
+## 2026-09-07 — Play Billing 8, not the 7 the spec names
+
+SPEC 5.2 says "Play Billing 7". Play stopped accepting new releases on 7 before this was
+written, so 8.3.0 shipped instead. The migration is two things and both are already in
+`PlayStoreBilling`: `queryProductDetailsAsync` hands back a `QueryProductDetailsResult`
+rather than a bare list, and `enablePendingPurchases(PendingPurchasesParams)` is
+mandatory. `enableAutoServiceReconnection()` is on, which removes the reconnect loop
+every Billing 5-era implementation had to hand-roll.
+
+The one thing not to copy from a Billing tutorial: `BILLING_UNAVAILABLE` is **not**
+mapped to "not owned". It means this device cannot do billing at all, and a device that
+cannot ask is not a device that answered no. Same for `SERVICE_*` and `NETWORK_ERROR`.
+All of them return `StoreOwnership.Unknown`, which is the value that leaves a paying
+customer alone.
+
+## 2026-09-07 — every ad id is in one file behind one boolean
+
+`AdUnits.useTestUnits` is the whole migration. Google's published sample units are
+committed for both platforms and the `Live` blocks are empty; when a live id is missing
+the accessor falls back to the test unit rather than requesting an empty string, because
+a blank unit id is an SDK error and an SDK error is one more way for an ad to "fail" —
+and this app *pays the player* when ads fail. A typo would quietly hand out free rewards.
+
+The AdMob **app** id cannot live there: both SDKs read it before any app code runs, so it
+is in `AndroidManifest.xml` (`com.google.android.gms.ads.APPLICATION_ID`) and `Info.plist`
+(`GADApplicationIdentifier`). That split is the one thing about this file that will catch
+somebody out, which is why both ends say so in a comment.
+
+## 2026-09-07 — the iOS ad network is compile-guarded, the iOS store is not
+
+`IOSStoreBilling` is unguarded and real: StoreKit ships with the OS. `IOSAdNetwork` is
+wrapped in `#if canImport(GoogleMobileAds)`, because the SDK arrives through SPM in Xcode
+and nothing in this repo can add a package dependency to a project it cannot open. Until
+somebody does, the guard makes every ad "fail", and the shared Kotlin grants the reward
+anyway — correct behaviour, zero revenue, and an app that still builds.
+
+The alternative was to commit the Swift unguarded and leave the iOS target broken until
+the package is added. A repo where the iOS app does not compile is a repo where nobody
+notices the next thing that breaks it.
+
 ## 2026-09-07 — badge copy lives in `:features:achievements` (the api module), not its impl
 
 The catalog carries stable ids and no words; an exhaustive `when (AchievementId)` in the UI is
@@ -1067,3 +1178,18 @@ The daily agent found the mirror image of the same thing — the level pane scro
 the campaign list to a *daily's* id and highlighted a locked stranger as "current",
 because `currentLevelId` was not nullable and "not a campaign level" was not
 representable. Both are the same failure to make an invalid state impossible.
+
+## 2026-09-07 — three desktop source sets that were never compiled
+
+`libraries/ui/src/jvmMain` and `libraries/navigation/impl/src/jvmMain` held a
+`JvmWebLinkLauncher`, a desktop `FontFamily` and a `NativeButton` actual. Only
+`:libraries:puzzle` declares a `jvm()` target — it needs one so the level
+generator can run on the JVM — so none of those three files has ever been
+compiled by anything.
+
+Deleted. They read as live platform implementations, which is worse than absent:
+someone fixing a link-opening bug on desktop would have edited a file that does
+not run, and the build would have agreed with them by staying green.
+
+Sodogku is Android and iOS. If a desktop target ever lands, this code is one
+`git log` away and will need rewriting against whatever the desktop story is then.

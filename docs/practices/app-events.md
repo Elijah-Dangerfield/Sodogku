@@ -122,6 +122,34 @@ rated harder than they are (`decisions.md`, 2026-09-07), and nothing in the app 
 surfaced it — the pack verification only checks that the stored numbers are in range. A band
 where tier 4 completes faster than tier 3 is the shape to watch for.
 
+## Advertising and purchases
+
+Emitted by `RealAdGate` (`:libraries:ads:impl`), `RealPaywallCoordinator` and
+`RealEntitlements` (`:libraries:billing:impl`). `placement` is the id from SPEC 5.3
+(`level_complete`, `continue_level`, `booster_grant`, `skip_level`, `streak_freeze`) and is
+the same string `ads.rewardedPlacements` is keyed on, so a config change and its effect on
+the funnel line up without a lookup table.
+
+**There is no event for an ad the gate declined to show.** Suppressions are the normal
+case — a player in the new-user grace generates one per level — and at that volume the
+funnel would be mostly noise. A suppressed interstitial logs at debug with its reason and
+stays out of Loki. `ads.result` with `outcome=granted_without_ad` covers the one case
+where a suppression is still interesting, because it means a reward was paid for nothing.
+
+| Event | Attributes | Fires |
+|---|---|---|
+| `ads.gate_shown` | `placement`, `is_offline` | A rewarded gate is entered, or an interstitial passes all three frequency gates. `is_offline` is the **device** signal (`AppState.isDeviceOffline`), not the banner one — our backend being down is not an ad-network outage. No `level_id`: the gate is called from the game and the daily and does not know which |
+| `ads.result` | `placement`, `outcome`, `latency_ms`, `error_kind`, `reason`, `grace_levels_used` | Every terminal state of a gate. `outcome` is an `AdShowResult` name (`Rewarded` / `Dismissed` / `Completed` / `NoFill` / `Offline` / `NotShown` / `Failed`) **or** the synthetic `granted_without_ad`, which carries `reason` (`pro`, `ads_disabled`, `placement_disabled`, `new_user_grace`). `latency_ms` spans prepare-plus-load-plus-watch, so it is dominated by how long the player watched — read its floor, not its mean |
+| `ads.offline_block` | `placement`, `grace_levels_used` | The offline grace is spent and the block screen is requested. One per gate past the grace, so a repeat count is a player stuck offline rather than a bug |
+| `iap.paywall_shown` | `trigger` | An offer the coordinator **accepted** (`continue_level` / `skip_level` / `direct`), or an offline block. Refusals — capped, disabled, already Pro — emit nothing, so the ratio of this to `ads.gate_shown` is the offer rate rather than the attempt rate |
+| `iap.purchase_result` | `outcome`, `error_kind` | `outcome` is the `PurchaseOutcome` class name (`Success` / `Cancelled` / `AlreadyOwned` / `Unavailable` / `Failed`); `error_kind` is present only on `Failed` and is the store's own code (`billing_6`, `storekit_2`, `purchase_pending`) |
+| `iap.restore_result` | `outcome` | `Restored` / `NothingToRestore` / `Failed`. A rise in `Failed` is a store-reachability signal, not a customer-support one — it means we could not ask, and the cached entitlement was left alone |
+
+The ad funnel is `ads.gate_shown` → `ads.result`, split by `placement` and platform.
+`outcome=NoFill` is the number to watch: every one of those is a reward given away, and
+SPEC 5.3 says that is the correct behaviour, so the dashboard is measuring cost rather
+than a fault.
+
 ## Warn+ log forwarding (not events)
 
 Besides events, `GrafanaLogTree` forwards plain KLog lines at Warn and above to Loki as ordinary

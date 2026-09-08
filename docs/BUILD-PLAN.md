@@ -652,7 +652,7 @@ no production state was touched. The steps, in order:
 
 ---
 
-## C8 · Ads and billing
+## C8 · Ads and billing — **DONE** (2026-09-07), minus a store account and an Xcode package
 
 **Unblocked by** C7.
 
@@ -670,6 +670,86 @@ no production state was touched. The steps, in order:
 **Done when** a real test ad shows on both platforms, a sandbox purchase grants Pro and survives
 a reinstall via restore, an ad failure grants the reward anyway, and the offline grace expires
 and blocks correctly with counters that survive a force-quit.
+
+**Outcome (2026-09-07) — everything except the two things that need a store account.**
+
+Shipped: `:libraries:ads:impl` (`RealAdGate` in common Kotlin over an `AdNetwork` seam,
+`AdMobAdNetwork` + UMP on Android, `IOSAdNetwork` in Swift), `:libraries:billing:impl`
+(`RealEntitlements`, `RealPaywallCoordinator`, `PlayStoreBilling` on Play Billing 8,
+`IOSStoreBilling` on StoreKit 2), and `:features:paywall` / `:features:paywall:impl`
+(the Pro sheet, the offline block screen, and the navigator that turns a coordinator
+request into a route). 48 new tests.
+
+All policy is in common Kotlin — the frequency gates, both graces, the fail-open mapping,
+the entitlement cache — and the platform seams only load, show, and say what happened.
+That is what makes the interesting behaviour reachable from `commonTest` without an ad
+network or a store, and it is why the Android and iOS builds cannot disagree about when
+an ad is allowed.
+
+**Demonstrated on a Pixel 4a (physical device).**
+
+1. **A real AdMob test rewarded ad shows.** Tapped the board's ad offer, watched the
+   Google Ads test creative play through to "Reward granted", closed it. The trail:
+   `ads.gate_shown placement=booster_grant is_offline=false` → `AdMob initialised` →
+   `ads.result outcome=Rewarded latency_ms=26583`.
+2. **An ad failure grants the reward anyway.** Covered by `RealAdGateTest` across the
+   whole `AdShowResult` enum, and demonstrated on device: every offline gate returned a
+   reward-granting outcome while the network was unreachable.
+3. **The offline grace expires and blocks, and the counters survive a force-quit.**
+   Airplane mode on, one gate spent (`grace_levels_used=1`, written to `ad_state.json`),
+   `am force-stop`, relaunch, second gate → `ads.offline_block grace_levels_used=2` and
+   the block screen. Airplane mode off → the screen dismissed itself and the board came
+   back. `GET PRO` opened the paywall; `GET PRO` there reported the store as unavailable
+   (correctly — offline, and the product does not exist yet) rather than hanging.
+
+**Not demonstrated.**
+
+- **iOS, at all.** `xcode-select` on this machine points at something that is not Xcode,
+  and fixing it needs the user's password. `:apps:compose:compileKotlinIosSimulatorArm64`
+  is green, so the Kotlin half and the `IosAppComponent` signature change compile, but no
+  Swift in `apps/ios/iosApp/Platform/` has been through a compiler. Treat
+  `AdNetwork.swift` and `StoreBilling.swift` as unverified drafts.
+- **The sandbox purchase.** There is no Play Console app, no App Store Connect record and
+  no `sodogku_pro` product anywhere, so "a sandbox purchase grants Pro and survives a
+  reinstall via restore" could not be run. The half that *is* tested is the half that
+  owns the bug: `RealEntitlementsTest` covers unknown-vs-not-owned, restore, reinstall
+  (empty cache + a store that remembers) and persistence across a relaunch.
+- **The UMP form itself never appeared**, because the test device is not in the EEA.
+  `canRequestAds()` returned true without one, which is the correct path for most of the
+  world and also the path that proves nothing about the form. Test it with
+  `ConsentDebugSettings.setDebugGeography(DEBUG_GEOGRAPHY_EEA)` plus a test-device hash.
+
+**Discovered.**
+
+- **The offline block fired on full wifi.** `AppState.isOffline` also means "our backend
+  is unreachable", and the dev server is not deployed. SPEC 6 already said only the OS
+  signal should trip the grace; nothing expressed it. Fixed with `AppState.isDeviceOffline`
+  — see `decisions.md`, including why no test could have caught it before the fake was
+  split in two.
+- **The first rewarded ad takes about five seconds to load**, with no visual feedback,
+  because nothing calls `AdGate.preload`. The gate warms the next ad after each show, so
+  only the first one in a session is slow. The fix is one line in the game layer, below.
+
+**What is left, and who owns it.**
+
+1. **`GameViewModel` never calls `showInterstitial`.** The `level_complete` placement,
+   its triple gate and its telemetry are all implemented and tested; the trigger is
+   missing because that file was owned by another chunk this session. One line after a
+   level is recorded: `adGate.showInterstitial(AdPlacement.LevelComplete)`. Everything
+   else — Pro, the kill switch, the new-user grace, N-levels, cooldown, session cap,
+   offline — is decided inside the gate.
+2. **`AdGate.preload` has no caller.** `adGate.preload(AdPlacement.ContinueLevel)` when
+   the lose sheet opens removes the five-second wait from the moment it matters most.
+3. **Settings has no "Sodogku Pro" or "Restore purchases" row.** Apple *requires* a
+   visible restore control. It exists on the paywall, but nothing in Settings reaches the
+   paywall. `:features:settings:impl` needs `implementation(projects.features.paywall)`
+   and a row that navigates to `PaywallRoute(trigger = PaywallTrigger.Direct.id)` —
+   `Direct` is deliberately exempt from both the trigger list and the session cap.
+4. **The banner placement is unimplemented.** `ads.bannerOnLevelMap` defaults to off and
+   `AdNetwork.show(Banner)` returns `NotShown`; a banner is a view in a layout, not
+   something you show and await. The level map owns its own slot when it wants one.
+5. **The `GoogleMobileAds` SPM package is not in the Xcode project**, so iOS serves no
+   ads yet. See `SPEC.md` §20 for the exact steps.
 
 ---
 
