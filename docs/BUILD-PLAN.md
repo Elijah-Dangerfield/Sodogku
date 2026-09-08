@@ -2081,10 +2081,10 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S19 | The shake dialog picks a random "sentient" title. Remove all of it and make it normal | **DONE** (2026-09-08) |
 | S20 | **The score dialog is far too much text**, and the score counts up very fast. Question whether the number should get that big at all | copy and count-up **DONE** (2026-09-08); magnitude sits with the scoring pass |
 | S21 | The broken-rule highlight is good and could be more colourful. Consider a small shake of the whole grid on a wrong guess | |
-| S22 | An attractor on Sniff when it is worth using: a flashing ring, the bone inside shaking, a slight scale up. A small "look at me" | |
-| S23 | **The circular icon buttons are hard to see.** They want a soft shadow all the way round, which makes them visible *and* says they are tappable | |
-| S24 | **Rework the booster row to the competitor's shape** (screenshot 2026-09-08): circular white buttons in a row, each with a picture and a label underneath. They call Sniff "Locate", which is a better word. Use pictures where we can: a paw, a bone, a dog. Consider adding a Clear button | |
-| S25 | **Meowdoku's hint works differently and better.** It picks a cat, highlights that cat's row, column and touching cells, paints an X into every one of them, and offers an **Apply** button. Ours reveals ruled-out squares with no confirm step | |
+| S22 | An attractor on Sniff when it is worth using: a flashing ring, the bone inside shaking, a slight scale up. A small "look at me" | **DONE** (2026-09-08) |
+| S23 | **The circular icon buttons are hard to see.** They want a soft shadow all the way round, which makes them visible *and* says they are tappable | **DONE** (2026-09-08) |
+| S24 | **Rework the booster row to the competitor's shape** (screenshot 2026-09-08): circular white buttons in a row, each with a picture and a label underneath. They call Sniff "Locate", which is a better word. Use pictures where we can: a paw, a bone, a dog. Consider adding a Clear button | **DONE** (2026-09-08) — Clear deliberately not added, see the commit |
+| S25 | **Meowdoku's hint works differently and better.** It picks a cat, highlights that cat's row, column and touching cells, paints an X into every one of them, and offers an **Apply** button. Ours reveals ruled-out squares with no confirm step | **DONE** (2026-09-08) |
 | S26 | Drag across the board to cross off several squares in one gesture | |
 
 ### Notes taken while logging these
