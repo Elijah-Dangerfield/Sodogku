@@ -989,6 +989,21 @@ look a lot like Meowdoku. Everything below is feel, not function.
 | P7 | A better dialog entrance animation | | |
 | P8 | Keep checking the app against Meowdoku screenshots | | |
 | P9 | Propose features, argued both ways, leaning conservative, each with a backend-driven-or-not call | | |
+| P10 | **Board state is lost.** Re-picking the level you are already on from the pane wipes every mark and placement. There is also no in-progress snapshot at all, so backgrounding loses the board — C5 promised one and it was never built | | |
+| P11 | Sniff and Treat buttons want colour and a playful, shiny treatment. Try several, screenshot, judge | | |
+| P12 | Splash: the dog head still, centred, with the loader appearing only after ~5s. Better than today's loader-and-words | | |
+| P13 | Use the supplied backgrounds on onboarding and splash — **blocked, see below** | | |
+
+**Blocked on files that never reached disk.** Three sets of art have now been described in chat
+and none of them exists in `art/source/`: the sad-dog still, the bone artwork, and these
+backgrounds. Images pasted into a chat message do not reach the filesystem. They need saving into
+`art/source/stills/` (or `art/source/backgrounds/`) before any of it can be wired, and until then
+those call sites keep their drawn or placeholder versions.
+
+**On P1, asked twice now:** yes, the fix belongs in the design system, and that is where it is
+being made — `libraries/ui/.../components/dialog/`. Every dialog in the app should get correct
+padding without its call site asking. The reason it kept recurring is that the padding was a
+per-call-site concern and nothing failed when a call site forgot.
 
 **Standing instructions attached to this list:** keep reviewing the code for what
 keeps it good, keep writing tests, commit to `main` often but not every edit, and
