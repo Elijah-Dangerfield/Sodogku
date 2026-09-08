@@ -31,6 +31,9 @@ kotlin {
             implementation(projects.libraries.scoring)
             implementation(projects.libraries.ads)
             implementation(projects.libraries.billing)
+            // The scoring coefficients, the booster economy and two feature
+            // switches are all `scoring.*` / `boosters.*` / `features.*` keys.
+            implementation(projects.libraries.config)
 
             // Compose dependencies (navigation and lifecycle provided by sodogku.feature plugin)
             implementation(compose.runtime)
@@ -51,6 +54,10 @@ kotlin {
             implementation(projects.libraries.scoring)
             implementation(projects.libraries.ads)
             implementation(projects.libraries.billing)
+            implementation(projects.libraries.config)
+            // `brokenRule` answers with the design system's `RuleDiagram`,
+            // which is the chip the board outlines.
+            implementation(projects.libraries.ui)
             // The dialog copy tests name StringResources directly.
             implementation(projects.libraries.resources)
             implementation(compose.components.resources)

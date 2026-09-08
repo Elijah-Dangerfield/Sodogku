@@ -7,6 +7,26 @@ import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
 import com.sodogku.libraries.billing.PurchaseOutcome
 import com.sodogku.libraries.billing.RestoreOutcome
+import com.sodogku.libraries.config.AppConfigMap
+import com.sodogku.libraries.config.values.BoostersRefillTo
+import com.sodogku.libraries.config.values.BoostersStartingSniffs
+import com.sodogku.libraries.config.values.BoostersStartingTreats
+import com.sodogku.libraries.config.values.FeatureAchievements
+import com.sodogku.libraries.config.values.FeatureBoosters
+import com.sodogku.libraries.config.values.ScoringBasePerPlacement
+import com.sodogku.libraries.config.values.ScoringComboMax
+import com.sodogku.libraries.config.values.ScoringComboStep
+import com.sodogku.libraries.config.values.ScoringCompletionBase
+import com.sodogku.libraries.config.values.ScoringDifficultyBonusRate
+import com.sodogku.libraries.config.values.ScoringExcellentPraiseAt
+import com.sodogku.libraries.config.values.ScoringGreatPraiseAt
+import com.sodogku.libraries.config.values.ScoringLivesBonusRate
+import com.sodogku.libraries.config.values.ScoringNicePraiseAt
+import com.sodogku.libraries.config.values.ScoringPerfectPraiseAt
+import com.sodogku.libraries.config.values.ScoringSpeedMaxMultiplier
+import com.sodogku.libraries.config.values.ScoringSpeedWindowMs
+import com.sodogku.libraries.config.values.ScoringThreePawFraction
+import com.sodogku.libraries.config.values.ScoringTwoPawFraction
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
@@ -598,6 +618,88 @@ class GameViewModelTest : CoroutineTest() {
 
         vm.takeAction(GameAction.LevelsClosed)
         assertFalse(vm.state.drawerOpen)
+    }
+
+    @Test
+    fun anAttemptSurvivesTheProcessBeingKilled() = runUnitTest {
+        // The bug this exists for: booster spends were written to disk the moment
+        // they happened and the board they paid for was not, so a force-quit
+        // mid-puzzle kept the charge and lost the reasoning.
+        val cache = InMemoryAppCache()
+        val first = viewModel(cache = cache)
+        val level = assertNotNull(first.state.level)
+        first.commit(cellFor(row = 1))
+        val marked = wrongCellIn(row = 3)
+        first.note(marked)
+        val placed = first.state.placedCells
+        val score = first.state.score.total
+        assertTrue(placed.isNotEmpty(), "the fixture needs a placement to lose")
+
+        // A new ViewModel over the same cache is what a relaunch looks like.
+        val resumed = viewModel(cache = cache)
+
+        assertEquals(level.id, resumed.state.level?.id)
+        assertEquals(placed, resumed.state.placedCells, "the placements have to come back")
+        assertTrue(marked in resumed.state.manualMarks, "and the player's own crosses")
+        assertEquals(score, resumed.state.score.total, "and the score they earned")
+        assertEquals(GamePhase.Playing, resumed.state.phase)
+    }
+
+    @Test
+    fun aResumedBoardKeepsTheBonesItAlreadySpent() = runUnitTest {
+        val cache = InMemoryAppCache()
+        val first = viewModel(cache = cache)
+        first.commit(wrongCellIn(row = 0))
+        val remaining = first.state.livesRemaining
+        val red = first.state.wrongGuesses
+        assertTrue(remaining < ScoringConfig.MAX_LIVES && red.isNotEmpty())
+
+        val resumed = viewModel(cache = cache)
+
+        assertEquals(remaining, resumed.state.livesRemaining, "a strike survives a relaunch")
+        assertEquals(red, resumed.state.wrongGuesses, "and so does the red square it left")
+    }
+
+    @Test
+    fun aFinishedAttemptIsNotOfferedBack() = runUnitTest {
+        // Nothing to resume once the board is done, and offering it would put a
+        // won board back on screen as if it were still in play.
+        val cache = InMemoryAppCache()
+        val first = viewModel(cache = cache)
+        val level = assertNotNull(first.state.level)
+        (0 until level.size).forEach { row -> first.commit(cellFor(row)) }
+        assertEquals(GamePhase.Won, first.state.phase)
+        assertEquals(null, cache.get().boardInProgress, "a finished board clears the slot")
+
+        val resumed = viewModel(cache = cache)
+
+        assertTrue(resumed.state.placedCells.size <= 1, "only the starter dog, if any")
+    }
+
+    @Test
+    fun anUntouchedBoardIsNotWorthResuming() = runUnitTest {
+        // A player who glanced at a level and left should not be offered it
+        // forever. Restoring an untouched board is indistinguishable from
+        // starting one anyway.
+        val cache = InMemoryAppCache()
+        viewModel(levelId = PlainLevel, cache = cache)
+
+        assertEquals(null, cache.get().boardInProgress)
+    }
+
+    @Test
+    fun aSnapshotOfADifferentLevelIsLeftAlone() = runUnitTest {
+        // Opening level 2 must not restore level 1's board onto it, and must not
+        // throw level 1's board away either — the player may well go back.
+        val cache = InMemoryAppCache()
+        val onLevelOne = viewModel(levelId = StarterDogLevel, cache = cache)
+        onLevelOne.commit(cellFor(row = 1))
+        val saved = assertNotNull(cache.get().boardInProgress)
+
+        val other = viewModel(levelId = PlainLevel, cache = cache)
+
+        assertTrue(other.state.manualMarks.isEmpty(), "a fresh board, not the other one")
+        assertEquals(saved.levelId, cache.get().boardInProgress?.levelId, "the other board is kept")
     }
 
     @Test
@@ -1250,6 +1352,7 @@ class GameViewModelTest : CoroutineTest() {
         progress: ProgressRepository = InMemoryProgress(),
         daily: DailyRepository = FakeDaily(),
         achievements: AchievementsRepository = RecordingAchievements(),
+        config: AppConfigMap = configOf(),
     ) = GameViewModel(
         levelId,
         isDaily,
@@ -1265,6 +1368,45 @@ class GameViewModelTest : CoroutineTest() {
         // fail depending on when it ran.
         wallClock = FixedClock,
         deviceTimeZone = { TimeZone.UTC },
+        scoringConfig = scoringFrom(config),
+        startingSniffs = BoostersStartingSniffs(config),
+        startingTreats = BoostersStartingTreats(config),
+        refillTo = BoostersRefillTo(config),
+        achievementsEnabled = FeatureAchievements(config),
+        boostersEnabled = FeatureBoosters(config),
+    )
+
+    /**
+     * A config map addressed the way the admin console addresses it — dotted
+     * paths — so a test names the key an operator would type. An empty one is
+     * the outage case: every value resolves to its shipped default.
+     */
+    private fun configOf(vararg values: Pair<String, Any>): AppConfigMap {
+        val tree = mutableMapOf<String, MutableMap<String, Any>>()
+        values.forEach { (path, value) ->
+            val namespace = path.substringBefore('.')
+            tree.getOrPut(namespace) { mutableMapOf() }[path.substringAfter('.')] = value
+        }
+        return object : AppConfigMap() {
+            override val map: Map<String, *> = tree
+        }
+    }
+
+    private fun scoringFrom(config: AppConfigMap) = ConfiguredScoring(
+        ScoringBasePerPlacement(config),
+        ScoringCompletionBase(config),
+        ScoringComboStep(config),
+        ScoringComboMax(config),
+        ScoringSpeedWindowMs(config),
+        ScoringSpeedMaxMultiplier(config),
+        ScoringLivesBonusRate(config),
+        ScoringDifficultyBonusRate(config),
+        ScoringTwoPawFraction(config),
+        ScoringThreePawFraction(config),
+        ScoringNicePraiseAt(config),
+        ScoringGreatPraiseAt(config),
+        ScoringExcellentPraiseAt(config),
+        ScoringPerfectPraiseAt(config),
     )
 
     /**

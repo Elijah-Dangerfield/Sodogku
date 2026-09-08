@@ -9,7 +9,13 @@ import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
-/** What an ad refill tops a consumable up to. Holdings may exceed it. */
+/**
+ * What an ad refill tops a consumable up to. Holdings may exceed it.
+ *
+ * The number the *game* refills to is `boosters.refillTo` in remote config;
+ * this is the copy the booster prompt still prints and the seed for [AppData]'s
+ * bone count. Keep the two in step until the prompt is handed the live value.
+ */
 const val ConsumableRefillTo: Int = 3
 
 /**
@@ -55,15 +61,30 @@ data class AppData(
 
     /**
      * Held consumables. These are *not* capped at three — a refill tops up to
-     * three, but clearing levels grants extra, so the store is a reward for
-     * playing rather than a meter that only ever empties.
+     * `boosters.refillTo`, but clearing levels grants extra, so the store is a
+     * reward for playing rather than a meter that only ever empties.
+     *
+     * [sniffs] and [treats] are null until the player has been granted any.
+     * The opening handful is `boosters.startingSniffs` / `startingTreats`, and
+     * a default written here instead would be a second answer to the same
+     * question — one an operator cannot change, and the one that would win,
+     * because a record that already says "3" is indistinguishable from a player
+     * who spent down to three.
      */
     val bones: Int = ConsumableRefillTo,
-    val sniffs: Int = ConsumableRefillTo,
-    val treats: Int = ConsumableRefillTo,
+    val sniffs: Int? = null,
+    val treats: Int? = null,
 
     /** Boosters whose first-use explainer has been seen, by name. */
     val explainedBoosters: Set<String> = emptySet(),
+
+    /**
+     * The attempt in progress, if there is one. See [BoardSnapshot].
+     *
+     * One slot, not one per level: a player has one board on the go, and keeping
+     * a stack of half-finished levels would turn resuming into a choice.
+     */
+    val boardInProgress: BoardSnapshot? = null,
 
     /**
      * Stable per-install identifier, minted on first read and persisted for

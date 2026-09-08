@@ -6,6 +6,75 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — the dialog card pads itself, and the floating-window host had nothing to do with it
+
+Every dialog in the app had its title, its body and its close button flush against the card
+edges. The cause was not five call sites each forgetting padding — it was that `Dialog` gave them
+nowhere to put it. `Dialog`'s surface was a `Box` with a background and no inset, so "looks
+right" was something each caller had to reconstruct, and the one caller that did (`BasicDialog`)
+reconstructed it wrongly: it passed the caller's `modifier` to `Dialog` **and** again to the
+`ModalContent` inside it, so any size, weight or click a caller attached was applied twice.
+
+`ModalDialogDefaults.ContentPadding` is now applied inside the card and the call sites carry
+none. That is the shape the standing instruction asks for — a new screen gets the right behaviour
+without its author knowing the rule exists.
+
+Two smaller things fell out of the same read:
+
+- The surface was `clipToBounds()`, a **rectangular** clip on a rounded card, so a full-width
+  button at the bottom of a dialog squared off the card's bottom corners. It is `clip(shape)`
+  now. Nobody would have found this from the code; it is only visible with a button flush to the
+  bottom edge, which is exactly the state the missing padding produced.
+- The card is `0.85f` of the width rather than `fillMaxWidth()`, and there is a test saying so.
+  The strip of scrim either side is the tap target that dismisses the dialog, so widening the
+  card silently removes a gesture.
+
+**The floating-window nav host does not control any of this.** `FloatingWindowHost` iterates
+`FloatingWindowNavigator`'s back stack and calls `destination.content(entry)`; it decides *which*
+nav destinations exist and nothing about how they appear. Dialog presentation is
+`DialogHostState` → `DialogHost` → `DialogOverlay`, mounted once in `App.kt`, and every dialog in
+the game reaches it through `Dialog(...)` without touching navigation at all. Worth writing down
+because the two look interchangeable from the outside and only one of them is where the animation
+lives.
+
+## 2026-09-07 — `reduceAnimations` is a composition local, not a parameter
+
+The dialog entrance is a spring, so it has to answer to the reduce-animations setting, and the
+design system has no ViewModel to ask. `LocalReduceAnimations` is provided once in `App.kt` from
+`AppViewModel.reduceAnimations` and defaults to `false` — never `error(...)`, so previews and
+tests animate normally with no setup.
+
+The spec is resolved **at the call site** (`ModalDialogDefaults.animationSpec()`, composable) and
+carried into `DialogHostEntry`, not read inside `DialogOverlay`. The host renders from a snapshot
+captured when the caller composed, so a local read in the host would be read outside the subtree
+the value is provided to. The non-composable `animationSpecFor(reduceAnimations)` exists so the
+choice itself is testable without a Compose harness.
+
+Reduced motion is a plain fade on both the scrim and the card, not a shortened spring — the
+setting is for players who find movement unpleasant, and a fast bounce is still a bounce. The
+test pins this by asserting the card animates *exactly like the scrim* when reduced and *unlike
+it* when not; the second assertion is the one that stops "reduce everything" passing.
+
+## 2026-09-07 — the win and lose sheets stay out of `Dialog`, and borrow its padding token
+
+`GameOutcomeSheet` looks like a dialog and is not one. `Dialog` dismisses on an outside tap, and
+a lose sheet that vanishes when the player taps the board behind it strands them on a finished
+grid with no retry. So `OutcomeLayout` keeps its own card — but it now takes
+`ModalDialogDefaults.ContentPadding` rather than repeating the two numbers, which is what stops
+the two kinds of card drifting apart the next time the dialog padding is retuned.
+
+## 2026-09-07 — the score explainer names no numbers
+
+Every scoring coefficient is remote config (`scoring.*`, SPEC §4). Copy that says "100 points per
+dog" is a sentence that goes stale the first time anyone retunes the formula, in a build nobody
+would think to re-check. `score_explainer_body` describes the *shape* — bigger board pays more, a
+combo builds, speed stacks, finishing pays a bonus — and names no value that config can move.
+
+The level explainer takes the same line for a different reason: it reads the campaign length from
+`LevelPacks.campaign.size` rather than the 500 the spec names, so a content update that lengthens
+the pack cannot leave the copy lying. There is a test pinning the shipped count at 500 so that
+change is a deliberate one.
+
 ## 2026-09-07 — the tutorial's scrim reports taps instead of letting them through
 
 A guided step that says "tap the lit square" needs the lit square to work while the rest of the
@@ -1283,3 +1352,47 @@ actually make.
 The 37 are baselined in `UNWIRED`, held by two tests: one fails if a new name
 appears, the other fails if a listed name gains a reader and is left behind. The
 list can only shrink.
+
+## 2026-09-07 — the board survives a kill now
+
+Reported from a device: open the level pane mid-puzzle, tap the row you are
+already on, and every mark and placement is gone. Two separate faults behind one
+symptom.
+
+The small one: `goToLevel` restarted unconditionally, including for the level
+already on screen. Tapping your own row is a way of closing the pane, not a
+request to start over. It restarts only when the attempt is already over, where
+refusing would strand the player on a dead board.
+
+The large one: **there was no in-progress snapshot at all.** SPEC 13.3 describes
+one and BUILD-PLAN recorded C5 as delivering it; nothing did. Booster spends were
+written to disk the instant they happened and the board they paid for was not, so
+a force-quit mid-puzzle kept the charge and lost the reasoning — the worst
+possible half to save.
+
+`BoardSnapshot` lives on `AppData` rather than in Room. It is one small blob,
+there is only ever one of it, and nothing queries it; a table would have bought a
+migration and no capability. It stores what the player *did* — placements, their
+own crosses, the squares that cost a bone, lives, score — and not what the game
+derived. Auto-marks are recomputed from the placements on restore, because they
+are a function of it and a stored copy is a second source of truth that can
+disagree.
+
+Elapsed time is stored as a duration, not a start timestamp. A wall-clock start
+would count the hours the app spent closed, and a player resuming the next
+morning would find a level they had lost on time they never spent.
+
+It saves after every move, not on a lifecycle callback: a crash and a force-quit
+both skip `onStop`, and force-quitting mid-puzzle is the first thing a motivated
+player tries, so the only save that can be relied on is one that already
+happened.
+
+Two things the tests caught that the design did not:
+
+- The first attempt saved off `stateFlow`, which is a derived flow lagging the
+  source of truth by a dispatch — so every write persisted the board as it was
+  one move ago. Fifth time that lag has bitten in this file. `updateBoard`
+  captures the new state inside the transform instead of reading it back.
+- Opening a fresh level produced an empty snapshot on its first frame and wrote
+  it unconditionally, deleting the half-finished level the player had left
+  behind. A save now only ever writes over its own board's slot.

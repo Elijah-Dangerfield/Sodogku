@@ -1,10 +1,19 @@
 package com.sodogku.features.game.impl
 
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import com.sodogku.libraries.ads.AdGate
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
+import com.sodogku.libraries.config.values.BoostersRefillTo
+import com.sodogku.libraries.config.values.BoostersStartingSniffs
+import com.sodogku.libraries.config.values.BoostersStartingTreats
+import com.sodogku.libraries.config.values.FeatureAchievements
+import com.sodogku.libraries.config.values.FeatureBoosters
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.logging.KLog
@@ -35,7 +44,7 @@ import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.sodogku.AppCache
-import com.sodogku.libraries.sodogku.ConsumableRefillTo
+import com.sodogku.libraries.sodogku.BoardSnapshot
 import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
 import me.tatarka.inject.annotations.Assisted
@@ -81,6 +90,17 @@ class GameViewModel(
      */
     private val wallClock: Clock,
     private val deviceTimeZone: DeviceTimeZone,
+    /**
+     * The `scoring.*` coefficients. Asked for a fresh set at each scoring
+     * decision rather than held, so a retune lands on the next board rather
+     * than the next install — see [ConfiguredScoring].
+     */
+    private val scoringConfig: ConfiguredScoring,
+    private val startingSniffs: BoostersStartingSniffs,
+    private val startingTreats: BoostersStartingTreats,
+    private val refillTo: BoostersRefillTo,
+    private val achievementsEnabled: FeatureAchievements,
+    private val boostersEnabled: FeatureBoosters,
 ) : SEAViewModel<GameState, GameEvent, GameAction>(initialStateArg = GameState()) {
 
     private val logger = KLog.withTag("Game")
@@ -88,6 +108,15 @@ class GameViewModel(
     private var attemptStartedAt = clock.markNow()
     private var lastPlacementAt = clock.markNow()
     private var attemptNumber = 1
+
+    /**
+     * Play time this attempt had already accumulated before it was resumed.
+     *
+     * The monotonic clock restarts with the process, so a resumed board has to
+     * carry its own history. Adding it here rather than storing a wall-clock
+     * start is what keeps the hours the app spent closed out of the timer.
+     */
+    private var elapsedBeforeResume = 0L
     private var lastTappedCell: Int? = null
     private var warnedAboutLastBone = false
     private var lastTapAt: ComparableTimeMark? = null
@@ -195,8 +224,12 @@ class GameViewModel(
                 reduceAnimations = settings?.reduceAnimations == true,
                 showAchievements = settings?.achievementsVisible != false,
                 isPro = entitlements.isPro.value,
-                sniffs = settings?.sniffs ?: ConsumableRefillTo,
-                treats = settings?.treats ?: ConsumableRefillTo,
+                boostersEnabled = boostersEnabled(),
+                // Null is "never granted any", which is what a fresh install
+                // looks like — so the opening grant comes from config rather
+                // than from a default baked into the record that stores it.
+                sniffs = settings?.sniffs ?: startingSniffs(),
+                treats = settings?.treats ?: startingTreats(),
                 explainedBoosters = settings?.explainedBoosters
                     ?.mapNotNull { name -> Consumable.entries.firstOrNull { it.name == name } }
                     ?.toSet()
@@ -215,7 +248,13 @@ class GameViewModel(
             sendEvent(GameEvent.NavigateBack)
             return
         }
-        startAttempt(level)
+        // Only the attempt for *this* board comes back. A snapshot of some other
+        // level is left alone rather than discarded: the player may well return
+        // to it, and this screen has no business deciding that for them.
+        val saved = settings?.boardInProgress
+            ?.takeIf { it.levelId == level.id && it.isDaily == isDaily }
+            ?.takeIf { it.placements.size == level.size }
+        startAttempt(level, resume = saved)
     }
 
     /**
@@ -244,14 +283,19 @@ class GameViewModel(
         return LevelPacks.daily.byId(status.levelId)
     }
 
-    private suspend fun GameAction.startAttempt(level: LevelDefinition) {
+    private suspend fun GameAction.startAttempt(
+        level: LevelDefinition,
+        resume: BoardSnapshot? = null,
+    ) {
         attemptStartedAt = clock.markNow()
         lastPlacementAt = attemptStartedAt
         lastTappedCell = null
         lastTapAt = null
         warnedAboutLastBone = false
-        sniffsUsed = 0
-        treatsUsed = 0
+        sniffsUsed = resume?.sniffsUsed ?: 0
+        treatsUsed = resume?.treatsUsed ?: 0
+        elapsedBeforeResume = resume?.elapsedMs ?: 0L
+        attemptNumber = resume?.attemptNumber ?: attemptNumber
         // Campaign progress is keyed on level id alone, and the two packs share
         // that number line, so every read and every write here is skipped for a
         // daily. Reading campaign level 7's record for daily level 7 would be
@@ -286,11 +330,21 @@ class GameViewModel(
         // a dispatch, so a follow-up that re-read `state` would see the board as
         // it was before this update landed.
         val starterRow = 0
-        val giveStarter = level.id <= StarterDogThroughLevel
-        val opening = Solution.empty(level.size).let {
-            if (giveStarter) it.withPlacement(starterRow, level.solution[starterRow]) else it
+        // A resumed board already has whatever the starter dog gave it, and
+        // re-granting it would place a second dog in row 0.
+        val giveStarter = resume == null && level.id <= StarterDogThroughLevel
+        val opening = when {
+            resume != null -> Solution(resume.placements.toIntArray())
+            giveStarter -> Solution.empty(level.size).withPlacement(starterRow, level.solution[starterRow])
+            else -> Solution.empty(level.size)
         }
-        val openingMarks = if (giveStarter) level.board.autoMarkedCells(opening) else emptySet()
+        // Auto-marks are derived from the placements rather than restored, so a
+        // snapshot cannot disagree with the board it describes.
+        val openingMarks = if (opening.placedCount > 0) {
+            level.board.autoMarkedCells(opening)
+        } else {
+            emptySet()
+        }
 
         tutorialScript = if (tutorialActive && level.id !in guidedLevels) {
             Tutorial.scriptFor(level.id)
@@ -301,7 +355,7 @@ class GameViewModel(
         freeMistakeAvailable = tutorialScript.isNotEmpty() && level.id == Tutorial.FREE_MISTAKE_LEVEL
         val lesson = openFrame(level, opening, openingMarks)
 
-        updateState {
+        updateBoard {
             GameState(
                 level = level,
                 placed = opening,
@@ -312,7 +366,18 @@ class GameViewModel(
                     null
                 },
                 phase = GamePhase.Playing,
-                livesRemaining = ScoringConfig.MAX_LIVES,
+                manualMarks = resume?.manualMarks.orEmpty(),
+                wrongGuesses = resume?.wrongGuesses.orEmpty(),
+                livesRemaining = resume?.livesRemaining ?: ScoringConfig.MAX_LIVES,
+                score = resume?.let { saved ->
+                    ScoreCard(
+                        total = saved.score,
+                        combo = saved.combo,
+                        bestCombo = saved.bestCombo,
+                        placements = saved.placementCount,
+                    )
+                } ?: ScoreCard.Empty,
+                elapsedMs = resume?.elapsedMs ?: 0L,
                 sniffs = it.sniffs,
                 treats = it.treats,
                 explainedBoosters = it.explainedBoosters,
@@ -320,6 +385,7 @@ class GameViewModel(
                 haptics = it.haptics,
                 reduceAnimations = it.reduceAnimations,
                 showAchievements = it.showAchievements,
+                boostersEnabled = it.boostersEnabled,
                 isPro = it.isPro,
                 records = it.records,
                 unlockedThrough = campaignFrontier(unlocked, level.id),
@@ -502,7 +568,7 @@ class GameViewModel(
         val placed = state.placed
         val marks = state.autoMarks
         sendEvent(GameEvent.Marked(cell))
-        updateState {
+        updateBoard {
             it.copy(
                 manualMarks = if (cell in it.manualMarks) {
                     it.manualMarks - cell
@@ -530,12 +596,12 @@ class GameViewModel(
         val since = lastPlacementAt.elapsedNow().inWholeMilliseconds
         lastPlacementAt = clock.markNow()
 
-        val scored = Scoring.placement(state.score, level.size, since)
+        val scored = Scoring.placement(state.score, level.size, since, scoringConfig())
         val placed = state.placed.withPlacement(row, level.board.colOf(cell))
         val marksBefore = state.autoMarks
         val marks = level.board.autoMarkedCells(placed)
 
-        updateState {
+        updateBoard {
             it.copy(
                 placed = placed,
                 autoMarks = marks,
@@ -581,7 +647,7 @@ class GameViewModel(
         val placed = state.placed
         val marks = state.autoMarks
         val remaining = if (forgiven) state.livesRemaining else state.livesRemaining - 1
-        updateState {
+        updateBoard {
             it.copy(
                 score = Scoring.strike(it.score),
                 livesRemaining = remaining,
@@ -596,19 +662,30 @@ class GameViewModel(
             remaining <= 0 -> lose(remaining)
             remaining == 1 && !warnedAboutLastBone -> {
                 warnedAboutLastBone = true
-                updateState { it.copy(warning = GameWarning.LastBone) }
+                updateBoard { it.copy(warning = GameWarning.LastBone) }
             }
         }
     }
 
     private suspend fun GameAction.win(level: LevelDefinition, earned: ScoreCard) {
+        // One resolve for the whole finish. The paw rating compares the score
+        // against a par derived from these same numbers, so asking twice could
+        // rate a run against coefficients it was never played under.
+        val scoring = scoringConfig()
         val finished = Scoring.complete(
             earned,
             level.size,
             level.difficulty,
             state.livesRemaining,
+            scoring,
         )
-        val paws = Scoring.paws(finished.total, level.size, level.difficulty, completed = true)
+        val paws = Scoring.paws(
+            finished.total,
+            level.size,
+            level.difficulty,
+            completed = true,
+            config = scoring,
+        )
         val duration = elapsedMs()
 
         logger.logEvent(
@@ -647,7 +724,7 @@ class GameViewModel(
         )
 
         sendEvent(GameEvent.Won)
-        updateState {
+        updateBoard {
             it.copy(
                 phase = GamePhase.Won,
                 score = finished,
@@ -722,10 +799,15 @@ class GameViewModel(
             localHour = now.toLocalDateTime(deviceTimeZone.current()).hour,
             finishedAt = now.toEpochMilliseconds(),
         )
-        return Catching { achievements.record(result) }
+        val earned = Catching { achievements.record(result) }
             .logOnFailure { "Failed to record the attempt at level ${level.id}" }
             .getOrNull()
             .orEmpty()
+        // The log is written either way. `features.achievements` hides the
+        // badges, and a dark launch that also stopped recording would hand
+        // everyone an empty grid on the day it was switched back on — the same
+        // reason the Settings toggle is display-only.
+        return if (achievementsEnabled()) earned else emptyList()
     }
 
     /**
@@ -762,7 +844,7 @@ class GameViewModel(
             livesRemaining = livesRemaining,
             dailyStreakDays = streak,
         )
-        updateState {
+        updateBoard {
             it.copy(
                 phase = GamePhase.Lost,
                 elapsedMs = duration,
@@ -810,7 +892,7 @@ class GameViewModel(
 
         lastPlacementAt = clock.markNow()
         logger.logEvent("game.continued", "level_id" to (state.level?.id ?: 0))
-        updateState { it.copy(phase = GamePhase.Playing, livesRemaining = 1) }
+        updateBoard { it.copy(phase = GamePhase.Playing, livesRemaining = 1) }
     }
 
     /**
@@ -828,7 +910,7 @@ class GameViewModel(
         lastPlacementAt = clock.markNow()
         warnedAboutLastBone = false
         logger.logEvent("game.bones_refilled", "level_id" to (state.level?.id ?: 0))
-        updateState {
+        updateBoard {
             it.copy(
                 phase = GamePhase.Playing,
                 // Never downward, matching `refill`: a player holding more than
@@ -977,9 +1059,15 @@ class GameViewModel(
      * consumable is irreversible, and the first time someone taps an unfamiliar
      * button they should learn what it costs before it happens. After that a tap
      * spends one, or offers the ad when they are out.
+     *
+     * `features.boosters` is read here rather than trusted from [GameState], so
+     * a switch thrown mid-session stops the economy on the next tap instead of
+     * on the next board. Bones are exempt: three strikes is a game rule, and
+     * this path is only their explainer.
      */
     private suspend fun GameAction.boosterTapped(consumable: Consumable) {
         if (state.phase != GamePhase.Playing) return
+        if (consumable != Consumable.Bone && !boostersEnabled()) return
         val explained = consumable in state.explainedBoosters
         if (!explained || countOf(consumable) <= 0) {
             updateState { it.copy(boosterPrompt = consumable) }
@@ -1001,12 +1089,13 @@ class GameViewModel(
     }
 
     /**
-     * Tops the consumable back up to [ConsumableRefillTo] for an ad.
+     * Tops the consumable back up to `boosters.refillTo` for an ad.
      *
      * Never *reduces* a holding: a player who earned five treats from level
      * rewards and watches an ad should not be punished down to three.
      */
     private suspend fun GameAction.refill(consumable: Consumable) {
+        if (consumable != Consumable.Bone && !boostersEnabled()) return
         markExplained(consumable)
         val granted = entitlements.isPro.value ||
             adGate.showRewarded(AdPlacement.BoosterGrant) != RewardOutcome.Dismissed
@@ -1015,7 +1104,7 @@ class GameViewModel(
             return
         }
 
-        val topped = maxOf(countOf(consumable), ConsumableRefillTo)
+        val topped = maxOf(countOf(consumable), refillTo())
         logger.logEvent(
             "game.booster_refilled",
             "booster" to consumable.name.lowercase(),
@@ -1112,7 +1201,76 @@ class GameViewModel(
         }.logOnFailure { "Failed to persist $consumable count" }
     }
 
-    private fun elapsedMs(): Long = attemptStartedAt.elapsedNow().inWholeMilliseconds
+    /**
+     * `updateState`, plus a write of whatever it just produced.
+     *
+     * The new state is captured inside the transform rather than read back
+     * afterwards. `state` is a derived flow that lags the source of truth by a
+     * dispatch, so a save that read it back would persist the board as it was
+     * one move ago — which is the exact failure this is here to prevent, and the
+     * fifth time that lag has bitten in this file.
+     *
+     * Used for anything that changes what is on the board or ends the attempt.
+     * A timer tick or a dialog opening goes through plain `updateState`, because
+     * writing the file every second buys nothing.
+     */
+    private suspend fun GameAction.updateBoard(f: (GameState) -> GameState) {
+        var next: GameState? = null
+        updateState { current -> f(current).also { next = it } }
+        next?.let { saveBoard(it) }
+    }
+
+    private fun elapsedMs(): Long =
+        elapsedBeforeResume + attemptStartedAt.elapsedNow().inWholeMilliseconds
+
+    /**
+     * Writes the attempt to disk, or clears the slot when there is nothing worth
+     * coming back to.
+     *
+     * Called after every move rather than on a lifecycle callback. A crash and a
+     * force-quit both skip `onStop`, and force-quitting mid-puzzle is the first
+     * thing a motivated player tries — so the only save that can be relied on is
+     * the one that already happened.
+     *
+     * Never throws. Losing a snapshot costs a resume; letting the write take down
+     * the placement that triggered it costs the game.
+     */
+    private suspend fun saveBoard(state: GameState) {
+        val level = state.level
+        val snapshot = if (level == null || state.phase != GamePhase.Playing) {
+            null
+        } else {
+            BoardSnapshot(
+                levelId = level.id,
+                isDaily = isDaily,
+                placements = state.placed.columnByRow.toList(),
+                manualMarks = state.manualMarks,
+                wrongGuesses = state.wrongGuesses,
+                livesRemaining = state.livesRemaining,
+                score = state.score.total,
+                combo = state.score.combo,
+                bestCombo = state.score.bestCombo,
+                placementCount = state.score.placements,
+                elapsedMs = elapsedMs(),
+                attemptNumber = attemptNumber,
+                sniffsUsed = sniffsUsed,
+                treatsUsed = treatsUsed,
+            ).takeUnless { it.isEmpty }
+        }
+        Catching {
+            appCache.update { data ->
+                // Only ever write over this board's own slot. Opening a fresh
+                // level produces a `null` snapshot on its first frame, and
+                // writing that unconditionally threw away the half-finished
+                // level the player had left behind — which is the thing the
+                // whole feature exists to keep.
+                val held = data.boardInProgress
+                val ours = held == null ||
+                    (held.levelId == level?.id && held.isDaily == isDaily)
+                if (ours) data.copy(boardInProgress = snapshot) else data
+            }
+        }.logOnFailure { "Failed to save the board" }
+    }
 
     private val modeName: String get() = if (isDaily) "daily" else "campaign"
 
@@ -1187,6 +1345,14 @@ data class GameState(
      * player who turns them back on sees real history rather than a blank grid.
      */
     val showAchievements: Boolean = true,
+
+    /**
+     * `features.boosters`, for the row of Sniff and Treat buttons. True by
+     * default so a board built before the flag is read — a preview, a test, a
+     * first launch with no network — has the economy rather than losing it.
+     * Bones are unaffected either way: three strikes is a game rule.
+     */
+    val boostersEnabled: Boolean = true,
 
     /** How far the player has reached; the level drawer unlocks up to it. */
     val unlockedThrough: Int = LevelRecord.FIRST_LEVEL_ID,
