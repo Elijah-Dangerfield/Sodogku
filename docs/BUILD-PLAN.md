@@ -2060,7 +2060,7 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 
 | # | Item | State |
 |---|---|---|
-| S1 | **Feedback loop, end to end.** Swipe in from the right on iOS in debug and TestFlight builds to slide out a feedback form. Sends to Sentry, with a screenshot and a checkbox to attach a tail of in-memory logs. Owner feedback is a **directive**: a triage skill scans Sentry for these and files them as TODOs, and a worker routine picks items off that list. `Workspace/Cards` has a version of this to copy from | |
+| S1 | **Feedback loop, end to end.** Swipe in from the right on iOS in debug and TestFlight builds to slide out a feedback form. Sends to Sentry, with a screenshot and a checkbox to attach a tail of in-memory logs. Owner feedback is a **directive**: a triage skill scans Sentry for these and files them as TODOs, and a worker routine picks items off that list. `Workspace/Cards` has a version of this to copy from | **DONE** (2026-09-08) |
 | S2 | Tapping a dog that is already correctly placed could play the shake animation | |
 | S3 | **Puzzle timer.** Persist elapsed time per puzzle, counting only while foregrounded. Show the completion time on the win dialog and in the level pane list | |
 | S4 | **Three paws feel unreachable.** Solving fast still lands on 2/3. Work out whether par, the thresholds or the multipliers are wrong | |
@@ -2068,8 +2068,8 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S6 | **The Pro screen's entrance is wrong.** It slides up over Settings while Settings slides out to the left, and coming back Settings slides up from the bottom so it reads as the Pro screen moving. Settings should stay put and only the Pro screen should move | **DONE** (2026-09-08) — see below |
 | S7 | **The achievements dialog renders under the header** — the scrim is not full page. `Workspace/Cards` does dialogs the right way | **already fixed** — verified on device, see below |
 | S8 | A trophy icon with a badge count beside the settings gear on the puzzle screen, the badge persisting until the player opens it | |
-| S9 | Tapping the bones bounces but does nothing | probably fixed 2026-09-08 (R14 batch) — **re-verify on device** |
-| S10 | **Some cells still refuse a double tap**, so a deliberate wrong placement is impossible. Losing the bone is the preferred outcome. Only a square that already holds a dog, or one that already failed, should refuse. Also worth exploring: telling the player *why* a placement failed — a toast, or a line drawn between the two conflicting squares — but only where doing so reveals nothing they did not already have | partly fixed 2026-09-08 (auto-marked squares, then red squares) — **re-verify; the "why" half is not started** |
+| S9 | Tapping the bones bounces but does nothing | **CONFIRMED FIXED** on device (2026-09-08) |
+| S10 | **Some cells still refuse a double tap**, so a deliberate wrong placement is impossible. Losing the bone is the preferred outcome. Only a square that already holds a dog, or one that already failed, should refuse. Also worth exploring: telling the player *why* a placement failed | **CONFIRMED FIXED** on device (2026-09-08); the "why" already exists as the broken-rule highlight, and making it flashier is S21 |
 | S11 | **Win celebration.** Golden paws zip up into the score and the score counts up on an odometer. `Workspace/Cards` `PlayPokerScreen` has the pattern | |
 | S12 | **Streaks, properly.** After the first few puzzles, a full-screen non-skippable "tap the paws to start your streak" that fills in a greyed-out thing. A streak page that appears on crossing a threshold and animates the day filling in, with haptics. The streak visible somewhere in the app — a flame icon as a small circular button with a badge, which `Workspace/Virtu` already has. Tapping it opens the streak page with no animation. Longest streak shown there. A weekly present for keeping it. Possibly the Duolingo trick of decaying the iOS app icon as the streak dies | |
 | S13 | Game Center on iOS | |
@@ -2165,3 +2165,24 @@ to avoid. It is linear in the delta between a 320ms floor and a 1400ms ceiling.
 
 Still open: whether the score *should* reach these magnitudes at all. That is a
 scoring question rather than a presentation one, and it belongs with the paw work.
+
+
+### S9 and S10 · Both confirmed fixed on a device (2026-09-08)
+
+Reported against an older build, as suspected. Measured on the emulator against
+a current one:
+
+**S9, the bones pill.** Opens its explainer, closes, and opens again on the next
+tap. The bug was that it fell through to a branch clearing a prompt nobody had
+opened, so it worked exactly once per install and then went dead while keeping
+its press animation.
+
+**S10, the refused double tap.** Double-tapping an auto-crossed square now costs
+a bone: the counter goes from three to two, which is the outcome the ask asked
+for. Double-tapping the same square again costs nothing, which is the other half
+— that square already cost a bone and is finished, and charging twice for one
+mistake was the bug introduced by fixing the first one.
+
+The "tell the player why it failed" part of S10 turns out to already exist: the
+broken-rule highlight outlines the rule that the placement violated. The ask to
+make it more colourful is S21.
