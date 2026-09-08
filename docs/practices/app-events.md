@@ -73,10 +73,41 @@ The events that motivated shipping direct-to-Grafana: what never reaches the bac
 
 ## Product funnels
 
-Seed your own here as features land — the onboarding feature already emits
-`onboarding.step_viewed` / `onboarding.auth_selected` / `onboarding.completed` /
-`onboarding.abandoned` (see `OnboardingViewModel`). Keep the pattern: one row per event, name the
-attributes and the exact fire site.
+Onboarding emits `onboarding.step_viewed` / `onboarding.auth_selected` / `onboarding.completed` /
+`onboarding.abandoned` (see `OnboardingViewModel`).
+
+## Gameplay
+
+Every one of these comes from `GameViewModel`. They carry `level_id` rather than a level *name*
+because the level is content: the pack is regenerated when the difficulty engine changes, and a
+dashboard keyed on anything else would silently start comparing two different boards.
+
+`attempt_number` is per level and per session — it resets when a different level is opened, not
+when the app restarts. It is what makes "how many tries does level 312 take" answerable without
+a session join.
+
+| Event | Attributes | Fires |
+|---|---|---|
+| `game.level_started` | `level_id`, `size`, `difficulty`, `attempt_number` | Every attempt, including a retry after a loss and a jump from the level pane. Not on resume from background |
+| `game.level_completed` | `level_id`, `size`, `difficulty`, `duration_ms`, `score`, `paws`, `strikes_used`, `attempt_number` | The last dog lands. `duration_ms` is monotonic from the attempt's start, so backgrounding does not inflate it |
+| `game.level_failed` | `level_id`, `duration_ms`, `dogs_placed`, `attempt_number` | The third bone goes. `dogs_placed` is how far they got, which is the difference between "too hard" and "unlucky" |
+| `game.continued` | `level_id` | A rewarded continue after a loss, board intact |
+| `game.bones_refilled` | `level_id` | The standing ad offer on the board, or the refill button on the lose sheet |
+| `game.booster_used` | `booster` (`sniff`/`treat`), `level_id` | A charge is actually spent |
+| `game.booster_no_op` | `booster`, `level_id` | A booster was asked for and **declined to spend**, because it had nothing to show. Should be rare; a rise means the hint engine is running out of things to say earlier than it should, which is a difficulty-calibration signal and not a UI one |
+| `game.booster_refilled` | `booster`, `to` | An ad topped a consumable up. `to` is the resulting holding, not the amount granted — refills never reduce, so the two differ for anyone above the floor |
+
+### The one that pays for itself
+
+Difficulty calibration. `difficulty` on `level_started` / `level_completed` is the tier the
+deduction engine assigned, and `attempt_number`, `duration_ms` and `strikes_used` are what
+players actually experienced. The engine's rating is a claim about how hard a board is to
+*reason* about; these are the measurement of whether that claim holds.
+
+It has already been wrong once. A guard bug in the tier-2 adjacency technique had 4% of boards
+rated harder than they are (`decisions.md`, 2026-09-07), and nothing in the app would have
+surfaced it — the pack verification only checks that the stored numbers are in range. A band
+where tier 4 completes faster than tier 3 is the shape to watch for.
 
 ## Warn+ log forwarding (not events)
 
