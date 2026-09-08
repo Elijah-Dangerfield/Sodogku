@@ -57,6 +57,11 @@ silently and looks like a board nobody is on.
 Each board needs at least one localisation (display name and score-format
 suffix) and an image.
 
+The app side is live as of `647d4a8`: the module is in the graph, and Settings
+shows a Leaderboards row on iOS once Game Center answers. Until these two
+records exist, submissions go out and are dropped by the platform, which is the
+designed behaviour and produces no error anywhere.
+
 ---
 
 ## 4. developer.apple.com: enable Game Center on the App ID
