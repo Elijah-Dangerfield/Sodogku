@@ -427,6 +427,49 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun tappingADogThatIsAlreadyThereShakesInsteadOfDoingNothing() = runUnitTest {
+        val vm = viewModel()
+        vm.commit(cellFor(row = 0))
+        val placedCell = vm.state.placedCells.first()
+        val before = vm.state.shakeNonce
+
+        vm.note(placedCell)
+
+        assertTrue(vm.state.shakeNonce > before, "the tap was ignored silently")
+        assertEquals(placedCell, vm.state.shakeCell)
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining, "a refused tap cost a bone")
+        assertTrue(placedCell !in vm.state.manualMarks, "a refused tap wrote a cross")
+    }
+
+    @Test
+    fun aRefusedTapStopsExplainingTheLastRealMistake() = runUnitTest {
+        // `brokenRule` reads `strikeCell`. Leaving it set through a refused tap
+        // would keep a rule chip outlined next to a tap that broke no rule.
+        val vm = viewModel()
+        vm.commit(wrongCellIn(row = 0))
+        assertTrue(vm.state.strikeCell != null, "the wrong guess was never diagnosed")
+        vm.commit(cellFor(row = 1))
+        val placedCell = vm.state.placedCells.first()
+
+        vm.note(placedCell)
+
+        assertEquals(null, vm.state.strikeCell, "a refused tap left a stale rule explanation up")
+    }
+
+    @Test
+    fun aRealStrikeStillShakesAndStillDiagnoses() = runUnitTest {
+        // The other half. Routing every refusal through `nudge` would be easy
+        // to over-apply until a genuine wrong guess stopped explaining itself.
+        val vm = viewModel()
+        val before = vm.state.shakeNonce
+
+        vm.commit(wrongCellIn(row = 0))
+
+        assertTrue(vm.state.shakeNonce > before, "a wrong guess did not shake")
+        assertEquals(wrongCellIn(row = 0), vm.state.strikeCell, "a wrong guess did not diagnose")
+    }
+
+    @Test
     fun aSecondCommitOnASquareThatAlreadyCostABoneCostsNothing() = runUnitTest {
         // The mirror of the bug that started this review. That one was `commit`
         // refusing too much; this is `commit` refusing too little, in the one

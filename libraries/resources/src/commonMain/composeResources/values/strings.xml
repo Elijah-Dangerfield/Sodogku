@@ -68,10 +68,8 @@
     <string name="level_explainer_daily_body">One fresh board a day, on a %1$d×%1$d grid. Clear it and your streak goes up; miss a day and it starts again, unless you spend a freeze.</string>
 
     <string name="score_explainer_title">Score</string>
-    <string name="score_explainer_body">Every dog you place is worth points, and a bigger board pays more per dog. Land them one after another without a wrong guess and a combo multiplier builds; land them quickly and a speed bonus stacks on top. Finishing pays a bonus of its own, worth more on a hard board and more again for every bone you still have.</string>
-    <string name="score_explainer_total">The number up top is everything you have earned, from every board you have finished, campaign levels and daily boards alike. Replaying a board you have already cleared only moves it once you beat your old score there, and then only by the difference.</string>
-    <string name="score_explainer_boosters">Sniffs and treats come out of what the board pays. They never cost you paws.</string>
-    <string name="score_explainer_paws">The paws at the end measure your score against par, which is what a clean, quick run on this board is worth. Three paws means you got close to it.</string>
+    <string name="score_explainer_total">Everything you have earned, from every board you finish. Placing dogs quickly and without mistakes pays more.</string>
+    <string name="score_explainer_replay">Replaying a board you have already cleared only adds the difference, and only if you beat your old score.</string>
 
     <string name="levels_title">Levels</string>
     <string name="levels_locked">Locked</string>

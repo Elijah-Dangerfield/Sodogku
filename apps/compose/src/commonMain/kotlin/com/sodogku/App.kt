@@ -32,6 +32,7 @@ import com.sodogku.libraries.navigation.AnimationType
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.NavigationOptions
 import com.sodogku.libraries.navigation.Route
+import com.sodogku.libraries.navigation.RouteTransitions
 import com.sodogku.libraries.navigation.floatingwindow.FloatingWindowHost
 import com.sodogku.libraries.navigation.floatingwindow.FloatingWindowNavigator
 import com.sodogku.libraries.navigation.impl.DelegatingRouter
@@ -285,59 +286,32 @@ private fun AppNavigation(
                 navController = navController,
                 startDestination = startDestination,
                 //To make this more readable consider Screens A and B
+                // The rules live in RouteTransitions so they can be tested.
+                // These lambdas are handed a NavBackStackEntry inside an
+                // AnimatedContentTransitionScope, neither of which a unit test
+                // can build, so while the rules were inline the only way to
+                // check them was to open the app and watch.
                 enterTransition = {
-                    // A -> B
-                    // How should we animate the B screen?
-                    // Enter animation should match B's Enter
-                    val targetRoute = targetState.toRouteOrNull<Route>()
-                    val (animationType, reason) = when {
-                        targetRoute != null -> targetRoute.enter to "Using target route enter animation"
-                        else -> AnimationType.None to "Target destination is not a Route; default to none"
-                    }
-
-                    animationType.toEnterTransition()
+                    RouteTransitions.enter(
+                        target = targetState.toRouteOrNull<Route>(),
+                    ).toEnterTransition()
                 },
                 popEnterTransition = {
-                    // Popping from B back to A
-                    // How should we animate the A screen?
-                    // Enter animation should match initials pop EXIT transition
-                    // AKA if B slides out, A should slide IN
-                    val initialRoute = initialState.toRouteOrNull<Route>()
-                    val targetRoute = targetState.toRouteOrNull<Route>()
-                    val (animationType, reason) = when {
-                        initialRoute != null -> initialRoute.popExit.opposite() to "Mirroring initial popExit animation"
-                        targetRoute != null -> targetRoute.enter to "Fallback to target route enter animation"
-                        else -> AnimationType.None to "No route metadata; default to none"
-                    }
-
-                    animationType.toEnterTransition()
+                    RouteTransitions.popEnter(
+                        initial = initialState.toRouteOrNull<Route>(),
+                        target = targetState.toRouteOrNull<Route>(),
+                    ).toEnterTransition()
                 },
                 exitTransition = {
-                    // A -> B
-                    // Initial: A | Target B
-                    // How should we animate the A screen
-                    // Exit animation should match A's Exit
-                    val initialRoute = initialState.toRouteOrNull<Route>()
-                    val (animationType, reason) = when {
-                        initialRoute != null -> initialRoute.exit to "Using initial route exit animation"
-                        else -> AnimationType.None to "Initial destination is not a Route; default to none"
-                    }
-
-                    animationType.toExitTransition()
+                    RouteTransitions.exit(
+                        initial = initialState.toRouteOrNull<Route>(),
+                        target = targetState.toRouteOrNull<Route>(),
+                    ).toExitTransition()
                 },
                 popExitTransition = {
-                    // Popping from B back to A
-                    // Initial: B | Target A
-                    // How should we animate the B screen
-                    // Exit animation should match B's pope Exit
-                    val initialRoute = initialState.toRouteOrNull<Route>()
-
-                    val (animationType, reason) = when {
-                        initialRoute != null -> initialRoute.popExit to "Using initial route popExit animation"
-                        else -> AnimationType.None to "Initial destination is not a Route; default to none"
-                    }
-
-                    animationType.toExitTransition()
+                    RouteTransitions.popExit(
+                        initial = initialState.toRouteOrNull<Route>(),
+                    ).toExitTransition()
                 },
                 typeMap = mapOf(
                     typeOf<AnimationType>() to serializableType<AnimationType>()

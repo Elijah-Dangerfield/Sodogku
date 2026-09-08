@@ -26,6 +26,8 @@ import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.libraries.ui.system.LocalBuildInfo
 import com.sodogku.libraries.ui.system.LocalContentColor
+import com.sodogku.libraries.ui.Elevation
+import com.sodogku.libraries.ui.elevation
 import com.sodogku.system.Radii
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.system.color.ColorResource
@@ -73,9 +75,29 @@ fun IconButton(
             // a 48dp focusable button with nothing on it — and whether a reader
             // finds it is up to the reader. Here it is on the thing being
             // pressed, which is the thing being described.
-            modifier = modifier.semantics(mergeDescendants = true) {
-                icon.contentDescription?.let { contentDescription = it }
-            },
+            // A shadow all the way round, but only on a button that has a fill.
+            //
+            // White circles on cream is the app's most common button and the
+            // hardest to see: the gear and the menu on the board are a 4%
+            // lightness step from the page they sit on, so they read as marks
+            // printed on the background rather than as objects on top of it.
+            // The shadow does two jobs at once, making the edge findable and
+            // saying the thing is raised, which is the convention for "you can
+            // press this".
+            //
+            // Skipped when there is no fill: a bare icon has no surface to lift
+            // off the page, and a shadow under one is a shadow under a glyph.
+            modifier = modifier
+                .then(
+                    if (backgroundColor != null) {
+                        Modifier.elevation(Elevation.Button, Radii.IconButton.shape)
+                    } else {
+                        Modifier
+                    },
+                )
+                .semantics(mergeDescendants = true) {
+                    icon.contentDescription?.let { contentDescription = it }
+                },
             contentPadding = PaddingValues(padding),
             color = backgroundColor,
             contentColor = iconColor,

@@ -23,6 +23,9 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import com.sodogku.libraries.ui.Elevation
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.bounceClick
+import com.sodogku.libraries.ui.components.icon.Icon
+import com.sodogku.libraries.ui.components.icon.IconSize
+import com.sodogku.libraries.ui.components.icon.Icons
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.elevation
 import com.sodogku.system.AppTheme
@@ -117,7 +120,7 @@ private fun UnlockToast(item: UnlockToastItem, onClick: () -> Unit) {
             .padding(horizontal = Dimension.D700, vertical = Dimension.D400),
     ) {
         Text(text = item.glyph, typography = AppTheme.typography.Heading.H700)
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.label,
                 typography = AppTheme.typography.Caption.C300,
@@ -125,6 +128,18 @@ private fun UnlockToast(item: UnlockToastItem, onClick: () -> Unit) {
             )
             Text(text = item.title, typography = AppTheme.typography.Body.B600)
         }
+        // A trophy on every pill, at the trailing edge rather than the leading
+        // one. The glyph on the left is the badge's own, and it varies: a paw, a
+        // bolt, a bathtub. Nothing about the pill said "this is an award" except
+        // the word "unlocked" in caption type, so the shape had to be read to be
+        // understood. The trophy is the same on all of them, which is the point
+        // — it is the part that means "you earned something" rather than the
+        // part that says which thing.
+        Icon(
+            icon = Icons.Trophy.decorative,
+            size = IconSize.Small,
+            color = AppTheme.colors.accentPrimary,
+        )
     }
 }
 

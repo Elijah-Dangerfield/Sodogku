@@ -899,7 +899,14 @@ class GameViewModel(
      */
     private suspend fun GameAction.tap(cell: Int) {
         if (state.phase != GamePhase.Playing) return
-        if (cell in state.placedCells) return
+        // A dog that is already placed stays placed, but the board says so
+        // rather than ignoring the tap. `strikeCell` is deliberately cleared:
+        // nothing was broken here, so the rule chip explaining the last real
+        // mistake should stop pointing at it.
+        if (cell in state.placedCells) {
+            nudge(cell)
+            return
+        }
         // A square that already cost a bone is finished, and the guard belongs
         // here rather than in `toggleMark` alone.
         //
@@ -913,7 +920,10 @@ class GameViewModel(
         // The accessibility path never had this bug — `GameScreen` refuses the
         // placement action on `wrongGuesses` — so the two paths disagreed about
         // what a red square is. They agree now: it is inert.
-        if (cell in state.wrongGuesses) return
+        if (cell in state.wrongGuesses) {
+            nudge(cell)
+            return
+        }
 
         val now = clock.markNow()
         val isSecondTap = lastTappedCell == cell &&
@@ -933,6 +943,27 @@ class GameViewModel(
             markedBeforeFirstTap = cell in state.visibleAutoMarks || cell in state.manualMarks
             toggleMark(cell)
         }
+    }
+
+    /**
+     * The board saying no, at no cost.
+     *
+     * A tap the rules refuse — on a dog already placed, or on a square that
+     * already cost a bone — used to return silently. Silence is the worst
+     * possible answer: it is exactly what a broken control looks like, and two
+     * of the bugs found on this screen were reported as "the tap did nothing"
+     * when the tap was being deliberately ignored.
+     */
+    private suspend fun GameAction.nudge(cell: Int) {
+        updateState {
+            it.copy(
+                shakeCell = cell,
+                shakeNonce = it.shakeNonce + 1,
+                // Nothing was broken, so stop explaining the last thing that was.
+                strikeCell = null,
+            )
+        }
+        sendEvent(GameEvent.Struck(cell))
     }
 
     /** Writes or erases the player's own cross. Free, and never a life. */
@@ -1141,6 +1172,8 @@ class GameViewModel(
                 wrongGuesses = it.wrongGuesses + cell,
                 strikeCell = cell,
                 strikeNonce = it.strikeNonce + 1,
+                shakeCell = cell,
+                shakeNonce = it.shakeNonce + 1,
             )
         }
         if (!forgiven) persistCounts(Consumable.Bone, remaining)

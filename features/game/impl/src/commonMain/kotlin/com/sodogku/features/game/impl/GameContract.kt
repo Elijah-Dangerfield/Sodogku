@@ -163,9 +163,27 @@ data class GameState(
     val boosterPrompt: Consumable? = null,
     val phase: GamePhase = GamePhase.Loading,
 
-    /** Bumped per wrong tap so the same cell can shake twice in a row. */
+    /**
+     * The last wrong guess, for `brokenRule` to explain.
+     *
+     * Separate from [shakeCell] because the two answer different questions.
+     * This one is "which placement broke a rule, and which rule", and only a
+     * real strike has an answer. The shake is just the board saying no, and
+     * plenty of taps deserve that without anything being broken.
+     */
     val strikeNonce: Int = 0,
     val strikeCell: Int? = null,
+
+    /**
+     * The cell to shake, and a nonce so the same one can shake twice running.
+     *
+     * Bumped by a strike *and* by a tap the board simply refuses, such as one on
+     * a dog that is already placed. Refusing silently is what made the earlier
+     * double-tap bugs so hard to read from the outside: a control that does
+     * nothing is indistinguishable from a control that is broken.
+     */
+    val shakeNonce: Int = 0,
+    val shakeCell: Int? = null,
 
     /** Bumped per placement so two identically-scored taps both animate. */
     val pointsNonce: Int = 0,

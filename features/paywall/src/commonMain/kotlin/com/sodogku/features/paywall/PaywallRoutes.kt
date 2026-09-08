@@ -22,6 +22,8 @@ class PaywallRoute(
     enter = AnimationType.SlideUp,
     exit = AnimationType.SlideDown,
     popExit = AnimationType.SlideDown,
+    // Settings stays exactly where it was while this slides up over it.
+    coversParent = true,
 )
 
 /**

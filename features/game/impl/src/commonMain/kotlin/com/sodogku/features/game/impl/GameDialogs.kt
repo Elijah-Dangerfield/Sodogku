@@ -54,9 +54,7 @@ import sodogku.libraries.resources.generated.resources.rules_line_body
 import sodogku.libraries.resources.generated.resources.rules_region_body
 import sodogku.libraries.resources.generated.resources.rules_title
 import sodogku.libraries.resources.generated.resources.rules_touch_body
-import sodogku.libraries.resources.generated.resources.score_explainer_body
-import sodogku.libraries.resources.generated.resources.score_explainer_boosters
-import sodogku.libraries.resources.generated.resources.score_explainer_paws
+import sodogku.libraries.resources.generated.resources.score_explainer_replay
 import sodogku.libraries.resources.generated.resources.score_explainer_title
 import sodogku.libraries.resources.generated.resources.score_explainer_total
 
@@ -244,9 +242,7 @@ private fun ScoreContent() {
         typography = AppTheme.typography.Heading.H700,
     )
     Body(stringResource(Res.string.score_explainer_total))
-    Body(stringResource(Res.string.score_explainer_body))
-    Body(stringResource(Res.string.score_explainer_boosters))
-    Body(stringResource(Res.string.score_explainer_paws))
+    Body(stringResource(Res.string.score_explainer_replay))
 }
 
 @Composable

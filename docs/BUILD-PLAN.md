@@ -2065,7 +2065,7 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S3 | **Puzzle timer.** Persist elapsed time per puzzle, counting only while foregrounded. Show the completion time on the win dialog and in the level pane list | |
 | S4 | **Three paws feel unreachable.** Solving fast still lands on 2/3. Work out whether par, the thresholds or the multipliers are wrong | |
 | S5 | **A fake interstitial in debug builds**, so it is visible when a real one would show. A black screen saying "Ads go here" is enough, and it must be skippable. Separately: when an ad fails to load, fall back to a Sodogku Pro self-promo with a short forced dwell | |
-| S6 | **The Pro screen's entrance is wrong.** It slides up over Settings while Settings slides out to the left, and coming back Settings slides up from the bottom so it reads as the Pro screen moving. Settings should stay put and only the Pro screen should move | |
+| S6 | **The Pro screen's entrance is wrong.** It slides up over Settings while Settings slides out to the left, and coming back Settings slides up from the bottom so it reads as the Pro screen moving. Settings should stay put and only the Pro screen should move | **DONE** (2026-09-08) — see below |
 | S7 | **The achievements dialog renders under the header** — the scrim is not full page. `Workspace/Cards` does dialogs the right way | **already fixed** — verified on device, see below |
 | S8 | A trophy icon with a badge count beside the settings gear on the puzzle screen, the badge persisting until the player opens it | |
 | S9 | Tapping the bones bounces but does nothing | probably fixed 2026-09-08 (R14 batch) — **re-verify on device** |
@@ -2076,11 +2076,16 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S14 | **Ads only for bones and sniffs**, nothing else. That constrains how generously streaks and rewards can be handed out, especially with a weekly prize in play | |
 | S15 | Great telemetry across the puzzle and all of the above. Players will complain about losing a streak and we need to be able to answer | |
 | S16 | "Beat 84.6% of players" on the win dialog. Decide whether that is real data or a qualitative message derived from the player's own run | |
-| S17 | A trophy on each of the floating achievement pills | |
+| S17 | A trophy on each of the floating achievement pills | **DONE** (2026-09-08) |
 | S18 | **Difficulty ramps too slowly.** It stays easy for too long | |
 | S19 | The shake dialog picks a random "sentient" title. Remove all of it and make it normal | **DONE** (2026-09-08) |
-| S20 | **The score dialog is far too much text**, and the score counts up very fast. Question whether the number should get that big at all | |
+| S20 | **The score dialog is far too much text**, and the score counts up very fast. Question whether the number should get that big at all | copy and count-up **DONE** (2026-09-08); magnitude sits with the scoring pass |
 | S21 | The broken-rule highlight is good and could be more colourful. Consider a small shake of the whole grid on a wrong guess | |
+| S22 | An attractor on Sniff when it is worth using: a flashing ring, the bone inside shaking, a slight scale up. A small "look at me" | |
+| S23 | **The circular icon buttons are hard to see.** They want a soft shadow all the way round, which makes them visible *and* says they are tappable | |
+| S24 | **Rework the booster row to the competitor's shape** (screenshot 2026-09-08): circular white buttons in a row, each with a picture and a label underneath. They call Sniff "Locate", which is a better word. Use pictures where we can: a paw, a bone, a dog. Consider adding a Clear button | |
+| S25 | **Meowdoku's hint works differently and better.** It picks a cat, highlights that cat's row, column and touching cells, paints an X into every one of them, and offers an **Apply** button. Ours reveals ruled-out squares with no confirm step | |
+| S26 | Drag across the board to cross off several squares in one gesture | |
 
 ### Notes taken while logging these
 
@@ -2119,3 +2124,44 @@ has high contrast.
 The KDoc on `BadgeDetailDialog` describes exactly the bug that was reported and
 says it was the reason the hand-rolled version was replaced, so this is a report
 against a build from before that change. Same shape as S9 and S10.
+### S6 · A route that covers rather than replaces (2026-09-08)
+
+The paywall already declared `enter = SlideUp, popExit = SlideDown`, so Pro's own
+movement was right. What was wrong was the screen underneath, and it was wrong
+because nothing in the navigation model could express "this one covers that one".
+
+The three animations on `Route` only ever describe that route's own movement.
+What the screen beneath does is *derived*: it plays its own `exit` on the way in,
+and the opposite of the top route's `popExit` on the way back. For a push that is
+correct, because the two screens travel together and only one should be on screen
+at the end. For an overlay it is exactly wrong. Settings inherits the default
+`SlideOutToLeft`, so it slid away as Pro slid up; and `SlideDown.opposite()` is a
+slide up from the bottom, so it slid back up as Pro slid down. Both halves made
+the still page the thing that appeared to move.
+
+`Route.coversParent` says so explicitly rather than inferring it from the
+animation pair, and the covered screen then plays nothing at all.
+
+**The rules moved out of `App.kt` into `RouteTransitions`.** They were inline
+`NavHost` lambdas taking a `NavBackStackEntry` inside an
+`AnimatedContentTransitionScope`, neither of which a unit test can construct, so
+the only way to check a transition was to open the app and watch one. That is why
+this survived. Six tests cover it now, mutation-checked including against the
+original bug.
+
+### S20 · The score dialog, and the roll (2026-09-08)
+
+**The copy went from about 130 words to about 35.** Four paragraphs explained the
+points formula, the combo and speed multipliers, the completion bonus, what
+boosters cost and how paws map to par. Somebody who taps a number wants to know
+what the number is. Two lines now: what it counts, and the one rule that
+surprises people, which is that replaying only adds the difference.
+
+**The roll now scales with the jump.** `ScoreCounter` used a flat 420ms whatever
+the delta, and a placement pays a few hundred points where a clear pays a few
+thousand. The same duration across a tenfold range meant the clear blurred and
+the number simply appeared to change, which is the one thing the animation exists
+to avoid. It is linear in the delta between a 320ms floor and a 1400ms ceiling.
+
+Still open: whether the score *should* reach these magnitudes at all. That is a
+scoring question rather than a presentation one, and it belongs with the paw work.

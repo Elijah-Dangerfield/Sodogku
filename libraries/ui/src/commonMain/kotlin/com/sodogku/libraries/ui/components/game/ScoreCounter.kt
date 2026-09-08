@@ -19,6 +19,7 @@ import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -27,6 +28,13 @@ import kotlin.math.roundToInt
  * The count-up is the point. A number that jumps from 3,840 to 4,896 reads as a
  * different number; one that rolls there reads as *earning* 1,056, which is the
  * feedback the whole scoring system exists to deliver.
+ *
+ * The roll takes longer for a bigger jump. It used to be a flat 420ms whatever
+ * the delta, which is fine for the few hundred points a placement pays and far
+ * too fast for the few thousand a completion pays: the digits blurred and the
+ * number simply appeared to change, which is the thing the animation exists to
+ * avoid. Scaling it means a placement still feels immediate while a level clear
+ * is watchable.
  */
 @Composable
 fun ScoreCounter(
@@ -41,7 +49,7 @@ fun ScoreCounter(
         if (start == score) return@LaunchedEffect
         from.intValue = start
         val progress = Animatable(0f)
-        progress.animateTo(1f, tween(durationMillis = CountUpMillis)) {
+        progress.animateTo(1f, tween(durationMillis = countUpMillis(score - start))) {
             displayed = (start + (score - start) * value).roundToInt()
         }
         displayed = score
@@ -101,7 +109,25 @@ fun FloatingPoints(
     }
 }
 
-private const val CountUpMillis = 420
+/**
+ * How long to roll, given how far.
+ *
+ * Linear in the delta between a floor and a ceiling. The floor keeps a small
+ * gain from feeling sluggish, and the ceiling keeps a huge one from holding the
+ * screen: past a few thousand points nobody is reading the digits anyway, they
+ * are watching it climb, and the extra time buys nothing.
+ */
+internal fun countUpMillis(delta: Int): Int =
+    (MinCountUpMillis + abs(delta) * MillisPerPoint).roundToInt()
+        .coerceAtMost(MaxCountUpMillis)
+
+/** Quick enough that a single placement still reads as immediate. */
+private const val MinCountUpMillis = 320
+
+/** A level clear pays a few thousand, and lands near the ceiling. */
+private const val MaxCountUpMillis = 1400
+
+private const val MillisPerPoint = 0.35f
 private const val FloatMillis = 900
 private const val FloatStartScale = 0.7f
 private const val FloatScaleRamp = 4f

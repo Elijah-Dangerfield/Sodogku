@@ -91,6 +91,25 @@ open class Route(
     val enter: AnimationType = AnimationType.SlideInFromRight,
     val exit: AnimationType = AnimationType.SlideOutToLeft,
     val popExit: AnimationType = AnimationType.SlideOutToRight,
+    /**
+     * Whether this route *covers* the screen beneath it rather than replacing it.
+     *
+     * The three animations above only ever describe the route's own movement.
+     * What the screen underneath does is derived: it plays its own `exit` on the
+     * way in, and the opposite of this route's `popExit` on the way back. For a
+     * push that reads correctly, because the two screens are travelling together
+     * and only one of them should be on screen at the end.
+     *
+     * For something that slides up over what you were doing it reads wrong, and
+     * the paywall was the proof. Opening Pro from Settings slid Pro up *and*
+     * slid Settings out to the left, and closing it slid Pro down while sliding
+     * Settings back up from the bottom, so the thing that appeared to move was
+     * the screen that should have been sitting still the whole time.
+     *
+     * Set this and the screen beneath does nothing at all: the overlay arrives
+     * over a still page and leaves the same page behind.
+     */
+    val coversParent: Boolean = false,
 )  {
     fun getEnterTransition(): EnterTransition = enter.toEnterTransition()
     fun getExitTransition(): ExitTransition = exit.toExitTransition()

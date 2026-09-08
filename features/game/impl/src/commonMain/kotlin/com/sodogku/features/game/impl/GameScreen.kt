@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.sodogku.libraries.ui.components.game.RewardButton
@@ -76,6 +77,10 @@ import sodogku.libraries.resources.generated.resources.game_bones_remaining
 import sodogku.libraries.resources.generated.resources.game_free_bones
 import sodogku.libraries.resources.generated.resources.game_sniff
 import sodogku.libraries.resources.generated.resources.game_treat
+import kotlin.math.sin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
 
 /**
  * The board and everything around it. A pure render of [GameState]; every
@@ -479,7 +484,31 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
     val level = state.level ?: return
     val size = level.size
 
-    BoardSurface(size = size) {
+    // The whole board flinches on a wrong guess, on top of the cell's own
+    // shake. The cell shake says *which* square was wrong; this says the board
+    // rejected something, and it is the part you see when you are looking at
+    // the square you tapped rather than at the grid.
+    //
+    // Keyed on `strikeNonce` and not `shakeNonce`, deliberately: a tap the board
+    // merely refuses, on a dog already placed, is not a mistake and does not
+    // deserve the whole screen reacting to it.
+    val boardShake = remember { Animatable(0f) }
+    LaunchedEffect(state.strikeNonce) {
+        boardShake.snapTo(0f)
+        if (state.strikeNonce == 0 || state.reduceAnimations) return@LaunchedEffect
+        boardShake.animateTo(1f, tween(Motion.ShakeMillis))
+    }
+
+    BoardSurface(
+        size = size,
+        // Read inside the layer, never in composition: the board is the most
+        // expensive subtree in the app and subscribing it to every frame of a
+        // shake would recompose a hundred cells sixty times a second.
+        modifier = Modifier.graphicsLayer {
+            val progress = boardShake.value
+            translationX = sin(progress * BoardShakeCycles) * BoardShakeTravel.toPx() * (1f - progress)
+        },
+    ) {
         // Keyed on the level, because `nextLevel` swaps the board *in place*
         // rather than navigating. Without a key the cells are memoised by
         // position and survive the swap, and two things follow from that.
@@ -532,7 +561,7 @@ private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Uni
                             column = col,
                             size = cell,
                             colorblind = state.colorblind,
-                            strikeNonce = if (state.strikeCell == index) state.strikeNonce else 0,
+                            strikeNonce = if (state.shakeCell == index) state.shakeNonce else 0,
                             placementNonce = placement.nonce,
                             placementRole = placement.roleOf(index),
                             entranceDelayMillis = if (state.reduceAnimations) {
@@ -690,3 +719,9 @@ private fun GameScreenPreview() {
         )
     }
 }
+
+/** How far the whole board travels on a wrong guess. Smaller than the cell's own shake. */
+private val BoardShakeTravel = Dimension.D100
+
+/** Radians swept across the shake, so it crosses centre a few times before settling. */
+private const val BoardShakeCycles = 14f

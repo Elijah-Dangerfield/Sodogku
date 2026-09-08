@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronLeft
@@ -179,6 +180,10 @@ enum class Icons(
 
     Bug(
         default = androidx.compose.material.icons.Icons.Rounded.BugReport,
+    ),
+
+    Trophy(
+        default = androidx.compose.material.icons.Icons.Rounded.EmojiEvents,
     ),
 
     ThumbsDown(
