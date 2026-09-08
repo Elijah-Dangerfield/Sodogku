@@ -2052,3 +2052,49 @@ no denominator, `mode` missing from the booster events, `daily.started` emitted
 from one route out of several, and several weak tests in `libraries/puzzle`
 named in the review (`CandidateGridTest` passes with the region rule deleted;
 two `DeductionSoundnessTest` cases are tautological).
+
+## Round four, 2026-09-08
+
+Numbered S1 onward. Two of these may already be fixed by work that landed earlier
+the same day and need re-checking on a device before anything is built (S9, S10).
+
+| # | Item | State |
+|---|---|---|
+| S1 | **Feedback loop, end to end.** Swipe in from the right on iOS in debug and TestFlight builds to slide out a feedback form. Sends to Sentry, with a screenshot and a checkbox to attach a tail of in-memory logs. Owner feedback is a **directive**: a triage skill scans Sentry for these and files them as TODOs, and a worker routine picks items off that list. `Workspace/Cards` has a version of this to copy from | |
+| S2 | Tapping a dog that is already correctly placed could play the shake animation | |
+| S3 | **Puzzle timer.** Persist elapsed time per puzzle, counting only while foregrounded. Show the completion time on the win dialog and in the level pane list | |
+| S4 | **Three paws feel unreachable.** Solving fast still lands on 2/3. Work out whether par, the thresholds or the multipliers are wrong | |
+| S5 | **A fake interstitial in debug builds**, so it is visible when a real one would show. A black screen saying "Ads go here" is enough, and it must be skippable. Separately: when an ad fails to load, fall back to a Sodogku Pro self-promo with a short forced dwell | |
+| S6 | **The Pro screen's entrance is wrong.** It slides up over Settings while Settings slides out to the left, and coming back Settings slides up from the bottom so it reads as the Pro screen moving. Settings should stay put and only the Pro screen should move | |
+| S7 | **The achievements dialog renders under the header** — the scrim is not full page. `Workspace/Cards` does dialogs the right way | |
+| S8 | A trophy icon with a badge count beside the settings gear on the puzzle screen, the badge persisting until the player opens it | |
+| S9 | Tapping the bones bounces but does nothing | probably fixed 2026-09-08 (R14 batch) — **re-verify on device** |
+| S10 | **Some cells still refuse a double tap**, so a deliberate wrong placement is impossible. Losing the bone is the preferred outcome. Only a square that already holds a dog, or one that already failed, should refuse. Also worth exploring: telling the player *why* a placement failed — a toast, or a line drawn between the two conflicting squares — but only where doing so reveals nothing they did not already have | partly fixed 2026-09-08 (auto-marked squares, then red squares) — **re-verify; the "why" half is not started** |
+| S11 | **Win celebration.** Golden paws zip up into the score and the score counts up on an odometer. `Workspace/Cards` `PlayPokerScreen` has the pattern | |
+| S12 | **Streaks, properly.** After the first few puzzles, a full-screen non-skippable "tap the paws to start your streak" that fills in a greyed-out thing. A streak page that appears on crossing a threshold and animates the day filling in, with haptics. The streak visible somewhere in the app — a flame icon as a small circular button with a badge, which `Workspace/Virtu` already has. Tapping it opens the streak page with no animation. Longest streak shown there. A weekly present for keeping it. Possibly the Duolingo trick of decaying the iOS app icon as the streak dies | |
+| S13 | Game Center on iOS | |
+| S14 | **Ads only for bones and sniffs**, nothing else. That constrains how generously streaks and rewards can be handed out, especially with a weekly prize in play | |
+| S15 | Great telemetry across the puzzle and all of the above. Players will complain about losing a streak and we need to be able to answer | |
+| S16 | "Beat 84.6% of players" on the win dialog. Decide whether that is real data or a qualitative message derived from the player's own run | |
+| S17 | A trophy on each of the floating achievement pills | |
+| S18 | **Difficulty ramps too slowly.** It stays easy for too long | |
+
+### Notes taken while logging these
+
+**S1 is the one that changes how everything else gets done**, so it should
+probably go first: it is the pipeline the rest of this list would be fed through.
+
+**S9 and S10 overlap with fixes that landed earlier today.** The bones pill did
+bounce and do nothing, because its tap fell through to a branch that clears a
+prompt nobody opened; that is fixed. Double-tap was refused on auto-marked
+squares (fixed earlier) and then charged twice on red squares (fixed in the same
+batch). Neither has been re-verified against these reports on a device, so both
+stay open until they are.
+
+**S14 constrains S12 and S5.** If the only ads are for bones and sniffs, then a
+weekly streak prize is pure cost, and the reward economy has to be tuned as one
+thing rather than per feature.
+
+**Release log levels, from the same message:** release builds send info and above,
+and errors should be sampled at 100%. Worth confirming against the telemetry
+config rather than assuming.

@@ -965,29 +965,6 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun hapticsToggleAndPersist() = runUnitTest {
-        val cache = InMemoryAppCache()
-        val vm = viewModel(cache = cache)
-        assertTrue(vm.state.haptics, "vibration is on by default")
-
-        vm.takeAction(GameAction.ToggleHaptics)
-
-        assertFalse(vm.state.haptics)
-        assertFalse(cache.get().hapticsEnabled)
-    }
-
-    @Test
-    fun colorblindModeTogglesAndPersists() = runUnitTest {
-        val cache = InMemoryAppCache()
-        val vm = viewModel(cache = cache)
-
-        vm.takeAction(GameAction.ToggleColorblind)
-
-        assertTrue(vm.state.colorblind)
-        assertTrue(cache.get().colorblindMode)
-    }
-
-    @Test
     fun guessesDoNothingOnceTheAttemptIsOver() = runUnitTest {
         val vm = viewModel()
         solve(vm)

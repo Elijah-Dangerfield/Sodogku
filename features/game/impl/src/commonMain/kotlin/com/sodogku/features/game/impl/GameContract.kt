@@ -547,9 +547,6 @@ sealed interface GameAction {
 
     /** Trade an ad for the level, after enough attempts have failed. */
     data object SkipLevel : GameAction
-    data object ToggleColorblind : GameAction
-    data object ToggleHaptics : GameAction
-    data object ToggleReduceAnimations : GameAction
     data object NextLevel : GameAction
 
     /** The drawer was opened, so its per-level records need reading. */

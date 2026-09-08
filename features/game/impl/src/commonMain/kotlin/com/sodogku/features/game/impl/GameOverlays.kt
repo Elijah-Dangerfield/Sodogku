@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
@@ -14,8 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import com.sodogku.libraries.ui.components.Switch
-import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.game.CoachMark
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.system.FocusScrim
@@ -34,11 +31,6 @@ import sodogku.libraries.resources.generated.resources.game_last_bone_body
 import sodogku.libraries.resources.generated.resources.game_last_bone_title
 import sodogku.libraries.resources.generated.resources.hint_body
 import sodogku.libraries.resources.generated.resources.hint_title
-import sodogku.libraries.resources.generated.resources.settings_colorblind
-import sodogku.libraries.resources.generated.resources.settings_colorblind_body
-import sodogku.libraries.resources.generated.resources.settings_done
-import sodogku.libraries.resources.generated.resources.settings_haptics
-import sodogku.libraries.resources.generated.resources.settings_haptics_body
 import sodogku.libraries.resources.generated.resources.tutorial_auto_mark_body
 import sodogku.libraries.resources.generated.resources.tutorial_auto_mark_title
 import sodogku.libraries.resources.generated.resources.tutorial_bones_body
@@ -350,69 +342,6 @@ private fun BoxScope.SpeechBubble(
             .padding(Dimension.D700),
     ) {
         content()
-    }
-}
-
-/**
- * The settings a player can reach mid-puzzle.
- *
- * Deliberately in-place rather than a navigation push: leaving the board to
- * change a display setting and coming back is a worse experience than a sheet,
- * and the board state has to survive it either way.
- */
-@Composable
-fun BoxScope.GameSettingsSheet(
-    state: GameState,
-    onAction: (GameAction) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .matchParentSize()
-            .background(AppTheme.colors.backgroundOverlay.color),
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Dimension.D600),
-            modifier = Modifier
-                .padding(horizontal = Dimension.D800)
-                .fillMaxWidth()
-                .clip(Radii.Card)
-                .background(AppTheme.colors.surfacePrimary.color)
-                .padding(Dimension.D800),
-        ) {
-            Text(
-                text = stringResource(Res.string.settings_colorblind),
-                typography = AppTheme.typography.Heading.H600,
-            )
-            Text(
-                text = stringResource(Res.string.settings_colorblind_body),
-                typography = AppTheme.typography.Body.B400,
-                color = AppTheme.colors.textSecondary,
-            )
-            Switch(
-                checked = state.colorblind,
-                onCheckedChange = { onAction(GameAction.ToggleColorblind) },
-            )
-
-            Text(
-                text = stringResource(Res.string.settings_haptics),
-                typography = AppTheme.typography.Heading.H600,
-            )
-            Text(
-                text = stringResource(Res.string.settings_haptics_body),
-                typography = AppTheme.typography.Body.B400,
-                color = AppTheme.colors.textSecondary,
-            )
-            Switch(
-                checked = state.haptics,
-                onCheckedChange = { onAction(GameAction.ToggleHaptics) },
-            )
-
-            ButtonPrimary(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(Res.string.settings_done))
-            }
-        }
     }
 }
 

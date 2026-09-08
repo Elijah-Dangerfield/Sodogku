@@ -320,9 +320,6 @@ class GameViewModel(
             GameAction.ForfeitDailyConfirmed -> action.forfeitDaily()
             GameAction.DismissForfeitPrompt -> action.updateState { it.copy(forfeitPrompt = false) }
             GameAction.SkipLevel -> action.skipLevel()
-            GameAction.ToggleColorblind -> action.toggleColorblind()
-            GameAction.ToggleHaptics -> action.toggleHaptics()
-            GameAction.ToggleReduceAnimations -> action.toggleReduceAnimations()
             GameAction.NextLevel -> action.nextLevel()
             GameAction.LevelsOpened -> action.loadRecords()
             GameAction.LevelsClosed -> action.updateState { it.copy(drawerOpen = false) }
@@ -1614,27 +1611,6 @@ class GameViewModel(
             "to" to topped,
             "placement" to placement.name,
         )
-    }
-
-    private suspend fun GameAction.toggleColorblind() {
-        val next = !state.colorblind
-        updateState { it.copy(colorblind = next) }
-        Catching { appCache.update { data -> data.copy(colorblindMode = next) } }
-            .logOnFailure { "Failed to persist colorblind mode" }
-    }
-
-    private suspend fun GameAction.toggleHaptics() {
-        val next = !state.haptics
-        updateState { it.copy(haptics = next) }
-        Catching { appCache.update { data -> data.copy(hapticsEnabled = next) } }
-            .logOnFailure { "Failed to persist haptics setting" }
-    }
-
-    private suspend fun GameAction.toggleReduceAnimations() {
-        val next = !state.reduceAnimations
-        updateState { it.copy(reduceAnimations = next) }
-        Catching { appCache.update { data -> data.copy(reduceAnimations = next) } }
-            .logOnFailure { "Failed to persist reduce-animations setting" }
     }
 
     /**
