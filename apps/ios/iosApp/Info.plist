@@ -52,6 +52,13 @@
 
 	  `LaunchBackground` must stay equal to `ColorResource.Cream50` (#F8F2ED).
 	  There is no dark variant because the app has one palette.
+
+	  This is also why `INFOPLIST_KEY_UILaunchScreen_Generation` is NO in the
+	  project. Left at YES, Xcode synthesises its own empty `UILaunchScreen`
+	  dictionary and merges it *inside* the one below, so the built plist ends
+	  up with a `UILaunchScreen` nested in a `UILaunchScreen`. iOS still reads
+	  the colour, but two sources declaring the same key is the setup where the
+	  next edit goes to the wrong one.
 	-->
 	<key>UILaunchScreen</key>
 	<dict>
