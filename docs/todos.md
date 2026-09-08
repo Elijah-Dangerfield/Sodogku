@@ -174,3 +174,47 @@ module.
 this module before deleting. `libraries/core` has its own
 `BuildConfig.android.kt` and `BuildConfig.ios.kt`, which is what makes this one
 look misplaced. Verify with the full matrix, not just Android.
+
+## SD-6 [P2] — Standing code review, by an agent that did not write the code
+
+**Ask:** A recurring review pass looking for better ways of doing things:
+additions worth making, cleanup worth doing, tests worth having. Not a lint run,
+which the build already does.
+
+**Done when:** A review has run over a named slice of the codebase and its
+findings are either fixed or filed here as their own items. This item does not
+close; re-run it and update which slices have been covered.
+
+**Hints:** Run it as a **Fable** subagent, and give it a *slice*, not the whole
+repo. A review with no boundary returns a list of generalities. Slices worth
+taking, roughly in order of how much has been built in them without a second
+pair of eyes:
+
+- `features/game/impl/GameViewModel.kt`, which is about 2,000 lines and has
+  absorbed nearly every feature this project has shipped
+- `libraries/scoring` and the difficulty ramp
+- The telemetry event surface, against `DashboardQueryContractTest`
+- `libraries/ui` board and dog components
+
+What to point it at specifically, because these are the failure modes this
+codebase actually has:
+
+- **Tests that cannot fail.** Mutation-check the existing suite, do not just
+  read it. Two real cases so far: a rehearsal guard whose condition was already
+  unreachable, and a bones-pill test that dismissed the prompt instead of
+  confirming, so it passed against the bug.
+- **`startAttempt` in `GameViewModel`** builds a whole fresh `GameState` rather
+  than `it.copy`, enumerating carried fields by hand. It has silently dropped a
+  field three times.
+- **`SEAViewModel.state` lags `updateState` by a dispatch.** Any suspend
+  function that computes a value and then re-reads it from `state` is a bug.
+- **Unobservable defaults.** Several fields are initialised to a value that
+  `load()` always overwrites. Those are fine, but they should not be confused
+  for behaviour, and a test for one would be unreachable.
+- **Gradle tasks that are up to date when they should not be.** A test reading a
+  file at runtime needs that file declared as a task input, or it silently stops
+  running.
+
+Ask for a ranked list with a file:line and a concrete failure scenario for each,
+and require it to say which findings it verified versus which are hunches. Take
+nothing on trust: reviews from agents have been confidently wrong here before.
