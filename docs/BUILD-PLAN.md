@@ -2085,7 +2085,7 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S23 | **The circular icon buttons are hard to see.** They want a soft shadow all the way round, which makes them visible *and* says they are tappable | **DONE** (2026-09-08) |
 | S24 | **Rework the booster row to the competitor's shape** (screenshot 2026-09-08): circular white buttons in a row, each with a picture and a label underneath. They call Sniff "Locate", which is a better word. Use pictures where we can: a paw, a bone, a dog. Consider adding a Clear button | **DONE** (2026-09-08) — Clear deliberately not added, see the commit |
 | S25 | **Meowdoku's hint works differently and better.** It picks a cat, highlights that cat's row, column and touching cells, paints an X into every one of them, and offers an **Apply** button. Ours reveals ruled-out squares with no confirm step | **DONE** (2026-09-08) |
-| S26 | Drag across the board to cross off several squares in one gesture | |
+| S26 | Drag across the board to cross off several squares in one gesture | **DONE** (2026-09-08) |
 | S27 | **"Cross off squares for me" should default to off.** Reverses the call made when the setting was added | **DONE** (2026-09-08) |
 | S28 | "Progress lives on this device" should not sit inside the achievements card. Its own card with an info icon, or drop it | **DONE** (2026-09-08) |
 | S29 | The board controls can be smaller with less padding, so the picture takes up more of the circle | **DONE** (2026-09-08) |
