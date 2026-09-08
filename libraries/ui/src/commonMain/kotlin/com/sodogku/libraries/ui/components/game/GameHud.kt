@@ -36,6 +36,11 @@ import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.booster_a11y
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalInspectionMode
+import com.sodogku.libraries.ui.system.LocalReduceAnimations
 
 /**
  * The lives left in this attempt, as bones.
@@ -203,24 +208,56 @@ fun RuleChip(
 ) {
     val diagramColor = AppTheme.colors.text.color
     val regionColors = RuleChipRegionColors
-    val outline = AppTheme.colors.text.color
+    val resting = AppTheme.colors.surfaceSecondary.color
+    val alert = AppTheme.colors.danger.color
+    val still = LocalReduceAnimations.current || LocalInspectionMode.current
+
+    // One flash that settles, rather than a border that switches on.
+    //
+    // The chip is naming the rule a wrong guess just broke, so it wants to catch
+    // the eye at the moment it changes and then stop competing with the board.
+    // A dark outline did neither: it did not move when it appeared, and it
+    // stayed exactly as loud for as long as it was up.
+    //
+    // It settles to a tint rather than to nothing, because the answer is still
+    // useful after the flash. Somebody who looks down a second later should
+    // still be able to see which rule they hit.
+    val flash = remember { Animatable(0f) }
+    LaunchedEffect(highlighted, still) {
+        if (!highlighted) {
+            flash.animateTo(0f, tween(RuleChipFadeMillis))
+            return@LaunchedEffect
+        }
+        if (still) {
+            flash.snapTo(RuleChipRest)
+            return@LaunchedEffect
+        }
+        flash.snapTo(1f)
+        flash.animateTo(RuleChipRest, tween(RuleChipSettleMillis))
+    }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
-        // bounceClick before clip/background, so the press scales the whole chip
+        // bounceClick before the fill, so the press scales the whole chip
         // rather than shrinking the label inside a stationary pill.
         modifier = modifier
             .semantics { contentDescription = label }
             .bounceClick(onClick = onClick)
             .clip(Radii.Card)
-            .background(AppTheme.colors.surfaceSecondary.color)
-            .then(
-                if (highlighted) {
-                    Modifier.border(RuleChipOutline, outline, Radii.Card.shape)
-                } else {
-                    Modifier
-                },
-            )
+            // Fill and outline are drawn here rather than set as modifiers, so
+            // the flash is read in the draw phase. Read in composition it would
+            // recompose all three chips on every frame of the settle.
+            .drawBehind {
+                val lit = flash.value
+                drawRect(color = lerp(resting, alert.copy(alpha = RuleChipTint), lit))
+                if (lit > 0f) {
+                    drawRect(
+                        color = alert.copy(alpha = lit),
+                        style = Stroke(width = RuleChipOutline.toPx()),
+                    )
+                }
+            }
             .padding(horizontal = Dimension.D400, vertical = Dimension.D300),
     ) {
         Box(
@@ -320,7 +357,16 @@ private const val SpentScale = 0.82f
 private const val BoneAspect = 1.45f
 
 /** Heavy enough to be an outline rather than a hairline, at chip size. */
-private val RuleChipOutline = Dimension.D50
+private val RuleChipOutline = Dimension.D100
+
+/** How lit the chip stays once the flash has settled. Visible, not shouting. */
+private const val RuleChipRest = 0.35f
+
+/** The alert colour's strength in the fill at full flash. A wash, not a block. */
+private const val RuleChipTint = 0.22f
+
+private const val RuleChipSettleMillis = 520
+private const val RuleChipFadeMillis = 260
 
 /** Room for the badge to overhang the button's corner. */
 private val BadgeInset = Dimension.D400
