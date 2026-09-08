@@ -224,6 +224,66 @@ class ScoringTest {
     }
 
     @Test
+    fun eachBoosterCostsAShareOfWhatTheRunEarned() {
+        // The worked example, so the cost is a number rather than "less".
+        val rate = config.boosterPenaltyRate
+
+        assertEquals(10_000, Scoring.afterBoosters(10_000, boostersUsed = 0, rate))
+        assertEquals(8_500, Scoring.afterBoosters(10_000, boostersUsed = 1, rate))
+        assertEquals(7_225, Scoring.afterBoosters(10_000, boostersUsed = 2, rate))
+    }
+
+    @Test
+    fun noNumberOfBoostersCanTakeAScoreBelowZero() {
+        // The reason the cost compounds instead of subtracting. A player who
+        // leans on a booster every move of a 10x10 still banks something, and
+        // nothing anywhere has to clamp a negative score it was handed.
+        val banked = Scoring.afterBoosters(10_000, boostersUsed = 40, config.boosterPenaltyRate)
+
+        assertTrue(banked >= 0, "banked $banked")
+        assertTrue(banked < 100, "forty boosters should have taken nearly all of it, banked $banked")
+    }
+
+    @Test
+    fun theBoosterCostDoesNotMoveThePawRating() {
+        // The half that is easy to get wrong: subtract points without telling
+        // par and three paws quietly stops being reachable for anyone who used
+        // a hint — including every player following the tutorial, which asks
+        // for a sniff and a treat on level 2.
+        val size = 8
+        var card = ScoreCard.Empty
+        repeat(size) { card = Scoring.placement(card, size, millisSinceLastPlacement = 0).card }
+        card = Scoring.complete(card, size, difficulty = 3, livesRemaining = ScoringConfig.MAX_LIVES)
+
+        val banked = Scoring.afterBoosters(card.total, boostersUsed = 2, config.boosterPenaltyRate)
+
+        assertTrue(banked < card.total, "two boosters have to cost something")
+        assertEquals(
+            Scoring.THREE_PAWS,
+            Scoring.paws(card.total, size, difficulty = 3, completed = true),
+            "a flawless run stays a three-paw run however much help it took",
+        )
+    }
+
+    @Test
+    fun aZeroPenaltyRateIsHowTheCostIsSwitchedOff() {
+        // The remote-config off switch, and the direction a mistyped key falls.
+        val free = ScoringConfig(boosterPenaltyRate = 0.0)
+
+        assertEquals(10_000, Scoring.afterBoosters(10_000, boostersUsed = 5, free.boosterPenaltyRate))
+    }
+
+    @Test
+    fun configRejectsABoosterCostThatWouldPayPlayersToUseThem() {
+        listOf(
+            "negative rate" to { ScoringConfig(boosterPenaltyRate = -0.5) },
+            "rate above one" to { ScoringConfig(boosterPenaltyRate = 1.5) },
+        ).forEach { (name, build) ->
+            assertTrue(runCatching(build).isFailure, "$name must not be constructible")
+        }
+    }
+
+    @Test
     fun praiseEscalatesWithTheMultiplier() {
         assertEquals(Praise.None, Scoring.praiseFor(1.0))
         assertEquals(Praise.Nice, Scoring.praiseFor(config.nicePraiseAt))

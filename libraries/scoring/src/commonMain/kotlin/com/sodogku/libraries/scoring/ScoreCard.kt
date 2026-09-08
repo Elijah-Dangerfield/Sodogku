@@ -1,5 +1,7 @@
 package com.sodogku.libraries.scoring
 
+import kotlin.math.pow
+
 /**
  * A run's score so far. Immutable: every transition returns a new card, so the
  * ViewModel can hold one in its state and the board can animate off the delta
@@ -101,6 +103,25 @@ object Scoring {
         val difficultyFactor = 1.0 + (difficulty - 1).coerceAtLeast(0) * config.difficultyBonusRate
         val livesFactor = 1.0 + livesRemaining.coerceAtLeast(0) * config.livesBonusRate
         return (config.completionBase * size * difficultyFactor * livesFactor).toInt()
+    }
+
+    /**
+     * What an attempt banks after the boosters it leaned on, from a total that
+     * has already been through [complete].
+     *
+     * **Deliberately not part of [paws].** The rating is measured against
+     * [parScore], and scaling only the score would quietly put three paws out of
+     * reach of anyone who used a hint — including the player following the
+     * tutorial, which *instructs* a sniff and a treat on level 2. Because the
+     * cost is a multiplier and the paw thresholds are fractions of par, rating
+     * the run on the pre-penalty total is exactly the same arithmetic as scaling
+     * par by the same factor: `score × f ≥ par × f × 0.85` is `score ≥ par ×
+     * 0.85`. So the paws say how the board was solved and the banked score says
+     * what the help was worth, and neither has to know about the other.
+     */
+    fun afterBoosters(total: Int, boostersUsed: Int, penaltyRate: Double): Int {
+        val kept = (1.0 - penaltyRate.coerceIn(0.0, 1.0)).pow(boostersUsed.coerceAtLeast(0))
+        return (total * kept).toInt()
     }
 
     /**

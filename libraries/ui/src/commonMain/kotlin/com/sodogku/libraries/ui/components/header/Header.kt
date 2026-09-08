@@ -17,8 +17,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.draw.shadow
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import com.sodogku.system.Dimension
+import com.sodogku.system.Motion
 import androidx.compose.ui.unit.dp
 import com.sodogku.system.AppTheme
 import com.sodogku.system.thenIf
@@ -83,12 +91,18 @@ fun TopBar(
     }
 }
 
-// Suppressed rather than fixed: Modifier.shadow has no lambda form, so a shadow
-// driven by an animated value has no phase-deferred equivalent to move the read
-// into. The cost is bounded — this recomposes only the header, only while the
-// lift animation runs, which is a couple of hundred milliseconds at the top of a
-// scroll. If shadow ever grows a lambda overload, drop the `by` and use it.
-@Suppress("AnimatedStateReadInComposition")
+/**
+ * The lift a header gets once there is content scrolled up underneath it.
+ *
+ * Drawn rather than `Modifier.shadow`, which casts on all four sides — above the
+ * header as well as below, so on a screen where the header sits under the status
+ * bar the lift appeared as a halo around the whole bar. A header is lifted off
+ * the content *below* it and nothing else, so that is the only edge that gets a
+ * shadow.
+ *
+ * The gradient is painted after the content and outside the node's own bounds,
+ * which is what puts it on the content rather than on the header.
+ */
 private fun Modifier.elevateOnScroll(
     scrollState: ScrollState?,
 ): Modifier {
@@ -98,16 +112,41 @@ private fun Modifier.elevateOnScroll(
     }
 
     return this.composed {
-        val elevation by animateDpAsState(
-            if (scrollState.canScrollBackward) {
-                Elevation.Header.dp
-            } else {
-                0.dp
-            }, label = ""
-        )
-        Modifier.shadow(elevation)
+        val shadowColor = AppTheme.colors.shadow.color
+        // Animatable rather than `by animateDpAsState`, so the value is read in
+        // the draw phase instead of in composition — the detekt rule this used
+        // to suppress was right, and a lambda-taking draw is the phase-deferred
+        // form it was asking for.
+        val lift = remember { Animatable(0f) }
+        val lifted = scrollState.canScrollBackward
+        LaunchedEffect(lifted) { lift.animateTo(if (lifted) 1f else 0f, Motion.fade()) }
+
+        Modifier.drawWithContent {
+            drawContent()
+            if (lift.value <= 0f) return@drawWithContent
+            val depth = ShadowDepth.toPx()
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(shadowColor.copy(alpha = shadowColor.alpha * ShadowPeak * lift.value), shadowColor.copy(alpha = 0f)),
+                    startY = size.height,
+                    endY = size.height + depth,
+                ),
+                topLeft = Offset(0f, size.height),
+                size = Size(size.width, depth),
+            )
+        }
     }
 }
+
+/** How far the lift reaches onto the content. Short: it is a hint, not a scrim. */
+private val ShadowDepth = Dimension.D400
+
+/**
+ * The theme's shadow colour at full strength drew a crisp dark line rather than
+ * a shadow — the giveaway that it is a gradient and not a lift is that you can
+ * see where it starts.
+ */
+private const val ShadowPeak = 0.55f
 
 @Preview
 @Composable

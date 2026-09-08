@@ -47,6 +47,17 @@ data class ScoringConfig(
     val difficultyBonusRate: Double = 0.2,
 
     /**
+     * What one booster spent during an attempt costs the score it banks.
+     *
+     * Multiplicative rather than a flat deduction: at 0.15 one sniff banks 0.85
+     * of the run, two bank 0.72, five bank 0.44. Nothing can drive a score
+     * negative, the cost is the same wherever in the attempt the booster was
+     * spent, and it scales with the board — a treat on a 10x10 costs more points
+     * than one on a 4x4 because the run itself is worth more.
+     */
+    val boosterPenaltyRate: Double = 0.15,
+
+    /**
      * Score fractions of par at which the second and third paw are awarded.
      * Finishing at all earns the first, so there is no threshold for it.
      */
@@ -77,6 +88,10 @@ data class ScoringConfig(
         }
         require(threePawFraction >= twoPawFraction) {
             "the third paw cannot be easier to earn than the second"
+        }
+        // Above 1.0 a booster would *add* points, and below 0 it would too.
+        require(boosterPenaltyRate in 0.0..1.0) {
+            "boosterPenaltyRate must be between 0 and 1"
         }
     }
 
