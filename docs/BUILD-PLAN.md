@@ -1961,3 +1961,69 @@ which must survive a retry has to be named there too.
 Mutation-checked three ways: dropping the carry-over, showing it on every board
 rather than the daily, and dropping the persist. Verified on a device, including
 that it does not come back on the next launch.
+
+### R14 · Five bugs the review found on the board (2026-09-08)
+
+A read-only review of the puzzle screen. Its findings, and what was done:
+
+**A second commit on a red square charged another bone.** The mirror of the bug
+that prompted the review. That one was `commit` refusing too much; this is
+`commit` refusing too little, in the one place the refusal was load-bearing.
+`toggleMark` returned early on `wrongGuesses` and `commit` did not, so the first
+tap on a red square did nothing, which is exactly what makes a player tap again,
+and the second one spent another bone. At one bone left it ended the attempt.
+
+The accessibility path never had it: `GameScreen` refuses the placement action on
+`wrongGuesses`. The two paths disagreed about what a red square is, and that
+disagreement was the bug. They agree now: it is inert.
+
+`theStrikeNonceChangesSoTheSameCellCanShakeTwice` asserted the old behaviour, so
+it had to be looked at rather than deleted. It arrived with the original board
+build (C4) and its commit message says nothing about repeated wrong taps being
+chargeable, so it was protecting the nonce mechanism and describing the
+behaviour rather than deciding it. It now uses two different squares, which is
+what consecutive strikes actually are.
+
+**`game.commit.on_marked` was exactly inverted.** A commit is the *second* of two
+taps, and the first has already written a manual cross or cleared an auto one, so
+reading the mark state at the commit site reports the opposite: true on a plain
+empty square, false on a crossed-off one. Pinned near 100% either way, so the
+series looked healthy. Captured in `tap` before the first tap changes it now.
+
+**The tutorial could write a phantom level 0.** A rehearsal strike is forgiven, so
+`remaining` is whatever the player walked in holding. At zero it fell through to
+`lose()`, which is the one write on this screen that was not gated on the
+rehearsal, on the step that *instructs* a wrong guess. That wrote a `LevelResult`
+for level 0 into the achievement log and a `game.level_failed` for a board nobody
+chose to play. Reachable: Settings has a "Replay the tutorial" row, and a player
+out of bones who declined the ad is exactly who goes to Settings.
+
+**A spent sniff could be laundered by force-quitting.** Two causes, both needed
+fixing. `useSniff` used `updateState`, and only `updateBoard` writes the
+snapshot. And `BoardSnapshot.isEmpty` counted only placements and marks, so a
+board where the player had *only* sniffed was discarded as untouched. A sniff
+leaves nothing on the board, which is precisely why it needs saying.
+
+**The bones pill went dead after one tap.** Sniff and Treat stop explaining once
+known, because a later tap spends one. A bone is only ever spent by guessing
+wrong, so its tap fell through to a branch that clears a prompt nobody opened.
+The pill kept its press animation and its label and did nothing for the rest of
+the install.
+
+**The test harness that was missing.** Nothing in this module asserted on a single
+emitted event. Twelve `game.*` events feed six dashboards and the only thing
+holding them was a source-text scan for names. `RecordingEvents` plants a
+`LogTree`, so events are now assertable without touching production code. The
+inverted `on_marked` is what it was built for.
+
+One mutation check earned its keep beyond finding the bugs: the first draft of
+the bones-pill test dismissed the prompt rather than confirming it, so `Bone`
+never entered `explainedBoosters`, and the test passed against the bug it was
+written for.
+
+Still open from the review: the board entrance animation not replaying on the
+next level and the previous level's dogs animating away on it (needs a `key`),
+an animated value read during composition in `BoardCell`, a stale shake offset,
+`game.level_abandoned` not existing so drop-off has no denominator, `mode`
+missing from the booster events, and several weak tests in `libraries/puzzle`
+named in the review.

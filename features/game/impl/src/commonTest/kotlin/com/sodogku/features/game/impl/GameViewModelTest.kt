@@ -310,15 +310,20 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun theStrikeNonceChangesSoTheSameCellCanShakeTwice() = runUnitTest {
+    fun theStrikeNonceChangesSoASecondWrongGuessShakesToo() = runUnitTest {
+        // Two different squares, because a square that already cost a bone is
+        // now inert — see `aSecondCommitOnASquareThatAlreadyCostABoneCostsNothing`.
+        // This used to re-commit the same one, which was the behaviour rather
+        // than the intent: what the nonce is for is making a *consecutive*
+        // strike re-fire the shake, and consecutive strikes land on different
+        // squares.
         val vm = viewModel()
-        val cell = wrongCellIn(row = 0)
 
-        vm.commit(cell)
+        vm.commit(wrongCellIn(row = 0))
         val first = vm.state.strikeNonce
-        vm.commit(cell)
+        vm.commit(wrongCellIn(row = 1))
 
-        assertTrue(vm.state.strikeNonce != first, "a repeated wrong tap has to re-fire the shake")
+        assertTrue(vm.state.strikeNonce != first, "a second wrong guess has to re-fire the shake")
     }
 
     @Test
@@ -419,6 +424,84 @@ class GameViewModelTest : CoroutineTest() {
 
         assertEquals(0, onTop.state.livesRemaining)
         assertEquals(0, campaign.state.livesRemaining, "the board underneath has to follow")
+    }
+
+    @Test
+    fun aSecondCommitOnASquareThatAlreadyCostABoneCostsNothing() = runUnitTest {
+        // The mirror of the bug that started this review. That one was `commit`
+        // refusing too much; this is `commit` refusing too little, in the one
+        // place the refusal was load-bearing.
+        //
+        // The first tap on a red square did nothing, which is exactly what makes
+        // a player tap again, and the second tap reached `commit` and spent
+        // another bone on a square they had already been told was wrong.
+        val vm = viewModel()
+        val wrong = wrongCellIn(row = 0)
+        vm.commit(wrong)
+        val afterFirst = vm.state.livesRemaining
+        assertTrue(afterFirst < ConsumableRefillTo, "the first wrong guess did not cost a bone")
+
+        vm.commit(wrong)
+
+        assertEquals(afterFirst, vm.state.livesRemaining, "committing a red square again cost another bone")
+        assertEquals(GamePhase.Playing, vm.state.phase)
+    }
+
+    @Test
+    fun aRedSquareIsInertToASingleTapToo() = runUnitTest {
+        // The other half. Guarding only the commit would leave the single tap
+        // writing a manual cross over a square that already carries a red one.
+        val vm = viewModel()
+        val wrong = wrongCellIn(row = 0)
+        vm.commit(wrong)
+        // The commit is itself two taps, and the first of them already wrote a
+        // manual cross, so the interesting assertion is that nothing *changes*
+        // rather than that the set is empty.
+        val before = vm.state.manualMarks
+
+        vm.note(wrong)
+
+        assertEquals(before, vm.state.manualMarks, "a tap on a red square changed the marks")
+    }
+
+    @Test
+    fun onMarkedSaysWhetherTheSquareWasCrossedOffBeforeThePlayerStarted() = recordingEvents { events ->
+        runUnitTest {
+            // `on_marked` asks whether the crosses are reading as "ruled out".
+            // It was read at the commit site, which runs on the *second* tap,
+            // so it reported what the first tap had just done: true on a plain
+            // empty square, false on a crossed-off one. Exactly inverted, and
+            // pinned at nearly 100% either way.
+            val vm = viewModel()
+
+            vm.commit(wrongCellIn(row = 0))
+
+            assertEquals(
+                false,
+                events.single("game.commit")["on_marked"],
+                "a plain empty square was reported as already crossed off",
+            )
+        }
+    }
+
+    @Test
+    fun onMarkedIsTrueWhenThePlayerCommitsOnASquareTheBoardCrossedOff() = recordingEvents { events ->
+        runUnitTest {
+            // The companion, and the one that makes the assertion above mean
+            // something: a test that only ever saw `false` would pass against a
+            // hardcoded `false`.
+            val vm = viewModel()
+            vm.commit(cellFor(row = 0))
+            val autoMarked = vm.state.visibleAutoMarks.first { it !in vm.state.placedCells }
+
+            vm.commit(autoMarked)
+
+            assertEquals(
+                true,
+                events.attributesOf("game.commit").last()["on_marked"],
+                "a square the board had crossed off was reported as clean",
+            )
+        }
     }
 
     @Test
@@ -1764,6 +1847,116 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(TutorialStep.WrongExplained, vm.state.tutorial)
         assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining, "the taught mistake cost a bone")
         assertEquals(0, vm.state.strikesThisAttempt)
+    }
+
+    @Test
+    fun theBonesPillKeepsOpeningItsExplainer() = runUnitTest {
+        // Sniff and Treat stop explaining once the player knows them, because a
+        // later tap genuinely spends one. A bone is only ever spent by guessing
+        // wrong, so there is nothing for its tap to fall through to: it fell
+        // through to a branch that clears a prompt nobody opened, and the pill
+        // went dead for the rest of the install while keeping its press
+        // animation and its label.
+        val vm = viewModel()
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Bone))
+        assertEquals(Consumable.Bone, vm.state.boosterPrompt)
+        // Confirming, not dismissing. `markExplained` runs in `spend`, so only
+        // this path puts Bone in `explainedBoosters` — and being explained is
+        // the precondition for the fall-through that broke the pill. A first
+        // draft of this test dismissed instead, never marked it explained, and
+        // passed against the bug.
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Bone))
+        settle()
+        assertEquals(null, vm.state.boosterPrompt, "the prompt did not close")
+        assertTrue(Consumable.Bone in vm.state.explainedBoosters, "the bone was never marked explained")
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Bone))
+
+        assertEquals(Consumable.Bone, vm.state.boosterPrompt, "the bones pill stopped responding")
+    }
+
+    @Test
+    fun aKnownSniffIsSpentRatherThanExplainedAgain() = runUnitTest {
+        // The other half: making every booster always prompt would put a dialog
+        // in front of every hint forever.
+        val vm = viewModel()
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        settle()
+        val afterFirst = vm.state.sniffs
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        settle()
+
+        assertEquals(null, vm.state.boosterPrompt, "a known sniff explained itself again")
+        assertEquals(afterFirst - 1, vm.state.sniffs, "the second tap did not spend a sniff")
+    }
+
+    @Test
+    fun aPlayerWithNoBonesLeftCanStillBeTaught() = recordingEvents { events ->
+        runUnitTest {
+            // The rehearsal is free, so `livesRemaining` is simply whatever the
+            // player walked in holding. At zero, the strike path fell through to
+            // `lose()` on the very step that instructs a wrong guess, writing a
+            // level-0 result into the achievement log and a `game.level_failed`
+            // for a board nobody chose to play.
+            //
+            // Reachable: Settings has a "Replay the tutorial" row, and a player
+            // out of bones who declined the ad is exactly who goes looking at
+            // Settings.
+            val achievements = RecordingAchievements()
+            val cache = InMemoryAppCache().apply {
+                set(AppData(hasCompletedTutorial = false, bones = 0))
+            }
+            val vm = viewModel(levelId = FirstGuidedLevel, cache = cache, achievements = achievements)
+            vm.driveTo(TutorialStep.TryAWrongOne)
+
+            vm.commit(vm.state.tutorialCells.first())
+
+            assertEquals(TutorialStep.WrongExplained, vm.state.tutorial, "the lesson did not continue")
+            assertTrue(vm.state.phase != GamePhase.Lost, "the tutorial ended the attempt")
+            assertTrue(achievements.recorded.isEmpty(), "the rehearsal reached the achievement log")
+            assertTrue(
+                events.attributesOf("game.level_failed").isEmpty(),
+                "the rehearsal emitted a level failure: ${events.all.map { it.first }}",
+            )
+        }
+    }
+
+    @Test
+    fun aRealBoardStillLosesWhenTheBonesRunOut() = runUnitTest {
+        // The other half. Gating the loss on the wrong thing would make the
+        // game unloseable, which the test above cannot see.
+        val vm = viewModel()
+
+        repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
+
+        assertEquals(GamePhase.Lost, vm.state.phase)
+    }
+
+    @Test
+    fun aSpentSniffSurvivesBeingForceQuit() = runUnitTest {
+        // `persistCounts` writes the holding; only `updateBoard` writes the
+        // attempt, and `sniffsUsed` lives on the attempt. Spending a sniff and
+        // quitting before the next move restored a board that had taken no help,
+        // banking a bigger score than was earned.
+        val cache = InMemoryAppCache()
+        val achievements = RecordingAchievements()
+        val first = viewModel(cache = cache)
+        first.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        first.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        settle()
+        assertTrue(first.state.boostersUsed > 0, "the sniff was never spent, so the test proves nothing")
+
+        val resumed = viewModel(cache = cache, achievements = achievements)
+        solveCurrent(resumed)
+
+        assertEquals(
+            1,
+            achievements.recorded.single().sniffsUsed,
+            "the resumed attempt forgot the sniff it had already taken",
+        )
     }
 
     @Test

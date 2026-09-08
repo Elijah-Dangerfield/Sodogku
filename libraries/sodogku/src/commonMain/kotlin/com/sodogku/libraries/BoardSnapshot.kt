@@ -76,9 +76,21 @@ data class BoardSnapshot(
      * An untouched board is not worth resuming — restoring one is
      * indistinguishable from starting it, and keeping it would mean a player who
      * glanced at level 40 and left is offered level 40 forever.
+     *
+     * **Spent help counts as something.** A sniff leaves nothing on the board:
+     * it highlights squares and the highlight is transient, so a board where the
+     * player has only sniffed looks untouched by the first three terms. Dropping
+     * it there means the attempt comes back having taken no help, which banks a
+     * bigger score than was earned and under-reports `sniffs_used`. A treat is
+     * caught by the placements it makes, but it is named here too rather than
+     * left to that coincidence.
      */
     val isEmpty: Boolean
-        get() = placements.none { it != UNPLACED } && manualMarks.isEmpty() && wrongGuesses.isEmpty()
+        get() = placements.none { it != UNPLACED } &&
+            manualMarks.isEmpty() &&
+            wrongGuesses.isEmpty() &&
+            sniffsUsed == 0 &&
+            treatsUsed == 0
 
     companion object {
         /** Matches `Solution.UNPLACED`; duplicated so this module needs no puzzle dependency. */

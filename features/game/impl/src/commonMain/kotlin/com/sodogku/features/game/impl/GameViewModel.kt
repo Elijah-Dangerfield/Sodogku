@@ -170,6 +170,16 @@ class GameViewModel(
     private var lastTapAt: ComparableTimeMark? = null
 
     /**
+     * Whether the square was crossed off when the player started a double tap.
+     *
+     * A field rather than a read at the commit site, because the commit runs on
+     * the *second* tap and the first one has already changed the answer. Same
+     * shape as [lastTappedCell] and [lastTapAt]: state that belongs to a gesture
+     * in progress rather than to the board.
+     */
+    private var markedBeforeFirstTap = false
+
+    /**
      * Consumables spent *this attempt*. The holdings in state only ever say what
      * is left, and "cleared it without help" is a question about what was spent.
      * Reset by [startAttempt] rather than accumulated across retries.
@@ -893,6 +903,20 @@ class GameViewModel(
     private suspend fun GameAction.tap(cell: Int) {
         if (state.phase != GamePhase.Playing) return
         if (cell in state.placedCells) return
+        // A square that already cost a bone is finished, and the guard belongs
+        // here rather than in `toggleMark` alone.
+        //
+        // It used to live only there, so the first tap on a red square did
+        // nothing and the second one reached `commit`, which has no such guard,
+        // and spent *another* bone on a square the player was already told was
+        // wrong. The first tap doing nothing is exactly what makes the second
+        // one likely: it reads as a control that did not register. At one bone
+        // left it ended the attempt.
+        //
+        // The accessibility path never had this bug — `GameScreen` refuses the
+        // placement action on `wrongGuesses` — so the two paths disagreed about
+        // what a red square is. They agree now: it is inert.
+        if (cell in state.wrongGuesses) return
 
         val now = clock.markNow()
         val isSecondTap = lastTappedCell == cell &&
@@ -902,8 +926,14 @@ class GameViewModel(
 
         if (isSecondTap) {
             lastTappedCell = null
-            commit(cell)
+            commit(cell, wasMarked = markedBeforeFirstTap)
         } else {
+            // Read *before* `toggleMark` runs, because it is about to change the
+            // answer. A commit is the second of two taps, and the first one has
+            // already either written a manual cross or cleared an auto one — so
+            // asking after the fact reports the exact opposite of what happened,
+            // and reports it consistently rather than at random.
+            markedBeforeFirstTap = cell in state.visibleAutoMarks || cell in state.manualMarks
             toggleMark(cell)
         }
     }
@@ -982,7 +1012,7 @@ class GameViewModel(
      * slip, and a control that silently refuses is worse than one that costs
      * something. A single tap still toggles a mark harmlessly.
      */
-    private suspend fun GameAction.commit(cell: Int) {
+    private suspend fun GameAction.commit(cell: Int, wasMarked: Boolean) {
         val level = state.level ?: return
 
         val row = level.board.rowOf(cell)
@@ -1001,7 +1031,10 @@ class GameViewModel(
                 // "ruled out", which is a legibility problem rather than a
                 // difficulty one — so it is the drawn set and not the deduction,
                 // and a square the player tapped the cross off no longer counts.
-                "on_marked" to (cell in state.visibleAutoMarks || cell in state.manualMarks),
+                // Handed in from `tap`, not read here. See the capture site:
+                // by the time this runs the first of the two taps has already
+                // flipped it.
+                "on_marked" to wasMarked,
                 "mode" to modeName,
                 // Without this, `on_marked` means two different things in one
                 // series: with auto-mark off it can only ever be a cross the
@@ -1117,6 +1150,16 @@ class GameViewModel(
         sendEvent(GameEvent.Struck(cell))
         if (level != null) advanceTutorial(TutorialTrigger.Struck, level, placed, marks)
         when {
+            // `forgiven`, not `remaining`. A rehearsal strike costs nothing, so
+            // `remaining` is simply whatever the player was already holding —
+            // and a player who entered the tutorial on their last bone would
+            // otherwise "lose" the demo board on the step that *tells them to
+            // guess wrong*. That wrote a `LevelResult` for level 0 into the
+            // achievement log and a `game.level_failed` for a board nobody
+            // chose to play. Every other write on this screen is gated on the
+            // rehearsal; this one was missed because it is reached through a
+            // number rather than through a branch.
+            forgiven -> Unit
             remaining <= 0 -> lose(strikes)
             remaining == 1 && !warnedAboutLastBone -> {
                 warnedAboutLastBone = true
@@ -1788,7 +1831,16 @@ class GameViewModel(
         if (state.phase != GamePhase.Playing) return
         if (consumable != Consumable.Bone && !boostersEnabled()) return
         val explained = consumable in state.explainedBoosters
-        if (!explained || countOf(consumable) <= 0) {
+        // Bones always prompt. The other two are spent by tapping, so once the
+        // player knows what they do a tap should just use one — but a bone is
+        // only ever spent by guessing wrong, and its pill is an explainer and a
+        // refill offer.
+        //
+        // Without this it fell through to `spend(Bone)`, which does nothing but
+        // clear a prompt that was never opened. So the pill worked once, and
+        // then silently stopped for the rest of the install while keeping its
+        // press animation and its accessibility label.
+        if (consumable == Consumable.Bone || !explained || countOf(consumable) <= 0) {
             updateState { it.copy(boosterPrompt = consumable) }
             return
         }
@@ -1890,7 +1942,16 @@ class GameViewModel(
         logger.logEvent("game.booster_used", "booster" to "sniff", "level_id" to level.id)
         sniffsUsed++
         persistCounts(Consumable.Sniff, state.sniffs - 1)
-        updateState {
+        // `updateBoard`, not `updateState`, and that is the whole fix.
+        // `persistCounts` writes the holding to `AppData`; only `updateBoard`
+        // writes the *attempt*, which is where `sniffsUsed` lives. Spending a
+        // sniff and force-quitting before the next move therefore restored an
+        // attempt that had never taken any help, banking a bigger score than was
+        // earned and under-reporting `sniffs_used`.
+        //
+        // `useTreat` was safe by accident: it ends in `place`, which already
+        // goes through `updateBoard`.
+        updateBoard {
             it.copy(
                 sniffs = it.sniffs - 1,
                 // Counted from the fields rather than incremented in state:
