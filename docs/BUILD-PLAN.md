@@ -823,3 +823,35 @@ C0 → C1 → C2 ──┐
 C3a runs before C4 and C12 continues it from there. The dog art has landed, so the only remaining
 hard external dependencies are the AdMob and store accounts (C8) and the redrawn app icon; every
 chunk up to C7 can be built with nothing from outside.
+
+---
+
+## Where this actually stands, 2026-09-07 evening
+
+Everything through C7 is code-complete. What is left is either waiting on the user or is the
+last third of the plan.
+
+**Blocked on the user, not on us:**
+
+- **AdMob and store accounts** (C8). The implementation is built against Google's published test
+  ad unit ids and a StoreKit local configuration, so it runs end to end today; swapping in real
+  ids is a config change. SPEC §20 lists exactly what to create.
+- **Two art files that never reached disk** — the sad-dog still and the bone artwork described in
+  chat. The lose sheet still uses `DogPose.HardMode` and the bones are still drawn in
+  `GameShapes.drawBone`. Both are one-line swaps once the files exist.
+- **The app icon**, which currently has sudoku numerals on it. Sodogku has no numbers.
+- **The Fly deploy** (C7's tail). The steps are written out under C7 in order; none of them can be
+  done from here without the account.
+- **`xcode-select`** points at something that is not Xcode, so **iOS has never been run** — only
+  compiled, on every chunk. `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
+  needs the user's password.
+- **Docker**, when it is down, self-skips five Postgres and integration-harness tests. They have
+  run green when it was up.
+
+**The pattern worth carrying forward.** Four separate bugs this session came from the same
+shape — a suspend function computing a value, then reading it back off `state`, which lags
+`updateState` by a dispatch. It always compiles and is wrong about half the time depending on
+dispatch timing. Three more came from tests that could not fail: assertions of the form "nothing
+bad is in the output", which an empty output satisfies perfectly. Both are now written up in
+`decisions.md`, and every new assertion of that shape gets a companion that proves the output is
+non-empty.
