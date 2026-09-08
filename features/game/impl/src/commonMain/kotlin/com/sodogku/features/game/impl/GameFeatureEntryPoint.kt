@@ -7,6 +7,8 @@ import androidx.navigation.toRoute
 import com.sodogku.features.game.GameRoute
 import com.sodogku.features.home.FeedbackRoute
 import com.sodogku.features.settings.SettingsRoute
+import com.sodogku.features.streak.StreakIntentionRoute
+import com.sodogku.features.streak.StreakRoute
 import com.sodogku.libraries.flowroutines.ObserveEvents
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.Router
@@ -56,6 +58,8 @@ class GameFeatureEntryPoint(
                     GameEvent.OpenTerms -> router.openWebLink(TermsUrl)
                     GameEvent.OpenFeedback -> router.navigate(FeedbackRoute())
                     GameEvent.OpenSettings -> router.navigate(SettingsRoute())
+                    GameEvent.OpenStreakIntention -> router.navigate(StreakIntentionRoute())
+                    is GameEvent.OpenStreak -> router.navigate(StreakRoute(celebrating = event.streak))
                 }
             }
 

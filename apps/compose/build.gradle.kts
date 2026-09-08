@@ -116,6 +116,8 @@ kotlin {
             implementation(projects.features.settings)
             implementation(projects.features.settings.impl)
             implementation(projects.features.achievements)
+            implementation(projects.features.streak)
+            implementation(projects.features.streak.impl)
             implementation(projects.features.achievements.impl)
             implementation(projects.features.paywall)
             implementation(projects.features.paywall.impl)

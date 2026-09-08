@@ -485,6 +485,18 @@ sealed interface GameEvent {
     /** Today's daily, on its own route, from the card in the drawer. */
     data class OpenDaily(val levelId: Int) : GameEvent
 
+    /**
+     * The streak wants the screen, at the one pause where that is acceptable.
+     *
+     * Emitted after the win sheet's state is built rather than instead of it, so
+     * a player who closes the ceremony lands back on their finished board rather
+     * than on nothing.
+     */
+    data object OpenStreakIntention : GameEvent
+
+    /** A milestone worth a page. [streak] is the run being celebrated. */
+    data class OpenStreak(val streak: Int) : GameEvent
+
     /** A campaign level picked from the drawer of a board in the other pack. */
     data class OpenLevel(val levelId: Int) : GameEvent
 
@@ -595,6 +607,9 @@ sealed interface GameAction {
     data object DailyIntroDismissed : GameAction
     data object UseFreeze : GameAction
     data object RestoreStreak : GameAction
+
+    /** The streak badge in the level pane was tapped. */
+    data object OpenStreak : GameAction
     data object DismissFreezeMessage : GameAction
     data object OpenSettings : GameAction
 

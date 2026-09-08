@@ -71,6 +71,10 @@ import sodogku.libraries.resources.generated.resources.month_short_6
 import sodogku.libraries.resources.generated.resources.month_short_7
 import sodogku.libraries.resources.generated.resources.month_short_8
 import sodogku.libraries.resources.generated.resources.month_short_9
+import com.sodogku.libraries.ui.components.streak.StreakButton
+import sodogku.libraries.resources.generated.resources.daily_streak
+import sodogku.libraries.resources.generated.resources.daily_streak_label
+import sodogku.libraries.resources.generated.resources.daily_streak_none
 
 /**
  * The level list, as a pane that slides in over the board.
@@ -112,6 +116,7 @@ fun BoxScope.LevelDrawer(
     onPlayDaily: () -> Unit = {},
     onUseFreeze: () -> Unit = {},
     onRestoreStreak: () -> Unit = {},
+    onOpenStreak: () -> Unit = {},
     width: Dp = DrawerWidth,
 ) {
     val slide = animateFloatAsState(if (open) 1f else 0f, Motion.Pop)
@@ -138,11 +143,37 @@ fun BoxScope.LevelDrawer(
             .windowInsetsPadding(WindowInsets.systemBars)
             .padding(Dimension.D600),
     ) {
-        Text(
-            text = stringResource(Res.string.levels_title),
-            typography = AppTheme.typography.Heading.H700,
-            modifier = Modifier.padding(bottom = Dimension.D500),
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = Dimension.D500),
+        ) {
+            Text(
+                text = stringResource(Res.string.levels_title),
+                typography = AppTheme.typography.Heading.H700,
+                modifier = Modifier.weight(1f),
+            )
+            // Here rather than in the board's header, which already carries a
+            // menu, a level, a score and a gear. The streak's only input is the
+            // daily, the daily card is the next thing down this pane, and the
+            // number is most interesting in the moment right after playing one.
+            // Absent with the daily, for the same reason the card is: a control
+            // that says the daily exists but cannot be opened is a support
+            // ticket.
+            if (daily != null && daily.enabled) {
+                StreakButton(
+                    streak = daily.streak,
+                    label = stringResource(Res.string.daily_streak_label),
+                    stateLabel = if (daily.streak > 0) {
+                        stringResource(Res.string.daily_streak, daily.streak)
+                    } else {
+                        stringResource(Res.string.daily_streak_none)
+                    },
+                    onClick = onOpenStreak,
+                )
+            }
+        }
 
         // Absent, not greyed, when either flag is off. A card that says the daily
         // exists but cannot be opened is a support ticket; a kill switch has to

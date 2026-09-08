@@ -213,6 +213,7 @@ fun GameScreen(
                 onPlayDaily = { onAction(GameAction.PlayDaily) },
                 onUseFreeze = { onAction(GameAction.UseFreeze) },
                 onRestoreStreak = { onAction(GameAction.RestoreStreak) },
+                onOpenStreak = { onAction(GameAction.OpenStreak) },
             )
         }
 

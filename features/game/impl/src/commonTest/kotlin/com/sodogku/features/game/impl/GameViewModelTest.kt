@@ -84,6 +84,9 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.TestScope
+import com.sodogku.libraries.progress.streak.StreakPrompt
+import com.sodogku.libraries.progress.streak.StreakRepository
+import com.sodogku.libraries.progress.streak.StreakSummary
 
 class GameViewModelTest : CoroutineTest() {
 
@@ -424,6 +427,69 @@ class GameViewModelTest : CoroutineTest() {
 
         assertEquals(0, onTop.state.livesRemaining)
         assertEquals(0, campaign.state.livesRemaining, "the board underneath has to follow")
+    }
+
+    @Test
+    fun clearingALevelHandsTheScreenToAWaitingCeremony() = runUnitTest {
+        val vm = viewModel(streak = SilentStreak(StreakPrompt.Intention))
+        val events = eventsOf(vm)
+
+        solveCurrent(vm)
+
+        assertTrue(
+            events.any { it is GameEvent.OpenStreakIntention },
+            "the streak was owed a moment and never got it: $events",
+        )
+    }
+
+    @Test
+    fun aMilestoneCarriesTheRunItIsCelebrating() = runUnitTest {
+        val vm = viewModel(streak = SilentStreak(StreakPrompt.Celebrate(streak = SEVEN_DAYS)))
+        val events = eventsOf(vm)
+
+        solveCurrent(vm)
+
+        assertEquals(
+            SEVEN_DAYS,
+            events.filterIsInstance<GameEvent.OpenStreak>().single().streak,
+            "the celebration was opened without the number it is about",
+        )
+    }
+
+    @Test
+    fun aQuietStreakNeverInterruptsAWin() = runUnitTest {
+        // The overwhelmingly common case, and the one that would be most
+        // annoying to get wrong: a full-screen page after every clear.
+        val vm = viewModel(streak = SilentStreak(StreakPrompt.None))
+        val events = eventsOf(vm)
+
+        solveCurrent(vm)
+
+        assertTrue(events.any { it == GameEvent.Won }, "the level was never won, so this proves nothing")
+        assertTrue(
+            events.none { it is GameEvent.OpenStreak || it is GameEvent.OpenStreakIntention },
+            "a streak with nothing to say still took the screen: $events",
+        )
+    }
+
+    @Test
+    fun clearingTheDailyDoesNotOpenTheStreakOnTopOfItsOwnRecap() = runUnitTest {
+        // The daily is what the streak is about, so celebrating it over the
+        // daily's own recap would be two pages about one board.
+        val vm = viewModel(
+            isDaily = true,
+            daily = FakeDaily(levelId = DailyLevel),
+            streak = SilentStreak(StreakPrompt.Celebrate(streak = SEVEN_DAYS)),
+        )
+        val events = eventsOf(vm)
+
+        solveCurrent(vm)
+
+        assertTrue(events.any { it == GameEvent.Won }, "the daily was never won, so this proves nothing")
+        assertTrue(
+            events.none { it is GameEvent.OpenStreak },
+            "the daily opened a streak celebration over its own recap: $events",
+        )
     }
 
     @Test
@@ -3150,6 +3216,7 @@ class GameViewModelTest : CoroutineTest() {
         skips: SkipRepository = FakeSkips(),
         daily: DailyRepository = FakeDaily(),
         achievements: AchievementsRepository = RecordingAchievements(),
+        streak: StreakRepository = SilentStreak(),
         config: AppConfigMap = configOf(),
     ) = GameViewModel(
         levelId,
@@ -3165,6 +3232,7 @@ class GameViewModelTest : CoroutineTest() {
         // Fixed rather than the system clock: `localHour` is an input to the
         // time-of-day badges, so a test that read the real clock would pass or
         // fail depending on when it ran.
+        streak = streak,
         wallClock = FixedClock,
         deviceTimeZone = { TimeZone.UTC },
         scoringConfig = scoringFrom(config),
@@ -3353,6 +3421,9 @@ class GameViewModelTest : CoroutineTest() {
         const val THREE = 3
         const val SEVEN = 7
 
+        /** A milestone the streak celebrates. */
+        const val SEVEN_DAYS = 7
+
         /** A whole-campaign schedule at one rate, as the config map holds it. */
         fun everyN(rate: Int): List<Map<String, Int>> =
             listOf(TreatBand(fromLevel = 1, everyNLevels = rate)).asFallbackConfig()
@@ -3456,6 +3527,33 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     /** In-memory [AppCache], so a settings toggle can be asserted without disk. */
+    /**
+     * A streak that never wants the screen.
+     *
+     * The default for every test here, because a ceremony firing mid-assertion
+     * would make an unrelated test about the win path fail for a reason that has
+     * nothing to do with it. The tests that care about the ceremony hand in one
+     * that answers.
+     */
+    private class SilentStreak(
+        private val prompt: StreakPrompt = StreakPrompt.None,
+    ) : StreakRepository {
+        val shown = mutableListOf<StreakPrompt>()
+        override fun observe(): Flow<StreakSummary> = flowOf(empty)
+        override suspend fun summary(): StreakSummary = empty
+        override suspend fun pendingPrompt(): StreakPrompt = prompt
+        override suspend fun onPromptShown(prompt: StreakPrompt) { shown += prompt }
+        override suspend fun reset() = Unit
+
+        private val empty = StreakSummary(
+            current = 0,
+            longest = 0,
+            today = LocalDate(2026, 1, 1),
+            days = emptyList(),
+            enabled = true,
+        )
+    }
+
     private class InMemoryAppCache : AppCache {
         private val state = MutableStateFlow(AppData())
         override val updates: Flow<AppData> = state

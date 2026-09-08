@@ -44,6 +44,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
 import com.sodogku.libraries.progress.ProgressRepository
+import com.sodogku.libraries.progress.streak.StreakPrompt
+import com.sodogku.libraries.progress.streak.StreakRepository
 import com.sodogku.libraries.progress.SkipRepository
 import com.sodogku.libraries.progress.SkipResult
 import com.sodogku.libraries.puzzle.HintFinder
@@ -126,6 +128,7 @@ class GameViewModel(
     private val skips: SkipRepository,
     private val daily: DailyRepository,
     private val achievements: AchievementsRepository,
+    private val streak: StreakRepository,
     /**
      * Wall clock, not [clock]. The monotonic one cannot answer "what time of day
      * is it", which is what the time-of-day badges and the attempt's timestamp
@@ -331,6 +334,10 @@ class GameViewModel(
             GameAction.DailyIntroDismissed -> action.dismissDailyIntro()
             GameAction.UseFreeze -> action.useFreeze()
             GameAction.RestoreStreak -> action.restoreStreak()
+            // Zero, so the page opens still. The celebrating number is only ever
+            // set by the ceremony path; a page the player asked for animates
+            // nothing.
+            GameAction.OpenStreak -> sendEvent(GameEvent.OpenStreak(streak = 0))
             GameAction.DismissFreezeMessage -> action.updateState { it.copy(freezeMessage = null) }
             GameAction.OpenPrivacy -> sendEvent(GameEvent.OpenPrivacy)
             GameAction.OpenTerms -> sendEvent(GameEvent.OpenTerms)
@@ -1296,6 +1303,37 @@ class GameViewModel(
                 dailyStreak = streak,
                 treatAwarded = reward,
             )
+        }
+        offerStreakCeremony()
+    }
+
+    /**
+     * Hands the screen to the streak, if it is owed anything.
+     *
+     * Asked here and nowhere else. A finished board is the one pause in this
+     * app where a full-screen interruption is not taking something away: the
+     * puzzle is over, the sheet is up, and the player has already stopped.
+     * Anywhere mid-attempt and it costs them their place.
+     *
+     * After the win sheet's state is written, so closing the ceremony lands
+     * back on the finished board rather than on nothing.
+     *
+     * Not on the daily: the daily is the thing the streak is *about*, so a
+     * celebration on top of the daily's own recap would be two pages about one
+     * board. There is deliberately no rehearsal check — `win` is already gated
+     * on `!rehearsing` and this is only reachable from inside it, so a second
+     * guard here would be a line no test could ever fail.
+     */
+    private suspend fun GameAction.offerStreakCeremony() {
+        if (isDaily) return
+        val prompt = Catching { streak.pendingPrompt() }
+            .logOnFailure { "Failed to read the streak prompt" }
+            .getOrNull()
+            ?: return
+        when (prompt) {
+            StreakPrompt.None -> Unit
+            StreakPrompt.Intention -> sendEvent(GameEvent.OpenStreakIntention)
+            is StreakPrompt.Celebrate -> sendEvent(GameEvent.OpenStreak(prompt.streak))
         }
     }
 

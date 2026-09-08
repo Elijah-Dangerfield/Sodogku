@@ -27,6 +27,8 @@ kotlin {
             // AchievementCopy, for the unlock toast's badge names.
             implementation(projects.features.achievements)
             implementation(projects.features.settings)
+            // The two streak ceremonies are navigated to from the win path.
+            implementation(projects.features.streak)
             implementation(projects.libraries.sharing)
             implementation(projects.libraries.scoring)
             implementation(projects.libraries.ads)
