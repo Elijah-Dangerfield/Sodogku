@@ -160,7 +160,6 @@
     <string name="booster_not_now">Not now</string>
     <string name="booster_have">You have %1$d</string>
     <string name="hint_title">No dogs here</string>
-    <string name="hint_body">These squares are ruled out. Tap anywhere to carry on.</string>
 
     <!-- Tutorial (SPEC 10). One title + body per TutorialStep; the exhaustive
          `when` in TutorialCoachMark is what keeps this list honest.

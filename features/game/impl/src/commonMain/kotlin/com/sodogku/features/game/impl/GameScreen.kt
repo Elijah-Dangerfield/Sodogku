@@ -145,16 +145,10 @@ fun GameScreen(
 
             Spacer(modifier = Modifier.weight(SpaceBelowBoard))
 
-            // The proposal takes the booster row's place rather than stacking
-            // under it. Two rows of controls where there was one shifts the
-            // board mid-thought, and the one decision in front of the player
-            // right now is whether to keep the crosses.
-            if (state.hintCells.isNotEmpty()) {
-                HintProposalBar(count = state.hintCells.size, onAction = onAction)
-            } else if (state.boostersEnabled) {
-                // `boosters.enabled` off already stops the economy — a tap spends
-                // nothing and an ad refill refuses — but leaving the buttons on
-                // screen would advertise two controls that decline to work.
+            // `boosters.enabled` off already stops the economy — a tap spends
+            // nothing and an ad refill refuses — but leaving the buttons on
+            // screen would advertise two controls that decline to work.
+            if (state.boostersEnabled) {
                 BoosterBar(state = state, onAction = onAction)
             }
 
@@ -645,40 +639,6 @@ private fun cellState(state: GameState, cell: Int, placed: Set<Int>): BoardCellS
     // not weaken back to a suggestion.
     cell in state.hintCells -> BoardCellState.Proposed
     else -> BoardCellState.Empty
-}
-
-/**
- * What the sniff found, and the one tap that keeps it.
- *
- * The count is stated rather than left to be counted off the board: on a 10x10
- * the faint crosses are easy to miss, and "ruled out 6 squares" is what tells
- * somebody the charge was worth taking.
- */
-@Composable
-private fun HintProposalBar(count: Int, onAction: (GameAction) -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Dimension.D300),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            text = if (count == 1) {
-                stringResource(Res.string.hint_found_one)
-            } else {
-                stringResource(Res.string.hint_found_many, count)
-            },
-            typography = AppTheme.typography.Body.B500,
-            color = AppTheme.colors.textSecondary,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D400)) {
-            ButtonPrimary(onClick = { onAction(GameAction.ApplyHint) }) {
-                Text(stringResource(Res.string.hint_apply))
-            }
-            ButtonGhost(onClick = { onAction(GameAction.DiscardHint) }) {
-                Text(stringResource(Res.string.hint_discard))
-            }
-        }
-    }
 }
 
 /**

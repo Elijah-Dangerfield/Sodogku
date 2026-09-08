@@ -29,7 +29,6 @@ import sodogku.libraries.resources.generated.resources.board_action_mark
 import sodogku.libraries.resources.generated.resources.board_action_place
 import sodogku.libraries.resources.generated.resources.game_last_bone_body
 import sodogku.libraries.resources.generated.resources.game_last_bone_title
-import sodogku.libraries.resources.generated.resources.hint_body
 import sodogku.libraries.resources.generated.resources.hint_title
 import sodogku.libraries.resources.generated.resources.tutorial_auto_mark_body
 import sodogku.libraries.resources.generated.resources.tutorial_auto_mark_title
@@ -63,6 +62,14 @@ import sodogku.libraries.resources.generated.resources.tutorial_try_wrong_body
 import sodogku.libraries.resources.generated.resources.tutorial_try_wrong_title
 import sodogku.libraries.resources.generated.resources.tutorial_wrong_explained_body
 import sodogku.libraries.resources.generated.resources.tutorial_wrong_explained_title
+import com.sodogku.libraries.ui.components.button.ButtonGhost
+import com.sodogku.libraries.ui.components.button.ButtonPrimary
+import sodogku.libraries.resources.generated.resources.hint_apply
+import sodogku.libraries.resources.generated.resources.hint_discard
+import sodogku.libraries.resources.generated.resources.hint_found_many
+import sodogku.libraries.resources.generated.resources.hint_found_one
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 
 /** The thing the last-bone warning points at. */
 val LivesFocusKey = FocusTargetKey("game.lives")
@@ -106,11 +113,23 @@ fun BoxScope.LastBoneWarning(state: GameState, onAction: (GameAction) -> Unit) {
 }
 
 /**
- * The sniff's answer: the squares it ruled out, lit through the scrim.
+ * The sniff's answer: the squares it ruled out, lit through the scrim, and the
+ * one tap that keeps them.
  *
  * It shows where a dog *cannot* go, never where one does. A hint that hands over
  * the answer ends the puzzle; one that rules squares out leaves the deduction
  * intact and shows the technique that found them.
+ *
+ * The decision lives **in** the bubble rather than in a bar under the board, and
+ * that is not a layout preference. The scrim is modal: buttons outside it are
+ * dimmed and unreachable, so a player would have had to dismiss the highlight to
+ * reach the thing the highlight was asking about. Putting the choice next to the
+ * lit squares also means the eye is already where the answer is.
+ *
+ * Tapping the scrim leaves the squares alone rather than keeping them. Dismissing
+ * by accident is the common mistake, and the recoverable outcome is the one that
+ * marks nothing: the sniff can be looked at again, but crosses the player did not
+ * ask for have to be found and undone one at a time.
  */
 @Composable
 fun BoxScope.SniffHint(state: GameState, onAction: (GameAction) -> Unit) {
@@ -118,7 +137,7 @@ fun BoxScope.SniffHint(state: GameState, onAction: (GameAction) -> Unit) {
         spotlight = state.hintCells
             .takeIf { it.isNotEmpty() }
             ?.let { cells -> Spotlight(targets = cells.map(::cellFocusKey).toSet()) },
-        onDismiss = { onAction(GameAction.DismissWarning) },
+        onDismiss = { onAction(GameAction.DiscardHint) },
     ) {
         SpeechBubble(anchorBottomPx = 0f) {
             Text(
@@ -127,11 +146,39 @@ fun BoxScope.SniffHint(state: GameState, onAction: (GameAction) -> Unit) {
                 textAlign = TextAlign.Center,
             )
             Text(
-                text = stringResource(Res.string.hint_body),
+                // The count, because on a 10x10 the lit squares are spread out
+                // and "ruled out 6" is what says the charge was worth taking.
+                text = if (state.hintCells.size == 1) {
+                    stringResource(Res.string.hint_found_one)
+                } else {
+                    stringResource(Res.string.hint_found_many, state.hintCells.size)
+                },
                 typography = AppTheme.typography.Body.B400,
                 color = AppTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
             )
+            // Stacked, not side by side. The bubble is narrower than the
+            // screen and two buttons in a row truncated the second one to
+            // "LEAV..." on a 1080p phone. This is also what every dialog in the
+            // app does, so the shape is already familiar.
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Dimension.D300),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                ButtonPrimary(
+                    onClick = { onAction(GameAction.ApplyHint) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(Res.string.hint_apply))
+                }
+                ButtonGhost(
+                    onClick = { onAction(GameAction.DiscardHint) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(Res.string.hint_discard))
+                }
+            }
         }
     }
 }
