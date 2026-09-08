@@ -1355,7 +1355,7 @@ per-call-site concern and nothing failed when a call site forgot.
 | R9 | Confirm the daily is fully separate from the campaign, explain that in a first-run dialog, and settle whether any completed board feeds the streak or only the daily | |
 | R10 | Level rewards are too frequent. Front-load them and thin out as levels climb | |
 | R11 | Run the beta workflow locally for a TestFlight build. Needs an App Store Connect record and a working `xcode-select` | |
-| R12 | The iOS splash is ugly. Just the still dog head, in the exact spot it sits on the first-launch screen, with the paw-print background fading in behind it — so launch reads as one continuous render rather than a splash then a screen | |
+| R12 | The iOS splash is ugly. Just the still dog head, in the exact spot it sits on the first-launch screen, with the paw-print background fading in behind it — so launch reads as one continuous render rather than a splash then a screen | done except the paw print — see below |
 | R13 | Make sure the daily rolls at local midnight and the streak respects time zones. Add a way to restore a broken streak, which probably wants a config key | |
 | R14 | **A deliberate illegal placement did nothing.** `commit` returned early on any auto-marked square, and a placed dog auto-marks its own row, column, region and neighbours — so exactly the squares where an illegal placement lives were unreachable, silently. Fixed. The wider ask stands: the board is the most important screen and wants heavier review, tests and telemetry | |
 
@@ -1636,3 +1636,52 @@ prompt; giving up asks first, and the spent day then opens on its recap.
 needs a purchase and is covered by unit tests only. And the ad shown in the runs
 above was AdMob's test unit resolving instantly, so the *offline* leg was tested
 by turning the radios off rather than by a real no-fill.
+
+### R12 · The launch, as one render — **DONE** apart from the paw print (2026-09-08)
+
+Three separate things were wrong, and only the third was the one the ask named.
+
+**There was no launch screen at all.** `Info.plist` had neither `UILaunchScreen`
+nor a storyboard, so iOS painted a blank system screen before handing over. That
+white flash against the app's cream was most of what read as ugly, and no amount
+of work on the Compose side would have touched it — it happens before any Kotlin
+runs. Fixed with a `UILaunchScreen` dictionary pointing at a new
+`LaunchBackground` colorset holding `ColorResource.Cream50`.
+
+Colour only, deliberately. `UIImageName` scales its image to fill the screen, so
+it cannot place a dog at a fixed offset; it would land at a different size on
+every device and the handoff would jump. The system paints flat cream, the app
+paints flat cream, and the seam between them is invisible.
+
+Those two cream values live in different files that nothing connects, so
+`LaunchScreenMatchesTheAppTest` reads both as text and compares them. Both sides
+are parsed rather than imported: `:apps:integration` has no Compose on its
+classpath and adding `:libraries:ui` for one colour would put the design system
+behind every test in the module. Mutation-checked both ways — drifting the
+catalog to white and removing the plist key each fail it.
+
+**The Compose splash faded its own background in.** Even with the launch screen
+fixed, `SplashContent` animated one alpha across the whole `Box`, cream included,
+so the first 450ms showed the bare window underneath — reintroducing exactly the
+flash the launch screen had just removed. It is two alphas now: the cream is
+opaque from frame one, and only the dog arrives.
+
+**And the wordmark went.** It was `Brand.B1300` — the template's script face —
+centred, which is a different thing in a different place from anything that
+follows it. Now the splash draws `DogPose.Still` at the offset the first-run
+screen uses, holds, and fades out. Because the welcome screen's own dog is the
+same size in the same place, what the fade reveals is a dog that did not move:
+the title and tagline arrive *around* it. For a returning player there is no dog
+underneath and the overlay just fades — the nested alphas handle that with no
+special case.
+
+The two screens agree because they share `DogHeroTopInset`, not because someone
+wrote 40dp twice. The failure mode here is silent and visual, and a shared
+constant catches it at compile time where a test would only have caught it if
+someone thought to write one.
+
+**The paw-print background is not done, and is not startable.** It needs the art,
+which is in the same position as the sad dog, the bone artwork and the welcome
+backgrounds: described in chat, never saved to disk. The ripple-in load was
+raised as a maybe and is deferred with it — it only makes sense as a reveal *of*
+that background.

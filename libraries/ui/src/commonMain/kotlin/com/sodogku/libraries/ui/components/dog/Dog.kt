@@ -8,6 +8,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sodogku.libraries.ui.PreviewContent
+import com.sodogku.system.Dimension
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -55,6 +56,18 @@ enum class DogPose(internal val resource: DrawableResource, internal val weight:
 
 /** Default render size for a hero pose, sized to the art we ship. */
 val DogHeroSize: Dp = 160.dp
+
+/**
+ * How far below the system bars a hero dog stands, when it is the first thing on
+ * a screen.
+ *
+ * Named rather than repeated because two screens have to agree on it exactly:
+ * the iOS splash and the first-run welcome both open with a hero dog, and the
+ * splash fades out into the welcome. If the two offsets differ by even a few dp
+ * the dog visibly jumps at the handoff — which is the one flaw a viewer notices
+ * in a transition whose entire job is to look like nothing happened.
+ */
+val DogHeroTopInset: Dp = Dimension.D1200
 
 /**
  * Renders [pose] at [size].

@@ -36,6 +36,28 @@
 	-->
 	<key>NSUserTrackingUsageDescription</key>
 	<string>This lets us show ads that are more relevant to you. Sodogku is free because of them.</string>
+	<!--
+	  The launch screen, which is the first thing anyone sees and was previously
+	  nothing at all. With neither this key nor a storyboard, iOS shows a blank
+	  system screen and then hands over — the flash of white against the app's
+	  cream was the whole of what read as "ugly".
+
+	  Colour only, deliberately. `UIImageName` scales an image to fill the
+	  screen, so it cannot place the dog at the offset the first-run screen uses;
+	  it would land at a different size on every device and the handoff would
+	  jump. Instead the system paints the same cream the app paints, and the dog
+	  fades up over it from `SplashScreen.kt` already in its final position. The
+	  seam between the system's screen and ours is then invisible, because both
+	  sides are the same flat colour.
+
+	  `LaunchBackground` must stay equal to `ColorResource.Cream50` (#F8F2ED).
+	  There is no dark variant because the app has one palette.
+	-->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>processing</string>

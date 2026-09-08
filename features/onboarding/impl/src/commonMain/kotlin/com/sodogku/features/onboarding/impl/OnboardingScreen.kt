@@ -18,6 +18,7 @@ import com.sodogku.libraries.ui.components.Screen
 import com.sodogku.libraries.ui.components.button.ButtonGhost
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.dog.Dog
+import com.sodogku.libraries.ui.components.dog.DogHeroTopInset
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.system.AppTheme
@@ -54,7 +55,9 @@ fun OnboardingScreen(
                     .fillMaxSize()
                     .padding(horizontal = Dimension.D800),
             ) {
-                Spacer(modifier = Modifier.height(Dimension.D1200))
+                // Shared with the iOS splash, which fades out into this screen
+                // with its own dog already standing here. See DogHeroTopInset.
+                Spacer(modifier = Modifier.height(DogHeroTopInset))
                 Dog(pose = DogPose.Solved)
                 Spacer(modifier = Modifier.height(Dimension.D600))
                 Text(
