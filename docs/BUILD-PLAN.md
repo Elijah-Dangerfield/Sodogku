@@ -1359,6 +1359,9 @@ per-call-site concern and nothing failed when a call site forgot.
 | R13 | Make sure the daily rolls at local midnight and the streak respects time zones. Add a way to restore a broken streak, which probably wants a config key | |
 | R14 | **A deliberate illegal placement did nothing.** `commit` returned early on any auto-marked square, and a placed dog auto-marks its own row, column, region and neighbours — so exactly the squares where an illegal placement lives were unreachable, silently. Fixed. The wider ask stands: the board is the most important screen and wants heavier review, tests and telemetry | |
 
+| R15 | **The bone economy is per-attempt, and it should be global.** `GameState.livesRemaining` resets to three on every `startAttempt`, so bones come back free by starting anything. Three symptoms from one cause: a "keep going" that hands a bone back for nothing; leaving a board and returning with a full three; and the daily and the campaign each having their own three. Bones should be one count, held across boards and refilled by watching an ad | |
+| R16 | **Leaving a lost daily silently forfeits it.** Tapping Levels on a lost daily writes `onFailed`, which spends the day — so the player lands in the campaign and cannot reopen the daily. Writing on leave rather than on the third bone is deliberate (an ad revive can still earn the clear, and `daily_result` is insert-only), but forfeiting has to be a choice the player makes, not a side effect of navigating | |
+
 **Still blocked on files that never reached disk.** The sad dog, the bone artwork
 and now the welcome backgrounds. Four sets described in chat, none on the
 filesystem — images pasted into a message do not reach it. They need saving into
