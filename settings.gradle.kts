@@ -113,6 +113,11 @@ include(":libraries:sharing")
 include(":libraries:sharing:impl")
 include(":features:achievements")
 include(":features:achievements:impl")
+// The streak page and the one-off intention moment. Its copy lives in its own
+// composeResources rather than in :libraries:resources, because nothing outside
+// the feature renders it.
+include(":features:streak")
+include(":features:streak:impl")
     // No api sibling on purpose: the public surface is the `logEvent`
     // extension in :libraries:core; this impl only hosts the experimental
     // opentelemetry-kotlin dependency + the GrafanaLogTree wiring.

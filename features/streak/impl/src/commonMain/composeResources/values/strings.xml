@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+    <string name="streak_title">Streak</string>
+
+    <!-- The circular button. `label` is what it is, `days` / `none` is what it says. -->
+    <string name="streak_indicator_label">Streak</string>
+    <string name="streak_indicator_days">%1$d day streak</string>
+    <string name="streak_indicator_none">No streak yet</string>
+
+    <string name="streak_current_days">%1$d day streak</string>
+    <string name="streak_current_none">No streak yet</string>
+    <string name="streak_longest">Longest run: %1$d days</string>
+    <string name="streak_longest_none">No run to beat yet</string>
+    <string name="streak_calendar_title">The last five weeks</string>
+    <string name="streak_empty_body">Play the daily puzzle and this fills in. Miss a day and it starts again.</string>
+
+    <!-- One per day cell. Spoken, not printed: the grid itself shows a colour. -->
+    <string name="streak_day_completed">Played</string>
+    <string name="streak_day_bridged">Covered</string>
+    <string name="streak_day_failed">Out of bones</string>
+    <string name="streak_day_missed">Missed</string>
+    <string name="streak_day_future">Not yet</string>
+    <string name="streak_day_today">%1$s, today</string>
+
+    <string name="streak_weekday_mon">M</string>
+    <string name="streak_weekday_tue">T</string>
+    <string name="streak_weekday_wed">W</string>
+    <string name="streak_weekday_thu">T</string>
+    <string name="streak_weekday_fri">F</string>
+    <string name="streak_weekday_sat">S</string>
+    <string name="streak_weekday_sun">S</string>
+
+    <string name="streak_off_title">The daily is not running</string>
+    <string name="streak_off_body">Streaks come from the daily puzzle. Nothing you have already played is lost.</string>
+
+    <string name="streak_celebrate_title">%1$d days in a row</string>
+    <string name="streak_celebrate_body">Same time tomorrow.</string>
+    <string name="streak_celebrate_done">Nice</string>
+
+    <string name="streak_intention_title">One a day</string>
+    <string name="streak_intention_body">There is a new puzzle every day. Play it and this fills in, one paw a day, for as long as you keep coming back.</string>
+    <string name="streak_intention_mark">Start your streak</string>
+    <string name="streak_intention_waiting">Not started</string>
+    <string name="streak_intention_filled">Started</string>
+    <string name="streak_intention_cta">Play today\'s puzzle</string>
+    <!-- Offered only after the paw is filled. The moment itself has no way past it. -->
+    <string name="streak_intention_later">Maybe later</string>
+</resources>

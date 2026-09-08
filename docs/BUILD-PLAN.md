@@ -2186,3 +2186,98 @@ mistake was the bug introduced by fixing the first one.
 The "tell the player why it failed" part of S10 turns out to already exist: the
 broken-rule highlight outlines the rule that the placement violated. The ask to
 make it more colourful is S21.
+
+
+### S12 · Streaks, quietly. **BUILT, not yet wired in** (2026-09-08)
+
+The daily streak itself was already right and is untouched. `DailyStreak.streakOn`
+still owns what a run is, `DailyRepository` still owns the freeze and the restore,
+and nothing here forks either. What was missing was everything around it: a record,
+a page, a way in, and a decision about how loud any of it is allowed to be.
+
+**The record is a fold, like the run.** `longestStreakOn` walks the whole
+`daily_result` table under the same three rules the current streak obeys: a
+bridged day joins two runs without counting itself, a lost day ends one, a day
+with no row ends one. It ignores rows dated after today, because a clock wound
+forward and back must not leave behind the one number nobody can dispute. There
+is no `longest` column anywhere. `thereIsNoStoredStreak_soAWipedTableWipesBoth`
+is the test that says so, and `theRecordIsNeverShorterThanTheRunInFlight` is the
+one that catches a fold that has quietly stopped considering the live run.
+
+**The calendar is five weeks, aligned to the week, and does not page back.** A
+month view needs navigation, an empty-month state and an answer for what January
+looks like to somebody who installed in March. A rolling window ending today
+always holds the run that matters. It starts on a Monday because kotlinx-datetime
+has no locale-aware first day of the week, and guessing one from the region
+would put the grid out of step with the platform calendar for exactly the players who
+would notice.
+
+**The page does not move when you open it.** That is expressed as an absence
+rather than as a flag: `StreakScreen` has no entrance animation of its own, and
+the only thing that animates is the single cell named by `fillingIndex`, which is
+null unless the route carried a milestone. `StreakRoute(celebrating: Int)` is one
+`Int` rather than two routes or an enum. Enum route args need a typeMap and crash
+graph-build on iOS, and the page wants the number for its headline anyway.
+
+**Milestones are 3, 7, 14, 30, and every 30 after that.** Thinning out fast is the
+design. Duolingo can celebrate weekly because there the streak *is* the product;
+here the puzzle is the product and the streak is a reason to come back, so a page
+that appears on day 4, 5 and 6 stops being a reward and becomes something standing
+between the player and the next board. Three is the first run worth noticing and
+lands inside the first week. Seven is the number people say out loud.
+
+**The intention moment is offered after three cleared campaign levels, once, and
+only to somebody who has never played a daily.** One clear is the first thirty
+seconds of the app and a full-screen interruption there is indistinguishable from
+an ad. Ten is past the point where the player has already decided. Three is the
+first moment they have *chosen* to keep playing twice, with a session left to
+spend the streak on. The "never played a daily" clause is load-bearing rather than
+defensive: the daily card sits in the level pane from level one, so a curious
+player can be four days into a run before their third campaign clear, and "tap to
+start your streak" would be visibly false to them.
+
+It is recorded as shown the instant it opens, before the player touches anything.
+The screen swallows the back gesture and has no close control, so if a force-quit
+un-recorded it then killing the app would be the only exit and the moment would
+become a thing to escape. After the paw fills there are two buttons, and the
+second one matters: non-skippable is about the moment, not about the puzzle, and
+marching somebody into a fourth board three levels into their first session is how
+a nice moment becomes the reason they close the app.
+
+**No weekly present.** Argued both ways and decided against, on S14's constraint.
+With ads narrowed to bones and sniffs, a weekly prize is pure cost with no
+impression behind it, and the streak already pays out twice. The freeze and the
+restore exist precisely because there is a run worth saving, and both are wired to
+a rewarded placement that does earn. Adding a third payout that earns nothing
+would also have to be sized against the bone economy, which lives in
+`:libraries:config` and the game's own tuning rather than here, so any number
+chosen now would be uncalibrated. If it is built later, 3 bones on the seventh
+consecutive day is the shape: one board's worth of mistakes, the smallest gift
+that changes a decision, and denominated in the currency the ads already sell.
+
+**The decaying iOS icon is not built, and is not cheap.** `apps/ios` ships one
+`AppIcon.appiconset` with a single 1024 png and no `CFBundleIcons` entry.
+Alternate icons need artwork that does not exist (three or four decay stages, each
+a full 1024 asset), `CFBundleAlternateIcons` in `Info.plist` or the Xcode 14+
+`ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` route, and a Swift shim passed
+into the graph through `IosAppComponentFactory`. The blocker is not the plumbing.
+iOS shows a system alert on **every** `setAlternateIconName` call, reading "You
+have changed the icon for Sodogku",, and it cannot be suppressed, so a decay schedule
+means an unsolicited modal on a recurring basis. The app must also be foregrounded
+to change its icon, so a streak that dies on Tuesday only decays whenever the
+player next opens the app, which is the same moment the streak page would tell
+them anyway. Two days of work to ship a recurring system alert that says something
+the app can already say better.
+
+**The art is a paw print standing in for a flame.** `drawPaw` from the game shapes
+is already in the design system, so nothing here waited on artwork. Both places it
+appears, `StreakMark` on the button and the fill on the intention screen, are one
+line each.
+
+**Not wired in.** The feature contributes its routes by DI multibinding, so
+`apps/compose` needs no navigation code, but it does need the module on its
+classpath and something has to decide when to navigate. Both of those live outside
+this change: one dependency line in `apps/compose/build.gradle.kts`, the streak
+button placed in the level pane, and a three-line `pendingPrompt()` check wherever
+a level finishes. Until those land the streak page is unreachable at runtime and
+none of this has been seen on a device.

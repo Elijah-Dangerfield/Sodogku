@@ -190,7 +190,7 @@ class DailyRepositoryImpl(
  * and freeze, while a row invented at the wrong date silently shifts every
  * calculation that walks past it.
  */
-private fun DailyResultEntity.toResult(): DailyResult? {
+internal fun DailyResultEntity.toResult(): DailyResult? {
     val parsedDate = Catching { LocalDate.parse(date) }.getOrNull() ?: return null
     val parsedOutcome = DailyOutcome.entries.firstOrNull { it.name == outcome } ?: return null
     return DailyResult(
@@ -203,8 +203,8 @@ private fun DailyResultEntity.toResult(): DailyResult? {
     )
 }
 
-private fun List<DailyResultEntity>.toResults(): Map<LocalDate, DailyResult> =
+internal fun List<DailyResultEntity>.toResults(): Map<LocalDate, DailyResult> =
     mapNotNull { it.toResult() }.associateBy { it.date }
 
-private fun List<DailyResultEntity>.toOutcomes(): Map<LocalDate, DailyOutcome> =
+internal fun List<DailyResultEntity>.toOutcomes(): Map<LocalDate, DailyOutcome> =
     toResults().mapValues { it.value.outcome }
