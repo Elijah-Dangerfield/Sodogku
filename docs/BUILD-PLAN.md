@@ -1340,6 +1340,29 @@ being made — `libraries/ui/.../components/dialog/`. Every dialog in the app sh
 padding without its call site asking. The reason it kept recurring is that the padding was a
 per-call-site concern and nothing failed when a call site forgot.
 
+## Round three, 2026-09-08
+
+| # | Item | State |
+|---|---|---|
+| R1 | **Score stays 0 in campaign.** The header shows the *current attempt's* score, which starts at zero each level. The ask is one persistent lifetime score, earned from every board including the daily, weighted by hints used and level difficulty | |
+| R2 | Header lift-on-scroll drops a shadow on all four sides; it should only fall below | |
+| R3 | Tutorial: teach on a **throwaway demo board**, not level 1. Highlight the actual column or colour a rule is about, not just the chip. Block "continue" until the player really has crossed a square off / placed a dog, and let the mark finish drawing first | |
+| R4 | Sniff and Treat read oddly. The wanted look is the retro one from `Workspace/Cards`: the background duplicated and offset down, rather than the gradient-and-sheen currently there. Colours are right | |
+| R5 | A background on the welcome screen — **blocked, files not on disk** | |
+| R6 | A dialog when the dog counter (1/4) is tapped | |
+| R7 | Achievements: the earned border is clipped by the card's own shape; the detail dialog does not animate; grow the catalog toward ~75; more of them hidden until earned | |
+| R8 | Placing a dog auto-crosses too much and does the player's reasoning for them | |
+| R9 | Confirm the daily is fully separate from the campaign, explain that in a first-run dialog, and settle whether any completed board feeds the streak or only the daily | |
+| R10 | Level rewards are too frequent. Front-load them and thin out as levels climb | |
+| R11 | Run the beta workflow locally for a TestFlight build. Needs an App Store Connect record and a working `xcode-select` | |
+
+**Still blocked on files that never reached disk.** The sad dog, the bone artwork
+and now the welcome backgrounds. Four sets described in chat, none on the
+filesystem — images pasted into a message do not reach it. They need saving into
+`art/source/` before any of it can be wired.
+
+---
+
 **Tracked debt.** `GameViewModel` was 1895 lines with 22 constructor parameters. `GameContract.kt`
 (the state, events and actions) and `TutorialRunner.kt` (the script, the position in it, and which
 levels have been guided) are out, taking it to ~1490 — better, and still too big. The remaining
