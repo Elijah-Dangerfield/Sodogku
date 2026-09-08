@@ -51,6 +51,10 @@ import sodogku.libraries.resources.generated.resources.settings_section_pro
 import sodogku.libraries.resources.generated.resources.settings_terms
 import sodogku.libraries.resources.generated.resources.settings_title
 import sodogku.libraries.resources.generated.resources.settings_version_label
+import com.sodogku.libraries.ui.components.icon.Icon
+import com.sodogku.libraries.ui.components.icon.IconSize
+import com.sodogku.libraries.ui.components.icon.Icons
+import com.sodogku.system.AppTheme
 
 /**
  * Every player-facing setting in the app, and the legal links the stores
@@ -146,9 +150,35 @@ fun SettingsScreen(
                         checked = state.achievementsVisible,
                         onToggle = { onAction(SettingsAction.ToggleAchievements) },
                     ).takeIf { state.achievementsAvailable },
+                ),
+            )
+
+            VerticalSpacerD800()
+
+            // Its own card, not a row inside the achievements one.
+            //
+            // It is the only thing on this screen that is neither a control nor
+            // a place to go: everything else here does something when you touch
+            // it. Sitting it under two toggles made it read as a third setting
+            // whose switch had gone missing, and it is the one line on the
+            // screen a player really needs to have read — there are no accounts,
+            // so a reinstall is the end of three hundred levels.
+            //
+            // The icon does the work the grouping used to. A card with a single
+            // untappable row and no title is ambiguous; the same card with an
+            // info mark in front of it is plainly a notice.
+            ListSection(
+                items = listOf(
                     ListSectionItem(
                         headlineText = stringResource(Res.string.settings_progress_local_title),
                         supportingText = stringResource(Res.string.settings_progress_local_body),
+                        leadingContent = {
+                            Icon(
+                                icon = Icons.Info.decorative,
+                                size = IconSize.Small,
+                                color = AppTheme.colors.textSecondary,
+                            )
+                        },
                         accessory = ListItemAccessory.None,
                     ),
                 ),
