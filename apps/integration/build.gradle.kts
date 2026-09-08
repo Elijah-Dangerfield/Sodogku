@@ -108,4 +108,13 @@ tasks.withType<Test>().configureEach {
             exclude("**/build/**", "**/xcuserdata/**")
         },
     ).withPropertyName("iosProjectScan")
+
+    // And the shared strings, for the same reason: `UserFacingCopyStyleTest`
+    // reads them at runtime and Gradle cannot see that.
+    inputs.files(
+        rootProject.fileTree(repo.dir("libraries/resources")) {
+            include("**/composeResources/**/*.xml")
+            exclude("**/build/**")
+        },
+    ).withPropertyName("sharedStringsScan")
 }

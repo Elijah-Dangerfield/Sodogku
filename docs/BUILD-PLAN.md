@@ -1345,11 +1345,11 @@ per-call-site concern and nothing failed when a call site forgot.
 | # | Item | State |
 |---|---|---|
 | R1 | **Score stays 0 in campaign.** The header shows the *current attempt's* score, which starts at zero each level. The ask is one persistent lifetime score, earned from every board including the daily, weighted by hints used and level difficulty | done — see below |
-| R2 | Header lift-on-scroll drops a shadow on all four sides; it should only fall below | |
+| R2 | Header lift-on-scroll drops a shadow on all four sides; it should only fall below | **DONE** — `elevateOnScroll` draws a bottom-only gradient via `drawWithContent`, replacing `Modifier.shadow` |
 | R3 | Tutorial: teach on a **throwaway demo board**, not level 1. Highlight the actual column or colour a rule is about, not just the chip. Block "continue" until the player really has crossed a square off / placed a dog, and let the mark finish drawing first | done — see below |
-| R4 | Sniff and Treat read oddly. The wanted look is the retro one from `Workspace/Cards`: the background duplicated and offset down, rather than the gradient-and-sheen currently there. Colours are right | |
+| R4 | Sniff and Treat read oddly. The wanted look is the retro one from `Workspace/Cards`: the background duplicated and offset down, rather than the gradient-and-sheen currently there. Colours are right | **DONE** (2026-09-08) — see below |
 | R5 | A background on the welcome screen — **blocked, files not on disk** | |
-| R6 | A dialog when the dog counter (1/4) is tapped | |
+| R6 | A dialog when the dog counter (1/4) is tapped | **DONE** — `GameDialog.Dogs`, verified on device |
 | R7 | Achievements: the earned border is clipped by the card's own shape; the detail dialog does not animate; grow the catalog toward ~75; more of them hidden until earned | **DONE** (2026-09-08) |
 | R8 | Placing a dog auto-crosses too much and does the player's reasoning for them | **DONE** (2026-09-08) — see below |
 | R9 | Confirm the daily is fully separate from the campaign, explain that in a first-run dialog, and settle whether any completed board feeds the streak or only the daily | |
@@ -1898,3 +1898,39 @@ puts anything the tutorial and level 1 need in the binary.
 
 **Not verified:** iOS. The Kotlin target compiles and every change is
 `commonMain`, but nothing has run on a simulator on this machine.
+
+
+### R4 · The chip that said it matched the buttons — **DONE** (2026-09-08)
+
+The buttons themselves were converted earlier: `DeepSurface` gives Sniff, Treat
+and the reward button the face-on-a-lip that `BasicButton` already had, replacing
+a gradient-and-sheen that read as a shadow blob under a pill rather than as a
+thing with thickness.
+
+What was left was `LevelRewardChip`, which stayed on `glossy` while its KDoc
+claimed it got "the same candy treatment as the booster buttons". So the one
+place in the app that asserted it matched the buttons was the one place that no
+longer did.
+
+It could not simply use `DeepSurface`: that is a control, and wrapping a label in
+the pressable version to borrow the look would hand a screen reader a button that
+does nothing. `Modifier.deepFace` is the static lip, so there is one
+implementation and one place to change it.
+
+Verified on a device. The same screenshot confirms R10 on hardware: chips on
+levels 3, 6 and 9 where the flat every-fifth rule paid 5 and 10.
+
+### A copy pass on the words a player reads (2026-09-08)
+
+Seven strings used an em dash and one had drifted to British "colour" while the
+rule chip on every board says "color". Individually each looks fine, which is why
+neither was caught in review; across a screen seven em dashes read as one voice
+and two spellings read as two.
+
+`UserFacingCopyStyleTest` holds both, scanning `<string>` bodies only, because
+the comments in that file are for whoever edits it next and are not held to
+either rule. Mutation-checked both ways.
+
+It needed a build change to work at all. This module's test task declared only
+Kotlin as its input, so an edit to `strings.xml` left the task UP-TO-DATE and
+the test never ran. That is the same hole the iOS tests had.

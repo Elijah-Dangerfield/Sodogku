@@ -39,7 +39,7 @@
     <string name="game_dogs_found">%1$d/%2$d</string>
 
     <string name="rules_title">How to play</string>
-    <string name="rules_body">Find the one square in every color where a dog belongs.\n\nTap a square to cross it off. Tap it twice to place a dog there. Cross off freely — only placing a dog can cost you a bone.</string>
+    <string name="rules_body">Find the one square in every color where a dog belongs.\n\nTap a square to cross it off. Tap it twice to place a dog there. Cross off freely. Only placing a dog can cost you a bone.</string>
     <string name="rules_region_body">Every color holds exactly one dog. Once a dog lands, the rest of that color is out.</string>
     <string name="rules_line_body">Every row and every column holds exactly one dog too.</string>
     <string name="rules_touch_body">No two dogs may touch, not even corner to corner.</string>
@@ -61,9 +61,9 @@
 
     <string name="score_explainer_title">Score</string>
     <string name="score_explainer_body">Every dog you place is worth points, and a bigger board pays more per dog. Land them one after another without a wrong guess and a combo multiplier builds; land them quickly and a speed bonus stacks on top. Finishing pays a bonus of its own, worth more on a hard board and more again for every bone you still have.</string>
-    <string name="score_explainer_total">The number up top is everything you have earned, from every board you have finished — campaign levels and daily boards alike. Replaying a board you have already cleared only moves it once you beat your old score there, and then only by the difference.</string>
+    <string name="score_explainer_total">The number up top is everything you have earned, from every board you have finished, campaign levels and daily boards alike. Replaying a board you have already cleared only moves it once you beat your old score there, and then only by the difference.</string>
     <string name="score_explainer_boosters">Sniffs and treats come out of what the board pays. They never cost you paws.</string>
-    <string name="score_explainer_paws">The paws at the end measure your score against par — what a clean, quick run on this board is worth. Three paws means you got close to it.</string>
+    <string name="score_explainer_paws">The paws at the end measure your score against par, which is what a clean, quick run on this board is worth. Three paws means you got close to it.</string>
 
     <string name="levels_title">Levels</string>
     <string name="levels_locked">Locked</string>
@@ -130,7 +130,7 @@
     <string name="board_glyph_8">double bar</string>
     <string name="board_glyph_9">chevron</string>
     <string name="booster_sniff_title">Sniff it out</string>
-    <string name="booster_sniff_body">Your dog sniffs around and rules out a few squares for you. It never tells you where a dog goes — that part is still yours.</string>
+    <string name="booster_sniff_body">Your dog sniffs around and rules out a few squares for you. It never tells you where a dog goes. That part is still yours.</string>
     <string name="booster_treat_title">Give a treat</string>
     <string name="booster_treat_body">Places one dog correctly, free. No bone at risk.</string>
     <string name="booster_bone_title">Bones</string>
@@ -151,8 +151,8 @@
     <string name="tutorial_got_it">Got it</string>
     <string name="tutorial_skip">Skip tutorial</string>
     <string name="tutorial_starter_dog_title">A practice board</string>
-    <string name="tutorial_starter_dog_body">Nothing here counts — no score, no bones, no progress. One dog is already placed, and every square it rules out is crossed off.</string>
-    <string name="tutorial_starter_dog_body_manual">Nothing here counts — no score, no bones, no progress. One dog is already placed, and every square it rules out is yours to cross off.</string>
+    <string name="tutorial_starter_dog_body">Nothing here counts. No score, no bones, no progress. One dog is already placed, and every square it rules out is crossed off.</string>
+    <string name="tutorial_starter_dog_body_manual">Nothing here counts. No score, no bones, no progress. One dog is already placed, and every square it rules out is yours to cross off.</string>
     <string name="tutorial_rule_region_title">One dog per color</string>
     <string name="tutorial_rule_region_body">Every colored block holds exactly one dog. This one has its dog, so the rest of the block is out.</string>
     <string name="tutorial_rule_line_title">One per row and column</string>
@@ -493,6 +493,6 @@
     <string name="game_bones_remaining">%1$d bones left</string>
     <string name="booster_a11y">%1$s, %2$d left</string>
     <string name="dogs_title">Dogs found</string>
-    <string name="dogs_body">You have placed %1$d of the %2$d dogs this board needs. One per colour, one per row, one per column — so a %3$d-dog board is a %3$d by %3$d grid.</string>
+    <string name="dogs_body">You have placed %1$d of the %2$d dogs this board needs. One per color, one per row, one per column, so a %3$d-dog board is a %3$d by %3$d grid.</string>
     <string name="dogs_a11y">%1$d of %2$d dogs found</string>
 </resources>
