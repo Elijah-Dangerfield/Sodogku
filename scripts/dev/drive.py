@@ -30,10 +30,13 @@ import re
 import subprocess
 import sys
 import time
+from xml.etree import ElementTree
 
 PKG = "com.sodogku.debug"
 LAUNCH_ACTIVITY = "com.sodogku.MainActivity"
 SERIAL = ["-s", "emulator-5554"]
+
+BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 
 
 def adb(*args: str, binary: bool = False):
@@ -44,37 +47,55 @@ def adb(*args: str, binary: bool = False):
 def nodes():
     """Every labelled node on screen, as (label, centre x, centre y).
 
-    Parsed one element at a time rather than by scanning the whole dump for
-    label-then-bounds. The scanning version looked equivalent and was not: in a
-    uiautomator dump `text` always precedes `content-desc`, so on a node with
-    `text=""` the alternation matched the empty text, ran `[^>]*` on to that
-    node's `bounds`, and consumed the element — taking the real `content-desc`
-    with it.
+    Parsed as XML rather than scanned with a regex, and both halves of that
+    matter.
 
-    The effect was that nodes labelled *only* by content description were
-    invisible to this script, and it failed in the least helpful way: the board
-    is exactly that kind of node, so every cell and every icon button silently
-    did not exist and `tap` reported "never found" for a control plainly on
-    screen. Anything labelled with visible text worked, which made it look like
-    a labelling bug in the app.
+    The scanning version looked for `(text|content-desc)="..."` followed by
+    `bounds`, which reads as equivalent and is not. uiautomator emits `text`
+    before `content-desc` on every node, so on a node with `text=""` the
+    alternation matched the empty text, ran on to that node's `bounds` and
+    consumed the element — and `finditer` does not overlap, so the real
+    `content-desc` was never seen. The empty label was then dropped.
 
-    A node can carry both. Both are yielded, so either spelling can be tapped.
+    Nodes labelled *only* by content description were therefore invisible, and
+    it failed in the least helpful way: the board is exactly that kind of node,
+    so every cell and every icon button silently did not exist and `tap`
+    reported "never found" for a control plainly on screen. Anything with
+    visible text worked, which made it look like a labelling bug in the app.
+
+    Parsing per element fixed that and left a second bug behind. Attribute
+    values in the dump are XML-escaped, so the rule chip came back as
+    `1 dog per row &amp; column` and `tap("1 dog per row & column")` — the text
+    actually on screen, and what anyone would type — did not match. A real
+    parser decodes entities; a regex hands back the source.
+
+    A node can carry both a `text` and a `content-desc`. Both are yielded, so
+    either spelling can be tapped.
     """
     adb("shell", "rm", "-f", "/sdcard/ui.xml")
     adb("shell", "uiautomator", "dump", "/sdcard/ui.xml")
-    xml = adb("shell", "cat", "/sdcard/ui.xml")
+    # `exec-out`, not `shell`: `adb shell` translates LF to CRLF, which is
+    # enough to make the parser reject the document.
+    dump = adb("exec-out", "cat", "/sdcard/ui.xml", binary=True)
+    try:
+        root = ElementTree.fromstring(dump)
+    except ElementTree.ParseError:
+        # A dump can be empty or truncated when it lands mid-transition. The
+        # callers all poll, so an empty screen is the honest answer and a
+        # crash here would only turn a retry into a stack trace.
+        return []
+
     found = []
-    for element in re.finditer(r"<node\b[^>]*/?>", xml):
-        node = element.group(0)
-        bounds = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', node)
+    for node in root.iter("node"):
+        bounds = BOUNDS.match(node.get("bounds", ""))
         if not bounds:
             continue
-        x1, y1, x2, y2 = (int(bounds.group(i)) for i in range(1, 5))
+        x1, y1, x2, y2 = (int(value) for value in bounds.groups())
         centre = ((x1 + x2) // 2, (y1 + y2) // 2)
         for attribute in ("text", "content-desc"):
-            label = re.search(rf'{attribute}="([^"]*)"', node)
-            if label and label.group(1):
-                found.append((label.group(1), *centre))
+            label = node.get(attribute)
+            if label:
+                found.append((label, *centre))
     return found
 
 
