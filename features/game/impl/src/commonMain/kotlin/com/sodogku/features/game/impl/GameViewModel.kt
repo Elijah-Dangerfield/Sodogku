@@ -225,6 +225,7 @@ class GameViewModel(
                 showAchievements = settings?.achievementsVisible != false,
                 isPro = entitlements.isPro.value,
                 boostersEnabled = boostersEnabled(),
+                refillTo = refillTo(),
                 // Null is "never granted any", which is what a fresh install
                 // looks like — so the opening grant comes from config rather
                 // than from a default baked into the record that stores it.
@@ -386,6 +387,7 @@ class GameViewModel(
                 reduceAnimations = it.reduceAnimations,
                 showAchievements = it.showAchievements,
                 boostersEnabled = it.boostersEnabled,
+                refillTo = it.refillTo,
                 isPro = it.isPro,
                 records = it.records,
                 unlockedThrough = campaignFrontier(unlocked, level.id),
@@ -1343,6 +1345,9 @@ data class GameState(
     val placed: Solution = Solution.empty(1),
     val autoMarks: Set<Int> = emptySet(),
     val manualMarks: Set<Int> = emptySet(),
+
+    /** What an ad tops a booster up to, so the prompt's copy matches the tap. */
+    val refillTo: Int = 3,
 
     /**
      * True once the last campaign level is cleared, so the win sheet can say so

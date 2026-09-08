@@ -629,6 +629,44 @@ Server and admin half:
 - **Nothing was exercised against a live server.** The admin console's rendering of 60 flags
   instead of 4 has not been looked at in a browser, and no manifest has been uploaded anywhere.
 
+### Follow-up (2026-09-07): the keys that were declared and inert
+
+`ConfigValuesAreReadTest` found that 39 declared values were named nowhere outside
+`:libraries:config` — the console rendered a typed editor for each, an operator could change any
+of them, and nothing happened. That list is now **19**. What was wired:
+
+- **All fourteen `scoring.*` keys.** `ConfiguredScoring` (in `:features:game:impl`) assembles them
+  into the `ScoringConfig` that `Scoring.placement` / `complete` / `paws` take, and `GameViewModel`
+  passes it instead of letting the parameter default. `:libraries:scoring` stays dependency-free,
+  which is a stated intent in its build file, so the assembler lives next to its only consumer.
+  An invalid remote set falls back to `ScoringConfig.Default` **whole** — see `decisions.md`.
+- **`boosters.startingSniffs`, `boosters.startingTreats`, `boosters.refillTo`.** The first two
+  needed `AppData.sniffs`/`treats` to become nullable first: a record defaulting to 3 is
+  indistinguishable from a player who spent down to 3, so the config value could never win.
+- **`features.achievements`, `features.sharing`, `features.boosters`**, each read at the point the
+  feature draws itself rather than resolved into a field.
+
+**What is still inert, and why it is not a call site somebody missed.** Twelve of the nineteen name
+a feature that does not exist: skips (no button, no per-day counter), the level map with
+silhouettes (`progression.lookaheadCount` — the drawer deliberately shows every level with locks
+instead), a treat granted every N levels, a daily cap on ad grants, Pro's per-attempt boosters
+(SPEC 5.1 promises them; nothing implements them), and the app-open ad (`AdFormat.AppOpen` reaches
+the SDK, but there is no `AdPlacement`, no gate and no cold-start hook, so the cooldown has nothing
+to space out). `ads.failureMode`'s `LOCK` arm was never built at all. The remaining five need the
+upgrade gate, the maintenance screen or the legal re-accept sheet, which are chunk-sized.
+
+**Two gaps left open on purpose**, both in files owned by concurrent work in the same session:
+
+1. `GameScreen.kt`'s `BoosterBar(state, onAction)` call needs wrapping in
+   `if (state.boostersEnabled)`. The switch already stops the economy — a tap spends nothing and
+   the ad refill refuses — but the two buttons still render.
+2. `BoosterPrompt.kt` prints the compile-time `ConsumableRefillTo` in its "watch an ad for N" copy
+   while the refill itself now uses `boosters.refillTo`. Raise the config value above 3 and the
+   button under-promises. It wants the number passed in.
+
+**Also found:** the 37 in the original decisions entry and in the test's KDoc was a miscount. The
+set had 39 entries from the day it was written.
+
 **Remains: the Fly deploy.** Explicitly out of scope for this session; nothing was deployed and
 no production state was touched. The steps, in order:
 

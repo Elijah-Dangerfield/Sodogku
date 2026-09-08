@@ -6,6 +6,119 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — an invalid remote `ScoringConfig` is discarded whole, not repaired
+
+`ScoringConfig` validates in its `init` and **throws** — deliberately, since a
+negative `basePerPlacement` made par negative and handed every player three paws
+for scoring zero. Now that the fourteen `scoring.*` keys actually reach it, that
+throw would land inside `place()`, on the tap that put a dog on the board. So
+`ConfiguredScoring` catches it, logs, and returns `ScoringConfig.Default`.
+
+**The whole set, not the offending field.** Rebuilding field by field — keep the
+remote values that validate, default the rest — was the obvious alternative and
+it is wrong twice over. Two of the rules are about *pairs*: `threePawFraction`
+against `twoPawFraction` is a contradiction neither field can be blamed for, so
+"which one do I discard" has no answer. And the coefficients were balanced
+against each other; the entry above about a compressed multiplier range making
+one paw unreachable is what a half-remote blend produces. A blend is a
+combination nobody chose, that nobody could reproduce from the console, and that
+would rate a run against thresholds it was never played under.
+
+The cost is that one bad key throws away thirteen good ones. That is the right
+trade for a set of numbers whose whole value is their relationship, and it is
+loud: the log line names the config as invalid, and `ConfiguredScoringTest` pins
+that a valid `basePerPlacement` sitting next to an invalid `completionBase` does
+**not** survive.
+
+`win()` resolves the config once and passes the same instance to `complete` and
+`paws`, because the paw rating compares a score against a par derived from the
+same coefficients. Two resolves across that comparison is a refresh landing
+mid-sentence.
+
+## 2026-09-07 — the opening handful of boosters is null, not three
+
+`boosters.startingSniffs` could not be wired while `AppData.sniffs` defaulted to
+`ConsumableRefillTo`. A record that already says "3" is indistinguishable from a
+player who spent down to three, so the config value could never win: the default
+baked into the record answered first, every time.
+
+`sniffs` and `treats` are now `Int?`, null meaning "never granted any". The
+opening grant comes from config; everything after it is a number the player owns.
+That also removes a second answer to the same question — the compile-time
+constant an operator cannot change.
+
+`bones` keeps the constant, because nothing reads it as a starting count: an
+attempt opens on `ScoringConfig.MAX_LIVES`, which is a game rule.
+
+**Not finished.** `boosters.refillTo` now decides what a rewarded ad tops a
+holding up to, but `BoosterPrompt` still prints `ConsumableRefillTo` in its
+"watch an ad for N" copy. Raise the config value above 3 and the button
+under-promises. The fix is to hand the prompt the number instead of letting it
+reach for the constant; the file was owned by concurrent work in this session.
+
+## 2026-09-07 — a feature switch has to be read where the feature draws itself
+
+Three switches, three different seams, and the shape is the same each time: the
+value object is injected and *called at the point of use*, never resolved into a
+field or into state at construction. A `features.*` key exists so a feature can
+be pulled without a release, and one that waits for a process restart is not a
+switch.
+
+- **`features.achievements`** gates the unlock toast in `GameViewModel` and the
+  badge rows in Settings. It does **not** stop `AchievementsRepository`
+  recording — the same reason the player's own toggle is display-only. A dark
+  launch that also stopped the fold would hand everyone an empty grid on the day
+  it was switched back on.
+- **`features.boosters`** is read inside `boosterTapped` and `refill` rather
+  than trusted from `GameState`, so a switch thrown mid-session stops the
+  economy on the next tap. Bones are exempt: three strikes is a game rule, and
+  that path is only their explainer.
+- **`features.sharing`** reaches `ShareButton` as `LocalSharingEnabled`, which
+  holds a `() -> Boolean` rather than a `Boolean`. A boolean provided at the
+  root of the tree would be answered once — `App` is built to recompose almost
+  never — so the switch would need a process restart. The composition local is
+  the seam because only a composable can build a share string (see the entry on
+  `LocalShareSheet`), and the button draws nothing rather than greying out: a
+  disabled Share with no explanation is a support ticket.
+
+All three default **on** and stay on against a malformed value, which is now
+asserted directly rather than inferred from the empty map — see the entry on
+`"banana".toBoolean()`. The absent-value tests could never have caught that
+case, because the bug was in resolving a value that was present.
+
+## 2026-09-07 — nineteen keys are still inert, and none of them is a missing call site
+
+`ConfigValuesAreReadTest`'s `UNWIRED` went from 39 names to 19. (Thirty-nine:
+the entry that introduced it says 37, and the set has always had 39. The set is
+what runs.)
+
+What is left splits in two, and the split is the useful part. Most of them are
+keys whose **feature does not exist** — `progression.skipsPerDay` has no skip
+button and no per-day counter; `progression.lookaheadCount` describes a level
+map with silhouettes, and the level drawer deliberately shows every level with
+locks instead; `boosters.treatEveryNLevels` has no level reward to attach to;
+`boosters.adGrantsPerDay` has nowhere to count; `boosters.proSniffsPerAttempt`
+is a Pro benefit SPEC 5.1 promises and the code does not implement.
+`ads.appOpenCooldownHours` has an `AdFormat.AppOpen` that reaches the SDK and no
+`AdPlacement`, no gate and no cold-start hook to space out.
+
+`ads.failureMode` is the one worth naming on its own. `LOCK` — the level locks
+until a rewarded ad reopens it — was never built anywhere, and `RealAdGate`
+documents at length that it does not consult this key on the reward path *on
+purpose*. Wiring it would mean inventing the harsher arm of an A/B test, in the
+one place SPEC 4.2 says an outage must never be able to reach. It stays inert,
+which is the correct state for a key whose only non-default value does not
+exist.
+
+The rest need a screen: the upgrade gate, the maintenance screen, the legal
+re-accept sheet. Those are chunk-sized, not call-site-sized.
+
+**The rule this leaves behind:** wiring a key to nothing is what produced the
+debt in the first place, so a key with no feature stays on the list. The list
+shrinking is the goal; the list shrinking *honestly* is the point.
+
+---
+
 ## 2026-09-07 — the palette went pastel, and it had to get *further* apart to do it
 
 Softening ten fills is not a colour change, it is a compression: every colour moves
@@ -1538,3 +1651,30 @@ Two things the tests caught that the design did not:
 - Opening a fresh level produced an empty snapshot on its first frame and wrote
   it unconditionally, deleting the half-finished level the player had left
   behind. A save now only ever writes over its own board's slot.
+
+## 2026-09-07 — the boosters look like candy now
+
+*"The color used for the sniff and treat buttons could be more colorful. you
+could make the buttons more playful looking too. Maybe like a little squiggle or
+something idk. to make it look shiny."*
+
+`Modifier.glossy` in the design system, and it is three effects rather than one,
+which is worth naming because "shiny" as a single effect does not work:
+
+- **A shaded base**, drawn under the fill and peeking out below it. This is the
+  whole illusion — it reads as the side of a thing with thickness. Without it
+  the other two are just a gradient.
+- **A vertical gradient** from a lighter tint to the colour, which is what a
+  rounded surface does under a light above it.
+- **A soft white sheen** across the top. The one that is easy to overdo.
+
+Two device passes to get it right. The first drew square-cornered rectangles,
+because `glossy` is a `drawBehind` and a `clip` only trims what comes *after* it
+in the chain. The second read as a painted white oval rather than as light — the
+giveaway was that you could see where the highlight stopped. It is now wider,
+shallower and at 0.20 alpha; a sheen has no edge you can point at.
+
+Sniff is blue and Treat is orange, and those are identities rather than theme
+roles. A player learns "the blue one shows me squares" long before they read the
+word, and that only holds if the colours never move. The standing ad offer is
+purple, so an offer never wears a booster's clothes.

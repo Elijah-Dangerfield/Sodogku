@@ -28,6 +28,7 @@ import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
 import com.sodogku.system.Radii
+import com.sodogku.libraries.ui.system.glossy
 import com.sodogku.system.clip
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -241,6 +242,12 @@ fun BoosterButton(
     label: String,
     count: Int,
     modifier: Modifier = Modifier,
+    /**
+     * The button's own colour. Each booster keeps one, so a player learns
+     * "the green one" long before they read the word — which is the only way a
+     * booster row works once there are three of them and a thumb over two.
+     */
+    color: Color = AppTheme.colors.accentPrimary.color,
     enabled: Boolean = true,
     onClick: () -> Unit = {},
 ) {
@@ -250,17 +257,34 @@ fun BoosterButton(
             modifier = Modifier
                 .padding(BadgeInset)
                 .bounceClick(enabled = enabled, onClick = onClick)
+                // Colour, a lit top and a shaded base. A white pill on a cream
+                // page is a shape you have to look for, and this is the row a
+                // stuck player is already looking at. See `Modifier.glossy`.
+                // Clip *before* the gloss. `glossy` is a `drawBehind`, and a
+                // clip only trims what comes after it in the chain — the other
+                // order left three square-cornered rectangles on the page.
                 .clip(Radii.Round)
-                // White, like the counters above the board. On a cream page a
-                // cream button is a shape you have to look for, and this is the
-                // row a stuck player is already looking at.
-                .background(AppTheme.colors.surfacePrimary.color)
-                .padding(horizontal = Dimension.D800, vertical = Dimension.D500),
+                .glossy(
+                    color = if (enabled) color else AppTheme.colors.surfaceDisabled.color,
+                    enabled = enabled,
+                )
+                .padding(
+                    start = Dimension.D800,
+                    end = Dimension.D800,
+                    top = Dimension.D500,
+                    // Extra below, so the label sits on the lit face rather than
+                    // on the shaded base the gloss draws.
+                    bottom = Dimension.D600,
+                ),
         ) {
             Text(
                 text = label,
                 typography = AppTheme.typography.Body.B600,
-                color = if (enabled) AppTheme.colors.text else AppTheme.colors.textDisabled,
+                color = if (enabled) {
+                    AppTheme.colors.onAccentPrimary
+                } else {
+                    AppTheme.colors.onSurfaceDisabled
+                },
             )
         }
         Box(

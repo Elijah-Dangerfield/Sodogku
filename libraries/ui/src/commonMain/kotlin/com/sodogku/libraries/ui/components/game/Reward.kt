@@ -14,7 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalInspectionMode
 import com.sodogku.libraries.ui.PreviewContent
+import androidx.compose.ui.graphics.Color
 import com.sodogku.libraries.ui.bounceClick
+import com.sodogku.libraries.ui.system.glossy
 import com.sodogku.libraries.ui.components.icon.Icon
 import com.sodogku.libraries.ui.components.icon.IconSize
 import com.sodogku.libraries.ui.components.icon.Icons
@@ -48,6 +50,7 @@ import sodogku.libraries.resources.generated.resources.game_watch_ad_badge
 fun RewardButton(
     label: String,
     modifier: Modifier = Modifier,
+    color: Color = AppTheme.colors.accentSecondary.color,
     enabled: Boolean = true,
     onClick: () -> Unit = {},
 ) {
@@ -80,15 +83,20 @@ fun RewardButton(
                 scaleX = pulse.value
                 scaleY = pulse.value
             }
+            // Same candy treatment as the boosters beside it. An offer that
+            // looked flat next to two glossy buttons would read as the one
+            // control on the row that is switched off.
             .clip(Radii.Round)
-            .background(
-                if (enabled) {
-                    AppTheme.colors.accentSecondary.color
-                } else {
-                    AppTheme.colors.surfaceDisabled.color
-                },
+            .glossy(
+                color = if (enabled) color else AppTheme.colors.surfaceDisabled.color,
+                enabled = enabled,
             )
-            .padding(horizontal = Dimension.D500, vertical = Dimension.D300),
+            .padding(
+                start = Dimension.D500,
+                end = Dimension.D500,
+                top = Dimension.D300,
+                bottom = Dimension.D400,
+            ),
     ) {
         Icon(
             icon = Icons.PlayCircle(contentDescription = null),

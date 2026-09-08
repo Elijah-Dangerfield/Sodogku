@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import com.sodogku.libraries.sodogku.ConsumableRefillTo
 import com.sodogku.libraries.ui.components.button.ButtonGhost
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.button.ButtonSecondary
@@ -42,6 +41,15 @@ import sodogku.libraries.resources.generated.resources.booster_watch_ad
 fun BoosterPrompt(
     consumable: Consumable,
     held: Int,
+    /**
+     * What an ad tops this booster up to, from `boosters.refillTo`.
+     *
+     * Passed in rather than read from the compile-time constant, because the
+     * refill itself is config-driven now: with the constant here, raising the
+     * key above three would have had the button promise less than the tap
+     * delivers, and lowering it would have had the button lie.
+     */
+    refillTo: Int,
     onUse: () -> Unit,
     onWatchAd: () -> Unit,
     onDismiss: () -> Unit,
@@ -78,11 +86,11 @@ fun BoosterPrompt(
                     Text(stringResource(Res.string.booster_use))
                 }
                 ButtonSecondary(onClick = onWatchAd, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(Res.string.booster_watch_ad, ConsumableRefillTo))
+                    Text(stringResource(Res.string.booster_watch_ad, refillTo))
                 }
             } else {
                 ButtonPrimary(onClick = onWatchAd, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(Res.string.booster_watch_ad, ConsumableRefillTo))
+                    Text(stringResource(Res.string.booster_watch_ad, refillTo))
                 }
             }
 

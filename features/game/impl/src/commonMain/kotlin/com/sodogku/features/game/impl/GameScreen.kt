@@ -48,6 +48,7 @@ import com.sodogku.libraries.ui.system.focusTarget
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.core.BuildInfo
+import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
@@ -98,6 +99,8 @@ fun GameScreen(
                 onOpenLevels = { onAction(GameAction.LevelsOpened) },
                 onSettings = { onAction(GameAction.OpenSettings) },
                 onExplainBones = { onAction(GameAction.BoosterTapped(Consumable.Bone)) },
+                onExplainLevel = { dialog = GameDialog.Level },
+                onExplainScore = { dialog = GameDialog.Score },
             )
 
             // The rules sit directly under the header rather than floating above
@@ -105,7 +108,7 @@ fun GameScreen(
             // the score reads as a hole on a small grid.
             RuleChips(state = state, onExplain = { dialog = GameDialog.Rules })
 
-            Spacer(modifier = Modifier.weight(WEIGHT_FILL))
+            Spacer(modifier = Modifier.weight(SpaceAboveBoard))
 
             Box(contentAlignment = Alignment.Center) {
                 BoardGrid(state = state, onAction = onAction)
@@ -116,9 +119,14 @@ fun GameScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.weight(WEIGHT_FILL))
+            Spacer(modifier = Modifier.weight(SpaceBelowBoard))
 
-            BoosterBar(state = state, onAction = onAction)
+            // `boosters.enabled` off already stops the economy — a tap spends
+            // nothing and an ad refill refuses — but leaving the buttons on
+            // screen would advertise two controls that decline to work.
+            if (state.boostersEnabled) {
+                BoosterBar(state = state, onAction = onAction)
+            }
 
             Spacer(modifier = Modifier.height(Dimension.D700))
         }
@@ -196,6 +204,7 @@ fun GameScreen(
                     Consumable.Sniff -> state.sniffs
                     Consumable.Treat -> state.treats
                 },
+                refillTo = state.refillTo,
                 onUse = { onAction(GameAction.BoosterConfirmed(booster)) },
                 onWatchAd = { onAction(GameAction.BoosterRefillRequested(booster)) },
                 onDismiss = { onAction(GameAction.DismissBoosterPrompt) },
@@ -222,6 +231,8 @@ private fun GameHeader(
     onOpenLevels: () -> Unit,
     onSettings: () -> Unit,
     onExplainBones: () -> Unit,
+    onExplainLevel: () -> Unit,
+    onExplainScore: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = Dimension.D400),
@@ -245,16 +256,19 @@ private fun GameHeader(
                 HeaderStat(
                     label = stringResource(Res.string.daily_streak_label),
                     value = (state.daily?.streak ?: 0).toString(),
+                    onClick = onExplainLevel,
                 )
             } else {
                 HeaderStat(
                     label = stringResource(Res.string.game_level_label),
                     value = levelId.toString(),
+                    onClick = onExplainLevel,
                 )
             }
             HeaderStat(
                 label = stringResource(Res.string.game_score_label),
                 value = null,
+                onClick = onExplainScore,
                 content = { ScoreCounter(score = state.score.total) },
             )
         }
@@ -302,12 +316,20 @@ private fun GameHeader(
 private fun HeaderStat(
     label: String,
     value: String?,
+    onClick: () -> Unit,
     content: @Composable () -> Unit = {},
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.bounceClick(onClick = onClick),
+    ) {
         Text(
             text = label,
-            typography = AppTheme.typography.Caption.C300,
+            // Body rather than the caption scale. The next caption step up is
+            // 10sp, which is not a perceptible change from 8; at 12 the word
+            // still reads as quiet chrome next to a 24sp number, and it is
+            // legible, which 8sp was not.
+            typography = AppTheme.typography.Body.B500,
             color = AppTheme.colors.textSecondary,
         )
         if (value != null) {
@@ -474,6 +496,7 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
         BoosterButton(
             label = stringResource(Res.string.game_sniff),
             count = state.sniffs,
+            color = SniffColor,
             modifier = Modifier.focusTarget(SniffFocusKey),
             enabled = state.phase == GamePhase.Playing,
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Sniff)) },
@@ -481,12 +504,14 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
         BoosterButton(
             label = stringResource(Res.string.game_treat),
             count = state.treats,
+            color = TreatColor,
             modifier = Modifier.focusTarget(TreatFocusKey),
             enabled = state.phase == GamePhase.Playing,
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Treat)) },
         )
         RewardButton(
             label = stringResource(Res.string.game_free_bones),
+            color = AdOfferColor,
             enabled = state.livesRemaining < ScoringConfig.MAX_LIVES,
             onClick = { onAction(GameAction.RefillBones) },
         )
@@ -494,6 +519,33 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
 }
 
 private const val WEIGHT_FILL = 1f
+
+/**
+ * How the slack above and below the board is shared.
+ *
+ * Split evenly, the board centres between the rule chips and the booster row,
+ * which on a 4x4 leaves a hand-sized gap under the chips and puts the grid low
+ * enough that the thumb has to reach up for it. The reference sits its grid
+ * about a third of the way down the page; two-to-three gets close without
+ * pinning the board to a fixed offset that a 10x10 could not honour.
+ */
+/**
+ * One colour each, held for the life of the app.
+ *
+ * They are not theme roles because they are not roles — they are identities. A
+ * player learns "the blue one shows me squares" and "the orange one places a
+ * dog" long before they read either word, and that only works if the colours
+ * never move. Both are chosen against the cream page and against each other for
+ * anyone who cannot separate red from green.
+ */
+private val SniffColor = ColorResource.Blue500.color
+private val TreatColor = ColorResource.Orange600.color
+
+/** The standing ad offer. Purple, so an offer never wears a booster's clothes. */
+private val AdOfferColor = ColorResource.Purple600.color
+
+private const val SpaceAboveBoard = 1f
+private const val SpaceBelowBoard = 3f
 
 @Preview
 @Composable
