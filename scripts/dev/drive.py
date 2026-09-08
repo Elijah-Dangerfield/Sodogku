@@ -42,16 +42,39 @@ def adb(*args: str, binary: bool = False):
 
 
 def nodes():
+    """Every labelled node on screen, as (label, centre x, centre y).
+
+    Parsed one element at a time rather than by scanning the whole dump for
+    label-then-bounds. The scanning version looked equivalent and was not: in a
+    uiautomator dump `text` always precedes `content-desc`, so on a node with
+    `text=""` the alternation matched the empty text, ran `[^>]*` on to that
+    node's `bounds`, and consumed the element — taking the real `content-desc`
+    with it.
+
+    The effect was that nodes labelled *only* by content description were
+    invisible to this script, and it failed in the least helpful way: the board
+    is exactly that kind of node, so every cell and every icon button silently
+    did not exist and `tap` reported "never found" for a control plainly on
+    screen. Anything labelled with visible text worked, which made it look like
+    a labelling bug in the app.
+
+    A node can carry both. Both are yielded, so either spelling can be tapped.
+    """
     adb("shell", "rm", "-f", "/sdcard/ui.xml")
     adb("shell", "uiautomator", "dump", "/sdcard/ui.xml")
     xml = adb("shell", "cat", "/sdcard/ui.xml")
     found = []
-    for match in re.finditer(r'(text|content-desc)="([^"]*)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml):
-        label = match.group(2)
-        if not label:
+    for element in re.finditer(r"<node\b[^>]*/?>", xml):
+        node = element.group(0)
+        bounds = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', node)
+        if not bounds:
             continue
-        x1, y1, x2, y2 = (int(match.group(i)) for i in range(3, 7))
-        found.append((label, (x1 + x2) // 2, (y1 + y2) // 2))
+        x1, y1, x2, y2 = (int(bounds.group(i)) for i in range(1, 5))
+        centre = ((x1 + x2) // 2, (y1 + y2) // 2)
+        for attribute in ("text", "content-desc"):
+            label = re.search(rf'{attribute}="([^"]*)"', node)
+            if label and label.group(1):
+                found.append((label.group(1), *centre))
     return found
 
 

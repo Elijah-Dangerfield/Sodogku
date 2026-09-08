@@ -1,6 +1,5 @@
 package com.sodogku.libraries.ui.components.game
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -14,11 +13,9 @@ import androidx.compose.ui.graphics.Color
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.system.color.ColorResource
-import com.sodogku.libraries.ui.system.glossy
+import com.sodogku.libraries.ui.system.deepFace
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
-import com.sodogku.system.Radii
-import com.sodogku.system.clip
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -36,9 +33,13 @@ val TreatColor: Color = ColorResource.Orange600.color
  *
  * The pane is 500 rows and the rewards are the reason to scroll it, so this has
  * to read as a prize from across the row rather than as a decoration on it —
- * which is what the bare glyph it replaces did. It gets the same candy
- * treatment as the booster buttons ([com.sodogku.libraries.ui.system.glossy]):
- * a lit top, a shaded base, and the Treat's own orange.
+ * which is what the bare glyph it replaces did. It gets the same face-on-a-lip
+ * the booster buttons wear ([com.sodogku.libraries.ui.system.deepFace]), in the
+ * Treat's own orange.
+ *
+ * The static lip rather than [com.sodogku.libraries.ui.system.DeepSurface]: this
+ * is a label, not a control, and wrapping it in the pressable version to borrow
+ * the look would hand a screen reader a button that does nothing.
  *
  * [claimed] is the state that stops the chip lying. The reward is paid once, on
  * the first clear, so a level already cleared has nothing left to give — it
@@ -61,22 +62,13 @@ fun LevelRewardChip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimension.D200),
         modifier = modifier
-            .clip(Radii.Round)
-            .then(
-                if (claimed) {
-                    Modifier.background(AppTheme.colors.surfaceDisabled.color)
-                } else {
-                    Modifier.glossy(color)
-                },
+            .deepFace(
+                // A spent chip keeps its shape so the column stays a straight
+                // line down 500 rows, but goes flat-grey: it is still an object,
+                // just not a prize any more.
+                color = if (claimed) AppTheme.colors.surfaceDisabled.color else color,
             )
-            .padding(
-                start = Dimension.D400,
-                end = Dimension.D400,
-                top = Dimension.D200,
-                // Extra below, so the label sits on the lit face rather than on
-                // the shaded band `glossy` draws along the bottom.
-                bottom = Dimension.D300,
-            ),
+            .padding(horizontal = Dimension.D400, vertical = Dimension.D200),
     ) {
         Box(
             modifier = Modifier

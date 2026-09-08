@@ -82,6 +82,28 @@ fun DeepSurface(
 }
 
 /**
+ * The same face-on-a-lip, for something that is not pressable.
+ *
+ * [DeepSurface] is a control: it takes a click, collects presses, and drops the
+ * face into the lip when you hold it. A reward chip on a level row is not any of
+ * that — it is a label — and wrapping one in a `clickable` to borrow the look
+ * would hand a screen reader a button that does nothing.
+ *
+ * So the lip is available on its own. Two rules of the illusion are worth
+ * knowing before using it: the darker band has to be the same hue rather than a
+ * grey, and the face has to reserve the same [depth] whether or not anything is
+ * pressing it, or the thing changes height when it changes state.
+ */
+fun Modifier.deepFace(
+    color: Color,
+    shape: Radius = Radii.Round,
+    depth: Dp = DefaultDepth,
+): Modifier = this
+    .background(color.deepen(), shape.shape)
+    .padding(bottom = depth)
+    .background(color, shape.shape)
+
+/**
  * The lip's colour, derived rather than passed.
  *
  * A caller choosing both would eventually choose a pair that does not look like
