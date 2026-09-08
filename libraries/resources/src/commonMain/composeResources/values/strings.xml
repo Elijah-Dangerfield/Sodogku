@@ -116,6 +116,11 @@
          the player's memory. -->
     <string name="hint_apply">Cross them off</string>
     <string name="hint_discard">Leave them</string>
+
+    <!-- Shown on the Pro sheet only when it is standing in for an ad that could
+         not be filled. Without it the sheet is a decent pitch that never says
+         why it turned up, which reads as the app selling at you unprompted. -->
+    <string name="paywall_stand_in_reason">No ad was ready, so here is us instead.</string>
     <string name="hint_found_one">Your dog ruled out 1 square</string>
     <string name="hint_found_many">Your dog ruled out %1$d squares</string>
     <string name="board_cell_wrong">wrong guess, cost a bone</string>

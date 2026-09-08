@@ -4,6 +4,7 @@ import com.sodogku.libraries.billing.Entitlements
 import com.sodogku.libraries.billing.PaywallCoordinator
 import com.sodogku.libraries.billing.PaywallRequest
 import com.sodogku.libraries.billing.PaywallTrigger
+import com.sodogku.libraries.config.values.PaywallAdStandInEnabled
 import com.sodogku.libraries.config.values.PaywallOfflineBlockEnabled
 import com.sodogku.libraries.config.values.PaywallSessionCap
 import com.sodogku.libraries.config.values.PaywallTriggers
@@ -41,6 +42,7 @@ class RealPaywallCoordinator(
     private val triggers: PaywallTriggers,
     private val sessionCap: PaywallSessionCap,
     private val offlineBlockEnabled: PaywallOfflineBlockEnabled,
+    private val adStandInEnabled: PaywallAdStandInEnabled,
 ) : PaywallCoordinator {
 
     private val logger = KLog.withTag("Paywall")
@@ -87,6 +89,11 @@ class RealPaywallCoordinator(
 
     override fun requestAdStandIn(placementId: String, reason: String): Boolean {
         if (entitlements.isPro.value) return false
+        // Its own switch rather than sharing the offline block's or the session
+        // cap. This is the one paywall moment nobody here chose: it fires on an
+        // ad network having no inventory, which makes it the one most likely to
+        // need turning off from a distance and in a hurry.
+        if (!adStandInEnabled()) return false
 
         // Capped like an offer, and unlike the offline block. The block is a
         // state the player is stuck in and has to keep being explained; this is

@@ -43,6 +43,7 @@ import sodogku.libraries.resources.generated.resources.paywall_restore
 import sodogku.libraries.resources.generated.resources.paywall_store_unavailable
 import sodogku.libraries.resources.generated.resources.paywall_store_unreachable
 import sodogku.libraries.resources.generated.resources.paywall_subtitle
+import sodogku.libraries.resources.generated.resources.paywall_stand_in_reason
 import sodogku.libraries.resources.generated.resources.paywall_title
 
 /**
@@ -63,6 +64,14 @@ fun PaywallScreen(
     onAction: (PaywallAction) -> Unit,
     modifier: Modifier = Modifier,
     standInNote: String = "",
+    /**
+     * Whether this sheet is here because an ad could not be filled.
+     *
+     * Passed from the route rather than derived from the dwell, which expires:
+     * the sheet would stop explaining itself five seconds in, which is roughly
+     * when somebody who was waiting for bones starts reading it.
+     */
+    isStandIn: Boolean = false,
 ) {
     val scrollState = rememberScrollState()
     val dwelling = state.secondsUntilDismissible > 0
@@ -87,6 +96,20 @@ fun PaywallScreen(
                 .screenContentPadding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Why this appeared, in the player's words. Without it the sheet is
+            // a decent Pro pitch that turns up unbidden after a booster tap,
+            // which reads as the app selling at you rather than as a substitute
+            // for something it could not deliver.
+            if (isStandIn) {
+                Text(
+                    text = stringResource(Res.string.paywall_stand_in_reason),
+                    typography = AppTheme.typography.Body.B500,
+                    color = AppTheme.colors.textSecondary,
+                    textAlign = TextAlign.Center,
+                )
+                VerticalSpacerD300()
+            }
+
             if (standInNote.isNotEmpty()) {
                 Text(
                     text = standInNote,
@@ -216,6 +239,7 @@ private fun PaywallScreenPreview_StandingInForAnAd() {
             state = PaywallState(priceLabel = "$4.99", secondsUntilDismissible = 5),
             onAction = {},
             standInNote = "booster_grant · no_fill",
+            isStandIn = true,
         )
     }
 }

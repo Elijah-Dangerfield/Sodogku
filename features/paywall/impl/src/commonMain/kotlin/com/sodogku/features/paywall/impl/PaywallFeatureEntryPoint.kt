@@ -48,6 +48,10 @@ class PaywallFeatureEntryPoint(
                 state = state,
                 onAction = viewModel::takeAction,
                 standInNote = route.standInNote,
+                // The dwell is what only a stand-in has, so it is what
+                // identifies one. Reading it from the route rather than from
+                // state keeps the explanation up after the countdown ends.
+                isStandIn = route.dwellSeconds > 0,
             )
         }
 

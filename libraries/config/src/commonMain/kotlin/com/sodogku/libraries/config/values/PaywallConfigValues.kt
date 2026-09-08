@@ -73,6 +73,26 @@ class PaywallOfflineBlockEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(a
 }
 
 /**
+ * Whether Pro stands in for a rewarded ad that could not be filled.
+ *
+ * Its own switch because the alternative was dropping `paywall.sessionCap` to
+ * zero, which also silences every offer we chose to make. This one is the
+ * unchosen kind: it fires on somebody else's empty inventory, so it is the one
+ * most likely to need turning off in a hurry and from a distance.
+ *
+ * Turning it off never withholds a reward. The stand-in cannot affect the
+ * outcome by construction, so the switch only decides whether a sheet appears.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class PaywallAdStandInEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
+    override val name = "Pro stands in for an unfilled ad"
+    override val path = "paywall.adStandInEnabled"
+    override val default = true
+}
+
+/**
  * How many times the paywall may appear in one session, across all triggers. Two
  * is the difference between an offer and a nag; a player who declined twice has
  * answered.
@@ -90,5 +110,6 @@ class PaywallSessionCap(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMa
 fun paywallConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>> = listOf(
     PaywallTriggers(appConfigMap),
     PaywallOfflineBlockEnabled(appConfigMap),
+    PaywallAdStandInEnabled(appConfigMap),
     PaywallSessionCap(appConfigMap),
 )

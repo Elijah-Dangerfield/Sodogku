@@ -47,6 +47,7 @@
   { "path": "daily.poolOffset", "type": "int", "default": 0, "description": "Shifts the selection into the 730-board daily pool." },
 
   { "path": "paywall.triggers", "type": "json", "default": ["offline_block", "continue_level", "skip_level"], "description": "Which moments may show the Pro paywall. Unknown ids are ignored." },
+  { "path": "paywall.adStandInEnabled", "type": "boolean", "default": true, "description": "Whether Pro stands in for a rewarded ad that could not be filled. Never withholds a reward." },
   { "path": "paywall.offlineBlockEnabled", "type": "boolean", "default": true, "description": "Whether spending the offline grace blocks play until reconnect or Pro." },
   { "path": "paywall.sessionCap", "type": "int", "default": 2, "description": "How many times the paywall may appear in one session." },
 

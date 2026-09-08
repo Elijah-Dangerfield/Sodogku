@@ -6,6 +6,7 @@ import com.sodogku.libraries.billing.PaywallTrigger
 import com.sodogku.libraries.billing.PurchaseOutcome
 import com.sodogku.libraries.billing.RestoreOutcome
 import com.sodogku.libraries.config.AppConfigMap
+import com.sodogku.libraries.config.values.PaywallAdStandInEnabled
 import com.sodogku.libraries.config.values.PaywallOfflineBlockEnabled
 import com.sodogku.libraries.config.values.PaywallSessionCap
 import com.sodogku.libraries.config.values.PaywallTriggers
@@ -171,6 +172,31 @@ class RealPaywallCoordinatorTest : CoroutineTest() {
         )
     }
 
+    @Test
+    fun theStandInCanBeSwitchedOffWithoutSilencingRealOffers() {
+        // The point of a separate key. Before it existed the only way to stop
+        // the stand-in was `paywall.sessionCap = 0`, which also stops every
+        // offer we deliberately chose to make.
+        val off = coordinator(paywall = mapOf("adStandInEnabled" to false))
+
+        val stoodIn = off.requestAdStandIn(placementId = "booster_grant", reason = "no_fill")
+        val offered = off.requestOffer(PaywallTrigger.Direct)
+
+        assertFalse(stoodIn, "the stand-in fired with its switch off")
+        assertTrue(offered, "turning the stand-in off also silenced a real offer")
+    }
+
+    @Test
+    fun theStandInIsOnByDefault() {
+        // A kill switch defaulting to off is a feature nobody ships.
+        val on = coordinator()
+
+        assertTrue(
+            on.requestAdStandIn(placementId = "booster_grant", reason = "no_fill"),
+            "the stand-in did not fire with no config set",
+        )
+    }
+
     private fun coordinator(
         paywall: Map<String, Any> = emptyMap(),
         isPro: Boolean = false,
@@ -182,6 +208,7 @@ class RealPaywallCoordinatorTest : CoroutineTest() {
             triggers = PaywallTriggers(map),
             sessionCap = PaywallSessionCap(map),
             offlineBlockEnabled = PaywallOfflineBlockEnabled(map),
+            adStandInEnabled = PaywallAdStandInEnabled(map),
         )
     }
 

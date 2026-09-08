@@ -122,6 +122,7 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
     ),
     "paywall" to mapOf(
         "triggers" to PaywallTriggers.DefaultTriggers,
+        "adStandInEnabled" to true,
         "offlineBlockEnabled" to true,
         "sessionCap" to 2,
     ),
