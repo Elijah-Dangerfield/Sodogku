@@ -129,6 +129,27 @@ simply a smaller number next time somebody asks. Firing the event would need a r
 "streak as of last read" to compare against, which is exactly the counter that design refuses.
 The same fact is derivable server-side from the gaps between `daily.completed` events.
 
+## Onboarding the player
+
+| Event | Attributes | Fires |
+|---|---|---|
+| `tutorial.step_viewed` | `level_id`, `step` | Each coach mark in the guided run over levels 1 to 3. `step` names the lesson, not its index, so inserting one does not shift the meaning of every prior data point |
+| `tutorial.completed` | `last_step`, `skipped` | Once, when the script ends or the player skips. `last_step` on a skip is the whole value of the event: it says *where* people give up, which is the only actionable thing a tutorial funnel produces |
+
+## Monetization
+
+`ads.result` is the one to watch. SPEC 4.2 requires that an ad failure never costs the player the
+reward, so `outcome=Rewarded` with a non-null `error_kind` is the **correct** and expected
+combination — a dashboard that treats it as an anomaly has the rule backwards.
+
+| Event | Attributes | Fires |
+|---|---|---|
+| `ads.gate_shown` | `placement`, `is_offline` | An ad gate is reached, before any request. Paired with `ads.result` this gives the fill rate per placement without a join to the network's own reporting |
+| `ads.result` | `placement`, `outcome`, `error_kind`, `latency_ms`, `reason`, `grace_levels_used` | Every gate resolves, including the ones that resolved by failing open. `latency_ms` is what tells you whether a rewarded ad is worth preloading |
+| `ads.offline_block` | `placement`, `grace_levels_used` | The offline grace ran out and the block screen went up. Should be rare; a rise means the grace is too tight |
+| `iap.purchase_result` | `outcome`, `error_kind` | A purchase flow ends, in any way |
+| `purchase.failed` | `product_id`, `error`, `attempt`, `final` | A store call failed and is being retried. `final` marks the attempt that gave up |
+
 ### The one that pays for itself
 
 Difficulty calibration. `difficulty` on `level_started` / `level_completed` is the tier the

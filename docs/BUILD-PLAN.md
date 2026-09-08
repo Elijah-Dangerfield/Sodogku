@@ -1094,6 +1094,13 @@ being made — `libraries/ui/.../components/dialog/`. Every dialog in the app sh
 padding without its call site asking. The reason it kept recurring is that the padding was a
 per-call-site concern and nothing failed when a call site forgot.
 
+**Tracked debt.** `GameViewModel` is 1636 lines with 17 injected dependencies. It owns the board,
+scoring, three consumables, the daily, achievements, the tutorial, progress, board persistence,
+display settings and ads, because every chunk that needed the game added itself here. It is the
+highest-churn file in the repo and the place quality decays first — five of the seven bugs found
+today were in it. It wants splitting once the current wave of work lands; splitting it while three
+agents are editing it would cost more than it buys.
+
 **Standing instructions attached to this list:** keep reviewing the code for what
 keeps it good, keep writing tests, commit to `main` often but not every edit, and
 use sub-agents — including to argue a decision from both sides before taking it.
