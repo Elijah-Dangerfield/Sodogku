@@ -405,6 +405,36 @@ class RealAdGateTest : CoroutineTest() {
         )
     }
 
+    @Test
+    fun noOneIsSoldProBeforeTheyHaveSeenASingleAd() = runUnitTest {
+        // Day 0, inside the new-user grace: the reward is free and the player
+        // has not been interrupted by anything yet. "Pay to remove the ads" is
+        // an odd first impression when there have not been any.
+        progress.unlocked = 1
+        val gate = gate(ads = mapOf("newUserGraceLevels" to 5, "newUserGraceMinutes" to 5))
+
+        gate.showRewarded(AdPlacement.ContinueLevel)
+        gate.showRewarded(AdPlacement.SkipLevel)
+
+        assertEquals(emptyList(), paywall.offers)
+    }
+
+    @Test
+    fun theOfflineGateOffersTheBlockScreenRatherThanAnOffer() = runUnitTest {
+        // A configured zero is the harsh live-ops setting the admin console
+        // makes an operator confirm, so it has to actually bite: block on the
+        // first unservable gate. And it puts up the block, not a Pro offer —
+        // two paywalls stacked on one gate is a nag.
+        appState.isDeviceOffline.value = true
+        val gate = gate(ads = mapOf("offlineGraceLevels" to 0))
+
+        val outcome = gate.showRewarded(AdPlacement.ContinueLevel)
+
+        assertNotEquals(RewardOutcome.Dismissed, outcome, "Even a zero grace still pays this reward")
+        assertEquals(emptyList(), paywall.offers)
+        assertEquals(1, paywall.offlineBlocks)
+    }
+
     // ------------------------------------------------------------------
 
     /**

@@ -499,13 +499,27 @@ interface Entitlements {
 ```
 
 Sealed per-operation outcomes, not thrown exceptions, matching how the template's identity
-library models sign-in. Android wraps Play Billing 7. iOS wraps StoreKit 2 in Swift and is
-injected through `IosAppComponentFactory.create(...)`, the template's established pattern for
-Swift implementations (no expect/actual).
+library models sign-in. Android wraps **Play Billing 8** (the spec originally said 7; Play
+stopped accepting new releases on it). iOS wraps StoreKit 2 in Swift and is injected through
+`IosAppComponent.create(...)`, the template's established pattern for Swift implementations
+(no expect/actual).
 
-The entitlement is cached in `AppData` and treated as **true until proven false**. If the store
-is unreachable at launch, a paying customer must not see ads. Only an explicit "not entitled"
-response clears the cache.
+`Entitlements` and `AdGate` are the app-facing interfaces. Under each sits a **narrow platform
+seam** — `StoreBilling` and `AdNetwork`, both in the api modules and both `@ObjCName`-exported
+so Swift can implement them. The seams only talk to the SDK; everything worth reasoning about
+(the entitlement cache, the frequency gates, both graces, the fail-open mapping) is common
+Kotlin above them, which is what makes it testable without a store or an ad network and what
+stops the two platforms disagreeing about when an ad is allowed.
+
+The entitlement is cached in `AppData.isProEntitled` and treated as **true until proven false**.
+If the store is unreachable at launch, a paying customer must not see ads. Only an explicit
+"not entitled" response clears the cache — `StoreOwnership` is three-valued for exactly this
+reason, and `Unknown` covers every "we could not ask" case including `BILLING_UNAVAILABLE`.
+
+**Ad unit ids and the product id live in one file each and never in config** (SPEC 4.4).
+`AdUnits.useTestUnits` switches the whole app between Google's published sample units and the
+real ones; `ProductIds.pro` is the single store product. The AdMob *app* id is the exception —
+both SDKs read it before any app code runs, so it is in `AndroidManifest.xml` and `Info.plist`.
 
 `:libraries:ads`:
 
@@ -556,9 +570,15 @@ Three things that matter more than the frequency numbers:
   highest-intent paywall moment in the app, so instrument it carefully.
 - Grace counters persist to disk and reset on a successful ad view, not on reconnect.
 
-The template's `AppState.isOffline` distinguishes "OS says no network" from "our backend is
-unreachable". Only the former trips the grace, since ad networks are reachable when our own
-server is down.
+`AppState.isOffline` is `!osOnline || !backendReachable`, so it is the wrong signal here: our
+server being down says nothing about whether AdMob is reachable. The grace reads
+**`AppState.isDeviceOffline`**, the platform connectivity signal on its own. Ignoring this is
+not theoretical — the block screen went up on full wifi the first time C8 ran on a device,
+because the dev server is not deployed. See `decisions.md`.
+
+The block screen swallows the back gesture (a block you can dismiss is not one) and dismisses
+itself the moment connectivity returns or the player becomes Pro, so nobody has to work out
+what to press. `paywall.offlineBlockEnabled` turns it off entirely.
 
 ---
 
@@ -587,6 +607,13 @@ Kids Category. Set AdMob's `tagForChildDirectedTreatment` to not-child-directed 
   moment where the value is legible.
 
 Both are hard store requirements and both are easy to forget until review rejects the build.
+
+The order is enforced in one place per platform — `AdNetwork.prepare()`, which every show path
+awaits — rather than trusted to call sites: UMP, then ATT, then SDK init, then the first
+request. `prepare()` is called lazily by the first ad gate, which is what keeps ATT away from
+launch. The gate is `canRequestAds()`, **not** "did the form show": UMP answers true for a user
+outside the EEA who was never shown anything, so reading the form's presence would block ads for
+most of the world.
 
 ### 7.3 Terms and privacy acceptance
 
@@ -887,9 +914,9 @@ Aggregate into the completion event.
 | `daily.started` / `daily.completed` | `date`, `streak`, `score` |
 | `daily.streak_broken` | `previous_streak` |
 | `daily.freeze_used` | `streak` |
-| `ads.gate_shown` | `placement`, `level_id`, `is_offline` |
-| `ads.result` | `placement`, `outcome`, `latency_ms` |
-| `ads.offline_block` | `level_id`, `grace_levels_used` |
+| `ads.gate_shown` | `placement`, `is_offline` (the *device* signal) |
+| `ads.result` | `placement`, `outcome`, `latency_ms`, `error_kind`, `reason` |
+| `ads.offline_block` | `placement`, `grace_levels_used` |
 | `iap.paywall_shown` | `trigger` |
 | `iap.purchase_result` | `outcome`, `error_kind` |
 | `iap.restore_result` | `outcome` |
@@ -1111,15 +1138,49 @@ moderate difficulty so it stays a 3-to-5-minute daily habit rather than a wall.
 ### Accounts and credentials
 
 - [ ] Bundle IDs (proposing `com.sodogku` for both).
-- [ ] Play Console app, AdMob app ID, and one ad unit per placement per platform (interstitial,
-      rewarded, app-open, banner).
-- [ ] App Store Connect record and the StoreKit non-consumable product ID.
-- [ ] Play managed product ID. Keep both IDs identical if the stores allow.
 - [ ] Sentry DSN.
 - [ ] Grafana Cloud OTLP endpoint and token.
 - [ ] Fly app name and org.
 - [ ] Support email.
 - [ ] Domain, for the share footer and privacy pages.
+
+#### Monetization, and exactly where each value goes
+
+C8 ships against Google's published **test** ad units and no store product, so the app is fully
+playable and correctly gated today but earns nothing. Nothing below is a code change beyond the
+lines named. Every real id is committed to the binary on purpose — SPEC 4.4 keeps ad units and
+the product id out of remote config, because changing one is a store operation.
+
+**AdMob** (`https://apps.admob.com`). Create one app per platform, then one ad unit per format.
+
+| What to create | Where the value goes |
+|---|---|
+| AdMob **Android app** → app ID (`ca-app-pub-…~…`) | `apps/compose/src/androidMain/AndroidManifest.xml`, the `com.google.android.gms.ads.APPLICATION_ID` meta-data |
+| AdMob **iOS app** → app ID | `apps/ios/iosApp/Info.plist`, the `GADApplicationIdentifier` key |
+| Android **rewarded**, **interstitial**, **app-open**, **banner** unit ids | `AdUnits.AndroidLive` in `libraries/ads/src/commonMain/kotlin/com/sodogku/libraries/ads/AdUnits.kt` |
+| iOS **rewarded**, **interstitial**, **app-open**, **banner** unit ids | `AdUnits.IosLive`, same file |
+| — | then set `AdUnits.useTestUnits = false`. It is the only switch; a missing live id silently falls back to its test unit rather than requesting a blank one |
+
+In the AdMob console also set the app's **privacy and messaging** GDPR message, or the UMP form
+has nothing to show in the EEA. To see the form outside the EEA, add
+`ConsentDebugSettings.Builder(context).setDebugGeography(DEBUG_GEOGRAPHY_EEA).addTestDeviceHashedId(…)`
+in `AdMobAdNetwork.requestConsentInfoUpdate` — logcat prints the device hash on first run.
+
+**Play Console.** Create the app, then a **managed product** with id `sodogku_pro`
+(`ProductIds.pro` in `libraries/billing/src/commonMain/.../StoreBilling.kt` — change it there if
+you want a different id, and keep the two stores identical). A purchase flow only runs for a
+build uploaded to a Play track and an account on the licence-tester list, so testing this needs
+an internal-testing upload, not a local debug build.
+
+**App Store Connect.** Create the app record and a **non-consumable** with the same id. For
+local iOS testing add a StoreKit configuration file — the steps are in the header comment of
+`apps/ios/iosApp/Platform/StoreBilling.swift`.
+
+**Xcode, one package.** iOS serves no ads until the Google Mobile Ads SDK is in the project:
+File ▸ Add Package Dependencies ▸ `https://github.com/googleads/swift-package-manager-google-mobile-ads`,
+adding both the `GoogleMobileAds` and `UserMessagingPlatform` products to the iOS target.
+`IOSAdNetwork` is written behind `#if canImport(GoogleMobileAds)` so the app builds without it;
+until the package is added every iOS ad "fails" and the shared Kotlin grants the reward anyway.
 
 ### Copy
 

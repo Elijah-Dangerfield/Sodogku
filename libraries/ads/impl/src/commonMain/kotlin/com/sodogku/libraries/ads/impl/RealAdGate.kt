@@ -134,8 +134,6 @@ class RealAdGate(
             "is_offline" to offline,
         )
 
-        placement.paywallTrigger?.let { paywall.requestOffer(it) }
-
         // Each of these is a reason the reward is free. None of them is a
         // reason to withhold it.
         val freeReason = when {
@@ -148,6 +146,12 @@ class RealAdGate(
         if (freeReason != null) return granted(placement, freeReason)
 
         if (offline) return offlineRewarded(placement)
+
+        // Below every free path on purpose. Offering to sell "no more ads" to a
+        // player who has not been shown one yet — day 0, inside the new-user
+        // grace — is the friction SPEC 5.3 spends a whole section avoiding, and
+        // the offline path has its own block screen to put up instead.
+        placement.paywallTrigger?.let { paywall.requestOffer(it) }
 
         val started = now()
         network.prepare()
@@ -305,17 +309,20 @@ class RealAdGate(
 
     /**
      * Both legs of SPEC 6's "three levels or twenty minutes, whichever comes
-     * first". A zero or negative value on either key disables that leg rather
-     * than making it instantly true — a config typo must not be able to block a
-     * player on their first offline gate.
+     * first".
+     *
+     * A configured **zero blocks on the first unservable gate**, and that is
+     * deliberate rather than an oversight: the admin console already lists a
+     * zero offline grace among the writes it makes an operator confirm, so
+     * treating it as "leg disabled" would have made the one control that
+     * warning exists for do nothing. The protection against a typo is upstream
+     * — an unparseable number resolves to null and the shipped default (3 / 20)
+     * wins, so only a deliberate value can be harsh.
      */
     private fun offlineGraceIsSpent(state: AdState): Boolean {
-        val levels = offlineGraceLevels()
-        val minutes = offlineGraceMinutes()
-        val levelsSpent = levels > 0 && state.offlineGraceLevelsSpent > levels
-        val timeSpent = minutes > 0 &&
-            state.offlineGraceStartedAtMs != 0L &&
-            now() - state.offlineGraceStartedAtMs > minutes * MILLIS_PER_MINUTE
+        val levelsSpent = state.offlineGraceLevelsSpent > offlineGraceLevels()
+        val timeSpent = state.offlineGraceStartedAtMs != 0L &&
+            now() - state.offlineGraceStartedAtMs > offlineGraceMinutes() * MILLIS_PER_MINUTE
         return levelsSpent || timeSpent
     }
 

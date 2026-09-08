@@ -745,9 +745,13 @@ an ad is allowed.
    paywall. `:features:settings:impl` needs `implementation(projects.features.paywall)`
    and a row that navigates to `PaywallRoute(trigger = PaywallTrigger.Direct.id)` —
    `Direct` is deliberately exempt from both the trigger list and the session cap.
-4. **The banner placement is unimplemented.** `ads.bannerOnLevelMap` defaults to off and
-   `AdNetwork.show(Banner)` returns `NotShown`; a banner is a view in a layout, not
-   something you show and await. The level map owns its own slot when it wants one.
+4. **The two opt-in formats are stubs.** `ads.bannerOnLevelMap` and `ads.appOpenEnabled`
+   both default to off, which is why they are stubs and not a gap. `AdNetwork.show(Banner)`
+   returns `NotShown` because a banner is a view in a layout, not something you show and
+   await — the level map owns its own slot when it wants one. App-open *loads and shows*
+   correctly on both platforms but nothing calls it; turning it on means a cold-start hook
+   plus honouring `ads.appOpenCooldownHours`, which is a deliberate revenue decision
+   rather than leftover work.
 5. **The `GoogleMobileAds` SPM package is not in the Xcode project**, so iOS serves no
    ads yet. See `SPEC.md` §20 for the exact steps.
 
