@@ -200,6 +200,7 @@ fun GameScreen(
                 isDailyBoard = state.isDaily,
                 onPlayDaily = { onAction(GameAction.PlayDaily) },
                 onUseFreeze = { onAction(GameAction.UseFreeze) },
+                onRestoreStreak = { onAction(GameAction.RestoreStreak) },
             )
         }
 
@@ -274,14 +275,20 @@ private fun GameHeader(
             // A daily's level id is a position in the daily pool, which means
             // nothing to the player and reads as a campaign level they have not
             // reached. The streak is the number that belongs here instead.
-            if (state.isDaily) {
-                HeaderStat(
+            //
+            // The rehearsal board has no number at all, and inventing one is the
+            // trap: labelling it "Level 1" would put the player on a board that
+            // is not level 1 and then swap it under them at graduation, and
+            // "Level 0" is an id leaking out of a constant. It shows nothing,
+            // and the first coach mark says in words what board this is.
+            when {
+                state.isRehearsal -> Unit
+                state.isDaily -> HeaderStat(
                     label = stringResource(Res.string.daily_streak_label),
                     value = (state.daily?.streak ?: 0).toString(),
                     onClick = onExplainLevel,
                 )
-            } else {
-                HeaderStat(
+                else -> HeaderStat(
                     label = stringResource(Res.string.game_level_label),
                     value = levelId.toString(),
                     onClick = onExplainLevel,
@@ -390,21 +397,21 @@ private fun RuleChips(state: GameState, onExplain: () -> Unit) {
         RuleChip(
             diagram = RuleDiagram.OnePerRegion,
             label = stringResource(Res.string.game_rule_one_per_region),
-            modifier = Modifier.weight(WEIGHT_FILL).focusTarget(RuleChipFocusKeys[0]),
+            modifier = Modifier.weight(WEIGHT_FILL),
             highlighted = broken == RuleDiagram.OnePerRegion,
             onClick = onExplain,
         )
         RuleChip(
             diagram = RuleDiagram.OnePerLine,
             label = stringResource(Res.string.game_rule_one_per_line),
-            modifier = Modifier.weight(WEIGHT_FILL).focusTarget(RuleChipFocusKeys[1]),
+            modifier = Modifier.weight(WEIGHT_FILL),
             highlighted = broken == RuleDiagram.OnePerLine,
             onClick = onExplain,
         )
         RuleChip(
             diagram = RuleDiagram.NoTouching,
             label = stringResource(Res.string.game_rule_no_touching),
-            modifier = Modifier.weight(WEIGHT_FILL).focusTarget(RuleChipFocusKeys[2]),
+            modifier = Modifier.weight(WEIGHT_FILL),
             highlighted = broken == RuleDiagram.NoTouching,
             onClick = onExplain,
         )

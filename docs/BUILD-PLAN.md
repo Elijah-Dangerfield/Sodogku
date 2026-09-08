@@ -1346,7 +1346,7 @@ per-call-site concern and nothing failed when a call site forgot.
 |---|---|---|
 | R1 | **Score stays 0 in campaign.** The header shows the *current attempt's* score, which starts at zero each level. The ask is one persistent lifetime score, earned from every board including the daily, weighted by hints used and level difficulty | done — see below |
 | R2 | Header lift-on-scroll drops a shadow on all four sides; it should only fall below | |
-| R3 | Tutorial: teach on a **throwaway demo board**, not level 1. Highlight the actual column or colour a rule is about, not just the chip. Block "continue" until the player really has crossed a square off / placed a dog, and let the mark finish drawing first | |
+| R3 | Tutorial: teach on a **throwaway demo board**, not level 1. Highlight the actual column or colour a rule is about, not just the chip. Block "continue" until the player really has crossed a square off / placed a dog, and let the mark finish drawing first | done — see below |
 | R4 | Sniff and Treat read oddly. The wanted look is the retro one from `Workspace/Cards`: the background duplicated and offset down, rather than the gradient-and-sheen currently there. Colours are right | |
 | R5 | A background on the welcome screen — **blocked, files not on disk** | |
 | R6 | A dialog when the dog counter (1/4) is tapped | |
@@ -1356,7 +1356,7 @@ per-call-site concern and nothing failed when a call site forgot.
 | R10 | Level rewards are too frequent. Front-load them and thin out as levels climb | **DONE** (2026-09-08) |
 | R11 | Run the beta workflow locally for a TestFlight build. Needs an App Store Connect record and a working `xcode-select` | |
 | R12 | The iOS splash is ugly. Just the still dog head, in the exact spot it sits on the first-launch screen, with the paw-print background fading in behind it — so launch reads as one continuous render rather than a splash then a screen | done except the paw print — see below |
-| R13 | Make sure the daily rolls at local midnight and the streak respects time zones. Add a way to restore a broken streak, which probably wants a config key | |
+| R13 | Make sure the daily rolls at local midnight and the streak respects time zones. Add a way to restore a broken streak, which probably wants a config key | **DONE** (2026-09-08) — see below |
 | R14 | **A deliberate illegal placement did nothing.** `commit` returned early on any auto-marked square, and a placed dog auto-marks its own row, column, region and neighbours — so exactly the squares where an illegal placement lives were unreachable, silently. Fixed. The wider ask stands: the board is the most important screen and wants heavier review, tests and telemetry | |
 
 | R15 | **The bone economy is per-attempt, and it should be global.** `GameState.livesRemaining` resets to three on every `startAttempt`, so bones come back free by starting anything. Three symptoms from one cause: a "keep going" that hands a bone back for nothing; leaving a board and returning with a full three; and the daily and the campaign each having their own three. Bones should be one count, held across boards and refilled by watching an ad | done — see below |
@@ -1685,6 +1685,117 @@ which is in the same position as the sad dog, the bone artwork and the welcome
 backgrounds: described in chat, never saved to disk. The ripple-in load was
 raised as a maybe and is deferred with it — it only makes sense as a reveal *of*
 that background.
+
+### R13 · The daily's clock, and bringing a broken streak back — **DONE** (2026-09-08)
+
+**Half of this was already true, and the useful outcome is the tests that now say
+so.** The daily has taken its date from `dayOf(now, zone)` and its countdown from
+`untilNextDay(now, zone)` since C6. Both take the zone as an argument, so the
+rollover was already local, already correct across DST, and already re-read on
+every pass rather than captured at graph construction. Flying east and flying
+west each had a test. Nothing about the clock needed fixing.
+
+What was missing was coverage of the two places the *repository* could have got it
+wrong without the calendar noticing:
+
+- `DailyStatus.resetsIn` was only ever asserted at the `untilNextDay` level.
+  Nothing checked that the number the card renders is that number. It now is, in
+  three zones, plus a test that the countdown shortens through the day and does
+  **not** restart when the day is played, which is the shape a "24 hours after the
+  last board" implementation would have.
+- A board played at 23:59 and one at 00:01 were never asserted to be different
+  days. They are now, in New York, two minutes apart, ending at a streak of two.
+
+Both bite: mutating `untilNextDay` to resolve against UTC fails the new
+`resetsIn` test alongside the two calendar tests that already existed.
+
+**The restore is new.** The freeze covers exactly one missed day, so a gap of two
+ended a streak permanently. `freeze_coversOneDayAndNotTheDayBehindIt` pinned that
+as intended behaviour, and it is the hole. `DailyRepository.restoreStreak()`
+bridges a whole run of consecutive missed days for one rewarded ad, bounded by
+`daily.restoreMaxDays` (3) and `daily.restoreDaysPerMonth` (3). Reasoning for
+every number, and for why it stays a fold, is in `decisions.md`.
+
+The shape that mattered: a restore is **rows**, one `DailyOutcome.Restored` per
+bridged day, and the fold treats them exactly like `Frozen`. There is no restore
+counter anywhere, and the monthly allowance is itself folded out of those rows.
+`Restored` is a separate outcome from `Frozen` only so the two allowances can be
+counted apart. One budget must not quietly spend the other.
+
+**Measured against a permissive implementation.** Deleting the two bound checks
+from `restoreStreak` fails `restore_isRefusedWhenTheGapIsOlderThanItsReach`,
+`restore_stopsAtTheMonthlyAllowance` and
+`restore_reachIsTheConfiguredNumber_notAHardcodedThree`, which is what those three
+exist for. The reach test also pins the number to config rather than to a literal:
+the same four-day gap is refused at a reach of 3 and granted at 4.
+
+**Files.** `:libraries:progress` (`DailyResult`, `DailyStatus`, `DailyRepository`),
+`:libraries:progress:impl` (`DailyStreak`, `DailyRepositoryImpl`),
+`:libraries:config` (`DailyConfigValues`), `:libraries:config:impl`
+(`FallbackConfigMap`), `apps/admin/config-manifest-registry.json`,
+`:libraries:ui` (`DailyCard`), `:libraries:resources` (`strings.xml`), and five
+files in `features/game/impl` kept to the minimum: one action, one ViewModel
+method, one drawer parameter, three dialog branches, one screen callback.
+
+**Not verified:** the emulator refuses `adb shell su 0 date` (`adbd cannot run as
+root` on this image), so the rollover itself has never been watched happen on a
+device. It is unit tests only, which is what the seams were built for. iOS
+runtime, as ever. And the ad on the restore path is AdMob's test unit, so the
+fail-open branches are covered by tests rather than by a real no-fill.
+
+
+### R3 · The tutorial teaches on a board of its own — **DONE** (2026-09-08)
+
+Three asks, and a fourth thing that had to come with them.
+
+**A throwaway board.** `TutorialBoard` is a hand-authored 5x5 in no pack, id `0`, opened in front
+of campaign level 1 by the same `GameViewModel` on the same route. It cannot be finished — the
+script places three of its five dogs — and when the script ends or is skipped the ViewModel swaps
+the board under itself and level 1 opens clean, with the player's bones intact. One field,
+`rehearsing`, gates the attempt record, the level record, the achievement fold, the bone spend,
+the board snapshot and every `game.*` event; `GameState.lifetimeScore` gets one clause so the
+headline number holds still, the same sentence already written there for a lost attempt.
+
+The board was found by search, not by hand: random contiguous partitions, filtered to those with
+exactly one solution, then the whole script simulated over each to check every lesson still had
+squares to point at. 21 candidates survived and the winner is the one whose three rule highlights
+overlap least. `TutorialBoardTest` re-proves the uniqueness with `PuzzleSolver.uniqueSolutionOrNull`
+and re-walks the script, which is what caught the first draft: three placements on a 5x5 left the
+deduction tight enough that `TryAWrongOne` had no wrong square left and the lesson vanished.
+
+**The rules light the board.** `RuleRegion`, `RuleLine` and `RuleTouching` fall through to
+`Tutorial.cellsFor` instead of pointing at a rule chip, so they light the colour block, the cross
+of row and column, and the ring of five — every square in each already crossed off by that rule,
+with the dog in the middle. The starter dog moved to the front of the script, because "here is a
+free dog" has to come before three lessons read off it. `NoTouching` was deleted: it lit the ring
+around a dog on level 3, which is now exactly what `RuleTouching` does, and teaching it twice was
+padding. Fourteen steps, not fifteen. The rule chips lost their `focusTarget` registration with it.
+
+**The gate, and the wait.** A gated step already refused everything but its own gesture; what it
+did not do was let the player see the result. `advanceTutorial` now holds for
+`Tutorial.settleMillis(trigger)` — the design system's own `MarkDrawMillis` / `PlacementPulseMillis`
+/ `ShakeMillis` — before moving. On device the cross draws, the dog lands with its starburst, the
+red X shakes, all with the coach mark still up and the square still lit.
+
+**And the fourth thing.** Making those steps mandatory made the screen-reader gap from C12 a wall
+rather than an inconvenience, so it is closed: `Spotlight.targetLabel` puts a named, activatable,
+semantics-only node over each lit rectangle, and `TutorialCoachMark` synthesises the one or two
+taps the step wants. Verified with TalkBack on the emulator — the gated step advances on a reader's
+double-tap activation.
+
+**Measured on device, twice.** Once following the whole script: five distinct highlights, three
+off-target taps ignored on a gated step, the mark visibly drawing under a still-open coach mark,
+bones untouched through the taught wrong guess, score frozen at 0 throughout, then level 1 with
+1/4 dogs and three bones. Once skipping from `MarkSquare` in the middle: straight to a clean,
+immediately tappable level 1, and a relaunch does not replay anything.
+
+**`tutorial.step_viewed` lost `level_id`** — there is one board now, so it would have been a
+constant. `DashboardQueryContractTest` failed on exactly that, which is the entire reason it
+exists; the *Step views by level* panel in `tutorial-funnel.json` went with the attribute.
+
+**Not verified:** iOS. The Kotlin target compiles and every semantic is `commonMain`, but nothing
+has run on an iOS simulator on this machine, so the coach mark's placement and the VoiceOver path
+are untested there.
 
 ### R10 · A Treat curve instead of a metronome — **DONE** (2026-09-08)
 

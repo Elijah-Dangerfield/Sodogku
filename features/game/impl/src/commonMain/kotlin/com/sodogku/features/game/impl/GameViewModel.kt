@@ -1,6 +1,7 @@
 package com.sodogku.features.game.impl
 
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -38,6 +39,7 @@ import com.sodogku.libraries.progress.daily.DailyResult
 import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.DeviceTimeZone
 import com.sodogku.libraries.progress.daily.FreezeResult
+import com.sodogku.libraries.progress.daily.RestoreResult
 import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
@@ -198,14 +200,16 @@ class GameViewModel(
     private val tutorial = TutorialRunner(logger)
 
     /**
-     * Levels whose script has already run in this ViewModel, so losing level 1
-     * and starting over does not replay seven coach marks. A process death
-     * still resets it, which is the right answer: someone who left mid-lesson
-     * has not had the lesson.
+     * True while [TutorialBoard] is on screen instead of a real level.
+     *
+     * It is the one switch that makes the rehearsal a rehearsal: no attempt is
+     * recorded, no bone is spent, no snapshot is written, nothing is banked and
+     * no `game.*` event fires. Held in a field rather than read back off
+     * [state], for the reason everything else in this file is — [startAttempt]
+     * has to know before its own `updateState` lands, because that update saves
+     * the board.
      */
-
-    /** SPEC 10: level 3 forgives one wrong guess while it is being taught. */
-    private var freeMistakeAvailable = false
+    private var rehearsing = false
 
     /**
      * The level's history as it stood *before* this attempt touched it.
@@ -293,6 +297,7 @@ class GameViewModel(
             is GameAction.DailyChanged -> action.updateState { it.copy(daily = action.status) }
             GameAction.PlayDaily -> action.playDaily()
             GameAction.UseFreeze -> action.useFreeze()
+            GameAction.RestoreStreak -> action.restoreStreak()
             GameAction.DismissFreezeMessage -> action.updateState { it.copy(freezeMessage = null) }
             GameAction.OpenPrivacy -> sendEvent(GameEvent.OpenPrivacy)
             GameAction.OpenTerms -> sendEvent(GameEvent.OpenTerms)
@@ -342,10 +347,13 @@ class GameViewModel(
             )
         }
 
-        // Read here and held in a field, not re-read per level: the flag is
-        // written the moment the tutorial ends, and `startAttempt` for the next
+        // Read here and held in a field, not re-read per board: the flag is
+        // written the moment the tutorial ends, and `startAttempt` for the real
         // level runs before that write has any chance to land.
-        tutorial.arm(hasCompletedTutorial = settings?.hasCompletedTutorial == true, isDaily = isDaily)
+        tutorial.arm(
+            hasCompletedTutorial = settings?.hasCompletedTutorial == true,
+            onFirstLevel = !isDaily && levelId == LevelRecord.FIRST_LEVEL_ID,
+        )
 
         if (isDaily) {
             loadDaily()
@@ -357,7 +365,34 @@ class GameViewModel(
             sendEvent(GameEvent.NavigateBack)
             return
         }
+        // The lesson happens on a board of its own, in front of the level the
+        // route asked for. Nothing is navigated: the same screen swaps the board
+        // under itself when the script ends, so a process death mid-lesson
+        // restores the route the player actually meant to be on.
+        if (tutorial.shouldRehearse) {
+            startAttempt(TutorialBoard.level, rehearsal = true)
+            return
+        }
         startAttempt(level, resume = savedBoardFor(level))
+    }
+
+    /**
+     * Puts the level the route asked for on screen, now that the lesson is over.
+     *
+     * **No resume.** The rehearsal wrote no snapshot of its own, and whatever
+     * was in the slot belongs to a board the player left before they were ever
+     * taught to play — handing them a half-finished level as their graduation is
+     * not what "you know how to play, here is level one" means.
+     */
+    private suspend fun GameAction.leaveRehearsal() {
+        rehearsing = false
+        val level = LevelPacks.campaign.byId(levelId)
+        if (level == null) {
+            logger.e { "No level $levelId to hand the tutorial back to" }
+            sendEvent(GameEvent.NavigateBack)
+            return
+        }
+        startAttempt(level, resume = null)
     }
 
     /**
@@ -460,7 +495,14 @@ class GameViewModel(
     private suspend fun GameAction.startAttempt(
         level: LevelDefinition,
         resume: BoardSnapshot? = null,
+        /**
+         * True only for [TutorialBoard]. Set before anything else here, because
+         * the `updateBoard` at the bottom writes a snapshot and a rehearsal must
+         * not hold the one in-progress slot against a real board.
+         */
+        rehearsal: Boolean = false,
     ) {
+        rehearsing = rehearsal
         attemptStartedAt = clock.markNow()
         lastPlacementAt = attemptStartedAt
         lastTappedCell = null
@@ -475,7 +517,7 @@ class GameViewModel(
         // that number line, so every read and every write here is skipped for a
         // daily. Reading campaign level 7's record for daily level 7 would be
         // wrong quietly; writing it would hand out a campaign unlock.
-        recordBeforeAttempt = if (isDaily) {
+        recordBeforeAttempt = if (isDaily || rehearsal) {
             LevelRecord.unplayed(level.id)
         } else {
             Catching { progress.record(level.id) }
@@ -483,18 +525,25 @@ class GameViewModel(
                 .getOrNull()
                 ?: LevelRecord.unplayed(level.id)
         }
-        logger.logEvent(
-            "game.level_started",
-            "level_id" to level.id,
-            "size" to level.size,
-            "difficulty" to level.difficulty,
-            "attempt_number" to attemptNumber,
-            "mode" to modeName,
-        )
+        // The rehearsal emits no `game.*` events at all. Its board id is not a
+        // level id, so a `game.level_started` for it would land in the campaign
+        // funnel as a level nobody can play and a difficulty tier nobody
+        // generated. What the tutorial has to say, it says through
+        // `tutorial.step_viewed` and `tutorial.completed`.
+        if (!rehearsal) {
+            logger.logEvent(
+                "game.level_started",
+                "level_id" to level.id,
+                "size" to level.size,
+                "difficulty" to level.difficulty,
+                "attempt_number" to attemptNumber,
+                "mode" to modeName,
+            )
+        }
         // Recorded when the level opens rather than when it is cleared: an
         // abandoned attempt still happened, and it is what unlocks the level's
         // own row so `unlockedThrough` can see it.
-        if (!isDaily) {
+        if (!isDaily && !rehearsal) {
             Catching { progress.onAttemptStarted(level.id) }
                 .logOnFailure { "Failed to record the start of level ${level.id}" }
         }
@@ -506,8 +555,9 @@ class GameViewModel(
         // it was before this update landed.
         val starterRow = 0
         // A resumed board already has whatever the starter dog gave it, and
-        // re-granting it would place a second dog in row 0.
-        val giveStarter = resume == null && level.id <= StarterDogThroughLevel
+        // re-granting it would place a second dog in row 0. The rehearsal board
+        // always gets one — every rule lesson is read off it.
+        val giveStarter = resume == null && (rehearsal || level.id <= StarterDogThroughLevel)
         val opening = when {
             resume != null -> Solution(resume.placements.toIntArray())
             giveStarter -> Solution.empty(level.size).withPlacement(starterRow, level.solution[starterRow])
@@ -521,8 +571,7 @@ class GameViewModel(
             emptySet()
         }
 
-        tutorial.beginLevel(level.id)
-        freeMistakeAvailable = tutorial.isRunning && level.id == Tutorial.FREE_MISTAKE_LEVEL
+        if (rehearsal) tutorial.begin()
         val lesson = tutorial.openingFrame(level, opening, openingMarks)
         grantProBoosters()
         val banked = bankedScores(level)
@@ -581,6 +630,7 @@ class GameViewModel(
                 unlockedThrough = campaignFrontier(unlocked, level.id),
                 daily = it.daily,
                 isDaily = isDaily,
+                isRehearsal = rehearsal,
                 tutorial = lesson.step,
                 tutorialCells = lesson.cells,
             )
@@ -628,12 +678,19 @@ class GameViewModel(
 
     /**
      * Moves the guided run on, if [trigger] is what the current step was waiting
-     * for.
+     * for — and not before the mark the player just made has drawn itself.
      *
-     * Every board fact this needs arrives as a parameter. The callers are all
-     * mid-transition — the placement that fired the auto-marks has not reached
-     * `state` yet — and a step that read the board back off `state` would point
-     * at the board as it was before the move that earned the step.
+     * **The trigger check is the gate.** A step that asks for a cross moves on a
+     * cross and on nothing else: the coach mark carries no "Got it" button, the
+     * scrim declines to dismiss on an outside tap, and a `Tap` arriving here for
+     * a `Marked` step returns without doing anything. The way out of a step the
+     * player does not want is Skip, which is on every card.
+     *
+     * Every board fact this needs arrives as a parameter, and that matters more
+     * now that there is a suspension in the middle: `state` lags `updateState`
+     * by a dispatch *and* is a moving target across a delay, so reading the
+     * board back off it here would point the next lesson at whatever happened
+     * during the wait.
      */
     private suspend fun GameAction.advanceTutorial(
         trigger: TutorialTrigger,
@@ -645,12 +702,23 @@ class GameViewModel(
         val current = tutorial.currentStep ?: return
         if (Tutorial.triggerFor(current) != trigger) return
 
-        tutorial.advance(level.id)
-        val frame = tutorial.frameFor(level, placed, autoMarks, justMarked)
-        if (frame.step == null && level.id == Tutorial.LAST_LEVEL) {
-            completeTutorial(skipped = false, at = current)
+        // Hold the spotlight where it is until the cross has finished drawing or
+        // the dog has finished landing. The player did what they were asked; the
+        // lesson is the seeing of it, not the advancing past it.
+        delay(Tutorial.settleMillis(trigger))
+
+        val finished = tutorial.advance()
+        val frame = if (finished) {
+            TutorialFrame.None
+        } else {
+            tutorial.frameFor(level, placed, autoMarks, justMarked)
         }
-        updateState { it.copy(tutorial = frame.step, tutorialCells = frame.cells) }
+        if (frame.step != null) {
+            updateState { it.copy(tutorial = frame.step, tutorialCells = frame.cells) }
+            return
+        }
+        completeTutorial(skipped = false, at = current)
+        leaveRehearsal()
     }
 
     /** The coach mark's own dismissal, and the "Got it" button under it. */
@@ -660,21 +728,26 @@ class GameViewModel(
     }
 
     /**
-     * The way out, from any step.
+     * The way out, from any step — and it has to work from *every* one, because
+     * the gated steps have no other exit.
      *
-     * It clears the step *and* the script, so the scrim comes down and the board
-     * is immediately playable. A skip that only hid the card would leave the
-     * next trigger re-showing a lesson the player already refused.
+     * It clears the script and then leaves the rehearsal entirely. Clearing the
+     * card alone would drop the player onto the demo board: a puzzle that is not
+     * in the campaign, cannot be finished, and banks nothing. A skip means "let
+     * me play", so it hands over the same level 1 that finishing does.
      */
     private suspend fun GameAction.skipTutorial() {
         val at = tutorial.currentStep
         completeTutorial(skipped = true, at = at)
+        if (rehearsing) {
+            leaveRehearsal()
+            return
+        }
         updateState { it.copy(tutorial = null, tutorialCells = emptySet()) }
     }
 
     private suspend fun completeTutorial(skipped: Boolean, at: TutorialStep?) {
         tutorial.stop()
-        freeMistakeAvailable = false
         logger.logEvent(
             "tutorial.completed",
             "skipped" to skipped,
@@ -841,16 +914,22 @@ class GameViewModel(
 
         val row = level.board.rowOf(cell)
         val correct = level.solution[row] == level.board.colOf(cell)
-        logger.logEvent(
-            "game.commit",
-            "level_id" to level.id,
-            "correct" to correct,
-            // Was this square already crossed out when they committed? A rise
-            // here means the auto-marks are not reading as "ruled out", which is
-            // a legibility problem rather than a difficulty one.
-            "on_marked" to (cell in state.autoMarks || cell in state.manualMarks),
-            "mode" to modeName,
-        )
+        // Not on the rehearsal board. Its id is not a level id, and its taps are
+        // dictated by a script — folding them in would answer "how often do
+        // players commit on a square already crossed off" with the tutorial's
+        // own answer, on a board nobody chose to play.
+        if (!rehearsing) {
+            logger.logEvent(
+                "game.commit",
+                "level_id" to level.id,
+                "correct" to correct,
+                // Was this square already crossed out when they committed? A rise
+                // here means the auto-marks are not reading as "ruled out", which is
+                // a legibility problem rather than a difficulty one.
+                "on_marked" to (cell in state.autoMarks || cell in state.manualMarks),
+                "mode" to modeName,
+            )
+        }
         if (correct) place(cell) else strike(cell)
     }
 
@@ -892,7 +971,13 @@ class GameViewModel(
         // The finished card is handed on rather than re-read from `state`, which
         // lags this update by a dispatch — re-reading would drop the points for
         // the very placement that won the level.
-        if (placed.isComplete) win(level, scored.card)
+        //
+        // The rehearsal cannot get here: its script places three dogs on a
+        // five-row board and then hands over to level 1. The guard is here
+        // because `win` writes progress, achievements and a level record, and
+        // the cost of being wrong about that is a player credited with clearing
+        // a level that does not exist.
+        if (placed.isComplete && !rehearsing) win(level, scored.card)
     }
 
     /**
@@ -905,12 +990,16 @@ class GameViewModel(
      * which is the point: the two used to have three each.
      */
     private suspend fun GameAction.strike(cell: Int) {
-        // The guided level asks the player to get one wrong on purpose, so that
-        // one is on the house. Everything else about a strike still happens:
-        // the square goes red, the combo breaks, and the lesson that follows
-        // says what it would normally have cost.
-        val forgiven = freeMistakeAvailable
-        freeMistakeAvailable = false
+        // The lesson asks the player to get one wrong on purpose, so nothing on
+        // the rehearsal board is charged for. Everything else about a strike
+        // still happens — the square goes red, the combo breaks — and the step
+        // that follows says what it would normally have cost.
+        //
+        // This used to be a one-shot `freeMistakeAvailable` on campaign level 3,
+        // which had to be armed, spent and disarmed in three different places.
+        // A whole board that costs nothing needs none of that, and cannot get
+        // out of step with itself.
+        val forgiven = rehearsing
         val level = state.level
         val placed = state.placed
         val marks = state.autoMarks
@@ -1540,6 +1629,31 @@ class GameViewModel(
         updateState { it.copy(freezeMessage = message) }
     }
 
+    /**
+     * Trades an ad for a whole run of missed days, and says what happened.
+     *
+     * Routes into the same dialog as the freeze on purpose: from where the player
+     * is standing these are one feature with two sizes, and giving the bigger one
+     * its own surface would be two ways of saying "your streak is back".
+     */
+    private suspend fun GameAction.restoreStreak() {
+        val result = Catching { daily.restoreStreak() }
+            .logOnFailure { "Failed to restore a streak" }
+            .getOrNull()
+        val message = when (result) {
+            is RestoreResult.Applied -> {
+                logger.logEvent("daily.streak_restored", "days" to result.days, "streak" to result.streak)
+                FreezeMessage.Restored(result.days, result.streak)
+            }
+            RestoreResult.Declined -> FreezeMessage.Declined
+            RestoreResult.NoneLeft -> FreezeMessage.RestoreNoneLeft
+            RestoreResult.OutOfReach -> FreezeMessage.RestoreOutOfReach
+            RestoreResult.NothingToRestore -> FreezeMessage.NothingToFreeze
+            null -> FreezeMessage.Unavailable
+        }
+        updateState { it.copy(freezeMessage = message) }
+    }
+
     private suspend fun GameAction.restart() {
         val level = state.level ?: return
         // One attempt per day. Starting over would be a second run at a board
@@ -1740,6 +1854,11 @@ class GameViewModel(
     private suspend fun GameAction.updateBoard(f: (GameState) -> GameState) {
         var next: GameState? = null
         updateState { current -> f(current).also { next = it } }
+        // The rehearsal is never written down. There is one in-progress slot for
+        // the whole app, and a demo board holding it would evict a real level
+        // somebody left half-finished — and then be resumed on the next launch
+        // as a board with no id in either pack.
+        if (rehearsing) return
         next?.let { saveBoard(it) }
     }
 

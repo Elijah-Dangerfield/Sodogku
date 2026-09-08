@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Step drop-off across the guided first three levels (SPEC §14).\n\nPer-step rather than per-level because tutorial drop-off is where a casual puzzle game bleeds installs, and 'they quit' is not an actionable finding — 'they quit on the step that asks for a double tap' is.\n\n**`step` is the enum name, never an index.** The curriculum will be reordered, and a funnel keyed on position would silently start comparing two different lessons.\n\n**There is no `tutorial.skipped` event**, though SPEC §14 names one. A skip is `tutorial.completed` with `skipped=true` and a `last_step`, because both endings write `AppData.hasCompletedTutorial` and both are the end of the tutorial. Two events for one transition would mean every funnel had to remember to union them.\n\n**Replaying from Settings re-arms the run**, so a small number of repeat `tutorial.completed` events per install is expected rather than a bug. Rates against a distinct-install denominator read slightly high because of it.\n\n**Loki-backed, so nothing here can see past Grafana Cloud's log retention.** Widening the time picker does not widen the answer.\n\n**Delivery is at-least-once.** A record can rarely ship twice (export acknowledged, process died before the buffer delete), so read raw counts as approximate. Panels that count *installs* rather than records are immune to it by construction — a duplicate lands in the same `install_id` series and collapses.",
+  "description": "Step drop-off across the guided practice board (SPEC §14).\n\nPer-step rather than per-level because tutorial drop-off is where a casual puzzle game bleeds installs, and 'they quit' is not an actionable finding — 'they quit on the step that asks for a double tap' is.\n\n**`step` is the enum name, never an index.** The curriculum will be reordered, and a funnel keyed on position would silently start comparing two different lessons.\n\n**There is no `tutorial.skipped` event**, though SPEC §14 names one. A skip is `tutorial.completed` with `skipped=true` and a `last_step`, because both endings write `AppData.hasCompletedTutorial` and both are the end of the tutorial. Two events for one transition would mean every funnel had to remember to union them.\n\n**Replaying from Settings re-arms the run**, so a small number of repeat `tutorial.completed` events per install is expected rather than a bug. Rates against a distinct-install denominator read slightly high because of it.\n\n**Loki-backed, so nothing here can see past Grafana Cloud's log retention.** Widening the time picker does not widen the answer.\n\n**Delivery is at-least-once.** A record can rarely ship twice (export acknowledged, process died before the buffer delete), so read raw counts as approximate. Panels that count *installs* rather than records are immune to it by construction — a duplicate lands in the same `install_id` series and collapses.\n\n**One board, since R3.** The tutorial runs its whole script on a throwaway practice board rather than over campaign levels 1 to 3, so `tutorial.step_viewed` no longer carries a `level_id` and the *Step views by level* table that split on it has been removed. There was never anything in it the per-step panel did not say.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -494,96 +494,6 @@
       "panels": [],
       "title": "Across the three guided levels",
       "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "grafanacloud-logs"
-      },
-      "description": "The same funnel split by which of levels 1 to 3 the step belongs to. Level 1 carries the rules and both gestures, level 2 the auto-mark and the boosters, level 3 adjacency and the free mistake.\n\nA level that loses most of its population before its own last step is a level with too much script in it.",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "filterable": true,
-            "inspect": false
-          },
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 19
-      },
-      "id": 169,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "grafanacloud-logs"
-          },
-          "editorMode": "code",
-          "expr": "count by (level_id, step) (count by (level_id, step, install_id) (count_over_time({service_name=\"sodogku-client\", deployment_environment=\"$env\"} | event_name=\"tutorial.step_viewed\" [$__range])))",
-          "refId": "A",
-          "queryType": "instant"
-        }
-      ],
-      "title": "Step views by level",
-      "type": "table",
-      "transformations": [
-        {
-          "id": "labelsToFields",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "desc": true,
-                "field": "Value"
-              }
-            ]
-          }
-        }
-      ]
     },
     {
       "datasource": {

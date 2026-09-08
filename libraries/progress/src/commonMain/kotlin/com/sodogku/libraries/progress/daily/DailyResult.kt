@@ -5,9 +5,9 @@ import kotlinx.datetime.LocalDate
 /**
  * How one day of the daily challenge ended.
  *
- * A day with no result at all is *missed*, and missing is the only thing a
- * [Frozen] day is allowed to stand in for — a day the player attempted and lost
- * is not missed, they had their turn.
+ * A day with no result at all is *missed*, and missing is the only thing
+ * [Frozen] and [Restored] are allowed to stand in for — a day the player
+ * attempted and lost is not missed, they had their turn.
  */
 enum class DailyOutcome {
     Completed,
@@ -17,6 +17,17 @@ enum class DailyOutcome {
 
     /** Never played; a rewarded ad bridged the gap so the streak survives it. */
     Frozen,
+
+    /**
+     * Never played; bridged by a streak restore rather than a freeze.
+     *
+     * The fold treats it exactly like [Frozen] — it bridges without counting.
+     * It is a separate name only so the two allowances can be counted apart:
+     * `daily.freezesPerMonth` counts [Frozen] rows and
+     * `daily.restoreDaysPerMonth` counts these, and one budget must not quietly
+     * spend the other.
+     */
+    Restored,
 }
 
 /**

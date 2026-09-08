@@ -373,6 +373,15 @@ in the genre and it costs almost nothing given a bundled pack.
   frozen day bridges the gap without counting toward the total, and is only offered when covering
   it would actually reconnect a run. A day the player attempted and lost is not missed and cannot
   be frozen. This is the single most reliable ad impression in the app.
+- **Restore.** The freeze covers one day, so a gap of two used to end a streak for good. A
+  **Streak Restore** bridges a whole run of consecutive missed days for one rewarded ad, at the
+  same placement and under the same fail-open rule. Bounded twice: `daily.restoreMaxDays` (3) is
+  the longest gap it will cover, and `daily.restoreDaysPerMonth` (3) is how many days it may
+  bridge in a calendar month, which is one restore at full size. A one-day gap is never offered as
+  a restore; that is the freeze's, and the two offers are mutually exclusive. Restored days bridge
+  without counting, exactly like frozen ones, and are stored as rows so both allowances stay
+  folded rather than counted. Together with the freeze the daily forgives at most three consecutive
+  missed days, and past that the streak really does end.
 - **Entry point.** A card at the top of the **level drawer** — there is no level map; the puzzle
   is the home screen and the level list slides out over it. The card carries the day's date, the
   streak, a done / not-done state (with the day's paw rating once it is done), a countdown to the
@@ -534,7 +543,8 @@ which is why `apps/admin/config-manifest-registry.json` must list **every** decl
 
 **Daily**
 
-`daily.enabled` (true), `daily.freezesPerMonth` (2), `daily.poolOffset` (0).
+`daily.enabled` (true), `daily.freezesPerMonth` (2), `daily.restoreMaxDays` (3),
+`daily.restoreDaysPerMonth` (3), `daily.poolOffset` (0).
 
 **Paywall**
 
@@ -668,7 +678,7 @@ is not what shipped casual puzzle games do. The normal shape:
 | `continue_level` | Rewarded | Third strike, restore the whole set of bones, keep the board. The lose sheet's one revive. |
 | `booster_grant` | Rewarded | Earn a Sniff or a Treat, or top bones up from the standing offer on a board still in play. |
 | `skip_level` | Rewarded | After 2 failed attempts. |
-| `streak_freeze` | Rewarded | Cover a missed daily. |
+| `streak_freeze` | Rewarded | Cover a missed daily, or restore a run of them. Both, deliberately: they are the same placement to an operator, and a second id would be half a kill switch. `daily.freeze_used` and `daily.streak_restored` tell them apart in reporting. |
 | `app_open` | App Open | Cold start, off by default. |
 | `map_banner` | Banner | Level map only, off by default. Never on the board, it wrecks touch targets. |
 
@@ -909,28 +919,55 @@ the formatting: a screen supplies the board and what to call it, and nothing els
 
 ## 10. Tutorial
 
-Levels 1 to 3 are guided, not a separate mode. `:features:onboarding:impl` is the welcome screen
-in front of it; the teaching itself happens on the board, driven from `GameState` by
+The tutorial teaches on a board of its own, not on the campaign. `:features:onboarding:impl` is the
+welcome screen in front of it; the teaching happens on the board, driven from `GameState` by
 `GameViewModel` and drawn by `TutorialCoachMark` on the `Focus` spotlight (section 16a).
 
-Fifteen steps, all 4x4:
+**One throwaway board, `TutorialBoard`.** A hand-authored 5x5 that is in no pack, has no level id
+worth writing down, and cannot be finished — the script places three of its five dogs and then
+hands over. It replaced a guided run over campaign levels 1 to 3, which had two problems: a
+player's first three real boards were spent under a scrim, and every lesson had to point at
+whatever square the generator happened to produce. This one is chosen so each lesson has a clean
+example. Its uniqueness is checked with the shipped solver in `TutorialBoardTest`, the same
+property `LevelPackVerificationTest` enforces for the 500 generated levels.
 
-- **Level 1:** the three rules one at a time, each lighting its own permanent rule chip. Then the
-  free starter dog, then the two gestures — one tap crosses a square off, two taps place a dog —
-  each on a single lit square with the rest of the board dead. Ends on the bones.
-- **Level 2:** place a dog and watch auto-mark fire, with the squares *that placement just crossed
-  off* lit through the scrim. Then the sniff and the treat. Auto-mark is the mechanic players most
-  need to understand, and level 1 already showed its result around the starter dog.
-- **Level 3:** the ring of squares a dog rules out by touching, then a lit wrong square with "get
-  one wrong on purpose" — that guess costs no bone — then what the red X means, then the sign-off.
-- From level 4 the gloves come off.
+**Nothing on it counts.** No attempt is recorded, no level record is touched, no achievement is
+folded, no bone is spent, no board snapshot is written, and no `game.*` event fires. The header
+drops the level number, because a practice board has none, and the lifetime score holds still —
+a rehearsal banks nothing, so it contributes nothing, exactly as a lost attempt does.
+
+Fourteen steps, in order:
+
+- **The free dog**, then the three rules read off the board around it: its colour block, the cross
+  of its row and column, and the ring of squares it touches. Each lights the squares that rule
+  ruled out, with the dog in the middle and crosses already on them. They used to light the
+  permanent rule chip under the header instead, which is a diagram of a rule rather than the rule
+  happening on the board in front of you.
+- **The two gestures** — one tap crosses a square off, two taps place a dog — each on a single lit
+  square with the rest of the board dead. Then the bones.
+- **Place a dog and watch auto-mark fire**, with the squares *that placement just crossed off* lit
+  through the scrim. Then the sniff and the treat. Auto-mark is the mechanic players most need to
+  understand, and the starter dog already showed its result.
+- **A lit wrong square** with "get one wrong on purpose" — it costs nothing, because nothing on
+  this board does — then what the red X means, then the sign-off.
+- Then campaign level 1 opens, clean, with the player's bones intact. The gloves are off from
+  there.
 
 A step is one of two shapes, and the difference is what stops it becoming a dead end. **A step you
-read** dismisses on a tap anywhere. **A step you do** keeps its lit square live, ignores taps
-everywhere else, and moves only on the gesture it asked for. Every step carries a skip.
+read** dismisses on a tap anywhere and carries a "Got it". **A step you do** keeps its lit square
+live, ignores taps everywhere else, has no confirm button, and moves only on the gesture it asked
+for — and then not until that gesture has finished drawing itself (`Tutorial.settleMillis`, from
+the design system's own animation lengths). Advancing in the same frame as the tap meant the
+spotlight jumped away while the cross was mid-stroke, so the one thing the lesson asked for was the
+one thing the player never saw. Every step carries a skip, and a skip leaves the rehearsal for
+level 1 rather than dropping the player onto a demo board they can never finish.
+
+**A screen-reader player can complete the gated steps.** `Spotlight.targetLabel` makes `FocusScrim`
+put a named, activatable node over each lit rectangle — "Place a dog, row 2, column 1" — whose
+activation sends the same taps a thumb would. See section 16 and `decisions.md`.
 
 Per-step events (`tutorial.step_viewed`, `tutorial.completed`), because tutorial drop-off is where
-casual puzzle games bleed the most installs. Finishing level 3's script or skipping writes
+casual puzzle games bleed the most installs. Finishing the script or skipping writes
 `AppData.hasCompletedTutorial`; **Settings → Replay the tutorial** clears it and returns to level 1
 with the back stack replaced. The flag is separate from `hasUserOnboarded` precisely so a replay
 does not put the welcome screen back in front of somebody 200 levels in.
@@ -1032,12 +1069,14 @@ ruin a best time.
 
 ### 13.2 Room: `daily_result`
 
-`date` (PK, local ISO date), `levelIndex`, `outcome` (`Completed` / `Failed` / `Frozen`), `score`,
-`paws`, `timeMs`.
+`date` (PK, local ISO date), `levelIndex`, `outcome` (`Completed` / `Failed` / `Frozen` /
+`Restored`), `score`, `paws`, `timeMs`.
 
 `outcome` replaces the `completed` + `froze` pair: two booleans describe four states and one of
-them is meaningless. A day with **no row** is a missed day, which is the only thing a `Frozen` row
-may stand in for.
+them is meaningless. A day with **no row** is a missed day, which is the only thing a `Frozen` or
+`Restored` row may stand in for. The two bridge identically; they are separate names so
+`daily.freezesPerMonth` and `daily.restoreDaysPerMonth` can be counted apart, since both
+allowances are folded out of these rows rather than stored.
 
 Insert-only, with the primary key as the one-attempt-per-day lock. The streak is **not** stored —
 it is folded out of this table on every read. See section 8's counters for the same rule and
@@ -1117,6 +1156,7 @@ Aggregate into the completion event.
 | `daily.started` / `daily.completed` | `date`, `streak`, `score` |
 | `daily.streak_broken` | `previous_streak` |
 | `daily.freeze_used` | `streak` |
+| `daily.streak_restored` | `days`, `streak` |
 | `ads.gate_shown` | `placement`, `is_offline` (the *device* signal) |
 | `ads.result` | `placement`, `outcome`, `latency_ms`, `error_kind`, `reason` |
 | `ads.offline_block` | `placement`, `grace_levels_used` |
@@ -1241,12 +1281,17 @@ The board is playable with one. Every square is a labelled, activatable node.
 glyph (the region name is the same information), the flying points and the placement starburst
 (celebration; the score is a labelled control of its own).
 
+**The tutorial's lit square is a real control (R3).** `Spotlight.targetLabel` makes `FocusScrim`
+place a named, activatable node over each lit rectangle — "Place a dog, row 2, column 1", built
+from the board's own vocabulary so the words mean the same thing inside the lesson as after it.
+Activating it sends the taps the step is waiting for: one for a cross, two for a placement, the
+same synthesis `placeAt` already does for an ordinary square. The node declares semantics only and
+registers no pointer input, so it is invisible to a finger and the sighted double tap is still two
+separate taps. Verified with TalkBack on an emulator: the gated step advances on the reader's
+double-tap activation.
+
 **Not yet true, and needed before this is finished:**
 
-- The tutorial's "tap the lit square" steps cannot be completed with a screen reader. `FocusScrim`
-  owns the touch and knows its targets only as rectangles; lighting one as an accessible control
-  needs a label on `Spotlight`. "Skip tutorial" is labelled and reachable, so the guided run can
-  be left, which is a worse first five minutes than a sighted player gets.
 - **iOS is unverified.** The semantics are `commonMain` and platform-independent, but no VoiceOver
   pass has been run — `xcode-select` does not point at Xcode on the build machine, so the app has
   never been launched on iOS at all.

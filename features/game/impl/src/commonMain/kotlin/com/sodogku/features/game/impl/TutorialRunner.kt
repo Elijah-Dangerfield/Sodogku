@@ -9,9 +9,9 @@ import com.sodogku.libraries.puzzle.Solution
  * Where the guided run is up to.
  *
  * Pulled out of `GameViewModel` because it is the one responsibility in there
- * with a whole state machine of its own — a script, a position in it, and a
- * record of which levels have already been guided — and those three fields sat
- * next to fifteen others that had nothing to do with them.
+ * with a whole state machine of its own — a script, a position in it, and
+ * whether the run is still wanted — and those sat next to fifteen others that
+ * had nothing to do with them.
  *
  * It deliberately owns no `GameState`. Deciding *which* coach mark is showing is
  * this class's business; putting it on screen is the ViewModel's, because only
@@ -20,20 +20,22 @@ import com.sodogku.libraries.puzzle.Solution
  */
 class TutorialRunner(private val logger: Logger) {
 
-    private var active = false
+    private var armed = false
     private var script: List<TutorialStep> = emptyList()
     private var index = 0
 
-    /**
-     * Levels whose script has already run to the end.
-     *
-     * Without it, replaying level 1 after finishing the tutorial re-teaches the
-     * three rules to somebody who has just proved they know them.
-     */
-    private val guided = mutableSetOf<Int>()
-
     /** True while a script is showing, which is what suppresses the board's own overlays. */
     val isRunning: Boolean get() = script.isNotEmpty()
+
+    /**
+     * Whether the rehearsal board should open in front of the level the route
+     * asked for.
+     *
+     * Read *before* the board is chosen, which is why it is separate from
+     * [isRunning]: the ViewModel has to know which board to open before there is
+     * a script to run on it.
+     */
+    val shouldRehearse: Boolean get() = armed
 
     /**
      * The step the board is waiting on, or null between steps.
@@ -46,17 +48,22 @@ class TutorialRunner(private val logger: Logger) {
     /**
      * Whether the guided run should happen at all.
      *
-     * Set once from the persisted flag rather than re-read per level: the flag is
-     * written the moment the tutorial ends, and the next level's setup runs
+     * Set once from the persisted flag rather than re-read per board: the flag is
+     * written the moment the tutorial ends, and the real level's setup runs
      * before that write has any chance to land.
+     *
+     * [onFirstLevel] is false for a daily, and for a campaign level somebody
+     * jumped to. The rehearsal hands the player back to the board the route
+     * asked for when it is done, and that is only a sensible thing to do when
+     * the route was the start of the campaign.
      */
-    fun arm(hasCompletedTutorial: Boolean, isDaily: Boolean) {
-        active = !isDaily && !hasCompletedTutorial
+    fun arm(hasCompletedTutorial: Boolean, onFirstLevel: Boolean) {
+        armed = onFirstLevel && !hasCompletedTutorial
     }
 
-    /** Loads the script for [levelId], or nothing when this level is not guided. */
-    fun beginLevel(levelId: Int) {
-        script = if (active && levelId !in guided) Tutorial.scriptFor(levelId) else emptyList()
+    /** Loads the script, or nothing when the run is not armed. */
+    fun begin() {
+        script = if (armed) Tutorial.Script else emptyList()
         index = 0
     }
 
@@ -67,9 +74,7 @@ class TutorialRunner(private val logger: Logger) {
         autoMarks: Set<Int>,
     ): TutorialFrame {
         if (script.isEmpty()) return TutorialFrame.None
-        val frame = frameFor(level, placed, autoMarks, justMarked = emptySet())
-        if (frame.step == null) guided += level.id
-        return frame
+        return frameFor(level, placed, autoMarks, justMarked = emptySet())
     }
 
     /**
@@ -89,7 +94,7 @@ class TutorialRunner(private val logger: Logger) {
             val step = script[index]
             val cells = Tutorial.cellsFor(step, level, placed, autoMarks, justMarked)
             if (Tutorial.triggerFor(step) == TutorialTrigger.Tap || cells.isNotEmpty()) {
-                logger.logEvent("tutorial.step_viewed", "step" to step.name, "level_id" to level.id)
+                logger.logEvent("tutorial.step_viewed", "step" to step.name)
                 return TutorialFrame(step, cells)
             }
             index++
@@ -97,17 +102,15 @@ class TutorialRunner(private val logger: Logger) {
         return TutorialFrame.None
     }
 
-    /** Moves past the current step. Returns true once this level's script is spent. */
-    fun advance(levelId: Int): Boolean {
+    /** Moves past the current step. Returns true once the script is spent. */
+    fun advance(): Boolean {
         index++
-        val finished = index >= script.size
-        if (finished) guided += levelId
-        return finished
+        return index >= script.size
     }
 
-    /** Abandons the whole guided run, not just this level. */
+    /** Abandons the guided run for good. */
     fun stop() {
-        active = false
+        armed = false
         script = emptyList()
         index = 0
     }

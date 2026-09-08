@@ -90,19 +90,31 @@ accounts, so the template's auth step went with `:libraries:identity` in C0.
 
 ### Tutorial
 
-The guided first three levels, from `GameViewModel`. Per-step rather than per-level because
-tutorial drop-off is where a casual puzzle game bleeds installs, and "they quit" is not an
-actionable finding — "they quit on the step that asks for a double tap" is.
+The guided practice board, from `GameViewModel`. Per-step because tutorial drop-off is where a
+casual puzzle game bleeds installs, and "they quit" is not an actionable finding — "they quit on
+the step that asks for a double tap" is.
 
 | Event | Attributes | Fires |
 |---|---|---|
-| `tutorial.step_viewed` | `step` (the `TutorialStep` name), `level_id` | Each time a coach mark comes up, including the first one as a guided level opens. A step that is skipped over because it has nothing to point at never fires |
-| `tutorial.completed` | `skipped`, `last_step` | Once. `skipped=false` means they finished level 3's script; `skipped=true` means they took the way out, and `last_step` says from where. Both write `AppData.hasCompletedTutorial`, so both are the end of it |
+| `tutorial.step_viewed` | `step` (the `TutorialStep` name) | Each time a coach mark comes up, including the first one as the practice board opens. A step that is skipped over because it has nothing to point at never fires |
+| `tutorial.completed` | `skipped`, `last_step` | Once. `skipped=false` means they ran the script to the end; `skipped=true` means they took the way out, and `last_step` says from where. Both write `AppData.hasCompletedTutorial`, so both are the end of it |
 
-`step` is the enum name and not an index on purpose: the curriculum will be reordered, and a
-funnel keyed on position would silently start comparing two different lessons. Drop-off is
-`step_viewed` counts down the sequence; the pair to watch is the two gesture steps
-(`MarkSquare`, `PlaceDog`), which are the only ones a player cannot leave by tapping anywhere.
+**`level_id` is gone from `step_viewed` (R3).** The tutorial runs its whole script on one throwaway
+board rather than over campaign levels 1 to 3, so there is no level to split on and the attribute
+would have been a constant `0`. The *Step views by level* table in `tutorial-funnel.json` went with
+it. `DashboardQueryContractTest` is what catches a query left behind a change like this — it failed
+on exactly this attribute, which is the whole reason the test exists.
+
+**The practice board emits no `game.*` events at all.** No `game.level_started`, no `game.commit`,
+no completion or failure. Its board id is not a level id and its taps are dictated by a script, so
+folding them into the play funnels would answer questions about real play with the tutorial's
+answers. What the tutorial has to say it says here.
+
+`step` is the enum name and not an index on purpose: the curriculum will be reordered — it already
+has been — and a funnel keyed on position would silently start comparing two different lessons.
+Drop-off is `step_viewed` counts down the sequence; the ones to watch are the four gesture steps
+(`MarkSquare`, `PlaceDog`, `PlaceAndWatch`, `TryAWrongOne`), which are the only ones a player
+cannot leave by tapping anywhere.
 
 Replaying from Settings clears the flag and arms the run again, so a small number of repeat
 `tutorial.completed` events per install is expected rather than a bug.
@@ -132,6 +144,7 @@ a session join.
 | `daily.forfeited` | `date`, `dogs_placed` | The player gave today's board up from the lose sheet and confirmed it. **The only thing that writes a daily loss.** Leaving the sheet used to do it silently, so a count here is now a count of people who *chose* to close the day rather than of people who navigated away — the two answer completely different questions and the old event answered neither |
 | `daily.reviewed` | `date`, `outcome` | A day that was already played was reopened on its result. Deliberately not `daily.started`: a visit to a finished day is not an attempt, and folding it into the start event would inflate every daily funnel |
 | `daily.freeze_used` | `streak` | A rewarded ad covered a missed day |
+| `daily.streak_restored` | `days`, `streak` | A rewarded ad bridged a whole run of missed days. Shares the `streak_freeze` ad placement with `daily.freeze_used`, so these two events are the only way to tell the two products apart in reporting. `days` is what makes that worth doing: a restore is priced the same as a freeze and buys two or three times as much, so its rate against the freeze's is the number that says whether the reach is set anywhere near right |
 | `game.bones_refilled` | `level_id`, `to`, `placement` | The one way back from zero: the standing ad offer on the board, or the revive on the lose sheet. `to` is the resulting holding, not the amount granted — the refill never reduces, so the two differ above the floor. `placement` distinguishes the two call sites (`ContinueLevel` from the lose sheet, `BoosterGrant` from the board), which is the split the rewarded-placement config gates on. Replaced `game.continued`, whose button granted a single bone for the same ad and is gone |
 | `game.booster_used` | `booster` (`sniff`/`treat`), `level_id` | A charge is actually spent |
 | `game.booster_no_op` | `booster`, `level_id`, `difficulty` | A booster was asked for and **declined to spend**, because it had nothing to show. Should be rare; a rise means the hint engine is running out of things to say earlier than it should, which is a difficulty-calibration signal and not a UI one |

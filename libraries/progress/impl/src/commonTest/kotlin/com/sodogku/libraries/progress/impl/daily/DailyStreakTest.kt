@@ -182,6 +182,162 @@ class DailyStreakTest {
         assertEquals(0, offer.freezesRemaining)
     }
 
+    @Test
+    fun aRestoredDayBridgesExactlyLikeAFrozenOne() {
+        val history = completed(daysBack = 0..1) +
+            mapOf(today.minusDays(2) to DailyOutcome.Restored) +
+            completed(daysBack = 3..5)
+
+        assertEquals(
+            5,
+            streakOn(today, history),
+            "an ad is not a day played, whichever of the two bought it",
+        )
+    }
+
+    @Test
+    fun restoreOffer_coversTheWholeRunAndSaysWhatItBuys() {
+        val results = resultsFor(completed(daysBack = 0..0) + completed(daysBack = 4..12))
+
+        val offer = restoreOfferOn(today, results, maxDays = 3, daysPerMonth = 3)
+
+        assertEquals(1, streakOn(today, results.mapValues { it.value.outcome }))
+        assertEquals(
+            listOf(today.minusDays(3), today.minusDays(2), today.minusDays(1)),
+            offer?.missedDates,
+            "all three, oldest first — a partial bridge reconnects nothing",
+        )
+        assertEquals(10, offer?.streakIfUsed, "today plus the nine days behind the gap")
+        assertTrue(offer!!.available)
+    }
+
+    @Test
+    fun restoreOffer_leavesASingleMissedDayToTheFreeze() {
+        val oneDayGap = resultsFor(completed(daysBack = 0..0) + completed(daysBack = 2..9))
+
+        assertNull(
+            restoreOfferOn(today, oneDayGap, maxDays = 3, daysPerMonth = 3),
+            "the freeze covers this, it is cheaper, and two buttons for one day is a coin toss",
+        )
+        assertTrue(
+            freezeOfferOn(today, oneDayGap, freezesPerMonth = 2) != null,
+            "and the freeze really is the one being offered",
+        )
+    }
+
+    @Test
+    fun restoreOffer_andFreezeOffer_areNeverBothOnTheTable() {
+        val gaps = listOf(1, 2, 3, 4, 9).map { missed ->
+            resultsFor(completed(daysBack = 0..0) + completed(daysBack = (missed + 1)..(missed + 8)))
+        }
+
+        gaps.forEach { results ->
+            val freeze = freezeOfferOn(today, results, freezesPerMonth = 2)
+            val restore = restoreOfferOn(today, results, maxDays = 3, daysPerMonth = 3)
+            assertTrue(
+                freeze == null || restore == null,
+                "one gap, one offer: the card must never ask the player to pick",
+            )
+        }
+    }
+
+    @Test
+    fun restoreOffer_reportsAGapBeyondItsReachRatherThanHidingIt() {
+        val fourDayGap = resultsFor(completed(daysBack = 0..0) + completed(daysBack = 5..12))
+
+        val offer = restoreOfferOn(today, fourDayGap, maxDays = 3, daysPerMonth = 3)
+
+        assertTrue(offer != null, "the caller needs to say 'too long ago' rather than 'nothing to do'")
+        assertTrue(!offer.withinReach)
+        assertTrue(!offer.available)
+    }
+
+    @Test
+    fun restoreOffer_doesNotWalkAnAbandonedRunToItsEnd() {
+        val playedLastYear = resultsFor(
+            completed(daysBack = 0..0) + (400..410).associate { today.minusDays(it) to DailyOutcome.Completed }
+        )
+
+        val offer = restoreOfferOn(today, playedLastYear, maxDays = 3, daysPerMonth = 3)
+
+        assertTrue(offer == null || !offer.withinReach)
+        assertEquals(
+            4,
+            missedRunBefore(today, playedLastYear.mapValues { it.value.outcome }, maxDays = 3).size,
+            "the walk stops one past the limit; it does not count four hundred days to find out",
+        )
+    }
+
+    @Test
+    fun restoreOffer_isWithheldWhenItWouldBuyNothing() {
+        val nothingBehindTheGap = resultsFor(completed(daysBack = 0..0))
+
+        assertNull(
+            restoreOfferOn(today, nothingBehindTheGap, maxDays = 3, daysPerMonth = 3),
+            "there is no run on the far side of the gap to reconnect to",
+        )
+    }
+
+    @Test
+    fun restoreOffer_isWithheldAfterALoss() {
+        val lostThenPlayed = resultsFor(
+            completed(daysBack = 0..0) +
+                mapOf(today.minusDays(1) to DailyOutcome.Failed) +
+                completed(daysBack = 2..9)
+        )
+
+        assertNull(
+            restoreOfferOn(today, lostThenPlayed, maxDays = 3, daysPerMonth = 3),
+            "an attempt was spent on that day; an ad may not undo a loss",
+        )
+    }
+
+    @Test
+    fun restoreOffer_countsDaysAlreadyRestoredThisMonth() {
+        val twoAlreadySpent = resultsFor(
+            completed(daysBack = 0..0) +
+                completed(daysBack = 4..9) +
+                mapOf(
+                    LocalDate(2026, 9, 1) to DailyOutcome.Restored,
+                    LocalDate(2026, 9, 2) to DailyOutcome.Restored,
+                    LocalDate(2026, 8, 2) to DailyOutcome.Restored,
+                )
+        )
+
+        val offer = restoreOfferOn(today, twoAlreadySpent, maxDays = 3, daysPerMonth = 3)
+
+        assertEquals(1, offer?.daysRemaining, "August's restored day is not out of September's three")
+        assertTrue(!offer!!.withinAllowance, "one day left cannot pay for a three-day gap")
+        assertTrue(offer.withinReach, "and it is the allowance refusing, not the reach")
+    }
+
+    @Test
+    fun restoreOffer_makesEachMonthPayForItsOwnDays() {
+        val secondOfSeptember = LocalDate(2026, 9, 2)
+        val straddling = resultsFor(
+            mapOf(secondOfSeptember to DailyOutcome.Completed) +
+                (3..9).associate { secondOfSeptember.minusDays(it) to DailyOutcome.Completed } +
+                mapOf(
+                    LocalDate(2026, 8, 5) to DailyOutcome.Restored,
+                    LocalDate(2026, 8, 6) to DailyOutcome.Restored,
+                )
+        )
+
+        val offer = restoreOfferOn(secondOfSeptember, straddling, maxDays = 3, daysPerMonth = 3)
+
+        assertEquals(
+            listOf(LocalDate(2026, 8, 31), LocalDate(2026, 9, 1)),
+            offer?.missedDates,
+            "the gap runs over the month end",
+        )
+        assertTrue(
+            offer!!.withinAllowance,
+            "August has one of three days left and owes one; September owes the other and has three. " +
+                "A cap that took the smaller of the two remainders would refuse this wrongly",
+        )
+        assertEquals(3, offer.daysRemaining, "the number shown is the month the player is standing in")
+    }
+
     private fun completed(daysBack: IntRange): Map<LocalDate, DailyOutcome> =
         daysBack.associate { today.minusDays(it) to DailyOutcome.Completed }
 

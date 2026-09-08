@@ -2,31 +2,33 @@ package com.sodogku.features.game.impl
 
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.puzzle.Solution
+import com.sodogku.system.Motion
 
 /**
- * One lesson in the guided run over campaign levels 1 to 3.
+ * One lesson in the guided run over [TutorialBoard].
  *
- * The order inside a level is the order of [Tutorial.scriptFor]; the enum is
- * declared in that order so a reader can see the whole curriculum at once.
+ * The enum is declared in the order of [Tutorial.Script], so a reader can see
+ * the whole curriculum at once.
  */
 enum class TutorialStep {
-    // Level 1 — the three rules, then the two gestures.
+    // The free dog, and then the three rules read off the board around it.
+    StarterDog,
     RuleRegion,
     RuleLine,
     RuleTouching,
-    StarterDog,
+
+    // The two gestures, and what a wrong one costs.
     MarkSquare,
     PlaceDog,
     Bones,
 
-    // Level 2 — auto-mark firing from the player's own placement, then the boosters.
+    // Auto-mark firing from the player's own placement, then the boosters.
     PlaceAndWatch,
     AutoMark,
     Sniff,
     Treat,
 
-    // Level 3 — adjacency, and one wrong guess that costs nothing.
-    NoTouching,
+    // One wrong guess that costs nothing, and the sign-off.
     TryAWrongOne,
     WrongExplained,
     Graduation,
@@ -47,45 +49,34 @@ enum class TutorialTrigger { Tap, Marked, Placed, Struck }
  *
  * Nothing here reads a clock, a cache or a ViewModel field, which is what lets
  * the "no step can strand the player" property be checked against the real
- * shipped levels rather than against a fixture.
+ * board rather than against a fixture.
  */
 object Tutorial {
 
-    /** The last guided level. Clearing its script is what ends the tutorial. */
-    const val LAST_LEVEL: Int = 3
-
     /**
-     * The level whose first wrong guess is free.
+     * The whole lesson, on one board, in order.
      *
-     * SPEC 10: level 3 "allows one wrong tap with no life charged", because the
-     * step that teaches what a wrong guess looks like has to ask for one.
+     * It used to be three scripts over three campaign levels. Merging them
+     * dropped a step: `NoTouching` lit the ring around a dog on level 3, which
+     * is exactly what [TutorialStep.RuleTouching] now does on the same board,
+     * and teaching it twice was padding rather than reinforcement.
      */
-    const val FREE_MISTAKE_LEVEL: Int = LAST_LEVEL
-
-    fun scriptFor(levelId: Int): List<TutorialStep> = when (levelId) {
-        1 -> listOf(
-            TutorialStep.RuleRegion,
-            TutorialStep.RuleLine,
-            TutorialStep.RuleTouching,
-            TutorialStep.StarterDog,
-            TutorialStep.MarkSquare,
-            TutorialStep.PlaceDog,
-            TutorialStep.Bones,
-        )
-        2 -> listOf(
-            TutorialStep.PlaceAndWatch,
-            TutorialStep.AutoMark,
-            TutorialStep.Sniff,
-            TutorialStep.Treat,
-        )
-        LAST_LEVEL -> listOf(
-            TutorialStep.NoTouching,
-            TutorialStep.TryAWrongOne,
-            TutorialStep.WrongExplained,
-            TutorialStep.Graduation,
-        )
-        else -> emptyList()
-    }
+    val Script: List<TutorialStep> = listOf(
+        TutorialStep.StarterDog,
+        TutorialStep.RuleRegion,
+        TutorialStep.RuleLine,
+        TutorialStep.RuleTouching,
+        TutorialStep.MarkSquare,
+        TutorialStep.PlaceDog,
+        TutorialStep.Bones,
+        TutorialStep.PlaceAndWatch,
+        TutorialStep.AutoMark,
+        TutorialStep.Sniff,
+        TutorialStep.Treat,
+        TutorialStep.TryAWrongOne,
+        TutorialStep.WrongExplained,
+        TutorialStep.Graduation,
+    )
 
     fun triggerFor(step: TutorialStep): TutorialTrigger = when (step) {
         TutorialStep.MarkSquare -> TutorialTrigger.Marked
@@ -95,11 +86,33 @@ object Tutorial {
     }
 
     /**
+     * How long a step holds still after the player has done what it asked, so
+     * the mark they just made finishes drawing before the spotlight moves.
+     *
+     * Without this the coach mark advanced in the same frame as the tap: the
+     * hole in the scrim jumped to the next square while the cross was two
+     * strokes in, so the one thing the lesson had just asked for was the one
+     * thing the player never saw. The numbers are the design system's own —
+     * they are how long the thing being waited on actually takes.
+     */
+    fun settleMillis(trigger: TutorialTrigger): Long = when (trigger) {
+        TutorialTrigger.Tap -> 0L
+        TutorialTrigger.Marked -> Motion.MarkDrawMillis.toLong()
+        TutorialTrigger.Placed -> Motion.PlacementPulseMillis.toLong()
+        TutorialTrigger.Struck -> Motion.ShakeMillis.toLong()
+    }
+
+    /**
      * The board squares a step points at, given the board as it stands *now*.
      *
      * Recomputed on every advance rather than baked into the script, because a
      * lesson that names a square the player already crossed off is a lesson
      * with nothing to tap.
+     *
+     * The three rule steps light the squares that rule ruled out rather than
+     * the chip that names it. A chip is a picture of the rule; the column with
+     * a dog at the top of it and four crosses under it *is* the rule, on the
+     * board the player is looking at.
      *
      * [justMarked] is the auto-marks that appeared with the placement that got
      * us here, and only [TutorialStep.AutoMark] uses it — it is the whole point
@@ -112,7 +125,20 @@ object Tutorial {
         autoMarks: Set<Int>,
         justMarked: Set<Int>,
     ): Set<Int> = when (step) {
-        TutorialStep.StarterDog -> placed.cells().toSet()
+        TutorialStep.StarterDog -> setOfNotNull(starterCell(placed))
+        TutorialStep.RuleRegion -> starterCell(placed)
+            ?.let { level.board.cellsInRegion(level.board.regionAt(it)).toSet() }
+            .orEmpty()
+        TutorialStep.RuleLine -> starterCell(placed)?.let { cell ->
+            val row = level.board.rowOf(cell)
+            val col = level.board.colOf(cell)
+            (0 until level.size).flatMap {
+                listOf(level.board.cellAt(row, it), level.board.cellAt(it, col))
+            }.toSet()
+        }.orEmpty()
+        TutorialStep.RuleTouching -> starterCell(placed)
+            ?.let { level.board.neighborsOf(it).toSet() }
+            .orEmpty()
         TutorialStep.MarkSquare,
         TutorialStep.TryAWrongOne,
         -> setOfNotNull(freeWrongCell(level, placed, autoMarks))
@@ -120,11 +146,19 @@ object Tutorial {
         TutorialStep.PlaceAndWatch,
         -> setOfNotNull(nextCorrectCell(level, placed, autoMarks))
         TutorialStep.AutoMark -> justMarked
-        TutorialStep.NoTouching -> placed.cells()
-            .flatMap { level.board.neighborsOf(it).toList() }
-            .toSet()
         else -> emptySet()
     }
+
+    /**
+     * The dog the board opened with, which is what the three rule lessons are
+     * read off.
+     *
+     * The first placement by row order, not a constant: it is the free dog on
+     * row 0, and every rule step runs before the player has placed anything of
+     * their own. Null on a board that opened empty, which lights nothing — safe,
+     * because all four steps that ask for it dismiss on a tap anywhere.
+     */
+    private fun starterCell(placed: Solution): Int? = placed.cells().firstOrNull()
 
     /**
      * A square with no dog in it that the player can still act on.

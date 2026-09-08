@@ -111,6 +111,7 @@ fun BoxScope.LevelDrawer(
     isDailyBoard: Boolean = false,
     onPlayDaily: () -> Unit = {},
     onUseFreeze: () -> Unit = {},
+    onRestoreStreak: () -> Unit = {},
     width: Dp = DrawerWidth,
 ) {
     val slide = animateFloatAsState(if (open) 1f else 0f, Motion.Pop)
@@ -152,6 +153,7 @@ fun BoxScope.LevelDrawer(
                 isCurrentBoard = isDailyBoard,
                 onPlay = onPlayDaily,
                 onFreeze = onUseFreeze,
+                onRestore = onRestoreStreak,
                 modifier = Modifier.padding(bottom = Dimension.D500),
             )
         }
@@ -199,6 +201,7 @@ private fun DailyCardSlot(
     isCurrentBoard: Boolean,
     onPlay: () -> Unit,
     onFreeze: () -> Unit,
+    onRestore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     DailyCard(
@@ -212,10 +215,10 @@ private fun DailyCardSlot(
             null -> if (isCurrentBoard) DailyCardState.Current else DailyCardState.Open
             DailyOutcome.Completed -> DailyCardState.Completed
             DailyOutcome.Failed -> DailyCardState.Failed
-            // A freeze only ever covers a *missed* day, so today cannot be
-            // frozen — but a clock moved backwards can put one here, and "out of
-            // bones" would be a lie about a day nobody played.
-            DailyOutcome.Frozen -> DailyCardState.Completed
+            // A freeze or a restore only ever covers a *missed* day, so today
+            // cannot be either — but a clock moved backwards can put one here,
+            // and "out of bones" would be a lie about a day nobody played.
+            DailyOutcome.Frozen, DailyOutcome.Restored -> DailyCardState.Completed
         },
         paws = status.result?.paws ?: 0,
         resetsIn = status.resetsIn,
@@ -224,8 +227,10 @@ private fun DailyCardSlot(
         // push a second copy of the same route onto the backstack.
         canReview = status.result != null && !isCurrentBoard,
         freezesRemaining = status.freezeOffer?.freezesRemaining,
+        restoreDays = status.restoreOffer?.days,
         onPlay = onPlay,
         onFreeze = onFreeze,
+        onRestore = onRestore,
         modifier = modifier,
     )
 }

@@ -62,5 +62,20 @@ interface DailyRepository {
      */
     suspend fun useFreeze(): FreezeResult
 
+    /**
+     * Trades a rewarded ad for the whole gap in [DailyStatus.restoreOffer],
+     * bringing back a streak that has already broken.
+     *
+     * Bounded in two directions, and both bounds are the mechanic rather than a
+     * detail: `daily.restoreMaxDays` is how far back it reaches, because
+     * restoring a run abandoned months ago is a gift and not a restore, and
+     * `daily.restoreDaysPerMonth` is how often, because a streak that cannot
+     * break is not a streak.
+     *
+     * Shares the freeze's ad placement and its fail-open rule — only a deliberate
+     * dismissal withholds it.
+     */
+    suspend fun restoreStreak(): RestoreResult
+
     suspend fun reset()
 }

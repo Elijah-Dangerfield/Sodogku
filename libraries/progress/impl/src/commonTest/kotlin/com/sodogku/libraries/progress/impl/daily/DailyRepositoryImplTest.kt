@@ -11,12 +11,15 @@ import com.sodogku.libraries.config.AppConfigMap
 import com.sodogku.libraries.config.values.DailyEnabled
 import com.sodogku.libraries.config.values.DailyFreezesPerMonth
 import com.sodogku.libraries.config.values.DailyPoolOffset
+import com.sodogku.libraries.config.values.DailyRestoreDaysPerMonth
+import com.sodogku.libraries.config.values.DailyRestoreMaxDays
 import com.sodogku.libraries.config.values.FeatureDailyChallenge
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
 import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.progress.daily.DailyOutcome
 import com.sodogku.libraries.progress.daily.DeviceTimeZone
 import com.sodogku.libraries.progress.daily.FreezeResult
+import com.sodogku.libraries.progress.daily.RestoreResult
 import com.sodogku.libraries.progress.db.DailyResultDao
 import com.sodogku.libraries.progress.db.DailyResultEntity
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +39,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -171,6 +175,63 @@ class DailyRepositoryImplTest : CoroutineTest() {
         assertEquals((today.packIndex + 1) % LevelPacks.daily.size, tomorrow.packIndex)
         assertTrue(tomorrow.playable)
         assertEquals(1, tomorrow.streak, "yesterday's clear still counts all of today")
+    }
+
+    @Test
+    fun aBoardPlayedAtOneMinuteToMidnightAndOneMinutePast_areDifferentDaysAndConsecutive() = runUnitTest {
+        zone = TimeZone.of("America/New_York")
+        clock.set(Instant.parse("2026-09-08T03:59:00Z"))
+        val repo = repository()
+
+        val lastMinute = repo.status()
+        repo.onCompleted(lastMinute.date, score = 500, paws = 2, timeMs = 60_000)
+
+        clock.advance(2.minutes)
+        val firstMinute = repo.status()
+        repo.onCompleted(firstMinute.date, score = 500, paws = 2, timeMs = 60_000)
+
+        assertEquals(LocalDate(2026, 9, 7), lastMinute.date, "23:59 in New York is still the 7th")
+        assertEquals(LocalDate(2026, 9, 8), firstMinute.date, "00:01 is the 8th and a new board")
+        assertTrue(lastMinute.packIndex != firstMinute.packIndex)
+        assertEquals(
+            2,
+            repo.status().streak,
+            "two minutes apart and two days long — the roll is the calendar's, not a 24-hour timer",
+        )
+    }
+
+    @Test
+    fun resetsIn_countsToTheNextLocalMidnight_notTwentyFourHoursOn() = runUnitTest {
+        clock.set(Instant.parse("2026-09-07T21:00:00Z"))
+
+        assertEquals(3.hours, repository().status().resetsIn)
+
+        zone = TimeZone.of("Europe/Berlin")
+        assertEquals(
+            1.hours,
+            repository().status().resetsIn,
+            "the same instant is an hour from midnight two zones east",
+        )
+
+        zone = TimeZone.of("America/New_York")
+        assertEquals(7.hours, repository().status().resetsIn)
+    }
+
+    @Test
+    fun resetsIn_shortensAsTheDayGoesOn_andNeverRestartsAtTwentyFourHours() = runUnitTest {
+        val repo = repository()
+        val atEight = repo.status().resetsIn
+
+        clock.advance(1.hours)
+        val atNine = repo.status().resetsIn
+        repo.onCompleted(repo.status().date, score = 500, paws = 2, timeMs = 60_000)
+
+        assertEquals(atEight - 1.hours, atNine)
+        assertEquals(
+            atNine,
+            repo.status().resetsIn,
+            "playing the day does not restart the countdown; the board is the calendar's, not the player's",
+        )
     }
 
     @Test
@@ -373,6 +434,150 @@ class DailyRepositoryImplTest : CoroutineTest() {
     }
 
     @Test
+    fun restore_bringsBackAStreakTheFreezeCouldNotReach() = runUnitTest {
+        val repo = repository()
+        seedHistory(completedDaysBack = (3..9).toList())
+
+        val before = repo.status()
+        assertEquals(0, before.streak)
+        assertNull(before.freezeOffer, "two missing days is past what a freeze can bridge")
+        assertEquals(2, before.restoreOffer?.days)
+
+        val result = repo.restoreStreak()
+
+        assertEquals(RestoreResult.Applied(days = 2, streak = 7), result)
+        assertEquals(7, repo.status().streak)
+        assertEquals(AdPlacement.StreakFreeze, adGate.rewardedShown.single())
+        assertEquals(
+            listOf(LocalDate(2026, 9, 5), LocalDate(2026, 9, 6)),
+            repo.history().filter { it.outcome == DailyOutcome.Restored }.map { it.date },
+            "one row per bridged day, so the streak is still a fold over what is on disk",
+        )
+    }
+
+    @Test
+    fun restore_isRefusedWhenTheGapIsOlderThanItsReach() = runUnitTest {
+        val repo = repository()
+        seedHistory(completedDaysBack = (5..12).toList())
+
+        assertEquals(
+            RestoreResult.OutOfReach,
+            repo.restoreStreak(),
+            "four days missed against a reach of three",
+        )
+        assertEquals(0, repo.status().streak, "and the streak stays gone")
+        assertNull(repo.status().restoreOffer, "the card does not offer what would be refused")
+        assertTrue(adGate.rewardedShown.isEmpty(), "no ad is burned finding that out")
+        assertEquals(8, repo.history().size, "nothing was written")
+    }
+
+    @Test
+    fun restore_reachIsTheConfiguredNumber_notAHardcodedThree() = runUnitTest {
+        seedHistory(completedDaysBack = (5..12).toList())
+
+        assertEquals(RestoreResult.OutOfReach, repository(restoreMaxDays = 3).restoreStreak())
+        assertEquals(
+            RestoreResult.Applied(days = 4, streak = 8),
+            repository(restoreMaxDays = 4, restoreDaysPerMonth = 4).restoreStreak(),
+        )
+    }
+
+    @Test
+    fun restore_stopsAtTheMonthlyAllowance() = runUnitTest {
+        val repo = repository(restoreDaysPerMonth = 2)
+        seedHistory(
+            completedDaysBack = (4..11).toList(),
+            restoredDates = listOf(LocalDate(2026, 9, 1)),
+        )
+
+        assertEquals(
+            RestoreResult.NoneLeft,
+            repo.restoreStreak(),
+            "one day of the month's two is spent and this gap needs three",
+        )
+        assertEquals(0, repo.status().streak)
+        assertNull(repo.status().restoreOffer)
+        assertTrue(adGate.rewardedShown.isEmpty())
+    }
+
+    @Test
+    fun restore_leavesASingleMissedDayToTheFreeze() = runUnitTest {
+        val repo = repository()
+        seedHistory(completedDaysBack = (2..8).toList())
+
+        assertEquals(RestoreResult.NothingToRestore, repo.restoreStreak())
+        assertNull(repo.status().restoreOffer)
+        assertNotNull(repo.status().freezeOffer, "the one-day gap is the freeze's, and it is offered")
+        assertTrue(adGate.rewardedShown.isEmpty())
+    }
+
+    @Test
+    fun restore_isWithheldWhenThePlayerClosesTheAd() = runUnitTest {
+        adGate.outcome = RewardOutcome.Dismissed
+        val repo = repository()
+        seedHistory(completedDaysBack = (3..9).toList())
+
+        assertEquals(RestoreResult.Declined, repo.restoreStreak())
+        assertEquals(0, repo.status().streak)
+        assertEquals(7, repo.history().size, "nothing was written")
+    }
+
+    @Test
+    fun restore_isGrantedWhenTheAdNetworkFails() = runUnitTest {
+        listOf(RewardOutcome.NoFill, RewardOutcome.Offline, RewardOutcome.Failed("sdk")).forEach { outcome ->
+            dao.clear()
+            adGate.outcome = outcome
+            val repo = repository()
+            seedHistory(completedDaysBack = (3..9).toList())
+
+            assertEquals(
+                RestoreResult.Applied(days = 2, streak = 7),
+                repo.restoreStreak(),
+                "an ad that could not be served is not the player's fault: $outcome",
+            )
+        }
+    }
+
+    @Test
+    fun restore_skipsTheAdEntirelyForPro() = runUnitTest {
+        val repo = repository(isPro = true)
+        seedHistory(completedDaysBack = (3..9).toList())
+
+        assertTrue(repo.restoreStreak() is RestoreResult.Applied)
+        assertTrue(adGate.rewardedShown.isEmpty(), "a paying player is never shown a rewarded ad")
+    }
+
+    @Test
+    fun restore_doesNotCountTowardTheStreakItReconnects() = runUnitTest {
+        val repo = repository()
+        seedHistory(completedDaysBack = (3..9).toList())
+
+        repo.restoreStreak()
+
+        assertEquals(
+            7,
+            repo.status().streak,
+            "seven days were played; the two bridged days are not two more",
+        )
+        assertEquals(9, repo.history().size, "and the bridge is nine rows on disk, not a stored number")
+    }
+
+    @Test
+    fun restore_cannotBeSpentTwiceOnTheSameDays() = runUnitTest {
+        val repo = repository(restoreDaysPerMonth = 9)
+        seedHistory(completedDaysBack = (3..9).toList())
+
+        repo.restoreStreak()
+
+        assertEquals(
+            RestoreResult.NothingToRestore,
+            repo.restoreStreak(),
+            "the gap is bridged; the day behind it was never played either, so there is nothing left to buy",
+        )
+        assertEquals(9, repo.history().size)
+    }
+
+    @Test
     fun killSwitchAndFeatureFlagBothCloseTheCard() = runUnitTest {
         assertTrue(repository().status().enabled, "on by default")
         assertTrue(!repository(dailyEnabled = false).status().enabled)
@@ -406,7 +611,11 @@ class DailyRepositoryImplTest : CoroutineTest() {
     }
 
     /** Writes history straight to the dao, for shapes the repository would refuse to produce. */
-    private fun seedHistory(completedDaysBack: List<Int>, frozenDates: List<LocalDate> = emptyList()) {
+    private fun seedHistory(
+        completedDaysBack: List<Int>,
+        frozenDates: List<LocalDate> = emptyList(),
+        restoredDates: List<LocalDate> = emptyList(),
+    ) {
         val today = LocalDate(2026, 9, 7)
         completedDaysBack.forEach { back ->
             var date = today
@@ -414,6 +623,7 @@ class DailyRepositoryImplTest : CoroutineTest() {
             dao.put(date, DailyOutcome.Completed)
         }
         frozenDates.forEach { dao.put(it, DailyOutcome.Frozen) }
+        restoredDates.forEach { dao.put(it, DailyOutcome.Restored) }
     }
 
     private fun repository(
@@ -422,11 +632,15 @@ class DailyRepositoryImplTest : CoroutineTest() {
         featureEnabled: Boolean = true,
         poolOffset: Int = 0,
         freezesPerMonth: Int = 2,
+        restoreMaxDays: Int = 3,
+        restoreDaysPerMonth: Int = 3,
     ): DailyRepositoryImpl {
         val config = configOf(
             "enabled" to dailyEnabled,
             "poolOffset" to poolOffset,
             "freezesPerMonth" to freezesPerMonth,
+            "restoreMaxDays" to restoreMaxDays,
+            "restoreDaysPerMonth" to restoreDaysPerMonth,
         )
         val features = object : AppConfigMap() {
             override val map = mapOf("features" to mapOf("dailyChallenge" to featureEnabled))
@@ -441,6 +655,8 @@ class DailyRepositoryImplTest : CoroutineTest() {
             featureEnabled = FeatureDailyChallenge(features),
             poolOffset = DailyPoolOffset(config),
             freezesPerMonth = DailyFreezesPerMonth(config),
+            restoreMaxDays = DailyRestoreMaxDays(config),
+            restoreDaysPerMonth = DailyRestoreDaysPerMonth(config),
         )
     }
 

@@ -6,6 +6,234 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-08 — The tutorial teaches on a board that is not in the game
+
+**Decision:** the guided run happens on `TutorialBoard`, a hand-authored 5x5 in no pack with id
+`0`, opened in front of campaign level 1 by the same `GameViewModel` on the same route. When the
+script ends — or is skipped — the ViewModel swaps the board under itself and level 1 opens clean.
+It replaces fifteen coach marks spread over campaign levels 1 to 3.
+
+**Why a demo board at all.** Two things were wrong with teaching on the campaign, and only one of
+them is obvious. The obvious one: a new player's first three real boards were spent under a scrim,
+and a level you were walked through is a level you did not play. The other one is worse — every
+lesson had to point at whatever the generator happened to produce. "One dog per column" lit the
+rule chip under the header because there was no guarantee that any particular column on level 1
+would illustrate anything. A board we author can guarantee it, and once it does, the chip is the
+wrong thing to light: a chip is a *diagram* of a rule, and a player who has never seen the game
+does not yet know it is a diagram of this board.
+
+**What the board is chosen for.** The dog opens at row 0, column 2 — not a corner, deliberately: a
+corner dog rules out three neighbours and three squares do not read as a ring. From there its
+colour block, the cross of its row and column, and its five-square ring are three visibly different
+shapes, and every square in each of them is already crossed off *by that rule*. So each rule lesson
+lights an explanation rather than a decoration. It was found by searching random contiguous
+partitions for one that is uniquely solvable and then simulating the whole script over it; 21
+candidates survived, and this is the one whose three highlights overlap least.
+
+**It is verified with the real solver, not by reading it.** `TutorialBoardTest` runs
+`PuzzleSolver.uniqueSolutionOrNull` over it and checks the shipped answer is the one the solver
+finds. A demo board with two answers would teach that a tap can be right and wrong at the same
+time, and nothing would report it: the tap mechanic answers from the stored solution and never
+solves anything. The same test walks the script asserting each lesson still has squares to point
+at, which caught the first draft — three placements on a 5x5 left the deduction so tight that
+`TryAWrongOne` had no wrong square left and the lesson silently disappeared.
+
+**Nothing on it is written down.** One field, `GameViewModel.rehearsing`, gates the attempt record,
+the level record, the achievement fold, the bone spend, the board snapshot and every `game.*`
+event. The snapshot one is not hypothetical: there is a single in-progress slot for the whole app,
+and a demo board holding it would evict a real level somebody left half-finished and then be
+resumed on the next launch as a board with no id in either pack.
+
+**The score holds still rather than being suppressed at the source.** Placements still score, the
+points still fly up, the combo still builds — that is what the lesson is showing. What changes is
+one clause on `GameState.lifetimeScore`: a rehearsal contributes nothing, the same sentence already
+written there for a lost attempt. Suppressing `Scoring.placement` instead would have meant a
+`ScoredPlacement` faked at the call site and a "+0" floating over the board.
+
+**Rejected: a separate route, or a separate ViewModel.** Both were tempting because "practice
+board" sounds like its own destination. Neither survives process death well — the route is what
+Android restores, and restoring onto a tutorial the player has since finished is a worse bug than
+anything this was solving. Swapping the board in place means a process death mid-lesson restores
+the route the player actually meant to be on, which is level 1.
+
+**The one-shot free mistake is gone.** SPEC 10 used to forgive a single wrong guess on campaign
+level 3, which needed arming in `startAttempt`, spending in `strike` and disarming in
+`completeTutorial` — three places that could disagree. A whole board that costs nothing needs none
+of them and cannot get out of step with itself.
+
+**What the header shows is nothing.** A rehearsal has no level number. "Level 1" would be a lie
+that gets caught when the board changes at graduation, and "Level 0" is a constant leaking through
+the UI. The stat is simply absent, and the first coach mark says in words what board this is.
+
+## 2026-09-08 — A gated tutorial step waits for the mark to finish drawing
+
+**Decision:** after the player does what a gated step asked, the step holds its spotlight for
+`Tutorial.settleMillis(trigger)` — 170ms for a cross, 460ms for a placement, 260ms for a strike —
+before advancing. The numbers are `Motion.MarkDrawMillis`, `Motion.PlacementPulseMillis` and
+`Motion.ShakeMillis`, which is to say they are not new numbers: they are how long the thing being
+waited on actually takes, owned by the design system that draws it.
+
+**The bug it fixes is a frame-ordering one and it is easy to miss.** `advanceTutorial` ran
+synchronously inside `toggleMark` and `place`, so the coach mark moved in the same frame as the
+tap. The hole in the scrim jumped to the next square while the cross was two strokes into its
+animation — the one thing the lesson had just asked for was the one thing the player never saw. On
+a device it reads as the tutorial being twitchy rather than as anything specific, which is why it
+survived a whole chunk.
+
+**It is a `delay` in the ViewModel, not a wait in the screen.** The spotlight is drawn from
+`GameState.tutorial`, so the state is where the holding has to happen; a screen that lagged the
+state would be a second source of truth for which step is showing. The suspension only ever
+happens while a script is running — `advanceTutorial` returns early when there is no current step —
+so ordinary play never waits for anything.
+
+**Everything after the delay is a parameter.** This file's oldest rule is that `state` lags
+`updateState` by a dispatch; a suspension makes it worse, because now the board can also move
+*during* the wait. `level`, `placed`, `autoMarks` and `justMarked` were already parameters for the
+first reason and are now load-bearing for the second.
+
+**The tests advance virtual time rather than the production code taking an injectable clock.**
+`UnconfinedTestDispatcher` runs a handler eagerly until it suspends, so a test that reads state
+after a gesture sees the step it just satisfied. `note` and `commit` in `GameViewModelTest` now
+call `advanceUntilIdle`, and one test deliberately asserts on both sides of the hold. Making the
+delay injectable would have let every other test skip the behaviour entirely, which is the opposite
+of what a hold that exists for the player's benefit needs.
+
+## 2026-09-08 — The scrim's hole is a labelled control, so the tutorial is completable without sight
+
+**Decision:** `Spotlight` gained `targetLabel`, and `FocusScrim` places an invisible `Box` over each
+lit rectangle carrying `contentDescription`, `Role.Button` and a semantic `onClick`. This closes the
+gap written up on 2026-09-08 under "a scrim is a drawing" — the tutorial's "tap the lit square"
+steps could not be completed with a screen reader at all, and R3 made those steps mandatory, so
+leaving it would have turned a bad first five minutes into a wall.
+
+**The node takes no pointer input, and that is the whole trick.** A `Modifier.clickable` here would
+have been the obvious build and would have quietly broken the lesson: hit testing only reaches
+nodes that declare pointer input, so a clickable child would have intercepted the sighted player's
+taps and turned "tap the lit square twice" into one activation. Semantics-only means the node is
+invisible to a finger, the scrim's own gesture handler still sees every touch, and the two taps the
+tutorial teaches stay two taps.
+
+**Activation and a tap are different callbacks on purpose.** `onTargetTap` reports each pointer tap
+as it happens and leaves double-tap recognition to `GameViewModel`'s 320ms window;
+`onTargetActivate` is one indivisible "do the thing", because that is what an accessibility action
+is. `TutorialCoachMark` sends one `CellTapped` for a cross step and two for a placement or a
+strike — the same synthesis `GameScreen.placeAt` already does for an ordinary board square, for the
+same reason and with the same comment.
+
+**The label is built from the board's own vocabulary.** "Place a dog, row 2, column 1" reuses
+`board_action_place` and one-based coordinates, so the words mean the same thing inside the lesson
+as they do after it. One label covers the spotlight because a gated step lights exactly one square.
+
+**Verified with TalkBack on an emulator**, not by reading the tree: touch exploration on, focus the
+lit square, double tap, and the gated step advances. The `uiautomator` dump shows one node,
+`content-desc="Place a dog, row 2, column 1"`, `clickable="true"`, bounded to the lit square.
+
+**Still not verified:** VoiceOver on iOS, for the same reason as everything else in SPEC 16 —
+nothing has run on an iOS simulator on this machine.
+
+---
+
+## 2026-09-08 — A restore is rows, not a number the fold has to be told about
+
+**Decision:** `restoreStreak()` writes one `daily_result` row per bridged day, outcome
+`Restored`, and that is the whole of its persistence. Nothing stores "restores used", "streak
+before the break" or "last restored date". The monthly allowance is folded back out of the same
+rows the streak is folded out of.
+
+**Why it had to be rows.** The streak has no counter on purpose (see the C6 entry below), and a
+restore that set a number would have handed the counter back through a side door: the fold would
+have needed an input it could not derive, and the property that a past bug is fixable by shipping
+a fix and reading again would have been gone. Written as rows, a restore is indistinguishable in
+kind from a freeze, and every rule already written about `Frozen` days holds for it unchanged.
+
+**`Restored` is its own outcome rather than more `Frozen` rows.** The fold treats the two
+identically, so a shared name would have cost nothing there. It costs something in the
+allowances: `daily.freezesPerMonth` counts `Frozen` rows and `daily.restoreDaysPerMonth` counts
+`Restored` ones, and if both wrote `Frozen` then one three-day restore would have silently
+emptied a two-freeze month and then some. Two budgets, two names, both derived.
+
+**The allowance is denominated in days, not restores, and that is not laziness.** A restore is not
+identifiable from what it leaves behind. Two restores whose runs land next to each other are the
+same rows as one longer restore, so any attempt to count restores by looking for the start of a
+`Restored` block under-reports, and a cap that under-reports leaks. Days are exactly what is on
+disk. Three days a month is one restore of the maximum size; an operator who wants two sets it to
+six.
+
+**Each month a run touches pays for its own days.** A gap can straddle a month end, and the
+obvious shortcut, taking the smaller of the two months' remainders, refuses a two-day gap that
+each month could comfortably afford one day of. `restoreOfferOn` groups the run by month and
+checks each. The number the card shows is the remainder for the month the newest missed day is
+in, because that is the month the player is standing in.
+
+**One thing is knowingly not atomic.** The rows are inserted one at a time, not in a transaction.
+A run interrupted half way leaves a shorter gap and no lie: the streak does not reconnect, the
+next offer covers what is left, and the table is insert-only so nothing is corrupted. A
+transaction would have bought atomicity at the price of a dao method with one caller.
+
+## 2026-09-08 — What a restore costs, how far back it reaches, and how often
+
+**Cost: one rewarded ad, at the freeze's placement, failing open.** Pro skips the ad entirely.
+Only `RewardOutcome.Dismissed` withholds the restore, so no fill, no network and an SDK failure
+all grant it, which is SPEC 4.2's rule and the same line `useFreeze` and `SkipRepositoryImpl`
+already use.
+
+**It reuses `AdPlacement.StreakFreeze` rather than adding one.** They are the same placement in
+every sense that matters to an operator: an ad that saves a streak. A second id would need
+creating in the ad network dashboard as well as here, and `ads.rewardedPlacements` would then
+have two switches that have to be thrown together or the kill switch is half a kill switch. Where
+the two genuinely differ is in reporting, and that is answered by `daily.streak_restored` carrying
+a `days` attribute next to `daily.freeze_used`.
+
+**Reach: three consecutive days, `daily.restoreMaxDays`.** Three is the outer edge of "life
+happened", a weekend away, a flight, a bug that put someone in bed. Four is a holiday, and someone
+on holiday has stopped playing rather than missed a day; handing them back a 90-day streak makes
+the number a lie about them, which is the failure mode most able to make the daily meaningless.
+Three is also about as far back as anyone still remembers what their streak was.
+
+The bound is on the **length of the gap**, and that turns out to be the whole of "how far back",
+because the gap the offer covers is by construction the one the streak walk stops on. Someone
+whose last daily was in March has an unbounded run of missed days behind them and is refused by
+the same check, with no separate rule about age. `missedRunBefore` walks at most `maxDays + 1` days
+for that reason: it has to be able to say "longer than the limit" without counting to four hundred.
+
+**Frequency: three bridged days a calendar month, `daily.restoreDaysPerMonth`.** That is one
+restore at full size. The freeze stays the everyday tool at two a month, one day each; the restore
+is the once-a-month hammer. Combined, the daily forgives at most three consecutive missed days,
+and the streak can still break.
+
+**A one-day gap is deliberately not offered as a restore.** It is the freeze's, the freeze is
+cheaper and more plentiful, and two buttons for the same missed day is a choice the player has no
+information to make. The two offers are mutually exclusive by construction rather than by a rule
+someone has to remember, and `restoreOffer_andFreezeOffer_areNeverBothOnTheTable` walks five gap
+lengths to keep it that way.
+
+**Turning it off takes no new key.** `restoreDaysPerMonth` at 0 refuses every restore, and
+`restoreMaxDays` at 1 leaves it nothing it is allowed to cover, because a one-day gap belongs to
+the freeze. A third `daily.restoreEnabled` would have been a switch with two existing synonyms.
+
+## 2026-09-08 — Local midnight was already right; what was missing was the test that says so
+
+**Finding, not a decision:** the daily already rolled at the player's local midnight, already
+counted down to it correctly through DST, and already followed a player across time zones. The
+seams built in C6 (`dayOf`, `untilNextDay`, `DeviceTimeZone` re-read on every call) were doing
+exactly what they were built for, and R13's first half needed no change.
+
+Two properties were true but unpinned, and both sit in the repository rather than in the calendar
+functions the existing tests cover:
+
+- **`DailyStatus.resetsIn` is the countdown the card renders**, and nothing asserted it was the
+  same number `untilNextDay` produces. Now asserted in three zones, plus a test that it shortens
+  as the day goes on and does not restart when the day is played. That second one is the shape
+  that separates a calendar rollover from a 24-hour timer started by the last board, which is the
+  wrong implementation someone would most plausibly write.
+- **23:59 and 00:01 are different days, and consecutive.** Two boards two minutes apart in New
+  York, different pack indices, ending at a streak of two.
+
+Both fail against a mutant that resolves `untilNextDay` in UTC, which is the check that they are
+tests rather than decoration.
+
+---
+
 ## 2026-09-08 — seventy-three badges, and every one of them off the log the game already keeps
 
 The catalog went from 21 to 73. The rule it was built under was not "reach 75", it was **every
@@ -208,6 +436,10 @@ as an accessible control needs a label on `Spotlight`, which is a wider change t
 "Skip tutorial" is labelled and reachable, so a screen-reader player can leave the guided run and
 play; that is a worse first five minutes than a sighted player gets, and it is written down in
 BUILD-PLAN C12 rather than closed.
+
+> **Closed on 2026-09-08 by R3** — `Spotlight.targetLabel` and the semantics-only node in
+> `FocusScrim`. See "the scrim's hole is a labelled control" at the top of this file. Everything
+> else in this entry still holds.
 
 ## 2026-09-08 — a 10x10 cell cannot reach 44pt, and the number that matters is not the one drawn
 

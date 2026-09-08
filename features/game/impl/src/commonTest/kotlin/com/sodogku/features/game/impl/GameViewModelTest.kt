@@ -35,6 +35,7 @@ import com.sodogku.libraries.config.values.ScoringSpeedWindowMs
 import com.sodogku.libraries.config.values.ScoringThreePawFraction
 import com.sodogku.libraries.config.values.ScoringTwoPawFraction
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.progress.LevelRecord
@@ -48,6 +49,8 @@ import com.sodogku.libraries.progress.daily.DailyResult
 import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.FreezeOffer
 import com.sodogku.libraries.progress.daily.FreezeResult
+import com.sodogku.libraries.progress.daily.RestoreOffer
+import com.sodogku.libraries.progress.daily.RestoreResult
 import com.sodogku.libraries.achievements.Achievement
 import com.sodogku.libraries.achievements.AchievementId
 import com.sodogku.libraries.achievements.AchievementState
@@ -650,7 +653,11 @@ class GameViewModelTest : CoroutineTest() {
         // cascade straight away, so the rules are visible before anyone has to
         // reason about them.
         val early = assertNotNull(LevelPacks.campaign.byId(StarterDogLevel))
-        val vm = viewModel(levelId = StarterDogLevel)
+        // Taught, explicitly. A default cache is a fresh install, and since R3 a
+        // fresh install opening level 1 gets the rehearsal board instead — which
+        // has a starter dog of its own and would pass this test for the wrong
+        // board.
+        val vm = viewModel(levelId = StarterDogLevel, cache = taughtCache())
 
         assertEquals(1, vm.state.dogsPlaced)
         assertTrue(vm.state.starterDogCell in early.solution.cells().toSet())
@@ -983,7 +990,7 @@ class GameViewModelTest : CoroutineTest() {
     fun aSnapshotOfADifferentLevelIsLeftAlone() = runUnitTest {
         // Opening level 2 must not restore level 1's board onto it, and must not
         // throw level 1's board away either — the player may well go back.
-        val cache = InMemoryAppCache()
+        val cache = taughtCache()
         val onLevelOne = viewModel(levelId = StarterDogLevel, cache = cache)
         onLevelOne.commit(cellFor(row = 1))
         val saved = assertNotNull(cache.get().boardInProgress)
@@ -1491,6 +1498,30 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun everyRestoreOutcomeSaysSomething() = runUnitTest {
+        val cases = listOf(
+            RestoreResult.Applied(days = 3, streak = 41) to FreezeMessage.Restored(3, 41),
+            RestoreResult.Declined to FreezeMessage.Declined,
+            RestoreResult.NoneLeft to FreezeMessage.RestoreNoneLeft,
+            RestoreResult.OutOfReach to FreezeMessage.RestoreOutOfReach,
+            RestoreResult.NothingToRestore to FreezeMessage.NothingToFreeze,
+        )
+        cases.forEach { (result, expected) ->
+            val daily = FakeDaily(restoreResult = result)
+            val vm = viewModel(daily = daily)
+
+            vm.takeAction(GameAction.RestoreStreak)
+
+            assertEquals(expected, vm.state.freezeMessage, "$result was not reported")
+            assertEquals(1, daily.restoresRequested)
+            assertEquals(0, daily.freezesRequested, "the restore does not quietly spend a freeze")
+
+            vm.takeAction(GameAction.DismissFreezeMessage)
+            assertEquals(null, vm.state.freezeMessage)
+        }
+    }
+
+    @Test
     fun aFreezeThatBlowsUpIsStillAnswered() = runUnitTest {
         val vm = viewModel(daily = FakeDaily(freezeThrows = true))
 
@@ -1500,11 +1531,97 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun theGuidedRunOpensOnLevelOneForSomebodyWhoAskedToBeTaught() = runUnitTest {
+    fun theTutorialTeachesOnItsOwnBoardAndNotOnLevelOne() = runUnitTest {
+        // R3. The lesson used to run over campaign levels 1 to 3, so a player's
+        // first three real boards were spent under a scrim and every highlight
+        // landed wherever the generator happened to put it.
         val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
 
-        assertEquals(TutorialStep.RuleRegion, vm.state.tutorial)
+        assertEquals(TutorialBoard.LEVEL_ID, vm.state.level?.id)
+        assertEquals(TutorialBoard.level.board, vm.state.level?.board)
+        assertTrue(vm.state.isRehearsal)
+        assertEquals(TutorialStep.StarterDog, vm.state.tutorial)
         assertEquals(GamePhase.Playing, vm.state.phase)
+    }
+
+    @Test
+    fun theRehearsalTouchesNothingThatCounts() = runUnitTest {
+        // "It is a rehearsal" is only true if none of it is written down. Each
+        // of these was a real write before the demo board existed, because the
+        // tutorial was running on a level the game was recording.
+        val cache = untaughtCache()
+        cache.set(cache.get().copy(hasCompletedTutorial = false, bones = ScoringConfig.MAX_LIVES))
+        val progress = InMemoryProgress()
+        val achievements = RecordingAchievements()
+        val vm = viewModel(
+            levelId = FirstGuidedLevel,
+            cache = cache,
+            progress = progress,
+            achievements = achievements,
+        )
+
+        // Stopped on the last step, so the board under test is still the demo
+        // one. Running to the end would hand over to level 1, and level 1
+        // recording its own attempt is correct rather than a leak.
+        vm.driveTo(TutorialStep.Graduation)
+
+        assertTrue(vm.state.isRehearsal, "the lesson left the demo board early")
+        assertEquals(0, progress.record(TutorialBoard.LEVEL_ID).attempts, "the demo board was recorded")
+        assertEquals(0, progress.record(FirstGuidedLevel).attempts, "level 1 was recorded early")
+        assertEquals(FirstGuidedLevel, progress.unlockedThrough(), "the rehearsal moved the frontier")
+        assertTrue(achievements.recorded.isEmpty(), "the rehearsal reached the achievement log")
+        assertEquals(ScoringConfig.MAX_LIVES, cache.get().bones, "the lesson spent a bone")
+        assertEquals(null, cache.get().boardInProgress, "the demo board took the in-progress slot")
+    }
+
+    @Test
+    fun aWrongGuessOnTheRehearsalBoardCostsNothing() = runUnitTest {
+        // SPEC 10 asks the player to get one wrong on purpose. Charging for
+        // following instructions is the failure; charging for the *second* one
+        // used to be the rule, and a whole board that costs nothing cannot get
+        // out of step with itself the way a one-shot flag could.
+        val cache = untaughtCache()
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = cache)
+        vm.driveTo(TutorialStep.TryAWrongOne)
+
+        vm.commit(vm.state.tutorialCells.first())
+
+        assertEquals(TutorialStep.WrongExplained, vm.state.tutorial)
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining, "the taught mistake cost a bone")
+        assertEquals(0, vm.state.strikesThisAttempt)
+    }
+
+    @Test
+    fun theRehearsalHoldsTheHeadlineScoreStill() = runUnitTest {
+        // The lesson places dogs, and a placement scores. Letting that reach the
+        // header would run the one number in the game up during the tutorial and
+        // drop it back the moment level 1 opened.
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 4_000, paws = 3, timeMs = 9_000)
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache(), progress = progress)
+        val before = vm.state.lifetimeScore
+
+        vm.driveTo(TutorialStep.AutoMark)
+
+        assertTrue(vm.state.score.total > 0, "the board did not actually score anything")
+        assertEquals(before, vm.state.lifetimeScore, "the rehearsal moved the lifetime score")
+    }
+
+    @Test
+    fun finishingTheLessonLandsOnACleanLevelOne() = runUnitTest {
+        val cache = untaughtCache()
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = cache)
+
+        vm.runScript()
+
+        assertEquals(FirstGuidedLevel, vm.state.level?.id, "the tutorial did not hand over")
+        assertFalse(vm.state.isRehearsal)
+        assertEquals(null, vm.state.tutorial)
+        assertEquals(GamePhase.Playing, vm.state.phase)
+        assertTrue(vm.state.wrongGuesses.isEmpty(), "the demo board's red square came along")
+        assertEquals(1, vm.state.placed.placedCount, "level 1 opened with more than its starter dog")
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+        assertTrue(cache.get().hasCompletedTutorial)
     }
 
     @Test
@@ -1515,6 +1632,8 @@ class GameViewModelTest : CoroutineTest() {
         cache.set(AppData(hasCompletedTutorial = true))
         val vm = viewModel(levelId = FirstGuidedLevel, cache = cache)
 
+        assertEquals(FirstGuidedLevel, vm.state.level?.id)
+        assertFalse(vm.state.isRehearsal)
         assertEquals(null, vm.state.tutorial)
         assertTrue(vm.state.tutorialCells.isEmpty())
     }
@@ -1522,8 +1641,8 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun theGuidedRunNeverStartsOnADaily() = runUnitTest {
         // A daily board's id shares a number line with the campaign, so daily
-        // level 1 would otherwise open with level 1's lesson over a board the
-        // lesson was not written for.
+        // level 1 would otherwise open on the rehearsal board and then hand the
+        // player a *campaign* level when it finished.
         val vm = viewModel(
             levelId = FirstGuidedLevel,
             isDaily = true,
@@ -1532,13 +1651,19 @@ class GameViewModelTest : CoroutineTest() {
         )
 
         assertEquals(null, vm.state.tutorial)
+        assertFalse(vm.state.isRehearsal)
     }
 
     @Test
-    fun theGuidedRunStopsAfterLevelThree() = runUnitTest {
-        val vm = viewModel(levelId = Tutorial.LAST_LEVEL + 1, cache = untaughtCache())
+    fun theGuidedRunNeverOpensOverALevelSomebodyJumpedTo() = runUnitTest {
+        // The rehearsal hands back to the board the route asked for, so it only
+        // makes sense in front of the first one. A Pro player who jumped to 200
+        // with the flag unset gets level 200.
+        val vm = viewModel(levelId = PlainLevel, cache = untaughtCache())
 
-        assertEquals(null, vm.state.tutorial, "the gloves come off from level 4")
+        assertEquals(PlainLevel, vm.state.level?.id)
+        assertFalse(vm.state.isRehearsal)
+        assertEquals(null, vm.state.tutorial)
     }
 
     @Test
@@ -1547,45 +1672,119 @@ class GameViewModelTest : CoroutineTest() {
         // whole script into a slideshow that the first stray tap runs through.
         val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
 
-        assertEquals(TutorialStep.RuleRegion, vm.state.tutorial)
+        assertEquals(TutorialStep.StarterDog, vm.state.tutorial)
         vm.note(freeCell(vm))
-        assertEquals(TutorialStep.RuleRegion, vm.state.tutorial, "a mark is not a read")
+        assertEquals(TutorialStep.StarterDog, vm.state.tutorial, "a mark is not a read")
 
         vm.driveTo(TutorialStep.MarkSquare)
         vm.takeAction(GameAction.TutorialAdvance)
+        settle()
         assertEquals(TutorialStep.MarkSquare, vm.state.tutorial, "a tap does not do the doing")
 
         vm.note(vm.state.tutorialCells.first())
         assertEquals(TutorialStep.PlaceDog, vm.state.tutorial)
 
         vm.takeAction(GameAction.TutorialAdvance)
+        settle()
         assertEquals(TutorialStep.PlaceDog, vm.state.tutorial)
         vm.commit(vm.state.tutorialCells.first())
         assertEquals(TutorialStep.Bones, vm.state.tutorial)
     }
 
     @Test
-    fun everyGuidedLevelTeachesTheStepsSpecAsksFor() = runUnitTest {
+    fun aGatedStepWaitsForTheMarkToFinishDrawing() = runUnitTest {
+        // R3's third ask. The coach mark used to advance in the same frame as
+        // the tap, so the hole in the scrim jumped to the next square while the
+        // cross the lesson had just asked for was two strokes into a 170ms
+        // animation — the one thing the player was told to look at was the one
+        // thing they never saw.
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+        vm.driveTo(TutorialStep.MarkSquare)
+        val lit = vm.state.tutorialCells.first()
+
+        vm.takeAction(GameAction.CellTapped(lit))
+        clock += SettleGap
+        // Everything the tap itself does has already landed...
+        testDispatcher.scheduler.runCurrent()
+        assertTrue(lit in vm.state.manualMarks, "the cross was not made")
+        // ...and the lesson is still pointing at it while it draws.
+        assertEquals(TutorialStep.MarkSquare, vm.state.tutorial)
+        assertEquals(setOf(lit), vm.state.tutorialCells)
+
+        testDispatcher.scheduler.advanceTimeBy(Tutorial.settleMillis(TutorialTrigger.Marked))
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(TutorialStep.PlaceDog, vm.state.tutorial, "the lesson never moved on")
+    }
+
+    @Test
+    fun everyGestureStepGivesItsMarkTimeToDraw() = runUnitTest {
+        // The hold is per gesture, because the three animations are different
+        // lengths and the board owns all three numbers.
+        assertEquals(0L, Tutorial.settleMillis(TutorialTrigger.Tap), "a read has nothing to wait for")
+        listOf(TutorialTrigger.Marked, TutorialTrigger.Placed, TutorialTrigger.Struck).forEach {
+            assertTrue(Tutorial.settleMillis(it) > 0L, "$it advances before its animation runs")
+        }
+    }
+
+    @Test
+    fun theCurriculumTeachesEverythingSpecAsksFor() = runUnitTest {
         // Pins the curriculum itself. Without this, an implementation that
-        // shipped one empty script per level passes every other test here.
+        // shipped one empty script passes every other test here.
         assertEquals(
             listOf(
+                TutorialStep.StarterDog,
                 TutorialStep.RuleRegion,
                 TutorialStep.RuleLine,
                 TutorialStep.RuleTouching,
-                TutorialStep.StarterDog,
                 TutorialStep.MarkSquare,
                 TutorialStep.PlaceDog,
                 TutorialStep.Bones,
+                TutorialStep.PlaceAndWatch,
+                TutorialStep.AutoMark,
+                TutorialStep.Sniff,
+                TutorialStep.Treat,
+                TutorialStep.TryAWrongOne,
+                TutorialStep.WrongExplained,
+                TutorialStep.Graduation,
             ),
-            Tutorial.scriptFor(1),
+            Tutorial.Script,
         )
-        assertTrue(TutorialStep.AutoMark in Tutorial.scriptFor(2), "level 2 shows auto-mark firing")
-        assertTrue(TutorialStep.Sniff in Tutorial.scriptFor(2))
-        assertTrue(TutorialStep.Treat in Tutorial.scriptFor(2))
-        assertTrue(TutorialStep.NoTouching in Tutorial.scriptFor(Tutorial.LAST_LEVEL))
-        assertTrue(TutorialStep.TryAWrongOne in Tutorial.scriptFor(Tutorial.LAST_LEVEL))
-        assertTrue(Tutorial.scriptFor(Tutorial.LAST_LEVEL + 1).isEmpty())
+        assertEquals(
+            TutorialStep.entries.toSet(),
+            Tutorial.Script.toSet(),
+            "a step exists that the script never shows",
+        )
+    }
+
+    @Test
+    fun theRuleLessonsPointAtTheBoardAndNotAtAChip() = runUnitTest {
+        // R3's second ask: "when you say only 1 dog per column maybe you
+        // highlight a column, not just the tips at the top."
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+        val board = assertNotNull(vm.state.level).board
+        val starter = assertNotNull(vm.state.starterDogCell)
+
+        vm.driveTo(TutorialStep.RuleRegion)
+        assertEquals(
+            board.cellsInRegion(board.regionAt(starter)).toSet(),
+            vm.state.tutorialCells,
+            "the colour rule did not light the colour",
+        )
+
+        vm.driveTo(TutorialStep.RuleLine)
+        val row = board.rowOf(starter)
+        val col = board.colOf(starter)
+        val cross = (0 until board.size)
+            .flatMap { listOf(board.cellAt(row, it), board.cellAt(it, col)) }
+            .toSet()
+        assertEquals(cross, vm.state.tutorialCells, "the row-and-column rule did not light them")
+
+        vm.driveTo(TutorialStep.RuleTouching)
+        assertEquals(
+            board.neighborsOf(starter).toSet(),
+            vm.state.tutorialCells,
+            "the adjacency rule did not light the ring",
+        )
     }
 
     @Test
@@ -1598,79 +1797,68 @@ class GameViewModelTest : CoroutineTest() {
         // dismisses on a tap anywhere, or it lights a square the player can
         // actually act on. A lit square that auto-mark has already swallowed is
         // not one — the game ignores taps on it.
-        guidedLevels().forEach { levelId ->
-            val vm = viewModel(levelId = levelId, cache = untaughtCache())
-            assertNotNull(vm.state.tutorial, "level $levelId opened with nothing to teach")
-            var seen = 0
-            while (vm.state.tutorial != null) {
-                val step = assertNotNull(vm.state.tutorial)
-                if (Tutorial.triggerFor(step) != TutorialTrigger.Tap) {
-                    val lit = vm.state.tutorialCells
-                    assertTrue(lit.isNotEmpty(), "$step asks for a gesture on nothing")
-                    lit.forEach { cell ->
-                        assertTrue(cell !in vm.state.autoMarks, "$step lit a crossed-off square")
-                        assertTrue(cell !in vm.state.placedCells, "$step lit an occupied square")
-                    }
+        //
+        // Extended for R3, because gating the doing steps made the second way
+        // out load-bearing: it is no longer enough for a lit square to exist,
+        // the gesture the step is waiting for has to *land* on it. So each one
+        // is performed and the step is asserted to have actually moved. A step
+        // that lights a square the asked-for gesture cannot satisfy — a
+        // placement on a wrong square, a strike on the right one — would loop
+        // here forever, which is precisely the dead end being ruled out.
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+        assertNotNull(vm.state.tutorial, "the tutorial opened with nothing to teach")
+        var seen = 0
+        while (vm.state.tutorial != null && vm.state.isRehearsal) {
+            val step = assertNotNull(vm.state.tutorial)
+            if (Tutorial.triggerFor(step) != TutorialTrigger.Tap) {
+                val lit = vm.state.tutorialCells
+                assertTrue(lit.isNotEmpty(), "$step asks for a gesture on nothing")
+                lit.forEach { cell ->
+                    assertTrue(cell !in vm.state.autoMarks, "$step lit a crossed-off square")
+                    assertTrue(cell !in vm.state.placedCells, "$step lit an occupied square")
                 }
-                assertEquals(GamePhase.Playing, vm.state.phase, "$step left the board out of play")
-                vm.perform(step)
-                seen++
-                assertTrue(seen <= StepBudget, "level $levelId never finished its script")
             }
-            assertEquals(Tutorial.scriptFor(levelId).size, seen, "level $levelId skipped a lesson")
+            assertEquals(GamePhase.Playing, vm.state.phase, "$step left the board out of play")
+            vm.perform(step)
+            assertTrue(vm.state.tutorial != step, "$step did not move on the gesture it asked for")
+            seen++
+            assertTrue(seen <= StepBudget, "the script never finished")
         }
+        assertEquals(Tutorial.Script.size, seen, "a lesson was skipped")
+        // And it let go of the board on the way out, rather than leaving the
+        // player on a demo puzzle they can never finish.
+        assertFalse(vm.state.isRehearsal)
+        assertEquals(FirstGuidedLevel, vm.state.level?.id)
     }
 
     @Test
     fun skippingFromAnyStepLeavesAPlayableBoard() = runUnitTest {
         // A skip that only hid the card would leave the scrim's dead zone over
-        // the board, which is the same dead end by another route.
-        guidedLevels().forEach { levelId ->
-            Tutorial.scriptFor(levelId).indices.forEach { stopAt ->
-                val cache = untaughtCache()
-                val vm = viewModel(levelId = levelId, cache = cache)
-                repeat(stopAt) { vm.perform(assertNotNull(vm.state.tutorial)) }
-                assertNotNull(vm.state.tutorial, "nothing was showing to skip out of")
+        // the board, which is the same dead end by another route. Since R3 it
+        // also has to leave the *rehearsal*: dropping the player onto the demo
+        // board would hand them a puzzle worth nothing that is not in any pack.
+        Tutorial.Script.indices.forEach { stopAt ->
+            val cache = untaughtCache()
+            val vm = viewModel(levelId = FirstGuidedLevel, cache = cache)
+            repeat(stopAt) { vm.perform(assertNotNull(vm.state.tutorial)) }
+            assertNotNull(vm.state.tutorial, "nothing was showing to skip out of")
 
-                vm.takeAction(GameAction.SkipTutorial)
+            vm.takeAction(GameAction.SkipTutorial)
+            settle()
 
-                assertEquals(null, vm.state.tutorial, "level $levelId step $stopAt kept the card")
-                assertTrue(vm.state.tutorialCells.isEmpty())
-                assertEquals(GamePhase.Playing, vm.state.phase)
-                assertTrue(cache.get().hasCompletedTutorial, "a skip is a completion")
+            assertEquals(null, vm.state.tutorial, "step $stopAt kept the card")
+            assertTrue(vm.state.tutorialCells.isEmpty())
+            assertEquals(GamePhase.Playing, vm.state.phase)
+            assertFalse(vm.state.isRehearsal, "step $stopAt left them on the demo board")
+            assertEquals(FirstGuidedLevel, vm.state.level?.id, "step $stopAt skipped to nowhere")
+            assertTrue(cache.get().hasCompletedTutorial, "a skip is a completion")
 
-                // And the board still answers, which is the thing the scrim
-                // was blocking.
-                val cell = freeCell(vm)
-                vm.note(cell)
-                assertTrue(cell in vm.state.manualMarks, "the board stopped taking taps")
-            }
+            // And the board still answers, which is the thing the scrim
+            // was blocking.
+            val cell = freeCell(vm)
+            vm.note(cell)
+            assertTrue(cell in vm.state.manualMarks, "the board stopped taking taps")
         }
-    }
-
-    @Test
-    fun finishingLevelThreeEndsTheGuidedRunForGood() = runUnitTest {
-        val cache = untaughtCache()
-        val vm = viewModel(levelId = Tutorial.LAST_LEVEL, cache = cache)
-        assertFalse(cache.get().hasCompletedTutorial)
-
-        vm.runScript()
-
-        assertEquals(null, vm.state.tutorial)
-        assertTrue(cache.get().hasCompletedTutorial)
-    }
-
-    @Test
-    fun finishingLevelOneDoesNotEndTheGuidedRun() = runUnitTest {
-        // There are two levels of teaching still to come, and writing the flag
-        // here would silently drop them.
-        val cache = untaughtCache()
-        val vm = viewModel(levelId = FirstGuidedLevel, cache = cache)
-
-        vm.runScript()
-
-        assertEquals(null, vm.state.tutorial)
-        assertFalse(cache.get().hasCompletedTutorial)
     }
 
     @Test
@@ -1678,10 +1866,12 @@ class GameViewModelTest : CoroutineTest() {
         val cache = untaughtCache()
         viewModel(levelId = FirstGuidedLevel, cache = cache)
             .takeAction(GameAction.SkipTutorial)
+        settle()
 
         val next = viewModel(levelId = FirstGuidedLevel, cache = cache)
 
         assertEquals(null, next.state.tutorial, "the skip did not outlive the ViewModel")
+        assertFalse(next.state.isRehearsal)
     }
 
     @Test
@@ -1690,15 +1880,18 @@ class GameViewModelTest : CoroutineTest() {
         vm.runScript()
 
         vm.takeAction(GameAction.Retry)
+        settle()
 
         assertEquals(null, vm.state.tutorial, "a retry is not a first look at the level")
+        assertFalse(vm.state.isRehearsal)
     }
 
     @Test
     fun theAutoMarkLessonPointsAtTheSquaresThePlacementJustCrossedOff() = runUnitTest {
         // The whole content of the step. Pointing at every marked square would
-        // include the starter dog's, which the player was shown two levels ago.
-        val vm = viewModel(levelId = AutoMarkLevel, cache = untaughtCache())
+        // include the starter dog's, which the player was shown five steps ago.
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+        vm.driveTo(TutorialStep.PlaceAndWatch)
         val before = vm.state.autoMarks
 
         vm.driveTo(TutorialStep.AutoMark)
@@ -1709,34 +1902,36 @@ class GameViewModelTest : CoroutineTest() {
         assertTrue(lit.none { it in before }, "these were already marked before the placement")
     }
 
-    @Test
-    fun theGuidedLevelForgivesExactlyOneWrongGuess() = runUnitTest {
-        // SPEC 10: the lesson asks for a wrong guess on purpose, so charging a
-        // bone for it would punish the player for following instructions.
-        val vm = viewModel(levelId = Tutorial.LAST_LEVEL, cache = untaughtCache())
-        vm.driveTo(TutorialStep.TryAWrongOne)
-
-        vm.commit(vm.state.tutorialCells.first())
-
-        assertEquals(TutorialStep.WrongExplained, vm.state.tutorial)
-        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining, "the free one cost a bone")
-
-        vm.runScript()
-        vm.commit(tappableWrongCellOn(vm))
-        assertEquals(
-            ScoringConfig.MAX_LIVES - 1,
-            vm.state.livesRemaining,
-            "only the first wrong guess is free",
-        )
-    }
-
     private val clock = TestTimeSource()
 
     /** A player who chose "Teach me how", which is the tutorial's entry condition. */
     private suspend fun untaughtCache(): InMemoryAppCache =
         InMemoryAppCache().apply { set(AppData(hasCompletedTutorial = false)) }
 
-    private fun guidedLevels(): List<Int> = (FirstGuidedLevel..Tutorial.LAST_LEVEL).toList()
+    /**
+     * A player who has already been taught, so level 1 opens as level 1.
+     *
+     * Worth spelling out at any call site that opens the first level and then
+     * asserts about the board: a default `InMemoryAppCache` is a fresh install,
+     * and a fresh install on level 1 now gets the rehearsal board in front of it.
+     */
+    private suspend fun taughtCache(): InMemoryAppCache =
+        InMemoryAppCache().apply { set(AppData(hasCompletedTutorial = true)) }
+
+    /**
+     * Runs out the virtual clock, because a gated step now *waits* before it
+     * advances.
+     *
+     * `UnconfinedTestDispatcher` runs a handler eagerly until it suspends, and
+     * `Tutorial.settleMillis` is a suspension — so without this a test reads the
+     * state mid-hold and sees the step it just satisfied. That is the behaviour
+     * under test rather than an inconvenience: `aGatedStepWaitsForTheMarkToFinishDrawing`
+     * asserts on both sides of it deliberately.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun settle() {
+        testDispatcher.scheduler.advanceUntilIdle()
+    }
 
     /** Does whatever the step is waiting for, and nothing else. */
     private fun GameViewModel.perform(step: TutorialStep) {
@@ -1745,6 +1940,7 @@ class GameViewModelTest : CoroutineTest() {
             TutorialTrigger.Marked -> note(state.tutorialCells.first())
             TutorialTrigger.Placed, TutorialTrigger.Struck -> commit(state.tutorialCells.first())
         }
+        settle()
     }
 
     private fun GameViewModel.runScript() {
@@ -2471,12 +2667,14 @@ class GameViewModelTest : CoroutineTest() {
         takeAction(GameAction.CellTapped(cell))
         takeAction(GameAction.CellTapped(cell))
         clock += SettleGap
+        settle()
     }
 
     /** A tap far enough after the last one that it cannot read as a commit. */
     private fun GameViewModel.note(cell: Int) {
         takeAction(GameAction.CellTapped(cell))
         clock += SettleGap
+        settle()
     }
 
     private fun solve(vm: GameViewModel) {
@@ -2560,11 +2758,8 @@ class GameViewModelTest : CoroutineTest() {
         /** Inside the starter-dog band. */
         const val StarterDogLevel = 1
 
-        /** Where the guided run starts. */
+        /** The level the rehearsal opens in front of, and hands back to. */
         const val FirstGuidedLevel = 1
-
-        /** The level whose script contains the auto-mark lesson. */
-        const val AutoMarkLevel = 2
 
         /**
          * A ceiling on how many steps a script may take, so a lesson that
@@ -2630,12 +2825,16 @@ class GameViewModelTest : CoroutineTest() {
         /** Days already in the bag, for anything that folds over the history. */
         history: List<DailyResult> = emptyList(),
         freezeOffer: FreezeOffer? = null,
+        restoreOffer: RestoreOffer? = null,
         private val freezeResult: FreezeResult = FreezeResult.NothingToFreeze,
+        private val restoreResult: RestoreResult = RestoreResult.NothingToRestore,
         private val freezeThrows: Boolean = false,
     ) : DailyRepository {
 
         val writes = history.toMutableList()
         var freezesRequested = 0
+            private set
+        var restoresRequested = 0
             private set
 
         private val state = MutableStateFlow(
@@ -2646,6 +2845,7 @@ class GameViewModelTest : CoroutineTest() {
                 result = result,
                 streak = streak,
                 freezeOffer = freezeOffer,
+                restoreOffer = restoreOffer,
                 resetsIn = 6.hours,
                 enabled = enabled,
             ),
@@ -2669,6 +2869,12 @@ class GameViewModelTest : CoroutineTest() {
             freezesRequested++
             if (freezeThrows) error("no ad service")
             return freezeResult
+        }
+
+        override suspend fun restoreStreak(): RestoreResult {
+            restoresRequested++
+            if (freezeThrows) error("no ad service")
+            return restoreResult
         }
 
         override suspend fun reset() {

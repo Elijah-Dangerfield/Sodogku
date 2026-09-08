@@ -42,6 +42,50 @@ class DailyFreezesPerMonth(appConfigMap: AppConfigMap) : IntConfigValue(appConfi
 }
 
 /**
+ * How far back a streak restore reaches: the longest run of consecutive missed
+ * days it will bridge in one go.
+ *
+ * Three is the outer edge of "life happened" — a weekend away, a flight, a bug
+ * that put someone in bed. Four is a holiday, and a player on holiday has stopped
+ * playing rather than missed a day, so handing them a 90-day streak makes the
+ * number a lie about them. It is also about as far back as anyone still remembers
+ * what their streak was.
+ *
+ * Set to 1 to turn restores off entirely: a one-day gap is the freeze's, so a
+ * reach of one leaves the restore nothing it is allowed to cover.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class DailyRestoreMaxDays(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Streak restore reach (days)"
+    override val path = "daily.restoreMaxDays"
+    override val default = 3
+}
+
+/**
+ * Days a streak restore may bridge per calendar month, counted against the month
+ * each bridged day falls in.
+ *
+ * Denominated in days rather than restores because days are what is on disk and a
+ * restore is not: two restores whose runs end up adjacent leave rows
+ * indistinguishable from one longer restore, so a count of restores would
+ * under-report and the cap would leak.
+ *
+ * Three is one restore of the maximum size, which is the intent — the restore is
+ * the once-a-month hammer, and the freeze (two a month, one day each) is the
+ * everyday tool. Raise to six to allow two. Zero is the kill switch.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class DailyRestoreDaysPerMonth(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Streak restore days per month"
+    override val path = "daily.restoreDaysPerMonth"
+    override val default = 3
+}
+
+/**
  * Shifts the selection into the 730-board daily pool
  * (`daysSinceEpoch(localDate) + poolOffset` modulo pool size). Zero until the
  * pool wraps, at which point moving the offset re-orders which boards come round
@@ -61,5 +105,7 @@ class DailyPoolOffset(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap)
 fun dailyConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>> = listOf(
     DailyEnabled(appConfigMap),
     DailyFreezesPerMonth(appConfigMap),
+    DailyRestoreMaxDays(appConfigMap),
+    DailyRestoreDaysPerMonth(appConfigMap),
     DailyPoolOffset(appConfigMap),
 )

@@ -8,6 +8,8 @@ import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.config.values.DailyEnabled
 import com.sodogku.libraries.config.values.DailyFreezesPerMonth
 import com.sodogku.libraries.config.values.DailyPoolOffset
+import com.sodogku.libraries.config.values.DailyRestoreDaysPerMonth
+import com.sodogku.libraries.config.values.DailyRestoreMaxDays
 import com.sodogku.libraries.config.values.FeatureDailyChallenge
 import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.progress.daily.DailyOutcome
@@ -16,6 +18,7 @@ import com.sodogku.libraries.progress.daily.DailyResult
 import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.DeviceTimeZone
 import com.sodogku.libraries.progress.daily.FreezeResult
+import com.sodogku.libraries.progress.daily.RestoreResult
 import com.sodogku.libraries.progress.db.DailyResultDao
 import com.sodogku.libraries.progress.db.DailyResultEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -59,6 +62,8 @@ class DailyRepositoryImpl(
     private val featureEnabled: FeatureDailyChallenge,
     private val poolOffset: DailyPoolOffset,
     private val freezesPerMonth: DailyFreezesPerMonth,
+    private val restoreMaxDays: DailyRestoreMaxDays,
+    private val restoreDaysPerMonth: DailyRestoreDaysPerMonth,
 ) : DailyRepository {
 
     override fun observe(): Flow<DailyStatus> = dayChanges()
@@ -89,6 +94,30 @@ class DailyRepositoryImpl(
 
         write(offer.missedDate, DailyOutcome.Frozen, score = 0, paws = 0, timeMs = 0L)
         return FreezeResult.Applied(offer.missedDate, streakOn(today(), dao.all().toOutcomes()))
+    }
+
+    /**
+     * The gap is bridged one row per day, and the rows are not written as a unit.
+     *
+     * That is survivable rather than sloppy: the table is insert-only, so a run
+     * interrupted half way leaves a shorter gap and no lie — the streak does not
+     * reconnect, and the next offer covers what is left. A transaction would buy
+     * atomicity at the price of a dao method whose only caller is this one.
+     */
+    override suspend fun restoreStreak(): RestoreResult {
+        val today = today()
+        val results = dao.all().toResults()
+        val offer = restoreOfferOn(today, results, restoreMaxDays(), restoreDaysPerMonth())
+            ?: return RestoreResult.NothingToRestore
+        if (!offer.withinReach) return RestoreResult.OutOfReach
+        if (!offer.withinAllowance) return RestoreResult.NoneLeft
+
+        val granted = entitlements.isPro.value ||
+            adGate.showRewarded(AdPlacement.StreakFreeze) != RewardOutcome.Dismissed
+        if (!granted) return RestoreResult.Declined
+
+        offer.missedDates.forEach { write(it, DailyOutcome.Restored, score = 0, paws = 0, timeMs = 0L) }
+        return RestoreResult.Applied(offer.days, streakOn(today(), dao.all().toOutcomes()))
     }
 
     override suspend fun reset() {
@@ -124,6 +153,8 @@ class DailyRepositoryImpl(
             streak = streakOn(day, results.mapValues { it.value.outcome }),
             freezeOffer = freezeOfferOn(day, results, freezesPerMonth())
                 ?.takeIf { it.freezesRemaining > 0 },
+            restoreOffer = restoreOfferOn(day, results, restoreMaxDays(), restoreDaysPerMonth())
+                ?.takeIf { it.available },
             resetsIn = untilNextDay(clock.now(), timeZone.current()),
             enabled = dailyEnabled() && featureEnabled(),
         )

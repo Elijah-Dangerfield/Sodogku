@@ -141,23 +141,27 @@
     <string name="hint_body">These squares are ruled out. Tap anywhere to carry on.</string>
 
     <!-- Tutorial (SPEC 10). One title + body per TutorialStep; the exhaustive
-         `when` in TutorialCoachMark is what keeps this list honest. -->
+         `when` in TutorialCoachMark is what keeps this list honest.
+
+         The whole lesson runs on one throwaway practice board, so no line here
+         may tell the player to finish it or count the levels behind it. Two
+         earlier versions did, back when this ran over campaign levels 1 to 3. -->
     <string name="tutorial_got_it">Got it</string>
     <string name="tutorial_skip">Skip tutorial</string>
+    <string name="tutorial_starter_dog_title">A practice board</string>
+    <string name="tutorial_starter_dog_body">Nothing here counts — no score, no bones, no progress. One dog is already placed, and every square it rules out is crossed off.</string>
     <string name="tutorial_rule_region_title">One dog per color</string>
-    <string name="tutorial_rule_region_body">Every colored block holds exactly one dog. Never two, never none.</string>
+    <string name="tutorial_rule_region_body">Every colored block holds exactly one dog. This one has its dog, so the rest of the block is out.</string>
     <string name="tutorial_rule_line_title">One per row and column</string>
-    <string name="tutorial_rule_line_body">The same across the grid. Each row gets one dog, and so does each column.</string>
+    <string name="tutorial_rule_line_body">The same across the grid. This row and this column are both spoken for.</string>
     <string name="tutorial_rule_touching_title">Dogs keep their distance</string>
-    <string name="tutorial_rule_touching_body">No two dogs may sit next to each other. Corners count as next to.</string>
-    <string name="tutorial_starter_dog_title">Here is one for free</string>
-    <string name="tutorial_starter_dog_body">The early levels start you off. Every square this one rules out is crossed off already.</string>
+    <string name="tutorial_rule_touching_body">No two dogs may sit next to each other, corners included. That is the ring around this one.</string>
     <string name="tutorial_mark_square_title">Cross a square off</string>
     <string name="tutorial_mark_square_body">One tap marks a square as empty. It costs nothing, so mark freely. Try the lit square.</string>
     <string name="tutorial_place_dog_title">Two taps places a dog</string>
     <string name="tutorial_place_dog_body">Tap the lit square twice, quickly. A dog belongs here.</string>
     <string name="tutorial_bones_title">Three bones, for keeps</string>
-    <string name="tutorial_bones_body">Putting a dog on the wrong square costs one, and a new board does not give you more. Crossing squares off never costs anything. Now finish the board.</string>
+    <string name="tutorial_bones_body">Putting a dog on the wrong square costs one, and a new board does not give you more. Crossing squares off never costs anything.</string>
     <string name="tutorial_place_and_watch_title">Place this one</string>
     <string name="tutorial_place_and_watch_body">Two quick taps on the lit square, then watch what the board does.</string>
     <string name="tutorial_auto_mark_title">The board marks for you</string>
@@ -165,18 +169,22 @@
     <string name="tutorial_sniff_title">Sniff</string>
     <string name="tutorial_sniff_body">Stuck? A sniff rules a few squares out. It never says where a dog goes, so the puzzle stays yours.</string>
     <string name="tutorial_treat_title">Treat</string>
-    <string name="tutorial_treat_body">A treat places one dog correctly, with no bone at risk. Now finish this board.</string>
-    <string name="tutorial_no_touching_title">Nothing sits beside a dog</string>
-    <string name="tutorial_no_touching_body">A dog rules out every square it touches, corners included. That is the ring around this one.</string>
+    <string name="tutorial_treat_body">A treat places one dog correctly, with no bone at risk.</string>
     <string name="tutorial_try_wrong_title">Get one wrong on purpose</string>
-    <string name="tutorial_try_wrong_body">Two taps on the lit square. No dog lives there, and this one mistake is on us.</string>
+    <string name="tutorial_try_wrong_body">Two taps on the lit square. No dog lives there, and nothing on this board costs you anything.</string>
     <string name="tutorial_wrong_explained_title">That is a wrong guess</string>
-    <string name="tutorial_wrong_explained_body">Red means no dog, and it normally costs a bone. Yours are all still here.</string>
+    <string name="tutorial_wrong_explained_body">Red means no dog. On a real board it costs a bone. Yours are all still here.</string>
     <string name="tutorial_graduation_title">You know how to play</string>
-    <string name="tutorial_graduation_body">Finish this board and the other 497 are yours. The three rules stay at the top if you ever want them.</string>
+    <string name="tutorial_graduation_body">That is the practice board done. Level 1 is next, and this time it counts. The three rules stay at the top if you ever want them.</string>
+
+    <!-- Spoken, never drawn: the label FocusScrim puts on the lit square so a
+         screen-reader player can complete a step that asks for a gesture.
+         Placeholders are the action, then the square's one-based row and
+         column — the same order and the same counting as `board_cell_format`. -->
+    <string name="tutorial_target_action">%1$s, row %2$d, column %3$d</string>
 
     <string name="settings_rerun_tutorial">Replay the tutorial</string>
-    <string name="settings_rerun_tutorial_body">Runs the guided first three levels again, from the start.</string>
+    <string name="settings_rerun_tutorial_body">Runs the guided practice board again, from the start.</string>
 
     <!-- The chip on every level that pays a Treat on its first clear. -->
     <string name="levels_reward_treat">+%1$d Treat</string>
@@ -216,6 +224,14 @@
     <string name="daily_freeze_nothing_body">There is no missed day a freeze would bring back right now.</string>
     <string name="daily_freeze_unavailable_title">Not right now</string>
     <string name="daily_freeze_unavailable_body">That did not go through. Give it another try in a moment.</string>
+    <string name="daily_restore_cta">Bring your streak back</string>
+    <string name="daily_restore_days">Covers %1$d missed days</string>
+    <string name="daily_restore_applied_title">Streak back</string>
+    <string name="daily_restore_applied_body">%1$d missed days are covered. Your streak stands at %2$d days.</string>
+    <string name="daily_restore_none_left_title">No catch-up days left</string>
+    <string name="daily_restore_none_left_body">You have used this month’s catch-up days. They come back next month.</string>
+    <string name="daily_restore_out_of_reach_title">Too long ago</string>
+    <string name="daily_restore_out_of_reach_body">A restore reaches back a few days, not a few weeks. Today’s board starts a new streak.</string>
 
     <!-- Short month names, for the daily card and the share sheet. -->
     <string name="month_short_1">Jan</string>

@@ -116,6 +116,8 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
     "daily" to mapOf(
         "enabled" to true,
         "freezesPerMonth" to 2,
+        "restoreMaxDays" to 3,
+        "restoreDaysPerMonth" to 3,
         "poolOffset" to 0,
     ),
     "paywall" to mapOf(

@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
@@ -11,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -30,12 +33,19 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastRoundToInt
 import com.sodogku.system.Motion
 
 /**
@@ -73,6 +83,24 @@ data class Spotlight(
      * nothing rather than clearing a step the player has not completed.
      */
     val targetsAreLive: Boolean = false,
+
+    /**
+     * What activating a lit target does, spoken — "Place a dog on row 2, column
+     * 1", not "button".
+     *
+     * **Non-null is what makes a live spotlight usable at all without sight.** A
+     * scrim is a drawing: it swallows every touch and reports the ones that land
+     * in a hole, and none of that is in the semantics tree, so what is under it
+     * is hidden ([Modifier.coveredByOverlay]) and the hole itself is nothing a
+     * screen reader can find. With a label, [FocusScrim] puts a real, named,
+     * activatable node over each lit rectangle and a step that says "tap the lit
+     * square" becomes a step that can be completed.
+     *
+     * Null on a spotlight that is only *showing* something — the last-bone
+     * warning, the sniff's ruled-out squares — where there is nothing to
+     * activate and the coach mark's own text is the whole message.
+     */
+    val targetLabel: String? = null,
 )
 
 /**
@@ -145,6 +173,17 @@ fun BoxScope.FocusScrim(
     cornerRadius: Dp = DefaultCornerRadius,
     padding: Dp = DefaultPadding,
     onTargetTap: (FocusTargetKey) -> Unit = {},
+
+    /**
+     * A lit target activated through the accessibility tree rather than by a
+     * finger, which is a different number of taps.
+     *
+     * The pointer path reports each tap as it happens and leaves the caller to
+     * recognise a double tap against its own clock; an accessibility activation
+     * is one indivisible "do the thing", so the caller decides here what the
+     * thing is. Defaults to [onTargetTap] for the single-tap case.
+     */
+    onTargetActivate: (FocusTargetKey) -> Unit = onTargetTap,
     content: @Composable (Rect) -> Unit = {},
 ) {
     val registry = LocalFocusRegistry.current
@@ -213,8 +252,47 @@ fun BoxScope.FocusScrim(
                 }
             },
     ) {
+        val label = spotlight?.targetLabel
+        if (label != null && spotlight.targetsAreLive) {
+            lit.forEach { (key, rect) -> AccessibleHole(label, rect) { onTargetActivate(key) } }
+        }
         content(lit.map { it.second }.union())
     }
+}
+
+/**
+ * An invisible, named, activatable node sitting exactly over a lit rectangle.
+ *
+ * **It takes no pointer input, deliberately.** Hit testing only reaches nodes
+ * that declare a `pointerInput`, so a plain `Modifier.semantics` box is
+ * transparent to a finger and the scrim's own gesture handler above still sees
+ * every touch — which is what keeps the sighted double tap the two separate taps
+ * the tutorial teaches. A `clickable` here would have quietly turned it into one.
+ *
+ * Its geometry comes from the same [FocusRegistry] rectangle the hole is cut
+ * from, so it is where the hole is by construction rather than by a second
+ * measurement that could disagree.
+ */
+@Composable
+private fun AccessibleHole(label: String, rect: Rect, onActivate: () -> Unit) {
+    val density = LocalDensity.current
+    val activate = rememberUpdatedState(onActivate)
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(rect.left.fastRoundToInt(), rect.top.fastRoundToInt()) }
+            .size(
+                width = with(density) { rect.width.toDp() },
+                height = with(density) { rect.height.toDp() },
+            )
+            .semantics {
+                contentDescription = label
+                role = Role.Button
+                onClick(label = label) {
+                    activate.value()
+                    true
+                }
+            },
+    )
 }
 
 /**

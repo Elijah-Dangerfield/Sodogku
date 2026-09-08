@@ -29,6 +29,12 @@ import sodogku.libraries.resources.generated.resources.daily_freeze_nothing_body
 import sodogku.libraries.resources.generated.resources.daily_freeze_nothing_title
 import sodogku.libraries.resources.generated.resources.daily_freeze_unavailable_body
 import sodogku.libraries.resources.generated.resources.daily_freeze_unavailable_title
+import sodogku.libraries.resources.generated.resources.daily_restore_applied_body
+import sodogku.libraries.resources.generated.resources.daily_restore_applied_title
+import sodogku.libraries.resources.generated.resources.daily_restore_none_left_body
+import sodogku.libraries.resources.generated.resources.daily_restore_none_left_title
+import sodogku.libraries.resources.generated.resources.daily_restore_out_of_reach_body
+import sodogku.libraries.resources.generated.resources.daily_restore_out_of_reach_title
 
 /**
  * What the streak freeze did, whatever it did.
@@ -48,7 +54,7 @@ fun FreezeMessageDialog(message: FreezeMessage, onDismiss: () -> Unit) {
         ) {
             Dog(
                 pose = when (message) {
-                    is FreezeMessage.Applied -> DogPose.Solved
+                    is FreezeMessage.Applied, is FreezeMessage.Restored -> DogPose.Solved
                     else -> DogPose.Thinking
                 },
             )
@@ -76,6 +82,9 @@ private fun FreezeMessage.title() = when (this) {
     FreezeMessage.NoneLeft -> Res.string.daily_freeze_none_left_title
     FreezeMessage.NothingToFreeze -> Res.string.daily_freeze_nothing_title
     FreezeMessage.Unavailable -> Res.string.daily_freeze_unavailable_title
+    is FreezeMessage.Restored -> Res.string.daily_restore_applied_title
+    FreezeMessage.RestoreNoneLeft -> Res.string.daily_restore_none_left_title
+    FreezeMessage.RestoreOutOfReach -> Res.string.daily_restore_out_of_reach_title
 }
 
 @Composable
@@ -85,6 +94,9 @@ private fun FreezeMessage.body(): String = when (this) {
     FreezeMessage.NoneLeft -> stringResource(Res.string.daily_freeze_none_left_body)
     FreezeMessage.NothingToFreeze -> stringResource(Res.string.daily_freeze_nothing_body)
     FreezeMessage.Unavailable -> stringResource(Res.string.daily_freeze_unavailable_body)
+    is FreezeMessage.Restored -> stringResource(Res.string.daily_restore_applied_body, days, streak)
+    FreezeMessage.RestoreNoneLeft -> stringResource(Res.string.daily_restore_none_left_body)
+    FreezeMessage.RestoreOutOfReach -> stringResource(Res.string.daily_restore_out_of_reach_body)
 }
 
 @Preview
@@ -100,5 +112,13 @@ private fun FreezeAppliedPreview() {
 private fun FreezeDeclinedPreview() {
     PreviewContent {
         FreezeMessageDialog(message = FreezeMessage.Declined, onDismiss = {})
+    }
+}
+
+@Preview
+@Composable
+private fun StreakRestoredPreview() {
+    PreviewContent {
+        FreezeMessageDialog(message = FreezeMessage.Restored(days = 3, streak = 41), onDismiss = {})
     }
 }

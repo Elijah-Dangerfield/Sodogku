@@ -28,6 +28,8 @@ import com.sodogku.system.clip
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.board_action_mark
+import sodogku.libraries.resources.generated.resources.board_action_place
 import sodogku.libraries.resources.generated.resources.game_last_bone_body
 import sodogku.libraries.resources.generated.resources.game_last_bone_title
 import sodogku.libraries.resources.generated.resources.hint_body
@@ -46,8 +48,6 @@ import sodogku.libraries.resources.generated.resources.tutorial_graduation_body
 import sodogku.libraries.resources.generated.resources.tutorial_graduation_title
 import sodogku.libraries.resources.generated.resources.tutorial_mark_square_body
 import sodogku.libraries.resources.generated.resources.tutorial_mark_square_title
-import sodogku.libraries.resources.generated.resources.tutorial_no_touching_body
-import sodogku.libraries.resources.generated.resources.tutorial_no_touching_title
 import sodogku.libraries.resources.generated.resources.tutorial_place_and_watch_body
 import sodogku.libraries.resources.generated.resources.tutorial_place_and_watch_title
 import sodogku.libraries.resources.generated.resources.tutorial_place_dog_body
@@ -63,6 +63,7 @@ import sodogku.libraries.resources.generated.resources.tutorial_sniff_body
 import sodogku.libraries.resources.generated.resources.tutorial_sniff_title
 import sodogku.libraries.resources.generated.resources.tutorial_starter_dog_body
 import sodogku.libraries.resources.generated.resources.tutorial_starter_dog_title
+import sodogku.libraries.resources.generated.resources.tutorial_target_action
 import sodogku.libraries.resources.generated.resources.tutorial_treat_body
 import sodogku.libraries.resources.generated.resources.tutorial_treat_title
 import sodogku.libraries.resources.generated.resources.tutorial_try_wrong_body
@@ -76,13 +77,8 @@ val LivesFocusKey = FocusTargetKey("game.lives")
 /** One focus key per board square, so a spotlight can light several at once. */
 fun cellFocusKey(cell: Int) = FocusTargetKey("game.cell.$cell")
 
-/** The three permanent rule chips, in the order they sit under the header. */
-val RuleChipFocusKeys = List(RuleChipCount) { FocusTargetKey("game.rule.$it") }
-
 val SniffFocusKey = FocusTargetKey("game.booster.sniff")
 val TreatFocusKey = FocusTargetKey("game.booster.treat")
-
-private const val RuleChipCount = 3
 
 /**
  * Dims the board and lights up the bones when the player is down to their last
@@ -148,7 +144,7 @@ fun BoxScope.SniffHint(state: GameState, onAction: (GameAction) -> Unit) {
 }
 
 /**
- * The guided run over levels 1 to 3, drawn entirely from [GameState.tutorial].
+ * The guided run over [TutorialBoard], drawn entirely from [GameState.tutorial].
  *
  * Every decision — which step, which squares, whether it is finished — was made
  * in the ViewModel. This maps a step to a spotlight and a piece of copy, and
@@ -170,6 +166,7 @@ fun BoxScope.TutorialCoachMark(state: GameState, onAction: (GameAction) -> Unit)
     val shown = rememberLastNonNull(step)
     val live = shown != null && Tutorial.triggerFor(shown) != TutorialTrigger.Tap
     val cellByKey = state.tutorialCells.associateBy(::cellFocusKey)
+    val targetLabel = spokenTarget(state, shown.takeIf { live })
 
     FocusScrim(
         spotlight = step?.let {
@@ -177,6 +174,7 @@ fun BoxScope.TutorialCoachMark(state: GameState, onAction: (GameAction) -> Unit)
                 targets = targetsFor(it, state.tutorialCells),
                 dismissOnOutsideTap = !live,
                 targetsAreLive = live,
+                targetLabel = targetLabel,
             )
         },
         onDismiss = { onAction(GameAction.TutorialAdvance) },
@@ -185,6 +183,21 @@ fun BoxScope.TutorialCoachMark(state: GameState, onAction: (GameAction) -> Unit)
         // cell would have sent — including the second one, so the double tap
         // that places a dog still works through the lesson.
         onTargetTap = { key -> cellByKey[key]?.let { onAction(GameAction.CellTapped(it)) } },
+        // The same square, reached without a finger. A screen reader has no
+        // double tap to give — its activation is one indivisible act — so the
+        // gesture the step is waiting for is synthesised here, exactly as
+        // `placeAt` does for an ordinary board square: two `CellTapped`s land on
+        // one channel microseconds apart and `GameViewModel`'s own 320ms window
+        // reads them as a commit. Nothing in the state machine needs to know a
+        // screen reader exists.
+        onTargetActivate = { key ->
+            cellByKey[key]?.let { cell ->
+                onAction(GameAction.CellTapped(cell))
+                if (shown != null && Tutorial.triggerFor(shown) != TutorialTrigger.Marked) {
+                    onAction(GameAction.CellTapped(cell))
+                }
+            }
+        },
     ) { anchor ->
         if (shown == null) return@FocusScrim
         CoachMark(
@@ -212,10 +225,19 @@ private fun rememberLastNonNull(value: TutorialStep?): TutorialStep? {
     return holder.value
 }
 
+/**
+ * What the spotlight lights.
+ *
+ * The three rule steps used to point at their chip under the header, and that
+ * is the whole of what was wrong with them: a chip is a diagram of a rule, and
+ * a player learning the game does not yet know it is a diagram of *this* board.
+ * They fall through to [cells] now, which `Tutorial.cellsFor` fills with the
+ * column, the colour block or the ring the rule actually ruled out — squares
+ * with crosses already on them, around the dog that put them there.
+ *
+ * Only the four things that are not on the board keep a key of their own.
+ */
 private fun targetsFor(step: TutorialStep, cells: Set<Int>): Set<FocusTargetKey> = when (step) {
-    TutorialStep.RuleRegion -> setOf(RuleChipFocusKeys[0])
-    TutorialStep.RuleLine -> setOf(RuleChipFocusKeys[1])
-    TutorialStep.RuleTouching -> setOf(RuleChipFocusKeys[2])
     TutorialStep.Bones, TutorialStep.WrongExplained -> setOf(LivesFocusKey)
     TutorialStep.Sniff -> setOf(SniffFocusKey)
     TutorialStep.Treat -> setOf(TreatFocusKey)
@@ -223,11 +245,42 @@ private fun targetsFor(step: TutorialStep, cells: Set<Int>): Set<FocusTargetKey>
     else -> cells.map(::cellFocusKey).toSet()
 }
 
+/**
+ * What the lit square is called, for a player who cannot see it lit.
+ *
+ * Reuses the board's own vocabulary rather than minting tutorial copy: the
+ * square announces itself in the same words `BoardCellLabels` uses, so "row 2,
+ * column 1" means the same thing inside the lesson as it does after it, and the
+ * action is the one the board's own semantics offer. Null on a step that only
+ * shows something — there is nothing to activate, so there is nothing to name.
+ *
+ * A gated step lights exactly one square (`cellsFor` returns `setOfNotNull`),
+ * which is why one label covers the whole spotlight.
+ */
+@Composable
+private fun spokenTarget(state: GameState, step: TutorialStep?): String? {
+    val board = state.level?.board ?: return null
+    val cell = state.tutorialCells.singleOrNull() ?: return null
+    val action = when (step?.let(Tutorial::triggerFor)) {
+        TutorialTrigger.Marked -> stringResource(Res.string.board_action_mark)
+        TutorialTrigger.Placed, TutorialTrigger.Struck -> stringResource(Res.string.board_action_place)
+        else -> return null
+    }
+    // One-based, because that is what a person counts in — the same conversion
+    // `BoardCellLabels.describe` makes, and for the same reason.
+    return stringResource(
+        Res.string.tutorial_target_action,
+        action,
+        board.rowOf(cell) + 1,
+        board.colOf(cell) + 1,
+    )
+}
+
 private fun titleOf(step: TutorialStep): StringResource = when (step) {
+    TutorialStep.StarterDog -> Res.string.tutorial_starter_dog_title
     TutorialStep.RuleRegion -> Res.string.tutorial_rule_region_title
     TutorialStep.RuleLine -> Res.string.tutorial_rule_line_title
     TutorialStep.RuleTouching -> Res.string.tutorial_rule_touching_title
-    TutorialStep.StarterDog -> Res.string.tutorial_starter_dog_title
     TutorialStep.MarkSquare -> Res.string.tutorial_mark_square_title
     TutorialStep.PlaceDog -> Res.string.tutorial_place_dog_title
     TutorialStep.Bones -> Res.string.tutorial_bones_title
@@ -235,17 +288,16 @@ private fun titleOf(step: TutorialStep): StringResource = when (step) {
     TutorialStep.AutoMark -> Res.string.tutorial_auto_mark_title
     TutorialStep.Sniff -> Res.string.tutorial_sniff_title
     TutorialStep.Treat -> Res.string.tutorial_treat_title
-    TutorialStep.NoTouching -> Res.string.tutorial_no_touching_title
     TutorialStep.TryAWrongOne -> Res.string.tutorial_try_wrong_title
     TutorialStep.WrongExplained -> Res.string.tutorial_wrong_explained_title
     TutorialStep.Graduation -> Res.string.tutorial_graduation_title
 }
 
 private fun bodyOf(step: TutorialStep): StringResource = when (step) {
+    TutorialStep.StarterDog -> Res.string.tutorial_starter_dog_body
     TutorialStep.RuleRegion -> Res.string.tutorial_rule_region_body
     TutorialStep.RuleLine -> Res.string.tutorial_rule_line_body
     TutorialStep.RuleTouching -> Res.string.tutorial_rule_touching_body
-    TutorialStep.StarterDog -> Res.string.tutorial_starter_dog_body
     TutorialStep.MarkSquare -> Res.string.tutorial_mark_square_body
     TutorialStep.PlaceDog -> Res.string.tutorial_place_dog_body
     TutorialStep.Bones -> Res.string.tutorial_bones_body
@@ -253,7 +305,6 @@ private fun bodyOf(step: TutorialStep): StringResource = when (step) {
     TutorialStep.AutoMark -> Res.string.tutorial_auto_mark_body
     TutorialStep.Sniff -> Res.string.tutorial_sniff_body
     TutorialStep.Treat -> Res.string.tutorial_treat_body
-    TutorialStep.NoTouching -> Res.string.tutorial_no_touching_body
     TutorialStep.TryAWrongOne -> Res.string.tutorial_try_wrong_body
     TutorialStep.WrongExplained -> Res.string.tutorial_wrong_explained_body
     TutorialStep.Graduation -> Res.string.tutorial_graduation_body

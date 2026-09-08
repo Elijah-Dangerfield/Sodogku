@@ -32,6 +32,8 @@ import sodogku.libraries.resources.generated.resources.daily_out_of_bones
 import sodogku.libraries.resources.generated.resources.daily_play
 import sodogku.libraries.resources.generated.resources.daily_resets_hours
 import sodogku.libraries.resources.generated.resources.daily_resets_minutes
+import sodogku.libraries.resources.generated.resources.daily_restore_cta
+import sodogku.libraries.resources.generated.resources.daily_restore_days
 import sodogku.libraries.resources.generated.resources.daily_review
 import sodogku.libraries.resources.generated.resources.daily_streak
 import sodogku.libraries.resources.generated.resources.daily_streak_none
@@ -61,9 +63,10 @@ enum class DailyCardState {
  * so a card built from one snapshot cannot show today's date next to tomorrow's
  * reset.
  *
- * [freezesRemaining] is non-null only when a freeze would actually reconnect a
- * run. It wears [RewardButton] because it costs an ad, and one colour means "an
- * ad is involved" everywhere in the app.
+ * [freezesRemaining] and [restoreDays] are non-null only when that offer would
+ * actually reconnect a run, and never both at once — one missed day is a freeze
+ * and more than one is a restore. Both wear [RewardButton] because both cost an
+ * ad, and one colour means "an ad is involved" everywhere in the app.
  */
 @Composable
 fun DailyCard(
@@ -79,8 +82,11 @@ fun DailyCard(
      */
     canReview: Boolean = false,
     freezesRemaining: Int? = null,
+    /** How many missed days a restore would bridge. Always two or more. */
+    restoreDays: Int? = null,
     onPlay: () -> Unit = {},
     onFreeze: () -> Unit = {},
+    onRestore: () -> Unit = {},
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Dimension.D400),
@@ -185,6 +191,20 @@ fun DailyCard(
                 color = AppTheme.colors.textSecondary,
             )
         }
+
+        // The caption says how many days, because that is the whole difference
+        // between this and the freeze and it is what makes the ad worth watching.
+        if (restoreDays != null) {
+            RewardButton(
+                label = stringResource(Res.string.daily_restore_cta),
+                onClick = onRestore,
+            )
+            Text(
+                text = stringResource(Res.string.daily_restore_days, restoreDays),
+                typography = AppTheme.typography.Caption.C200,
+                color = AppTheme.colors.textSecondary,
+            )
+        }
     }
 }
 
@@ -233,6 +253,14 @@ private fun DailyCardPreview() {
                 paws = 3,
                 resetsIn = 42.minutes,
                 freezesRemaining = 2,
+            )
+            DailyCard(
+                dateLabel = "Sep 7",
+                streak = 0,
+                state = DailyCardState.Open,
+                paws = 0,
+                resetsIn = 3.hours,
+                restoreDays = 3,
             )
         }
     }

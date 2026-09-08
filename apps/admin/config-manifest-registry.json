@@ -42,6 +42,8 @@
 
   { "path": "daily.enabled", "type": "boolean", "default": true, "description": "Kill switch for the Daily Challenge mechanic." },
   { "path": "daily.freezesPerMonth", "type": "int", "default": 2, "description": "Streak freezes a player may use per calendar month." },
+  { "path": "daily.restoreMaxDays", "type": "int", "default": 3, "description": "Longest run of missed days a streak restore will bridge. 1 turns restores off." },
+  { "path": "daily.restoreDaysPerMonth", "type": "int", "default": 3, "description": "Days a streak restore may bridge per calendar month. 0 turns restores off." },
   { "path": "daily.poolOffset", "type": "int", "default": 0, "description": "Shifts the selection into the 730-board daily pool." },
 
   { "path": "paywall.triggers", "type": "json", "default": ["offline_block", "continue_level", "skip_level"], "description": "Which moments may show the Pro paywall. Unknown ids are ignored." },

@@ -9,6 +9,7 @@ import com.sodogku.libraries.progress.LifetimeScore
 import com.sodogku.libraries.progress.daily.DailyResult
 import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.FreezeResult
+import com.sodogku.libraries.progress.daily.RestoreResult
 import com.sodogku.libraries.puzzle.Solution
 import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.scoring.ScoreCard
@@ -242,6 +243,17 @@ data class GameState(
     val isDaily: Boolean = false,
 
     /**
+     * Whether the board on screen is [TutorialBoard] rather than a level.
+     *
+     * The screen needs to know for one reason and the state for another. The
+     * header drops the level number, because the rehearsal board has no level
+     * number to show; and [lifetimeScore] drops this attempt, because a
+     * rehearsal banks nothing and a headline number that climbs during the
+     * tutorial and falls back afterwards is a lie the player will notice.
+     */
+    val isRehearsal: Boolean = false,
+
+    /**
      * The streak as of this attempt, for the outcome sheet. Set from the value
      * the write returned rather than read back off [daily], which arrives on its
      * own dispatch and would show the streak from before the clear.
@@ -297,12 +309,17 @@ data class GameState(
      * A lost attempt banks nothing, so it contributes nothing — the number
      * falls back to what was already earned the moment the bones run out,
      * rather than leaving points on screen that no record will ever hold.
+     *
+     * A rehearsal banks nothing either, and for exactly the same reason. The
+     * header holds still at the player's real total for the whole tutorial
+     * instead of climbing three dogs' worth and then dropping back when level 1
+     * opens.
      */
     val lifetimeScore: Int
         get() = LifetimeScore.withAttempt(
             banked = lifetimeBanked,
             bankedForThisBoard = bankedForThisBoard,
-            attemptScore = if (phase == GamePhase.Lost) 0 else attemptScore,
+            attemptScore = if (phase == GamePhase.Lost || isRehearsal) 0 else attemptScore,
         )
 
     /**
@@ -362,9 +379,14 @@ data class SkipOffer(
 }
 
 /**
- * What came of a streak freeze. Every [FreezeResult] maps to one of these, plus
- * [Unavailable] for a repository call that threw — five answers, five things the
- * player can be told, and no silent branch.
+ * What came of a streak save, freeze or restore. Every [FreezeResult] and every
+ * [RestoreResult] maps to one of these, plus [Unavailable] for a repository call
+ * that threw — no branch of either is silent.
+ *
+ * The two share this type, and the dialog, because they share a placement and an
+ * outcome: an ad was watched and a streak did or did not come back. Only the
+ * branches whose *copy* differs are separate — [Restored] names a number of days,
+ * and its two refusals are about a run rather than a day.
  */
 sealed interface FreezeMessage {
     data class Applied(val streak: Int) : FreezeMessage
@@ -372,6 +394,14 @@ sealed interface FreezeMessage {
     data object NoneLeft : FreezeMessage
     data object NothingToFreeze : FreezeMessage
     data object Unavailable : FreezeMessage
+
+    data class Restored(val days: Int, val streak: Int) : FreezeMessage
+
+    /** The monthly allowance of restored days cannot pay for this gap. */
+    data object RestoreNoneLeft : FreezeMessage
+
+    /** The gap is longer than `daily.restoreMaxDays`. */
+    data object RestoreOutOfReach : FreezeMessage
 }
 
 sealed interface GameEvent {
@@ -474,6 +504,7 @@ sealed interface GameAction {
 
     data object PlayDaily : GameAction
     data object UseFreeze : GameAction
+    data object RestoreStreak : GameAction
     data object DismissFreezeMessage : GameAction
     data object OpenSettings : GameAction
 
