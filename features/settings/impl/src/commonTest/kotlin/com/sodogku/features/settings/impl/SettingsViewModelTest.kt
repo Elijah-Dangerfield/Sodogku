@@ -1,6 +1,7 @@
 package com.sodogku.features.settings.impl
 
 import com.sodogku.libraries.config.AppConfigMap
+import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.LegalPrivacyUrl
 import com.sodogku.libraries.config.values.LegalTermsUrl
 import com.sodogku.libraries.core.BuildInfo
@@ -167,6 +168,40 @@ class SettingsViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun switchingAchievementsOffTakesTheWholeSectionAway() = runUnitTest {
+        val vm = viewModel(
+            InMemoryAppCache(),
+            FakeConfigMap(mapOf("features" to mapOf("achievements" to false))),
+        )
+
+        assertFalse(vm.state.achievementsAvailable)
+        assertTrue(
+            vm.state.achievementsVisible,
+            "the player's own toggle is untouched, so the setting is still there " +
+                "when the feature comes back",
+        )
+    }
+
+    @Test
+    fun withNoConfigTheAchievementSectionIsPresent() = runUnitTest {
+        val vm = viewModel(InMemoryAppCache(), FakeConfigMap(emptyMap<String, Any>()))
+
+        assertTrue(vm.state.achievementsAvailable)
+    }
+
+    @Test
+    fun aMalformedAchievementFlagDoesNotHideTheFeature() = runUnitTest {
+        // A string typed into a boolean key used to resolve to `false`. Every
+        // `features.*` key is one console typo away from this.
+        val vm = viewModel(
+            InMemoryAppCache(),
+            FakeConfigMap(mapOf("features" to mapOf("achievements" to "banana"))),
+        )
+
+        assertTrue(vm.state.achievementsAvailable)
+    }
+
+    @Test
     fun feedbackIsItsOwnDestination() = runUnitTest {
         val vm = viewModel(InMemoryAppCache())
 
@@ -175,10 +210,11 @@ class SettingsViewModelTest : CoroutineTest() {
         assertEquals(SettingsEvent.OpenFeedback, vm.eventFlow.first())
     }
 
-    private fun viewModel(cache: AppCache) = SettingsViewModel(
+    private fun viewModel(cache: AppCache, config: AppConfigMap = this.config) = SettingsViewModel(
         appCache = cache,
         termsUrl = LegalTermsUrl(config),
         privacyUrl = LegalPrivacyUrl(config),
+        achievementsEnabled = FeatureAchievements(config),
     )
 
     private val config = FakeConfigMap(

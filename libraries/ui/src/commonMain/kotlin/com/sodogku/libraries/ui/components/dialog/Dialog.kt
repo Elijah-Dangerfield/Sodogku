@@ -5,20 +5,23 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -33,16 +36,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.dialog
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.IntOffset
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.text.Text
+import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.system.AppTheme
+import com.sodogku.system.Dimension
+import com.sodogku.system.Motion
 import com.sodogku.system.Radii
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.roundToInt
@@ -53,6 +60,12 @@ import kotlin.random.Random
  * Public dialog entry point that mirrors Compose's windowed dialog API but renders
  * entirely inside our Compose hierarchy. Supply a [DialogState] if you need to trigger
  * animated dismissals from inside the dialog; otherwise a default state is provided.
+ *
+ * The card pads its own content ([ModalDialogDefaults.ContentPadding]). Callers
+ * hand over the copy and the buttons and get the breathing room for free —
+ * before this existed every dialog in the app had its title, its body and its
+ * close button flush against the card edges, because padding was something each
+ * call site had to remember and none of them did.
  */
 @Composable
 fun Dialog(
@@ -60,9 +73,10 @@ fun Dialog(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     properties: ModalDialogProperties = ModalDialogProperties(),
-    animationSpec: ModalDialogAnimationSpec = ModalDialogAnimationSpec(),
+    animationSpec: ModalDialogAnimationSpec = ModalDialogDefaults.animationSpec(),
     scrimColor: Color = ModalDialogDefaults.scrimColor(),
     contentAlignment: Alignment = Alignment.Center,
+    contentPadding: PaddingValues = ModalDialogDefaults.ContentPadding,
     content: @Composable () -> Unit = {},
 ) {
     HostedDialog(
@@ -76,10 +90,14 @@ fun Dialog(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.8f)
+                .fillMaxWidth(ModalDialogDefaults.WidthFraction)
                 .animateContentSize()
-                .clipToBounds()
-                .background(AppTheme.colors.surfacePrimary.color, shape = Radii.Card.shape),
+                // clip to the *shape*, not the bounds: with a rectangular clip a
+                // full-width button at the bottom of the card squared off the
+                // card's rounded corners.
+                .clip(Radii.Card.shape)
+                .background(AppTheme.colors.surfacePrimary.color)
+                .padding(contentPadding),
             contentAlignment = Alignment.Center
         ) {
             content()
@@ -114,7 +132,7 @@ internal fun HostedDialog(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     properties: ModalDialogProperties = ModalDialogProperties(),
-    animationSpec: ModalDialogAnimationSpec = ModalDialogAnimationSpec(),
+    animationSpec: ModalDialogAnimationSpec = ModalDialogDefaults.animationSpec(),
     scrimColor: Color = ModalDialogDefaults.scrimColor(),
     contentAlignment: Alignment = Alignment.Center,
     hostState: DialogHostState? = LocalDialogHostState.current,
@@ -171,7 +189,7 @@ internal fun DialogOverlay(
     onDismissComplete: () -> Unit,
     modifier: Modifier = Modifier,
     properties: ModalDialogProperties = ModalDialogProperties(),
-    animationSpec: ModalDialogAnimationSpec = ModalDialogAnimationSpec(),
+    animationSpec: ModalDialogAnimationSpec = ModalDialogDefaults.animationSpec(),
     scrimColor: Color = ModalDialogDefaults.scrimColor(),
     contentAlignment: Alignment = Alignment.Center,
     content: @Composable BoxScope.() -> Unit,
@@ -272,43 +290,111 @@ data class ModalDialogAnimationSpec(
 )
 
 object ModalDialogDefaults {
-    private val enterMillis = 260
-    private val exitMillis = 180
+
+    /**
+     * How wide the card sits on the page. Not `fillMaxWidth()`: the strip of
+     * scrim either side is what the player taps to dismiss.
+     */
+    const val WidthFraction: Float = 0.85f
+
+    /**
+     * The breathing room inside every dialog card.
+     *
+     * Vertical is a step larger than horizontal because the top and bottom of a
+     * dialog are a heading and a full-width button, and both read as crowded at
+     * the same value that looks right beside a line of body text.
+     */
+    val ContentPadding: PaddingValues =
+        PaddingValues(horizontal = Dimension.D800, vertical = Dimension.D900)
+
+    /** Scrim fade. Settles well before the card does, so the card lands on a dim that is already there. */
+    private const val ScrimEnterMillis = 200
+    private const val ExitMillis = 160
+
+    /** Fade-only enter and exit, for `reduceAnimations`. Short enough to read as instant. */
+    private const val ReducedMillis = 90
+
+    /** How far below its resting place the card starts, as a fraction of its own height. */
+    private const val RiseFraction = 0.10f
+
+    /** How small the card starts. Far enough down that the overshoot is legible. */
+    private const val EnterScale = 0.82f
+
+    /** How far the card shrinks on the way out. Shallower than the entrance: leaving is not an event. */
+    private const val ExitScale = 0.92f
 
     @Composable
     fun scrimColor(): Color = AppTheme.colors.backgroundOverlay.color
 
+    /**
+     * The spec a dialog animates with, honouring the player's reduce-animations
+     * setting.
+     *
+     * Resolved at the *call site*, not inside [DialogOverlay]: the host renders
+     * every dialog from a snapshot captured when the caller composed, so a spec
+     * read in the host would be read outside the subtree the setting is
+     * provided to.
+     */
+    @Composable
+    fun animationSpec(): ModalDialogAnimationSpec =
+        animationSpecFor(LocalReduceAnimations.current)
+
+    /**
+     * [animationSpec] without the composition local, so the choice itself can be
+     * tested.
+     *
+     * Reduced motion is a plain fade on *both* layers rather than a shortened
+     * spring: the setting exists for players who find movement unpleasant, and a
+     * fast bounce is still a bounce.
+     */
+    fun animationSpecFor(reduceAnimations: Boolean): ModalDialogAnimationSpec =
+        if (reduceAnimations) {
+            ModalDialogAnimationSpec(
+                scrimEnter = fadeIn(tween(ReducedMillis)),
+                scrimExit = fadeOut(tween(ReducedMillis)),
+                contentEnter = fadeIn(tween(ReducedMillis)),
+                contentExit = fadeOut(tween(ReducedMillis)),
+            )
+        } else {
+            ModalDialogAnimationSpec()
+        }
+
     fun scrimEnter(): EnterTransition = fadeIn(
-        animationSpec = tween(enterMillis)
+        animationSpec = tween(ScrimEnterMillis)
     )
 
     fun scrimExit(): ExitTransition = fadeOut(
-        animationSpec = tween(exitMillis)
+        animationSpec = tween(ExitMillis)
     )
 
+    /**
+     * The card springs up from below and overshoots before settling — the same
+     * gesture a dog landing on a cell makes, so the app has one idea of how
+     * things arrive rather than one per surface.
+     *
+     * The scale uses [Motion.Pop] and the rise is the same spring rebuilt for
+     * `IntOffset`, which `slideInVertically` needs and `Motion` has no token
+     * for. They have to match: on different curves the card looks like it is
+     * being assembled rather than arriving. The fade is a plain tween and
+     * finishes early, because a card still translucent while it bounces reads as
+     * a rendering fault.
+     */
     fun contentEnter(): EnterTransition =
-        slideInVertically(
-            animationSpec = tween(enterMillis),
-            initialOffsetY = { (it * 0.12f).roundToInt() }
-        ) +
-            fadeIn(animationSpec = tween(enterMillis)) +
-            scaleIn(
-                initialScale = 0.92f,
-                animationSpec = androidx.compose.animation.core.spring(
-                    dampingRatio = 0.65f,
-                    stiffness = 350f
-                )
-            )
+        scaleIn(initialScale = EnterScale, animationSpec = Motion.Pop) +
+            slideInVertically(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                    visibilityThreshold = IntOffset.VisibilityThreshold,
+                ),
+                initialOffsetY = { (it * RiseFraction).roundToInt() }
+            ) +
+            fadeIn(animationSpec = tween(Motion.FadeMillis))
 
     fun contentExit(): ExitTransition =
-        fadeOut(animationSpec = tween(exitMillis)) +
-            slideOutVertically(
-                animationSpec = tween(exitMillis),
-                targetOffsetY = { (it * 0.08f).roundToInt() }
-            ) +
+        fadeOut(animationSpec = tween(ExitMillis)) +
             scaleOut(
-                targetScale = 0.9f,
-                animationSpec = tween(exitMillis)
+                targetScale = ExitScale,
+                animationSpec = tween(ExitMillis)
             )
-
 }

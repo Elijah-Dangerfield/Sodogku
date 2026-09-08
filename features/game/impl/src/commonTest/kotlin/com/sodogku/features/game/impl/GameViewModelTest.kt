@@ -40,10 +40,12 @@ import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.FreezeOffer
 import com.sodogku.libraries.progress.daily.FreezeResult
 import com.sodogku.libraries.achievements.Achievement
+import com.sodogku.libraries.achievements.AchievementId
 import com.sodogku.libraries.achievements.AchievementState
 import com.sodogku.libraries.achievements.AchievementsRepository
 import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
+import com.sodogku.libraries.achievements.Stat
 import com.sodogku.libraries.scoring.ScoringConfig
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -56,9 +58,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1343,6 +1347,187 @@ class GameViewModelTest : CoroutineTest() {
         }
     }
 
+    // ---- Remote config, from the board's side of it. ------------------------
+    //
+    // `ConfiguredScoringTest` proves the fourteen keys reach a `ScoringConfig`.
+    // These prove the `ScoringConfig` reaches the score, which is the half that
+    // was missing: every coefficient resolved correctly for two months while
+    // `GameViewModel` let the parameter default.
+
+    @Test
+    fun aPlacementIsWorthWhatConfigSaysItIsWorth() = runUnitTest {
+        val vm = viewModel(config = configOf("scoring.basePerPlacement" to 1_000))
+        // Past the speed window, so the multiplier is exactly 1.0 and the
+        // expected score is arithmetic rather than a re-run of the formula.
+        clock += PastSpeedWindow
+
+        vm.commit(cellFor(row = 0))
+
+        assertEquals(1_000 * level.size, vm.state.score.total)
+    }
+
+    @Test
+    fun withNoConfigAPlacementIsWorthTheShippedRate() = runUnitTest {
+        val vm = viewModel()
+        clock += PastSpeedWindow
+
+        vm.commit(cellFor(row = 0))
+
+        assertEquals(ScoringConfig.Default.basePerPlacement * level.size, vm.state.score.total)
+    }
+
+    @Test
+    fun anInvalidRemoteScoringSetScoresOnTheShippedOneRatherThanCrashing() = runUnitTest {
+        // `ScoringConfig` throws on this. Reaching a `place()` through the real
+        // ViewModel is the point: the exception would land on the tap that put
+        // a dog on the board.
+        val vm = viewModel(config = configOf("scoring.basePerPlacement" to -1_000))
+        clock += PastSpeedWindow
+
+        vm.commit(cellFor(row = 0))
+
+        assertEquals(ScoringConfig.Default.basePerPlacement * level.size, vm.state.score.total)
+    }
+
+    @Test
+    fun thePawRatingMovesWithItsConfiguredThresholds() = runUnitTest {
+        // Both fractions at zero puts every finish over the three-paw line, and
+        // the default set does not — so this fails against a `paws` call that
+        // kept defaulting its config parameter.
+        val generous = viewModel(
+            config = configOf(
+                "scoring.twoPawFraction" to 0.0,
+                "scoring.threePawFraction" to 0.0,
+            ),
+        )
+        // Slow, sloppy play: every placement outside the speed window.
+        (0 until level.size).forEach { row ->
+            clock += PastSpeedWindow
+            generous.commit(cellFor(row))
+        }
+        assertEquals(3, generous.state.paws)
+
+        val shipped = viewModel()
+        (0 until level.size).forEach { row ->
+            clock += PastSpeedWindow
+            shipped.commit(cellFor(row))
+        }
+        assertTrue(
+            shipped.state.paws < 3,
+            "the fixture has to be a run the shipped thresholds would not rate three paws",
+        )
+    }
+
+    @Test
+    fun aFreshInstallStartsWithTheConfiguredBoosters() = runUnitTest {
+        val vm = viewModel(
+            config = configOf(
+                "boosters.startingSniffs" to 7,
+                "boosters.startingTreats" to 2,
+            ),
+        )
+
+        assertEquals(7, vm.state.sniffs)
+        assertEquals(2, vm.state.treats)
+    }
+
+    @Test
+    fun withNoConfigAFreshInstallStartsWithThreeOfEach() = runUnitTest {
+        val vm = viewModel()
+
+        assertEquals(ConsumableRefillTo, vm.state.sniffs)
+        assertEquals(ConsumableRefillTo, vm.state.treats)
+    }
+
+    @Test
+    fun theStartingGrantIsOnlyForPlayersWhoHaveNeverHadAny() = runUnitTest {
+        // Someone who spent down to one must not have the opening handful
+        // re-granted every time the board opens.
+        val cache = InMemoryAppCache()
+        cache.set(AppData(sniffs = 1))
+
+        val vm = viewModel(cache = cache, config = configOf("boosters.startingSniffs" to 7))
+
+        assertEquals(1, vm.state.sniffs)
+    }
+
+    @Test
+    fun aRefillTopsUpToTheConfiguredAmount() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(sniffs = 0))
+        val vm = viewModel(cache = cache, config = configOf("boosters.refillTo" to 6))
+
+        vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Sniff))
+
+        assertEquals(6, vm.state.sniffs)
+        assertEquals(6, cache.get().sniffs)
+    }
+
+    @Test
+    fun switchingBoostersOffStopsTheEconomyAndLeavesBonesAlone() = runUnitTest {
+        val vm = viewModel(config = configOf("features.boosters" to false))
+
+        assertFalse(vm.state.boostersEnabled)
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        assertNull(vm.state.boosterPrompt, "a switched-off booster does not even explain itself")
+
+        // Bones are the three-strike rule, which is a game rule and not a
+        // feature — the header's explainer has to survive the switch.
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Bone))
+        assertEquals(Consumable.Bone, vm.state.boosterPrompt)
+    }
+
+    @Test
+    fun aSwitchedOffBoosterCannotBeRefilledByAnAdEither() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(sniffs = 0))
+        val vm = viewModel(cache = cache, config = configOf("features.boosters" to false))
+
+        vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Sniff))
+
+        assertEquals(0, vm.state.sniffs)
+    }
+
+    @Test
+    fun withNoConfigTheBoostersAreThere() = runUnitTest {
+        val vm = viewModel()
+
+        assertTrue(vm.state.boostersEnabled)
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+
+        assertEquals(Consumable.Sniff, vm.state.boosterPrompt)
+    }
+
+    @Test
+    fun switchingAchievementsOffHidesTheBadgesAndKeepsTheLog() = runUnitTest {
+        val badges = RecordingAchievements(unlocks = listOf(AnyAchievement))
+        val vm = viewModel(
+            achievements = badges,
+            config = configOf("features.achievements" to false),
+        )
+
+        (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
+
+        assertEquals(emptyList(), vm.state.newBadges)
+        assertEquals(
+            1,
+            badges.recorded.size,
+            "the fact log is written either way, or a dark launch loses history",
+        )
+    }
+
+    @Test
+    fun withNoConfigABadgeStillLands() = runUnitTest {
+        val badges = RecordingAchievements(unlocks = listOf(AnyAchievement))
+        val vm = viewModel(achievements = badges)
+
+        (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
+
+        assertEquals(listOf(AnyAchievement), vm.state.newBadges)
+    }
+
     private fun viewModel(
         levelId: Int = PlainLevel,
         isDaily: Boolean = false,
@@ -1375,22 +1560,6 @@ class GameViewModelTest : CoroutineTest() {
         achievementsEnabled = FeatureAchievements(config),
         boostersEnabled = FeatureBoosters(config),
     )
-
-    /**
-     * A config map addressed the way the admin console addresses it — dotted
-     * paths — so a test names the key an operator would type. An empty one is
-     * the outage case: every value resolves to its shipped default.
-     */
-    private fun configOf(vararg values: Pair<String, Any>): AppConfigMap {
-        val tree = mutableMapOf<String, MutableMap<String, Any>>()
-        values.forEach { (path, value) ->
-            val namespace = path.substringBefore('.')
-            tree.getOrPut(namespace) { mutableMapOf() }[path.substringAfter('.')] = value
-        }
-        return object : AppConfigMap() {
-            override val map: Map<String, *> = tree
-        }
-    }
 
     private fun scoringFrom(config: AppConfigMap) = ConfiguredScoring(
         ScoringBasePerPlacement(config),
@@ -1523,6 +1692,16 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Just past the commit window, so a second tap is a second note. */
         val LateGap = 400.milliseconds
+
+        /**
+         * Longer than `scoring.speedWindowMs`, so the speed multiplier is
+         * exactly 1.0 and a placement's score is arithmetic a test can state
+         * rather than a second copy of the formula.
+         */
+        val PastSpeedWindow = 20.seconds
+
+        /** Any badge will do; these tests care about whether one is shown. */
+        val AnyAchievement = Achievement(AchievementId.FirstSteps, Stat.LevelsCleared, target = 1)
     }
 
     /**
@@ -1628,7 +1807,10 @@ class GameViewModelTest : CoroutineTest() {
      * last level, because clamping that is the game's job.
      */
     /** Keeps every attempt handed to it, so a test can assert on what was recorded. */
-    private class RecordingAchievements : AchievementsRepository {
+    private class RecordingAchievements(
+        /** What every recorded attempt unlocks. Empty is the normal answer. */
+        private val unlocks: List<Achievement> = emptyList(),
+    ) : AchievementsRepository {
         val recorded = mutableListOf<LevelResult>()
         private var state = AchievementState.Empty
 
@@ -1638,7 +1820,7 @@ class GameViewModelTest : CoroutineTest() {
 
         override suspend fun record(result: LevelResult): List<Achievement> {
             recorded += result
-            return emptyList()
+            return unlocks
         }
 
         override suspend fun reset() {

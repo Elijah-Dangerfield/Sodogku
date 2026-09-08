@@ -562,8 +562,37 @@ class GameViewModel(
     }
 
     /** Writes or erases the player's own cross. Free, and never a life. */
+    /**
+     * A single tap on a square that is not a dog.
+     *
+     * Everything a player can put on the board they can take back off, with two
+     * exceptions they cannot: a placed dog, and the red square a wrong guess
+     * left behind. Both were paid for — one with a correct answer, one with a
+     * bone — and letting either be tidied away would let the board forget
+     * something the player is supposed to carry.
+     *
+     * An auto-mark is neither. It is a convenience the game derived, and a
+     * square the player taps expecting a cross to come off should have the cross
+     * come off. It goes into [GameState.clearedMarks] rather than out of
+     * [GameState.autoMarks], because auto-marks are recomputed from the
+     * placements on every move and anything removed from them would come
+     * straight back.
+     */
     private suspend fun GameAction.toggleMark(cell: Int) {
-        if (cell in state.autoMarks) return
+        // Paid for with a bone. It stays.
+        if (cell in state.wrongGuesses) return
+        if (cell in state.autoMarks) {
+            updateBoard {
+                it.copy(
+                    clearedMarks = if (cell in it.clearedMarks) {
+                        it.clearedMarks - cell
+                    } else {
+                        it.clearedMarks + cell
+                    },
+                )
+            }
+            return
+        }
         val level = state.level
         val placed = state.placed
         val marks = state.autoMarks
@@ -953,6 +982,14 @@ class GameViewModel(
         // There is no next daily. Tomorrow's board is tomorrow's.
         val next = if (isDaily) null else LevelPacks.campaign.byId(current.id + 1)
         if (next == null) {
+            // Clearing level 500 used to close the app: `NavigateBack` pops the
+            // start destination, and the start destination is the board. The
+            // last thing a player who finished the campaign should get is the
+            // home screen disappearing.
+            if (!isDaily && current.id >= LevelPacks.lastCampaignLevelId) {
+                updateState { it.copy(campaignComplete = true, phase = GamePhase.Won) }
+                return
+            }
             sendEvent(GameEvent.NavigateBack)
             return
         }
@@ -1132,7 +1169,12 @@ class GameViewModel(
      */
     private suspend fun GameAction.useSniff() {
         val level = state.level ?: return
-        val known = state.autoMarks + state.placedCells + state.wrongGuesses
+        // `manualMarks` belongs here as much as the rest. Without it a player who
+        // crosses squares off by hand can spend a sniff and be shown the very
+        // squares they already reasoned out — which is a charge taken for
+        // nothing, and it lands on exactly the careful player manual marking was
+        // built for.
+        val known = state.autoMarks + state.manualMarks + state.placedCells + state.wrongGuesses
         val ruledOut = HintFinder
             .ruledOutCells(level.board, state.placed, limit = SniffRevealLimit * SniffSearchSlack)
             .filterNot { cell -> cell in known }
@@ -1301,6 +1343,21 @@ data class GameState(
     val placed: Solution = Solution.empty(1),
     val autoMarks: Set<Int> = emptySet(),
     val manualMarks: Set<Int> = emptySet(),
+
+    /**
+     * True once the last campaign level is cleared, so the win sheet can say so
+     * instead of offering a next level that does not exist.
+     */
+    val campaignComplete: Boolean = false,
+
+    /**
+     * Auto-marks the player has tapped away.
+     *
+     * Held as an exclusion rather than by removing them from [autoMarks],
+     * because auto-marks are recomputed from [placed] on every move — anything
+     * taken out of that set would reappear on the next placement.
+     */
+    val clearedMarks: Set<Int> = emptySet(),
 
     /**
      * Squares that cost a bone. Tracked apart from [manualMarks] so they stay

@@ -6,6 +6,148 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — the palette went pastel, and it had to get *further* apart to do it
+
+Softening ten fills is not a colour change, it is a compression: every colour moves
+towards white, and the ones that were already near each other arrive at the same place.
+The first pastel pass looked lovely in a swatch and put two purples 14.2 apart in CIELAB.
+On a 10x10 with both regions on screen — which is exactly where region colour is doing
+the most work — that is a board a player cannot read.
+
+So the set was tuned against a measured floor rather than by eye. The shipped ten hold a
+minimum pairwise ΔE of **23.6**, which is *better* than the 21.5 of the saturated palette
+they replaced, and `RegionPaletteTest.noTwoFillsAreCloserThanTheSeparationFloor` fails at
+20. Two of the ten (periwinkle, orchid) are deliberately deeper than the rest so the
+lightness ladder survives the softening: the luminance span is 0.37 against the old 0.42.
+
+**What this cost, stated plainly.** The dog is near-white art, and on the two lightest
+fills it now sits at 1.44:1. That is thin. `BoardCell` draws a soft contact shadow under
+every placed dog, and that shadow is the difference between a dog and a smudge — it is
+load-bearing, not decoration, and the KDoc on both ends says so.
+
+**What it gained.** The region glyph — colourblind mode's actual answer, since ten hues
+cannot survive deuteranopia whatever they are — went from a composited 1.48–1.67:1 to
+**1.82–2.02:1**, because a dark watermark has more room on a pale fill. Its alpha went
+0.45 to 0.60 at the same time, which is where most of that came from.
+
+## 2026-09-07 — the player's cross is white, and stopped being the derived ink
+
+`RegionStyle.ink` is still derived from contrast and still worth deriving. It just is no
+longer what the player's "no dog here" mark is drawn in.
+
+A mark has to be found at a glance across a hundred squares. The answer to "what reads on
+ten different pastels" is one loud colour on all of them, not ten quiet ones that each
+merely pass — and ten different marks also means the mark's meaning is carried by a colour
+that already means something else. It is white, at 60% of the square, with round caps,
+drawn arm by arm as before.
+
+The derivation keeps its job for the **region glyph**, which genuinely does want the
+higher-contrast ink for the fill it sits on, and which is a real accessibility mode rather
+than a preference. Worth knowing: after the pastel retune the dark ink wins on all ten, so
+the function currently returns one branch. That is not a reason to delete it —
+`RegionPaletteTest.aDarkFillFlipsTheInkToLight` feeds it a fill only a light ink can win,
+so a hardcoded `DARK_INK` fails, and the derivation will notice again the first time
+somebody darkens a fill.
+
+## 2026-09-07 — Fredoka, and the display face is only part of the scale
+
+Reverses "Poppins, not a new font file" below, on the terms that entry set out: it said
+Baloo 2 and Fredoka were both drop-in and named the condition as *needing to be rounder*.
+Both were rendered side by side against real strings from this app — a level number, a
+score, the rule chips, a paragraph of dialog copy — before choosing. Fredoka won on three
+things that can be checked rather than argued:
+
+- **It is rounder.** Round terminals and open counters. Baloo 2 is rounded but tall and
+  narrow, and its lining figures — which is what a level number and a score *are* — come
+  out condensed.
+- **It has the Light this scale declares.** Fredoka's axis is 300–700, exactly the five
+  weights `FontFamily.kt` names. Baloo 2 starts at 400, so `FontWeight.Light` would have
+  aliased Regular and quietly done nothing. That was visible in the comparison render as
+  two identical rows.
+- **260KB against 1.6MB.** Baloo 2 carries a Devanagari companion in every static
+  instance. Five Fredoka weights cost less than one Baloo 2 weight.
+
+**It is bound to Display, Heading and Label — not the whole family.** The earlier note said
+a swap would change nothing else in the type scale, and that is true but not obviously
+right: Body and Caption are the sizes a player *reads*, and every word of legal text in
+this app is set at 12sp. A rounded display face there is playful at the reader's expense.
+Poppins keeps those two. The split is by what the reader is doing, not by size.
+
+The weights ship as static instances cut from the variable font, not as the variable font
+itself. Compose Resources' `Font()` takes a weight and picks a file; handing it one
+variable face would need the `wght` axis set per style, which Compose Multiplatform does
+not do for you on every target.
+
+## 2026-09-07 — the board's consequence animation is nineteen cells, not a hundred
+
+A placement should show what it *resolved*, not just that a dog arrived. The reference app
+does this by glowing the row and column and dimming the rest of the board.
+
+Dimming the rest is the expensive half: on a 10x10 it means all hundred cells animating on
+every placement, a hundred concurrent animations and a hundred draw invalidations per
+frame. Brightening the two lines instead is the same read — the resolved lines stand out
+from the rest — for **nineteen**. `PlacementRole` is `None` for the other eighty-one, and
+`placementPulseProgress` returns a shared zero `State` for them rather than allocating an
+`Animatable`, so a board where nobody has placed anything holds none at all.
+
+**What was measured.** On a 10x10, with the starburst and the nineteen-cell glow running,
+`gfxinfo framestats` across the pulse reports frame work of **5.8ms at the median, 11.6ms
+at p90 and 23.8ms at worst against a 16.7ms budget** — 2 frames of 69 over. Forty rapid
+taps across the same board (which draws a hundred crosses stroke by stroke) reported 2.9%
+janky frames at p90 28ms. Both on an emulator; the physical Pixel 4a was locked and
+`screencap` refuses on a locked device, so nothing here was measured on real hardware.
+
+**One thing found while measuring and worth not repeating.** `Radii.Cell` was written as
+`get() = Radius(CornerSize(percent = 20))` — a getter, matching its neighbours. A hundred
+cells ask for it on every recomposition, and a new `Radius` each time hands
+`Modifier.clip` a shape that is never equal to the last, rebuilding a hundred modifier
+nodes per frame for a constant. It is a `val`. The percentage itself is the point: a 4x4
+gives cells three times a 10x10's size, and a fixed 8dp corner makes the easy boards look
+like a spreadsheet and the hard ones look like sweets.
+
+## 2026-09-07 — which square a placement resolved is derived in the design system, not the ViewModel
+
+`GameState` has no "last placed cell". Rather than add one, `rememberPlacementPulse` diffs
+the set of placed dogs the screen was already rendering and answers with the row and column
+of whatever square joined it.
+
+**Why there and not in `GameViewModel`:** the rule that a dog resolves its own row and its
+own column is a fact about the board, not about this game's state machine, and putting the
+derivation in `:libraries:ui` next to `BoardCell` keeps the promise that a screen cannot
+forget a board animation — it hands over the set it already has and gets back the answer
+for every square.
+
+**Two cases that are deliberately not a placement**, both pinned by tests: nothing added
+(a mark, a strike, a redraw) and *more than one* square appearing at once. The second is a
+restore or an undo, and it has no single line to celebrate; picking one arbitrarily would
+point the player at a deduction nobody made. That case is live now that C-late added a
+board snapshot.
+
+**The nonce is counted apart from the pulse.** Reading it back as `pulse.nonce + 1` looks
+tidier and is wrong: a pulse that resolved to `None` takes the nonce to zero, and the next
+placement then reuses a number a cell has already animated on and stays silent.
+
+## 2026-09-07 — the rule chip that lights up is derived from the strike, and is usually none
+
+Grouping the three rule chips into one card gave the outline something to mean. What it
+means is "the rule your last wrong guess ran into", worked out in the screen from the
+board, the placed dogs and `strikeCell` — no new ViewModel state.
+
+**Null is the common answer and it matters that it is representable.** Most wrong guesses
+on a partly-solved board break no *visible* rule: the square simply is not where the dog
+goes, and nothing on screen yet says why. Outlining a rule there would teach a player
+something untrue about a game they are already finding hard.
+
+**The check order is not the order the chips are drawn in.** Adjacency is tested first,
+because an orthogonally adjacent square also breaks the row-and-column rule — test that one
+first and the subtler answer is never reached. A diagonal neighbour breaks adjacency alone,
+which is the case `BrokenRuleTest` uses to prove the check runs at all.
+
+The test board is worth a note: region A is the four *corners* of a 4x4, an awkward
+partition on purpose. With compact regions every square that shares a region also touches
+its neighbours, so there is no ordinary board shape that can tell the colour rule and the
+touching rule apart.
+
 ## 2026-09-07 — the dialog card pads itself, and the floating-window host had nothing to do with it
 
 Every dialog in the app had its title, its body and its close button flush against the card

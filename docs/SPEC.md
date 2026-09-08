@@ -51,6 +51,8 @@ level.
 | Tap a cell | Draws the player's X, stroke by stroke. Tap again to erase it. **Never costs a bone.** |
 | Tap the same cell twice inside 320ms | Commits a guess. Correct: dog pops in, points fly up, auto-mark fires. Wrong: red X, shake, a bone. |
 | Tap a rule chip | Pulses the cells of the relevant grouping. |
+| Tap the Level stat | Opens an explainer: where this board sits in the campaign, its grid size, and its difficulty in words. On a daily it explains the streak instead, because that is the number the header shows there. |
+| Tap the Score stat | Opens an explainer: how points are earned (per placement, combo, speed, completion bonus) and what the paws measure against par. Names no coefficient, since they all live in remote config. |
 
 **The safe gesture is the cheap one.** A single tap only ever writes or erases a note, so the
 destructive action takes deliberate effort. The second tap is recognised in `GameViewModel` rather
@@ -994,6 +996,11 @@ deuteranopia.
 Also: 44pt minimum touch targets means a 10x10 board fills the width on a small phone; dynamic
 type in header and settings; and "reduce motion" degrades bounces to fades rather than removing
 feedback.
+
+"Reduce animations" reaches the design system as `LocalReduceAnimations`, provided once at the
+app root. Any component that moves on its own reads it there rather than being handed it, so a
+new screen honours the setting without its author having to know the setting exists. Dialogs are
+the worked example: on they spring in and overshoot, off they fade.
 
 ---
 

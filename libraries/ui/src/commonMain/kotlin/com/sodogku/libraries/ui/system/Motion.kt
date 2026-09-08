@@ -51,6 +51,24 @@ object Motion {
     /** Per-cell stagger for the board's entrance wave, measured on the diagonal. */
     const val BoardWaveStepMillis: Int = 22
 
+    /**
+     * The starburst behind a landed dog, and the glow that runs down the row and
+     * column it just resolved.
+     *
+     * The one thing in here allowed past the ~300ms rule, and the exception is
+     * argued rather than assumed. Everything else on this list is *feedback* —
+     * the player is waiting on it to carry on, so it has to be over before they
+     * are. This one is the reward, it happens at most ten times a board rather
+     * than dozens, and it takes no input away while it runs: the next tap lands
+     * mid-glow and behaves exactly as it would have.
+     *
+     * Still short of half a second. The row-and-column glow is there to *say*
+     * what the placement resolved, and a player who has to watch it finish
+     * before the board makes sense again is being told something they already
+     * knew, slowly.
+     */
+    const val PlacementPulseMillis: Int = 460
+
     /** How far a pressed element scales down. Matches `bounceClick`'s default. */
     const val PressScale: Float = 0.90f
 

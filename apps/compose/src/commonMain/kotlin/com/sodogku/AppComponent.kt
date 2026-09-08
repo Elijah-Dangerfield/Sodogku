@@ -1,5 +1,6 @@
 package com.sodogku
 
+import com.sodogku.libraries.config.values.FeatureSharing
 import com.sodogku.libraries.core.AppState
 import com.sodogku.libraries.core.AutoInit
 import com.sodogku.libraries.navigation.DeepLinkBridge
@@ -46,6 +47,16 @@ interface AppComponent {
      * line are string resources, so only a composable can build one.
      */
     val shareLauncher: ShareLauncher
+
+    /**
+     * `features.sharing`, provided into the composition as
+     * [com.sodogku.libraries.ui.system.LocalSharingEnabled]. Pulled out
+     * alongside [shareLauncher] and for the same reason — the only thing that
+     * can build a share is a composable — and handed over as the value object
+     * rather than as a resolved boolean, so the button asks the config map when
+     * it draws instead of inheriting an answer from app start.
+     */
+    val sharingEnabled: FeatureSharing
 
     /**
      * Production app-wide state (offline banner etc.). Backed by

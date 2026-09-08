@@ -32,3 +32,14 @@ val LocalAppState = staticCompositionLocalOf<AppState> {
 val LocalClock = staticCompositionLocalOf<Clock> {
     error("No LocalClock provided")
 }
+
+/**
+ * The player's "reduce animations" setting, ambient rather than threaded through
+ * every call site.
+ *
+ * Design-system components that move on their own — dialogs springing in, a
+ * board wave — read this so a new screen honours the setting without its author
+ * having to know the setting exists. Defaults to `false`, never `error(...)`,
+ * so previews and tests get sane motion for free.
+ */
+val LocalReduceAnimations = staticCompositionLocalOf { false }

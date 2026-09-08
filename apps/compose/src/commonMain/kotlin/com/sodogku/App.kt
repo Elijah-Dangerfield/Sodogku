@@ -53,6 +53,7 @@ import com.sodogku.libraries.ui.system.LocalBuildInfo
 import com.sodogku.libraries.ui.system.LocalClock
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.libraries.ui.system.LocalShareSheet
+import com.sodogku.libraries.ui.system.LocalSharingEnabled
 import com.sodogku.system.AppThemeProvider
 import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.seconds
@@ -135,6 +136,11 @@ fun App(appComponent: AppComponent) {
         // Provided once at the root: every screen that can build a share
         // string reads this rather than being handed a launcher.
         LocalShareSheet provides appComponent.shareLauncher,
+        // The value object, not `sharingEnabled()`. Resolving it here would
+        // answer once for the life of the composition — App is built to
+        // recompose almost never — and a kill switch that waits for a process
+        // restart is not one.
+        LocalSharingEnabled provides appComponent.sharingEnabled::invoke,
     ) {
         AppThemeProvider {
             Box(modifier = Modifier.fillMaxSize()) {

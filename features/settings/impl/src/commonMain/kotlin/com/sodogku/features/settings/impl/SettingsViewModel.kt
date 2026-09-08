@@ -1,5 +1,6 @@
 package com.sodogku.features.settings.impl
 
+import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.LegalPrivacyUrl
 import com.sodogku.libraries.config.values.LegalTermsUrl
 import com.sodogku.libraries.core.BuildInfo
@@ -27,6 +28,7 @@ class SettingsViewModel(
     private val appCache: AppCache,
     private val termsUrl: LegalTermsUrl,
     private val privacyUrl: LegalPrivacyUrl,
+    private val achievementsEnabled: FeatureAchievements,
 ) : SEAViewModel<SettingsState, SettingsEvent, SettingsAction>(
     initialStateArg = SettingsState(appVersion = BuildInfo.versionString()),
 ) {
@@ -52,6 +54,12 @@ class SettingsViewModel(
     }
 
     private suspend fun SettingsAction.load() {
+        // Its own update, ahead of the disk read, because that read can fail and
+        // return — and a screen that could not load a setting still has to show
+        // (or hide) the badge rows correctly. Read here rather than captured at
+        // construction: `features.achievements` is a live-ops switch.
+        updateState { it.copy(achievementsAvailable = achievementsEnabled()) }
+
         val saved = Catching { appCache.get() }
             .logOnFailure { "Failed to read settings" }
             .getOrNull()
@@ -137,6 +145,16 @@ data class SettingsState(
      * rather than the grid being emptied.
      */
     val achievementsVisible: Boolean = true,
+
+    /**
+     * `features.achievements`. False takes the badge rows off this screen
+     * entirely, toggle included — a switch that hid the grid but left a
+     * "Show badges" control would be a setting with nothing behind it.
+     *
+     * True by default so an unreachable config leaves the feature present,
+     * which is the fail-open direction SPEC 4.2 asks for.
+     */
+    val achievementsAvailable: Boolean = true,
     val appVersion: String = "",
 )
 

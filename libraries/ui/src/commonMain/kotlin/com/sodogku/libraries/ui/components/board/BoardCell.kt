@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -25,6 +28,8 @@ import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.dog.AnimatedDog
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
+import com.sodogku.libraries.ui.components.game.drawStarburst
+import com.sodogku.libraries.ui.system.color.BoardMark
 import com.sodogku.libraries.ui.system.color.RegionPalette
 import com.sodogku.libraries.ui.system.color.drawBoardMark
 import com.sodogku.libraries.ui.system.color.drawRegionGlyph
@@ -69,6 +74,9 @@ enum class BoardCellState {
  * - **Mark** — the cross draws stroke by stroke. A note being *made* reads
  *   differently from a fact that was always true.
  * - **Placement** — the dog overshoots and settles.
+ * - **Consequence** — [placementRole] gives the landing square a warm starburst
+ *   and lights the row and column the dog just resolved. Without it a placement
+ *   is a dog appearing; with it, it is a deduction landing on two lines.
  * - **Strike** — [strikeNonce] shakes the cell and flashes a red cross. A nonce
  *   rather than a boolean, so the same cell can be got wrong twice running.
  */
@@ -80,6 +88,10 @@ fun BoardCell(
     size: Dp = DefaultCellSize,
     colorblind: Boolean = false,
     strikeNonce: Int = 0,
+    /** Bumped once per placement, board-wide. See [PlacementPulse]. */
+    placementNonce: Int = 0,
+    /** What this square owes the placement [placementNonce] refers to. */
+    placementRole: PlacementRole = PlacementRole.None,
     entranceDelayMillis: Int = 0,
     /**
      * Staggers the placed dog's idle loop and picks which loop it gets, so a
@@ -129,6 +141,8 @@ fun BoardCell(
         shake.animateTo(1f, tween(Motion.ShakeMillis))
     }
 
+    val pulse = placementPulseProgress(placementNonce, placementRole, animated)
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -140,10 +154,31 @@ fun BoardCell(
                 alpha = enter
                 translationY = (1f - enter) * -EntranceDropPx
                 translationX = sin(shake.value * ShakeCycles) * ShakeAmplitudePx * (1f - shake.value)
+                // The lift on a resolved line. Small on purpose: nineteen
+                // squares swelling at once is the board convulsing, and the
+                // glow is what is meant to be read — this only says the two
+                // lines are one thing.
+                val lift = 1f + pulse.value * LinePulseScale
+                scaleX *= lift
+                scaleY *= lift
             }
             .clip(Radii.Cell)
             .drawBehind {
                 drawRect(style.fill)
+
+                // Order matters and is the whole reason these are draws rather
+                // than stacked composables: the glow washes over the fill, the
+                // burst sits on top of the glow, and the player's own cross is
+                // last so nothing the board is celebrating can obscure the note
+                // they made.
+                val elapsed = 1f - pulse.value
+                if (pulse.value > 0f) {
+                    drawRect(LineGlow.copy(alpha = LineGlow.alpha * pulse.value))
+                    if (placementRole == PlacementRole.Origin) {
+                        drawStarburst(BurstInk, elapsed)
+                    }
+                }
+
                 if (colorblind) {
                     drawRegionGlyph(
                         style.glyph,
@@ -151,9 +186,28 @@ fun BoardCell(
                         GlyphFraction,
                     )
                 }
+
+                // A near-white dog on a pastel square is 1.44:1 at worst, which
+                // is not enough on its own. The shadow is what puts an edge back
+                // under it, so it is drawn for every placed dog rather than only
+                // while the placement animation runs.
+                if (pop.value > 0f) {
+                    val radius = this.size.minDimension * DogShadowFraction
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(DogShadow, Color.Transparent),
+                            center = center.copy(y = center.y + radius * DogShadowDrop),
+                            radius = radius,
+                        ),
+                        radius = radius,
+                        center = center.copy(y = center.y + radius * DogShadowDrop),
+                        alpha = pop.value.coerceIn(0f, 1f),
+                    )
+                }
+
                 if (mark.value > 0f) {
-                    val ink = if (state == BoardCellState.Wrong) StrikeInk else style.ink
-                    drawBoardMark(ink, MarkFraction, mark.value)
+                    val ink = if (state == BoardCellState.Wrong) StrikeInk else MarkInk
+                    drawBoardMark(ink, BoardMark.Fraction, mark.value)
                 }
             }
             .pointerInput(enabled) {
@@ -188,6 +242,31 @@ fun BoardCell(
     }
 }
 
+/**
+ * How far through its placement pulse this square is, 1 down to 0.
+ *
+ * The `Animatable` only exists for the squares a placement actually touched —
+ * about 19 of a 10x10's hundred, and none at all when the player is only
+ * marking. A hundred idle animations that spend their lives at zero is the
+ * cheap-looking version of this that is not actually cheap.
+ */
+@Composable
+private fun placementPulseProgress(
+    nonce: Int,
+    role: PlacementRole,
+    animated: Boolean,
+): State<Float> {
+    if (role == PlacementRole.None || !animated) return NoPulse
+    val pulse = remember { Animatable(0f) }
+    LaunchedEffect(nonce) {
+        pulse.snapTo(1f)
+        pulse.animateTo(0f, tween(Motion.PlacementPulseMillis))
+    }
+    return pulse.asState()
+}
+
+private val NoPulse: State<Float> = mutableFloatStateOf(0f)
+
 /** Fits a 10x10 board on the narrowest phone we support with room for padding. */
 val DefaultCellSize: Dp = 34.dp
 
@@ -195,17 +274,43 @@ val DefaultCellSize: Dp = 34.dp
 private val StrikeInk = Color(0xE6D32F2F)
 
 /**
+ * The player's own cross. White on every fill, rather than the region's derived
+ * ink on each: a mark that has to be spotted across a hundred squares wants one
+ * answer, and white is the only colour that is louder than every pastel in the
+ * palette at once.
+ */
+private val MarkInk = Color(0xFFFFFFFF)
+
+/** The wash that runs down a resolved row and column. Warm, so it reads as praise. */
+private val LineGlow = Color(0x8CFFE39B)
+
+/** The burst behind a landed dog. */
+private val BurstInk = Color(0xCCFFD25E)
+
+/** Puts an edge under a near-white dog on a pastel square. */
+private val DogShadow = Color(0x33241207)
+private const val DogShadowFraction = 0.44f
+private const val DogShadowDrop = 0.16f
+
+/**
  * The region glyph is a watermark, not a badge. Loud enough to tell two fills
  * apart at a glance, quiet enough that a board of them does not compete with
  * the crosses and dogs the player is actually reading.
+ *
+ * The alpha went up with the pastel retune, from 0.45 to 0.60. Softer fills
+ * narrowed the lightness ladder the palette used to lean on, so the glyph is
+ * carrying more of colourblind mode than it was; measured against the ten
+ * fills, this takes the composited watermark from 1.48–1.67:1 to 1.82–2.02:1.
+ * It is still a watermark — but it is now the *most* legible it has been, on a
+ * palette where it matters more.
  */
 private const val GlyphFraction = 0.42f
-private const val GlyphAlpha = 0.45f
-private const val MarkFraction = 0.46f
+private const val GlyphAlpha = 0.60f
 private const val DogFraction = 0.82f
 private const val ShakeCycles = 18f
 private const val ShakeAmplitudePx = 7f
 private const val EntranceDropPx = 26f
+private const val LinePulseScale = 0.05f
 
 @Preview
 @Composable

@@ -26,16 +26,16 @@ import kotlin.test.assertNotEquals
  * `init` and **throws**. Every other configured value is a number the caller
  * uses as-is.
  *
- * So there are three properties here, and the middle one is the one a hardcoded
- * implementation would sail through. "The default is used when config is empty"
- * passes just as well against a function that returns `ScoringConfig.Default`
- * and never reads a key at all.
+ * The load-bearing test is [everyKeyIsActuallyRead]. "The default is used when
+ * config is empty" passes just as well against a function that returns
+ * `ScoringConfig.Default` and never opens the config map at all, so a key that
+ * was declared and then left off the constructor call would look wired.
  */
 class ConfiguredScoringTest {
 
     @Test
     fun withNoConfigTheShippedCoefficientsAreUsed() {
-        assertEquals(ScoringConfig.Default, ConfiguredScoring(configOf()).invoke())
+        assertEquals(ScoringConfig.Default, scoringFrom(configOf()).invoke())
     }
 
     @Test
@@ -44,7 +44,7 @@ class ConfiguredScoringTest {
         // single field left off the constructor call — which fourteen keys and
         // a copy-pasted list makes very easy. A test that only checked one
         // coefficient would pass with the other thirteen ignored.
-        val tuned = ConfiguredScoring(
+        val tuned = scoringFrom(
             configOf(
                 "scoring.basePerPlacement" to 111,
                 "scoring.completionBase" to 222,
@@ -85,7 +85,7 @@ class ConfiguredScoringTest {
         // The exact write `ScoringConfig`'s `require` was added for: a negative
         // base makes par negative, so every score clears three paws. It throws,
         // and a throw on the tap that placed a dog is a crash mid-level.
-        val broken = ConfiguredScoring(configOf("scoring.basePerPlacement" to -100)).invoke()
+        val broken = scoringFrom(configOf("scoring.basePerPlacement" to -100)).invoke()
 
         assertEquals(ScoringConfig.Default, broken)
     }
@@ -95,7 +95,7 @@ class ConfiguredScoringTest {
         // Not a field anything could reject on its own: both fractions are in
         // range, and only their order is wrong. It is the reason the fallback
         // is whole-set rather than per-field.
-        val inverted = ConfiguredScoring(
+        val inverted = scoringFrom(
             configOf(
                 "scoring.twoPawFraction" to 0.9,
                 "scoring.threePawFraction" to 0.5,
@@ -111,7 +111,7 @@ class ConfiguredScoringTest {
         // nobody chose. If this ever starts returning 500, someone has made the
         // fallback field-by-field and the paw thresholds are being applied to
         // coefficients that were never balanced against them.
-        val mixed = ConfiguredScoring(
+        val mixed = scoringFrom(
             configOf(
                 "scoring.basePerPlacement" to 500,
                 "scoring.completionBase" to 0,
@@ -119,19 +119,16 @@ class ConfiguredScoringTest {
         ).invoke()
 
         assertEquals(ScoringConfig.Default, mixed)
-        assertEquals(ScoringConfig.Default.basePerPlacement, mixed.basePerPlacement)
     }
 
     @Test
     fun aValueOfTheWrongTypeResolvesToItsDefaultRatherThanZero() {
-        val typo = ConfiguredScoring(configOf("scoring.comboMax" to "banana")).invoke()
+        val typo = scoringFrom(configOf("scoring.comboMax" to "banana")).invoke()
 
         assertEquals(ScoringConfig.Default, typo)
     }
 
-    private fun configOf(vararg values: Pair<String, Any>): ConfiguredScoring.Companion.Nothing? = null
-
-    private fun ConfiguredScoring(config: AppConfigMap) = ConfiguredScoring(
+    private fun scoringFrom(config: AppConfigMap) = ConfiguredScoring(
         ScoringBasePerPlacement(config),
         ScoringCompletionBase(config),
         ScoringComboStep(config),

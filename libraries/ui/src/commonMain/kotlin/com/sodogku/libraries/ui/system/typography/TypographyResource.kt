@@ -253,12 +253,14 @@ interface CaptionTypography {
 fun rememberTypography(): Typography {
     val serifFontFamily = SerifFontFamily
     val sansSerifFontFamily = SansSerifFontFamily
+    val roundedFontFamily = RoundedFontFamily
     val brandFontFamily = BrandFontFamily
 
-    return remember(serifFontFamily, sansSerifFontFamily, brandFontFamily) {
+    return remember(serifFontFamily, sansSerifFontFamily, roundedFontFamily, brandFontFamily) {
         DefaultTypography(
             serifFontFamily = serifFontFamily,
             sansSerifFontFamily = sansSerifFontFamily,
+            roundedFontFamily = roundedFontFamily,
             brandFontFamily = brandFontFamily
         )
     }
@@ -267,28 +269,35 @@ fun rememberTypography(): Typography {
 class DefaultTypography(
     @Suppress("UnusedPrivateProperty") serifFontFamily: FontFamily,
     sansSerifFontFamily: FontFamily,
+    roundedFontFamily: FontFamily,
     brandFontFamily: FontFamily
 ) : Typography {
     /**
-     * Poppins, not the serif the template shipped.
+     * The scale is split across two faces, and the split is by what the reader
+     * is doing rather than by size.
      *
-     * Display is not a decorative scale here — it is the app's own voice, and it
-     * carries every dialog title, screen header and error message as well as the
-     * level and score. DM Serif was a leftover, and it was quietly making a dog
-     * puzzle look like a magazine on every one of those screens.
+     * **Fredoka** takes Display, Heading and Label: the level number, the score,
+     * every title, every button. These are glanced at, never read, and they are
+     * where the app either sounds like a toy or sounds like a form. It replaced
+     * Poppins, which replaced the DM Serif the template shipped — that one was a
+     * leftover, and it was quietly making a dog puzzle look like a magazine.
+     *
+     * **Poppins** keeps Body and Caption. A rounded display face at 12sp across
+     * a paragraph of settings copy is playful at the reader's expense, and every
+     * word of legal text in this app is set at that size.
      *
      * [serifFontFamily] stays in the constructor rather than being deleted: the
      * template's theme wires all three families, and dropping the parameter is a
      * change to every caller for no gain. Nothing reads it, which is the point.
      */
-    override val Display: DisplayTypography = DisplayTypographyImpl(sansSerifFontFamily)
+    override val Display: DisplayTypography = DisplayTypographyImpl(roundedFontFamily)
 
     override val Brand: BrandTypography = BrandTypographyImpl(brandFontFamily)
 
-    override val Heading: HeadingTypography = HeadingTypographyImpl(sansSerifFontFamily)
+    override val Heading: HeadingTypography = HeadingTypographyImpl(roundedFontFamily)
+    override val Label: LabelTypography = LabelTypographyImpl(roundedFontFamily)
 
     override val Body: BodyTypography = BodyTypographyImpl(sansSerifFontFamily)
-    override val Label: LabelTypography = LabelTypographyImpl(sansSerifFontFamily)
     override val Caption: CaptionTypography = CaptionTypographyImpl(sansSerifFontFamily)
 
     override val Default: TypographyResource = Body.B600

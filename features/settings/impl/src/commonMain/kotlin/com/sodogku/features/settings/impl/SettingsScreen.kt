@@ -112,18 +112,19 @@ fun SettingsScreen(
                 // The row that opens the grid disappears when badges are off,
                 // matching what the toggle promises: nothing about them on
                 // screen. The toggle itself stays, or there would be no way
-                // back.
+                // back — unless `features.achievements` is off, which takes the
+                // feature away rather than hiding it, so the toggle goes too.
                 items = listOfNotNull(
                     ListSectionItem(
                         headlineText = stringResource(Res.string.settings_achievements),
                         onClick = { onAction(SettingsAction.OpenAchievements) },
-                    ).takeIf { state.achievementsVisible },
+                    ).takeIf { state.achievementsVisible && state.achievementsAvailable },
                     toggleItem(
                         headline = stringResource(Res.string.settings_achievements_show),
                         supporting = stringResource(Res.string.settings_achievements_show_body),
                         checked = state.achievementsVisible,
                         onToggle = { onAction(SettingsAction.ToggleAchievements) },
-                    ),
+                    ).takeIf { state.achievementsAvailable },
                     ListSectionItem(
                         headlineText = stringResource(Res.string.settings_progress_local_title),
                         supportingText = stringResource(Res.string.settings_progress_local_body),

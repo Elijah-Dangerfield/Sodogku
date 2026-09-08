@@ -18,3 +18,20 @@ import com.sodogku.libraries.sharing.ShareLauncher
  * without providing anything.
  */
 val LocalShareSheet = staticCompositionLocalOf<ShareLauncher> { ShareLauncher { } }
+
+/**
+ * Whether sharing is switched on at all — `features.sharing`, reachable from any
+ * composable that can offer a share.
+ *
+ * A function rather than a `Boolean` on purpose. The value it wraps resolves
+ * from the config map on every call, and a plain boolean provided at the root of
+ * the tree would be answered once at app start: the switch would not take effect
+ * until the process restarted, which is exactly what a dark launch cannot
+ * tolerate. Reading it where the button is drawn keeps the answer current.
+ *
+ * Defaults to on. An app that never reaches the server, a preview and a unit
+ * test all get the share button, which is the fail-open direction SPEC 4.2 asks
+ * for — a feature is hidden because someone decided to hide it, never because a
+ * fetch failed.
+ */
+val LocalSharingEnabled = staticCompositionLocalOf<() -> Boolean> { { true } }

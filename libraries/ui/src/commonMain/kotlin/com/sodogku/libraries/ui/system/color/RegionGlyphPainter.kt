@@ -86,7 +86,21 @@ fun DrawScope.drawRegionGlyph(
 }
 
 /**
- * The player's "no dog here" mark: a cross.
+ * One arm of the player's cross, as far as it has been drawn.
+ *
+ * A value rather than two `drawLine` calls buried in a draw scope, so the thing
+ * the geometry actually promises — where the arms start, how far each has got
+ * at a given progress, how thick they are — can be asserted without a canvas.
+ */
+data class MarkStroke(val start: Offset, val end: Offset)
+
+/**
+ * The geometry of the player's "no dog here" mark.
+ *
+ * Big, blunt and round-ended: [Fraction] of the square across, with arms
+ * [StrokeFraction] of that thick and round caps on both ends. A thin cross in
+ * the region's own ink reads as a spreadsheet tick; this reads as a friendly
+ * "nope", which is what the gesture means.
  *
  * Deliberately not drawn from [RegionGlyph]. The first pass reused `Plus` for
  * this, which is also region 6's identity glyph — so in colourblind mode a
@@ -94,39 +108,73 @@ fun DrawScope.drawRegionGlyph(
  * ruled this out". A cross is excluded from the region set precisely so it can
  * mean exactly one thing.
  */
+object BoardMark {
+
+    /** How much of the square the cross spans. */
+    const val Fraction: Float = 0.60f
+
+    /** Arm thickness, as a fraction of the cross's own extent. */
+    const val StrokeFraction: Float = 0.20f
+
+    /** Fraction of the draw spent on the first arm before the second starts. */
+    const val StrokeSplit: Float = 0.55f
+
+    fun extent(size: Size, fraction: Float = Fraction): Float =
+        minOf(size.width, size.height) * fraction
+
+    fun strokeWidth(size: Size, fraction: Float = Fraction): Float =
+        extent(size, fraction) * StrokeFraction
+
+    /**
+     * The arms visible at [progress], in draw order.
+     *
+     * Two strokes in sequence rather than both at once. A cross that appears
+     * whole reads as a state change; one that is *drawn* reads as the player
+     * making a note, which is what the gesture actually is.
+     */
+    fun strokes(
+        size: Size,
+        progress: Float,
+        fraction: Float = Fraction,
+    ): List<MarkStroke> {
+        val extent = extent(size, fraction)
+        val half = extent / 2f
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+
+        val first = (progress / StrokeSplit).coerceIn(0f, 1f)
+        val second = ((progress - StrokeSplit) / (1f - StrokeSplit)).coerceIn(0f, 1f)
+
+        return buildList {
+            if (first > 0f) {
+                add(
+                    MarkStroke(
+                        start = Offset(cx - half, cy - half),
+                        end = Offset(cx - half + extent * first, cy - half + extent * first),
+                    ),
+                )
+            }
+            if (second > 0f) {
+                add(
+                    MarkStroke(
+                        start = Offset(cx - half, cy + half),
+                        end = Offset(cx - half + extent * second, cy + half - extent * second),
+                    ),
+                )
+            }
+        }
+    }
+}
+
+/** Draws [BoardMark] centred in the current draw scope. */
 fun DrawScope.drawBoardMark(
     color: Color,
-    fraction: Float = MARK_FRACTION,
+    fraction: Float = BoardMark.Fraction,
     progress: Float = 1f,
 ) {
-    val extent = minOf(size.width, size.height) * fraction
-    val centre = Offset(size.width / 2f, size.height / 2f)
-    val half = extent / 2f
-    val strokeWidth = extent * MARK_STROKE_FRACTION
-
-    // Two strokes drawn in sequence rather than both at once. A cross that
-    // appears whole reads as a state change; one that is *drawn* reads as the
-    // player making a note, which is what the gesture actually is.
-    val first = (progress / STROKE_SPLIT).coerceIn(0f, 1f)
-    val second = ((progress - STROKE_SPLIT) / (1f - STROKE_SPLIT)).coerceIn(0f, 1f)
-
-    if (first > 0f) {
-        drawLine(
-            color,
-            Offset(centre.x - half, centre.y - half),
-            Offset(centre.x - half + extent * first, centre.y - half + extent * first),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round,
-        )
-    }
-    if (second > 0f) {
-        drawLine(
-            color,
-            Offset(centre.x - half, centre.y + half),
-            Offset(centre.x - half + extent * second, centre.y + half - extent * second),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round,
-        )
+    val width = BoardMark.strokeWidth(size, fraction)
+    BoardMark.strokes(size, progress, fraction).forEach { stroke ->
+        drawLine(color, stroke.start, stroke.end, strokeWidth = width, cap = StrokeCap.Round)
     }
 }
 
@@ -152,8 +200,3 @@ private const val PLUS_ARM_FRACTION = 0.34f
 private const val BAR_THICKNESS_FRACTION = 0.26f
 private const val DOUBLE_BAR_GAP_FRACTION = 0.08f
 private const val CHEVRON_RISE = 0.7f
-private const val MARK_FRACTION = 0.5f
-private const val MARK_STROKE_FRACTION = 0.22f
-
-/** Fraction of the draw spent on the first stroke before the second starts. */
-private const val STROKE_SPLIT = 0.55f

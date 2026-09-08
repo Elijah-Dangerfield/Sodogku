@@ -445,10 +445,14 @@ private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Uni
     }
 }
 
-private fun cellState(state: GameState, cell: Int): BoardCellState = when (cell) {
-    in state.placedCells -> BoardCellState.Occupied
-    in state.wrongGuesses -> BoardCellState.Wrong
-    in state.autoMarks, in state.manualMarks -> BoardCellState.Marked
+private fun cellState(state: GameState, cell: Int): BoardCellState = when {
+    cell in state.placedCells -> BoardCellState.Occupied
+    cell in state.wrongGuesses -> BoardCellState.Wrong
+    cell in state.manualMarks -> BoardCellState.Marked
+    // An auto-mark the player has tapped away reads as empty again. It is still
+    // in `autoMarks`, because that set is derived from the placements and is
+    // recomputed on every move; the clearing is an exclusion laid over it.
+    cell in state.autoMarks && cell !in state.clearedMarks -> BoardCellState.Marked
     else -> BoardCellState.Empty
 }
 

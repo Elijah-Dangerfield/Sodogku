@@ -42,6 +42,7 @@ object Radii {
     val R300 = Radius(CornerSize(DimensionResource.D300.dp))
     val R400 = Radius(CornerSize(DimensionResource.D400.dp))
     val R600 = Radius(CornerSize(DimensionResource.D600.dp))
+    val R900 = Radius(CornerSize(DimensionResource.D900.dp))
     val None = Radius(SquareCornerSize)
 
     val Default get() = None
@@ -51,8 +52,28 @@ object Radii {
     val Header get() = None
     val Card get() = R400
 
-    /** One board square. Generous enough to read as bubbly at 34dp. */
-    val Cell get() = R300
+    /**
+     * One board square, as a proportion rather than a fixed corner.
+     *
+     * A 4x4 gives a cell three times the size of a 10x10's, and 8dp of corner on
+     * both means the easy boards look like a spreadsheet and the hard ones look
+     * like sweets. Twenty percent holds the same shape at every board size,
+     * which is the only reading of "the board looks like this" that survives
+     * five different grid sizes.
+     *
+     * A `val`, not a `get()` like its neighbours. A hundred cells ask for this
+     * on every recomposition of the board, and a getter that builds a new
+     * `Radius` each time hands `Modifier.clip` a shape that is never equal to
+     * the last one — a hundred modifier nodes rebuilt per frame for a constant.
+     */
+    val Cell = Radius(CornerSize(percent = 20))
+
+    /**
+     * The card the grid sits on. Deliberately larger than [Card]: it has to read
+     * as an object the board is *resting on* rather than as another panel, and a
+     * 10dp corner on something 350dp wide barely registers.
+     */
+    val Board get() = R900
 }
 
 

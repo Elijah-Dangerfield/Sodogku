@@ -4,8 +4,11 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * The small game shapes, drawn rather than shipped as drawables.
@@ -45,6 +48,51 @@ fun DrawScope.drawBone(fill: Color, edge: Color) {
             drawCircle(color, radius = lobe - inset, center = Offset(x, centreY - spread))
             drawCircle(color, radius = lobe - inset, center = Offset(x, centreY + spread))
         }
+    }
+}
+
+/**
+ * The burst behind a dog that has just landed: a warm bloom with tapered rays
+ * fanning out of it.
+ *
+ * [elapsed] runs 0 to 1 over the life of the animation. The burst expands and
+ * fades at the same time, which is what stops it reading as a lens flare stuck
+ * to the square — a thing that grows *and* dims looks like energy leaving,
+ * which is the moment being drawn.
+ *
+ * Drawn as flat triangles rather than a blurred sprite. This is at most one
+ * cell out of a hundred and only for [com.sodogku.system.Motion.PlacementPulseMillis],
+ * so the cheap version is the one worth having: eight paths and two circles,
+ * no bitmap, no shader compile the first time a player places a dog.
+ */
+fun DrawScope.drawStarburst(color: Color, elapsed: Float) {
+    val fade = (1f - elapsed).coerceIn(0f, 1f)
+    if (fade <= 0f) return
+
+    val centre = Offset(size.width / 2f, size.height / 2f)
+    val extent = minOf(size.width, size.height)
+    val reach = extent * (BURST_START_REACH + elapsed * (BURST_END_REACH - BURST_START_REACH))
+
+    drawCircle(
+        color = color.copy(alpha = color.alpha * fade * BURST_BLOOM_ALPHA),
+        radius = reach * BURST_BLOOM_SCALE,
+        center = centre,
+    )
+
+    val ray = color.copy(alpha = color.alpha * fade)
+    val inner = reach * BURST_RAY_INNER
+    repeat(BURST_RAYS) { index ->
+        val angle = index * TAU / BURST_RAYS + BURST_RAY_PHASE
+        val spread = TAU / BURST_RAYS * BURST_RAY_WIDTH
+        drawPath(
+            Path().apply {
+                moveTo(centre.x + cos(angle) * reach, centre.y + sin(angle) * reach)
+                lineTo(centre.x + cos(angle - spread) * inner, centre.y + sin(angle - spread) * inner)
+                lineTo(centre.x + cos(angle + spread) * inner, centre.y + sin(angle + spread) * inner)
+                close()
+            },
+            ray,
+        )
     }
 }
 
@@ -174,6 +222,16 @@ private const val DIAGRAM_GAP = 0.16f
 private const val DIAGRAM_RADIUS = 0.22f
 private const val RULED_OUT_ALPHA = 0.5f
 private const val EMPTY_ALPHA = 0.14f
+
+private const val TAU = 6.2831855f
+private const val BURST_RAYS = 8
+private const val BURST_RAY_PHASE = 0.3927f
+private const val BURST_RAY_WIDTH = 0.22f
+private const val BURST_RAY_INNER = 0.30f
+private const val BURST_START_REACH = 0.30f
+private const val BURST_END_REACH = 0.86f
+private const val BURST_BLOOM_SCALE = 0.62f
+private const val BURST_BLOOM_ALPHA = 0.55f
 
 private const val BONE_LOBE_FRACTION = 0.21f
 private const val BONE_BAR_FRACTION = 0.30f

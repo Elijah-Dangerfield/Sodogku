@@ -1036,12 +1036,12 @@ look a lot like Meowdoku. Everything below is feel, not function.
 | P3 | Dog idle loops read oddly. Keep `idle` and `look`; drop the shake; the rest occasional at most | | |
 | P4 | Some X marks cannot be undone. The red X (paid for) and a placed dog must stay; every other mark must clear | | |
 | P5 | Tapping Level and Score opens an explainer; both labels a size bigger | dialogs | **Dialogs done**, seen on device. The two lines in `GameScreen.kt` that make the stats tappable and bump the label are handed back as a diff — that file was owned by another chunk |
-| P6 | A rounder, more playful display face. Poppins is already everywhere; `FontFamily.kt` names Baloo 2 and Fredoka as drop-in OFL replacements | | |
+| P6 | A rounder, more playful display face. Poppins is already everywhere; `FontFamily.kt` names Baloo 2 and Fredoka as drop-in OFL replacements | board look | **DONE** — Fredoka, on Display, Heading and Label. Both candidates were rendered against real strings first; see `decisions.md` for the three reasons, one of which is 260KB against 1.6MB |
 | P7 | A better dialog entrance animation | dialogs | **DONE** — springs up and overshoots on `Motion.Pop`, scrim fades under it, honours `reduceAnimations`. The floating-window nav host turned out not to control this |
-| P8 | Keep checking the app against Meowdoku screenshots | | |
+| P8 | Keep checking the app against Meowdoku screenshots | board look | **DONE for the board** — all five items in `docs/reference/meowdoku.md` are landed and `sodogku-board.png` sits next to their screenshot for comparison. What still differs is listed there rather than being called finished |
 | P9 | Propose features, argued both ways, leaning conservative, each with a backend-driven-or-not call | | |
 | P10 | **Board state is lost.** Re-picking the level you are already on from the pane wipes every mark and placement. There is also no in-progress snapshot at all, so backgrounding loses the board — C5 promised one and it was never built | | |
-| P11 | Sniff and Treat buttons want colour and a playful, shiny treatment. Try several, screenshot, judge | | |
+| P11 | Sniff and Treat buttons want colour and a playful, shiny treatment. Try several, screenshot, judge | board look | **PARTLY** — they are white pills now rather than cream-on-cream, which was the legibility half. The colour-and-shine half is untouched |
 | P12 | Splash: the dog head still, centred, with the loader appearing only after ~5s. Better than today's loader-and-words | | |
 | P13 | Use the supplied backgrounds on onboarding and splash — **blocked, see below** | | |
 

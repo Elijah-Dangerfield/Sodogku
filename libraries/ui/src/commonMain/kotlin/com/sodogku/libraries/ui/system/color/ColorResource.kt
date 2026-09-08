@@ -95,6 +95,22 @@ sealed class ColorResource(val color: Color, val designSystemName: String) {
     object Purple600 : ColorResource(Color(0xFF8E24AA), "purple-600")
     object Purple700 : ColorResource(Color(0xFF7B1FA2), "purple-700")
 
+    // Cream - the page. A cold grey background reads as a utility; a warm cream
+    // one reads as a toy, and that single substitution is most of the distance
+    // between this app and the games it is being compared against.
+    object Cream50 : ColorResource(Color(0xFFF8F2ED), "cream-50")
+    object Cream100 : ColorResource(Color(0xFFF2E9E1), "cream-100")
+    object Cream200 : ColorResource(Color(0xFFE8DCD1), "cream-200")
+    object Cream300 : ColorResource(Color(0xFFDCCCBE), "cream-300")
+
+    // Brown - every text colour. Pure black on cream reads as newsprint printed
+    // on the wrong paper; the ink has to be warm too or the cream looks like a
+    // mistake.
+    object Brown900 : ColorResource(Color(0xFF4A322F), "brown-900")
+    object Brown700 : ColorResource(Color(0xFF6D4A47), "brown-700")
+    object Brown500 : ColorResource(Color(0xFF9A7A75), "brown-500")
+    object Brown300 : ColorResource(Color(0xFFC2ABA6), "brown-300")
+
     // Utility colors
     object Black : ColorResource(Color(0xFF000000), "black")
     object Black_A70 : ColorResource(Color(0xFF000000).copy(alpha = 0.7f), "black-a-70")
@@ -193,6 +209,15 @@ private val colors = listOf(
     ColorResource.Purple500,
     ColorResource.Purple600,
     ColorResource.Purple700,
+    // Cream / brown
+    ColorResource.Cream50,
+    ColorResource.Cream100,
+    ColorResource.Cream200,
+    ColorResource.Cream300,
+    ColorResource.Brown900,
+    ColorResource.Brown700,
+    ColorResource.Brown500,
+    ColorResource.Brown300,
     // Utilities
     ColorResource.Black,
     ColorResource.White

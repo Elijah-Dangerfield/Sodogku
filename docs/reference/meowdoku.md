@@ -63,3 +63,53 @@ on the cream. No score on screen at all during play.
 3. The white X.
 4. The placement starburst and the row/column glow.
 5. Grouping the rule chips and centring the pills.
+
+---
+
+## Where this stands, 2026-09-07 late
+
+All five items above are done. `sodogku-board.png` next to this file is the same
+opening board as `meowdoku-board.png`, shot on a device after the change; compare them
+side by side rather than reading the list below.
+
+**Matched.**
+
+- **Temperature.** The page is `#F8F2ED` and every text colour is a warm brown. Body
+  text sits at 10.6:1 against it and secondary text at 7.0:1, so nothing was traded for
+  the warmth.
+- **The board card.** White, 24dp corners, a soft shadow, and 10dp of white showing
+  around the outermost cells. The gutter between cells went from 4dp to 6dp so the card
+  shows through, which is what makes it read as a board rather than a table.
+- **Pastel fills.** All ten resoftened. The white cross is now the loudest thing on a
+  square, which was the point.
+- **The white X.** Thick, round-capped, 60% of the square, drawn arm by arm.
+- **Placement juice.** A landing dog gets a warm starburst; the row and column it
+  resolved wash warm and lift very slightly, then settle.
+- **The rule chips** are one white card holding three, with the rule a wrong guess just
+  broke outlined.
+- **The two pills** are centred side by side.
+- **Circular white header buttons**, which was not on the list but is half of why their
+  header looks placed and ours looked like leftovers.
+- **A rounder face.** Fredoka for Display, Heading and Label; Poppins keeps Body and
+  Caption.
+
+**Still off, honestly.**
+
+- **The board sits lower on the page than theirs.** Their grid starts about a third of
+  the way down; ours is nearer the middle, because the booster row is pinned to the
+  bottom and the two spacers around the board share the slack evenly. It is one weight
+  away from matching and was left alone because moving the board changes where every
+  coach mark points.
+- **Their glow spills into the gutters.** Ours is clipped to the square, because the
+  cells clip their own corners. Matching it means drawing the glow on the card behind
+  the grid rather than in the cell, which breaks the rule that a cell owns its own
+  animations.
+- **Our rule chips carry miniature diagrams; theirs are text only.** Ours are better and
+  this is a deliberate difference, but it does make our chip row taller and it is why
+  two of the three labels wrap onto a second line.
+- **The booster row is still three items on the page** rather than a grouped container
+  like the rule chips. It reads fine now that the buttons are white pills, but it is the
+  last row that has not been given a shape.
+- **The dog is not the cat.** Their cat is black and white and reads on anything; our dog
+  is near-white and needs the contact shadow the cells now draw under it. On the two
+  lightest fills it is still the weakest thing on the board.

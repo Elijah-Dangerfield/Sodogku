@@ -3,10 +3,12 @@ package com.sodogku.libraries.ui.components.game
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -124,12 +126,66 @@ fun PawRating(
 }
 
 /**
+ * The white lozenge the board's two counters sit in.
+ *
+ * There are exactly two of these and they are read as a pair, so the shape they
+ * share is worth naming once rather than being two similar-looking `Row`s that
+ * drift apart the first time one of them is adjusted.
+ */
+@Composable
+fun HudPill(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
+        modifier = modifier
+            .clip(Radii.Round)
+            .background(AppTheme.colors.surfacePrimary.color)
+            .padding(horizontal = Dimension.D500, vertical = Dimension.D300),
+        content = content,
+    )
+}
+
+/**
+ * The three permanent rule reminders, as one thing.
+ *
+ * Three loose pills read as three unrelated buttons and leave the eye deciding
+ * whether they belong together; inside one card they read as what they are — a
+ * rule sheet that happens to live on the board. It also gives the outline on a
+ * [RuleChip] something to be an outline *within*, which is what makes
+ * highlighting one of them mean "this one, of these three" rather than "this
+ * one is on".
+ */
+@Composable
+fun RuleChipGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimension.D200),
+        modifier = modifier
+            .clip(Radii.Card)
+            .background(AppTheme.colors.surfacePrimary.color)
+            .padding(Dimension.D200),
+        content = content,
+    )
+}
+
+/**
  * One of the three permanent rule reminders, with a miniature board showing the
  * rule rather than describing it.
  *
  * These stay on screen for all 500 levels. A player who has internalised the
  * rules stops reading them, and a player who has not can glance without leaving
  * the board.
+ *
+ * [highlighted] outlines the chip rather than filling it. A filled chip in a row
+ * of unfilled ones reads as *selected* — as though the player had turned that
+ * rule on — and these are not controls. An outline reads as a pointer, which is
+ * the only thing this ever means: the rule you just ran into.
  */
 @Composable
 fun RuleChip(
@@ -139,13 +195,9 @@ fun RuleChip(
     highlighted: Boolean = false,
     onClick: () -> Unit = {},
 ) {
-    val background = if (highlighted) {
-        AppTheme.colors.accentPrimary.color.copy(alpha = HighlightAlpha)
-    } else {
-        AppTheme.colors.surfaceSecondary.color
-    }
     val diagramColor = AppTheme.colors.text.color
     val regionColors = RuleChipRegionColors
+    val outline = AppTheme.colors.text.color
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
@@ -154,7 +206,14 @@ fun RuleChip(
         modifier = modifier
             .bounceClick(onClick = onClick)
             .clip(Radii.Card)
-            .background(background)
+            .background(AppTheme.colors.surfaceSecondary.color)
+            .then(
+                if (highlighted) {
+                    Modifier.border(RuleChipOutline, outline, Radii.Card.shape)
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = Dimension.D400, vertical = Dimension.D300),
     ) {
         Box(
@@ -191,9 +250,12 @@ fun BoosterButton(
             modifier = Modifier
                 .padding(BadgeInset)
                 .bounceClick(enabled = enabled, onClick = onClick)
-                .clip(Radii.Card)
-                .background(AppTheme.colors.surfaceSecondary.color)
-                .padding(horizontal = Dimension.D600, vertical = Dimension.D500),
+                .clip(Radii.Round)
+                // White, like the counters above the board. On a cream page a
+                // cream button is a shape you have to look for, and this is the
+                // row a stuck player is already looking at.
+                .background(AppTheme.colors.surfacePrimary.color)
+                .padding(horizontal = Dimension.D800, vertical = Dimension.D500),
         ) {
             Text(
                 text = label,
@@ -226,10 +288,12 @@ const val DefaultLives: Int = 3
 private const val MaxPaws = 3
 private const val SpentAlpha = 0.28f
 private const val SpentScale = 0.82f
-private const val HighlightAlpha = 0.22f
 
 /** Bones are wider than they are tall, or they read as a lump. */
 private const val BoneAspect = 1.45f
+
+/** Heavy enough to be an outline rather than a hairline, at chip size. */
+private val RuleChipOutline = Dimension.D50
 
 /** Room for the badge to overhang the button's corner. */
 private val BadgeInset = Dimension.D400

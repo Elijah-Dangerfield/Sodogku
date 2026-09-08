@@ -125,8 +125,11 @@ class ConfigValuesAreReadTest {
         const val MIN_SOURCE_FILES = 200
 
         /**
-         * The debt, as it stood when this test was written: 37 declared values
-         * that nothing reads.
+         * The debt. It is now 19 names.
+         *
+         * It was 39 when this test was written, not the 37 the decisions entry
+         * and the KDoc above both claim — the prose miscounted and the set is
+         * the thing that runs, so trust the set.
          *
          * This is **not** a place to add things. Two tests hold it in place —
          * one fails if a name appears that is not listed here, the other fails
@@ -134,48 +137,43 @@ class ConfigValuesAreReadTest {
          * only ever shrink, and it shrinks by wiring a value up and deleting its
          * line.
          *
-         * What it means concretely: the admin console renders a typed editor for
-         * every one of these, an operator can change any of them, and nothing
-         * happens. The scoring block is the worst of it — fourteen keys, an
-         * entire tuning surface, and `GameViewModel` calls `Scoring.placement`
-         * and friends with the `config` parameter defaulted.
+         * What is left divides cleanly in two, and the difference matters. Some
+         * of these are keys whose *feature* does not exist — a skip button, a
+         * level map, a maintenance screen — and wiring one of those means
+         * building the feature, not finding the call site. The rest name a
+         * screen or hook that is genuinely missing. Neither is fixed by
+         * searching harder, which is why each line below says which it is.
          */
         val UNWIRED = setOf(
-            // Ads. The banner needs a component on a level map we do not have
-            // and app-open needs a cold-start hook; both default off, so those
-            // two are stubs rather than gaps.
+            // Ads. The banner needs a component on a level map we do not have,
+            // and app-open needs both an `AdPlacement` and a cold-start hook —
+            // `AdFormat.AppOpen` reaches the SDK but no gate ever asks for it,
+            // so the cooldown has nothing to space out. Both formats default
+            // off, so these are stubs rather than gaps.
             "AdsAppOpenEnabled",
             "AdsBannerOnLevelMap",
             "AdsAppOpenCooldownHours",
+
+            // `LOCK` is an arm that was never built: nothing anywhere locks a
+            // level after a third strike, and `RealAdGate` documents that it
+            // does not consult this key on the reward path on purpose. Wiring
+            // it would mean inventing the harsher half of an A/B test.
             "AdsFailureMode",
 
-            // Progression and the consumable economy.
+            // Progression and the economy that has no feature behind it yet.
+            // Skips are not built (no button, no per-day counter). The level
+            // map with silhouettes does not exist — the level drawer shows
+            // every level, locked ones included, deliberately. Nothing grants a
+            // treat on a level clear, nothing counts ad grants per day, and Pro
+            // does not top boosters up per attempt (SPEC 5.1 promises it; the
+            // code does not do it).
             "ProgressionSkipsPerDay",
             "ProgressionSkipAfterFailedAttempts",
             "ProgressionLookaheadCount",
-            "BoostersStartingSniffs",
-            "BoostersStartingTreats",
             "BoostersTreatEveryNLevels",
             "BoostersAdGrantsPerDay",
             "BoostersProSniffsPerAttempt",
             "BoostersProTreatsPerAttempt",
-            "BoostersRefillTo",
-
-            // Scoring, in full.
-            "ScoringBasePerPlacement",
-            "ScoringCompletionBase",
-            "ScoringComboStep",
-            "ScoringComboMax",
-            "ScoringSpeedWindowMs",
-            "ScoringSpeedMaxMultiplier",
-            "ScoringLivesBonusRate",
-            "ScoringDifficultyBonusRate",
-            "ScoringTwoPawFraction",
-            "ScoringThreePawFraction",
-            "ScoringNicePraiseAt",
-            "ScoringGreatPraiseAt",
-            "ScoringExcellentPraiseAt",
-            "ScoringPerfectPraiseAt",
 
             // The legal version gate, which is C11's remaining half.
             "LegalTermsVersion",
@@ -190,11 +188,6 @@ class ConfigValuesAreReadTest {
             "AppMaintenanceMessage",
             "AppMaintenanceMode",
             "AppReviewPromptAfterLevel",
-
-            // Feature switches whose features shipped without reading them.
-            "FeatureAchievements",
-            "FeatureSharing",
-            "FeatureBoosters",
         )
     }
 }

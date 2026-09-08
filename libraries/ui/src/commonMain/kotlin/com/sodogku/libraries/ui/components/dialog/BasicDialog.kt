@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,7 +22,7 @@ fun BasicDialog(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     properties: ModalDialogProperties = ModalDialogProperties(),
-    animationSpec: ModalDialogAnimationSpec = ModalDialogAnimationSpec(),
+    animationSpec: ModalDialogAnimationSpec = ModalDialogDefaults.animationSpec(),
     scrimColor: Color = ModalDialogDefaults.scrimColor(),
     contentAlignment: Alignment = Alignment.Center,
     topContent: @Composable () -> Unit = {},
@@ -39,13 +38,10 @@ fun BasicDialog(
         scrimColor = scrimColor,
         contentAlignment = contentAlignment
     ) {
+        // No padding and no `modifier` here. The card pads itself, and applying
+        // the caller's modifier a second time inside the card doubled every
+        // size, weight and click it carried.
         ModalContent(
-            modifier = modifier.padding(
-                top = Dimension.D800,
-                start = Dimension.D800,
-                end = Dimension.D800,
-                bottom = Dimension.D800
-            ),
             topContent = topContent,
             content = content,
             bottomContent = bottomContent
@@ -65,7 +61,7 @@ fun BasicDialog(
     onPrimaryButtonClicked: () -> Unit,
     onSecondaryButtonClicked: (() -> Unit)? = null,
     properties: ModalDialogProperties = ModalDialogProperties(),
-    animationSpec: ModalDialogAnimationSpec = ModalDialogAnimationSpec(),
+    animationSpec: ModalDialogAnimationSpec = ModalDialogDefaults.animationSpec(),
     scrimColor: Color = ModalDialogDefaults.scrimColor(),
     contentAlignment: Alignment = Alignment.Center,
 ) {
@@ -80,9 +76,7 @@ fun BasicDialog(
         topContent = { Text(text = title) },
         content = { Text(text = description) },
         bottomContent = {
-            Column(
-                modifier = Modifier.padding(horizontal = Dimension.D1000)
-            ) {
+            Column {
                 Button(
                     size = ButtonSize.Medium,
                     onClick = onPrimaryButtonClicked,

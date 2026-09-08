@@ -10,6 +10,7 @@ import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.button.ButtonSecondary
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.system.LocalShareSheet
+import com.sodogku.libraries.ui.system.LocalSharingEnabled
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
@@ -23,6 +24,10 @@ import sodogku.libraries.resources.generated.resources.share_cta
  * two things it alone knows: what the board was, and what to call it. The
  * launcher comes from [LocalShareSheet], which is a no-op in previews and
  * tests.
+ *
+ * Draws nothing when [LocalSharingEnabled] says the feature is off. Absent
+ * rather than disabled: a greyed-out Share with no explanation is a support
+ * ticket, and a dark-launched feature should leave no trace of itself.
  */
 @Composable
 fun ShareButton(
@@ -31,6 +36,7 @@ fun ShareButton(
     modifier: Modifier = Modifier,
     onShared: () -> Unit = {},
 ) {
+    if (!LocalSharingEnabled.current()) return
     val shareSheet = LocalShareSheet.current
     ButtonSecondary(
         onClick = {

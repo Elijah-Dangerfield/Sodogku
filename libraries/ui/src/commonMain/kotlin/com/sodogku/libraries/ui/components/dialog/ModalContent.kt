@@ -70,8 +70,6 @@ fun ModalContent(
                         bottomContent()
                     }
                 }
-
-                Spacer(modifier = Modifier.height(Dimension.D800))
             }
         }
     }
