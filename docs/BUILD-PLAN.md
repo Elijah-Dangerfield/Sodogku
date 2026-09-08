@@ -2021,9 +2021,34 @@ the bones-pill test dismissed the prompt rather than confirming it, so `Bone`
 never entered `explainedBoosters`, and the test passed against the bug it was
 written for.
 
-Still open from the review: the board entrance animation not replaying on the
-next level and the previous level's dogs animating away on it (needs a `key`),
-an animated value read during composition in `BoardCell`, a stale shake offset,
-`game.level_abandoned` not existing so drop-off has no denominator, `mode`
-missing from the booster events, and several weak tests in `libraries/puzzle`
-named in the review.
+Three more from the same review, fixed in a follow-up:
+
+**The board never animated in after level 1.** `nextLevel` swaps the board in
+place rather than navigating, and `BoardRows` had no `key`, so cells were
+memoised by position and survived the swap. Each cell's entrance is
+`remember { Animatable(0f) }` on `LaunchedEffect(Unit)`, so it played once per
+process. Worse, a cell that held a dog kept `pop` at 1f, so the new board's
+`Empty` state drove it back down and the *previous* level's dogs animated away on
+top of the new puzzle. On a size change only the added rows and columns animated.
+`key(level.id)` fixes all three. Confirmed on a device: level 2 opens with its
+one starter dog and no ghosts from the four on level 1.
+
+**An animated value was read during composition.** `if (pop.value > 0f)` in
+`BoardCell` subscribed the content scope to every frame of the pop, which is the
+landmine AGENTS.md documents. Gating on `state == Occupied` would also have fixed
+it and would have been wrong: `pop` animates *down* when a dog is removed, and
+the presence check is what keeps it on screen long enough to shrink away. A
+`derivedStateOf` boolean flips twice per placement instead of once per frame and
+keeps the fade-out.
+
+**A second wrong tap left the first square off its grid line.** Every cell that
+is not the current strike cell is driven to nonce 0, so a second wrong tap within
+the shake cancelled the first cell's animation mid-flight and re-entered its
+effect with nonce 0 — which returned before resetting, freezing the translation
+at up to about six pixels. The reset now happens before the early return.
+
+Still open from the review: `game.level_abandoned` not existing so drop-off has
+no denominator, `mode` missing from the booster events, `daily.started` emitted
+from one route out of several, and several weak tests in `libraries/puzzle`
+named in the review (`CandidateGridTest` passes with the region rule deleted;
+two `DeductionSoundnessTest` cases are tautological).

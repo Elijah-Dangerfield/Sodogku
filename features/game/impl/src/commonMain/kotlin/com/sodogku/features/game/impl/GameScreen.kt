@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -478,7 +479,22 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
     val level = state.level ?: return
     val size = level.size
 
-    BoardSurface(size = size) { BoardRows(state = state, size = size, onAction = onAction) }
+    BoardSurface(size = size) {
+        // Keyed on the level, because `nextLevel` swaps the board *in place*
+        // rather than navigating. Without a key the cells are memoised by
+        // position and survive the swap, and two things follow from that.
+        //
+        // Each cell's entrance animation is `remember { Animatable(0f) }` driven
+        // by `LaunchedEffect(Unit)`, so it plays once per process: level 2
+        // onward simply appeared, fully formed. And a cell that held a dog kept
+        // `pop` at 1f, so the new board's `Empty` state drove it back down and
+        // the *previous* level's dogs animated away on top of the new puzzle.
+        //
+        // On a size change only the newly added rows and columns animated, which
+        // is the version of this that looks like a rendering glitch rather than
+        // a missing flourish.
+        key(level.id) { BoardRows(state = state, size = size, onAction = onAction) }
+    }
 }
 
 @Composable
