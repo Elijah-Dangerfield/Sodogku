@@ -18,12 +18,17 @@ import com.sodogku.system.VerticalSpacerD800
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.settings_achievements
+import sodogku.libraries.resources.generated.resources.settings_achievements_show
+import sodogku.libraries.resources.generated.resources.settings_achievements_show_body
 import sodogku.libraries.resources.generated.resources.settings_colorblind
 import sodogku.libraries.resources.generated.resources.settings_colorblind_body
 import sodogku.libraries.resources.generated.resources.settings_feedback
 import sodogku.libraries.resources.generated.resources.settings_haptics
 import sodogku.libraries.resources.generated.resources.settings_haptics_body
 import sodogku.libraries.resources.generated.resources.settings_privacy
+import sodogku.libraries.resources.generated.resources.settings_progress_local_body
+import sodogku.libraries.resources.generated.resources.settings_progress_local_title
 import sodogku.libraries.resources.generated.resources.settings_reduce_animations
 import sodogku.libraries.resources.generated.resources.settings_reduce_animations_body
 import sodogku.libraries.resources.generated.resources.settings_section_about
@@ -93,6 +98,33 @@ fun SettingsScreen(
             VerticalSpacerD800()
 
             ListSection(
+                title = stringResource(Res.string.settings_achievements),
+                // The row that opens the grid disappears when badges are off,
+                // matching what the toggle promises: nothing about them on
+                // screen. The toggle itself stays, or there would be no way
+                // back.
+                items = listOfNotNull(
+                    ListSectionItem(
+                        headlineText = stringResource(Res.string.settings_achievements),
+                        onClick = { onAction(SettingsAction.OpenAchievements) },
+                    ).takeIf { state.achievementsVisible },
+                    toggleItem(
+                        headline = stringResource(Res.string.settings_achievements_show),
+                        supporting = stringResource(Res.string.settings_achievements_show_body),
+                        checked = state.achievementsVisible,
+                        onToggle = { onAction(SettingsAction.ToggleAchievements) },
+                    ),
+                    ListSectionItem(
+                        headlineText = stringResource(Res.string.settings_progress_local_title),
+                        supportingText = stringResource(Res.string.settings_progress_local_body),
+                        accessory = ListItemAccessory.None,
+                    ),
+                ),
+            )
+
+            VerticalSpacerD800()
+
+            ListSection(
                 title = stringResource(Res.string.settings_section_about),
                 items = listOf(
                     ListSectionItem(
@@ -147,6 +179,7 @@ private fun SettingsScreenPreview() {
                 hapticsEnabled = true,
                 reduceAnimations = false,
                 colorblindMode = true,
+                achievementsVisible = true,
                 appVersion = "1.4.0 (204)",
             ),
             onAction = {},

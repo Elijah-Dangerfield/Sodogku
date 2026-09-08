@@ -6,6 +6,149 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — badge copy lives in `:features:achievements` (the api module), not its impl
+
+The catalog carries stable ids and no words; an exhaustive `when (AchievementId)` in the UI is
+what makes adding a badge fail to compile until somebody writes them. That `when` had an obvious
+home in `:features:achievements:impl` next to the grid, and it is the wrong one: the unlock toast
+fires on the **win sheet**, in `:features:game:impl`, and a feature impl may only depend on
+another feature's *api*. Putting `AchievementCopy` in the impl would have forced a second copy of
+the mapping in the game — two exhaustive `when`s over the same enum, one of which nobody would
+remember to extend.
+
+So `AchievementCopy` is in the api module, alongside the route, and returns `StringResource`
+rather than `String` — non-composable, so it is usable from a `remember` or a preview and testable
+without a Compose harness. The glyphs are Kotlin constants rather than string resources: there is
+nothing in an emoji to translate, and 21 more rows in `strings.xml` is 21 more things for a
+translator to skip past.
+
+## 2026-09-07 — the share sheet is a composition local, not a ViewModel dependency
+
+`ShareText.format` is handed a title, a streak line and a footer that are **already localised** —
+that is the whole reason `:libraries:sharing` holds no English. The consequence is that the only
+thing in the app that can build a share is a composable, because `stringResource` is the only way
+to resolve the words. A `ShareLauncher` injected into `GameViewModel` would therefore have to be
+handed a string the composable built and passed back down through an action, which is a round trip
+for no gain.
+
+`LocalShareSheet` (in `:libraries:ui`) provides the launcher to the whole tree from `App.kt`,
+defaulting to a no-op so previews and tests get something harmless. `ShareButton` in the design
+system does the formatting, so a screen supplies only the two things it alone knows: what the board
+was, and what to call it. SPEC §9 wants three share points (win sheet, daily card, level-map
+long-press) and this is what keeps the second and third from being a copy of the first.
+
+**`:libraries:sharing` keeps its empty dependency list.** `ShareLauncher` returns `Unit` rather
+than `Catching<Unit>` — unlike `WebLinkLauncher`, which it otherwise mirrors — so the interface
+needs nothing from `:libraries:core`. That is not only bookkeeping: a web link that fails to open
+leaves the player on an unchanged screen and needs an answer, while a share sheet that fails to
+present has no recovery a caller could offer. The platform impls log and move on.
+
+## 2026-09-07 — the achievements toggle hides the row that opens the grid, not the grid's contents
+
+SPEC §8 says the toggle "suppresses toasts and hides the tab". There is no tab, so the question was
+what "hidden" means for a Settings row and a screen. Turning badges off removes the **Achievements
+row** from Settings; the toggle itself stays, or there would be no way back. The screen keeps an
+"achievements are off" panel behind it, which is what a deep link or a stale back stack lands on,
+and that panel says in as many words that recording carried on — because the reading that stops
+somebody switching them back on is the one where turning them off threw the history away.
+
+The toggle writes exactly one boolean into `AppData` and touches nothing else. `SettingsViewModel`
+has no `AchievementsRepository` at all, and the test asserts the whole of `AppData` afterwards
+rather than the one field, so a second effect added later fails rather than passing quietly.
+
+## 2026-09-07 — nothing in the app navigates to `SettingsRoute`
+
+Found while verifying C10 on a device, and it predates this chunk: `:features:settings` builds its
+graph and `SettingsScreen` works, but no `router.navigate(SettingsRoute())` exists anywhere. The
+board's gear icon opens `GameDialog.Settings`, an in-place sheet with three toggles, which is a
+different and much smaller surface. The full settings page — and therefore the achievements grid
+hanging off it — is currently unreachable in a shipped build.
+
+Verification for this chunk was done by pointing the start destination at `SettingsRoute()`
+temporarily, driving the device, and reverting. The real fix is one navigation call from the
+board's settings sheet into `SettingsRoute`, and it belongs to whoever owns `:features:game:impl`
+next; it is written up here so it is not rediscovered a third time.
+
+---
+
+## 2026-09-07 — the pack is a route argument, and it is a `Boolean`
+
+**Decision:** `GameRoute(levelId: Int, daily: Boolean = false)`. Which pack a board comes from is
+carried by the route, not by a mode the ViewModel can be switched into, and it is a plain
+`Boolean` rather than the `PackKind` enum that already exists.
+
+**Why the route and not a mode:** the route is what a process death restores. A screen that had
+been switched into daily mode in place would come back as whatever level id the route still held,
+in the campaign — the player force-quits mid-daily and reopens onto a different board, with their
+attempt lost and the day still open.
+
+**Why a Boolean:** an enum route argument has to be `@Serializable` *and* registered in a typeMap
+at every registration site, and forgetting either crashes graph construction on iOS with a message
+that names a different argument. That landmine is already recorded twice in `AGENTS.md`. Two packs
+do not need a type to tell them apart, and a third would be the moment to pay for the enum.
+
+**The daily ignores the route's `levelId`.** It resolves the board from `DailyRepository.status()`
+instead, because the board and the date the result is written against have to come from one
+snapshot of the clock. The route's id came from a card drawn at some earlier moment; trusting it
+would let a screen opened a second before midnight record yesterday's board against today.
+
+## 2026-09-07 — a lost daily is spent when the player walks away, not when the bones run out
+
+**The constraint:** `daily_result` takes one row per date and never updates it (that insert-only
+rule is what makes the one-attempt lock hold whatever the clock says), and SPEC §2 allows a failed
+daily to be continued with a rewarded ad exactly like a campaign level. Those two together mean
+the result cannot be written at the moment the third bone goes: the revive's clear would then find
+the day already locked to a loss, and the player would watch an ad, finish the board, and get
+nothing.
+
+**Decision:** `onFailed` is written when the player leaves the loss sheet. A win writes
+`onCompleted` immediately, as it always could. Starting over is removed from the daily's loss
+sheet entirely — a second run at a board whose score commits to a date is the replay the
+one-attempt rule exists to stop — but both ad revives stay.
+
+**The hole this leaves:** force-quitting at the loss sheet leaves the day unwritten and therefore
+still playable, so a determined player can retry today's board until they win it. That is
+deliberate, and it is the same call already recorded under "what the daily defends against a moved
+clock": the daily is device-local with no leaderboard, every defence costs an honest player
+something, and someone who does this has only cheated themselves. Closing it properly means either
+an upgradeable row (giving up the insert-only lock) or writing the loss immediately (giving up the
+revive), and both are worse.
+
+## 2026-09-07 — the shared level-id number line is a progress bug, not a lookup bug
+
+**What it looks like:** `LevelPacks.campaign.byId(7)` and `LevelPacks.daily.byId(7)` are different
+boards. The obvious consequence — resolve against the right pack — is one line. The dangerous
+consequence is everywhere a level id is *stored* or *compared* as campaign progress:
+
+- `progress.onAttemptStarted(id)` and `progress.onCompleted(id)` would unlock campaign levels the
+  player has never seen, and clearing the daily would hand out campaign level `id + 1`.
+- `progress.record(id)`, read for `isFirstClear` and `previousBestPaws`, would answer with a
+  campaign level's history.
+- `maxOf(unlockedThrough, level.id)` in `startAttempt` and `loadRecords` would widen the drawer's
+  frontier to the daily's id — a 264 in a pool of 730 unlocks most of the campaign.
+- The drawer scrolled to `currentLevelId - 1` and highlighted `level.id == currentLevelId`, which
+  on the daily meant scrolling the campaign list to a locked stranger and calling it current.
+
+**Decision:** the daily touches `ProgressRepository` for reads that are genuinely about the
+campaign (`unlockedThrough`, for the drawer) and for nothing else. `campaignFrontier()` is the one
+place that decides whether the level on screen counts as progress, and `LevelDrawer.currentLevelId`
+is nullable so "the board on screen is not a campaign level" is representable rather than faked
+with a number that means something else.
+
+The last one is worth the emphasis: it was invisible in tests and obvious in two seconds on a
+device. Every other item here is asserted by a ViewModel test that fails when the guard is removed.
+
+## 2026-09-07 — every freeze outcome gets a sentence, including the one that means "no"
+
+`FreezeResult` has four branches and the repository call can also throw, so the UI has five
+answers to give. All five are a dialog with a title and a line of copy.
+
+`Declined` is the reason this is not a `when` with three empty arms. It is what a player who
+opened a rewarded ad and closed it early gets, and it is the outcome most likely to be read as the
+app breaking: the ad disappears, the streak does not move, and nothing says why. A thrown
+repository call maps to its own "not right now" rather than to `NothingToFreeze`, because telling
+someone there is nothing to freeze when the database just failed is a lie they cannot act on.
+
 ## 2026-09-07 — the config registry drift guard is a test in `:apps:integration`, not a generator
 
 `apps/admin/config-manifest-registry.json` is a hand-written transcription of the
@@ -904,3 +1047,23 @@ It now writes the serializer's default back through `updateData`, which is the
 only write path `DataStore` observes. Nothing called `AppCache.clear()` yet, which
 is why a doubly-broken method sat there unnoticed — the account-switch clearer it
 was written for was deleted along with accounts in C0.
+
+## 2026-09-07 — the settings screen was shipped and unreachable
+
+`:features:settings` landed complete, tested and driven on a device, and nothing
+in the app navigated to it. The board's gear opened `GameDialog.Settings`, an
+in-place sheet that duplicated every row — including the strings. Two settings
+surfaces would have drifted the first time either was edited, and the
+achievements grid hangs off the screen nobody could reach, so C10's whole UI was
+dead in a real build.
+
+The gear now sends `GameAction.OpenSettings` out through an event to the router,
+and `GameDialog.Settings` and `SettingsContent` are deleted. The lesson is
+smaller than it looks: a feature module can be complete, tested, verified on a
+device and still be dead code, and nothing in the build says so. Three separate
+agents each assumed someone else owned the one line.
+
+The daily agent found the mirror image of the same thing — the level pane scrolled
+the campaign list to a *daily's* id and highlighted a locked stranger as "current",
+because `currentLevelId` was not nullable and "not a campaign level" was not
+representable. Both are the same failure to make an invalid state impossible.

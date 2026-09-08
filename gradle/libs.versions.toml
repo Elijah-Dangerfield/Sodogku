@@ -45,6 +45,9 @@ opentelemetryInstrumentation = "2.11.0-alpha"
 # Distinct from the server's JVM `opentelemetry` entries above.
 opentelemetryKotlin = "0.5.0"
 okio = "3.9.1"
+playServicesAds = "24.9.0"
+userMessagingPlatform = "4.0.0"
+playBilling = "8.3.0"
 jetbrainsNavigationCompose = "2.9.1"
 kotlinInjectAnvil = "0.1.6"
 composeIcons = "1.1.1"
@@ -180,6 +183,18 @@ supabase-auth = { module = "io.github.jan-tennert.supabase:auth-kt", version.ref
 
 google-play-review = { module = "com.google.android.play:review", version = "2.0.2" }
 google-play-review-ktx = { module = "com.google.android.play:review-ktx", version = "2.0.2" }
+
+# AdMob + the UMP consent SDK. Android only — iOS gets GoogleMobileAds through
+# SPM in apps/ios and reaches Kotlin via the `AdNetwork` seam, the same route
+# `ReviewLauncher` takes.
+google-play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
+google-ump = { module = "com.google.android.ump:user-messaging-platform", version.ref = "userMessagingPlatform" }
+
+# Play Billing. SPEC 5.2 says "Play Billing 7"; 8.x is what Play actually
+# accepts for new releases now, and the migration is `QueryProductDetailsResult`
+# plus `PendingPurchasesParams` — both already used in `PlayStoreBilling`.
+android-billing = { module = "com.android.billingclient:billing", version.ref = "playBilling" }
+android-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "playBilling" }
 
 
 androidx-datastore-core = { module = "androidx.datastore:datastore", version.ref = "datastore" }

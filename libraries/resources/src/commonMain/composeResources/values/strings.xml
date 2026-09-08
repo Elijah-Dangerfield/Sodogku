@@ -90,10 +90,10 @@
     <string name="daily_streak">%1$d day streak</string>
     <string name="daily_streak_label">Streak</string>
     <string name="daily_streak_none">No streak yet</string>
-    <string name="daily_play">Play today\'s board</string>
-    <string name="daily_done">Today\'s board is done</string>
+    <string name="daily_play">Play today’s board</string>
+    <string name="daily_done">Today’s board is done</string>
     <string name="daily_out_of_bones">Out of bones for today</string>
-    <string name="daily_today">Today\'s board</string>
+    <string name="daily_today">Today’s board</string>
     <string name="daily_resets_hours">New board in %1$dh %2$dm</string>
     <string name="daily_resets_minutes">New board in %1$dm</string>
     <string name="daily_freeze_cta">Save your streak</string>
@@ -103,7 +103,7 @@
     <string name="daily_freeze_declined_title">Streak not saved</string>
     <string name="daily_freeze_declined_body">The ad closed early, so the freeze was not used. The offer is still here.</string>
     <string name="daily_freeze_none_left_title">No freezes left</string>
-    <string name="daily_freeze_none_left_body">You have used this month\'s freezes. They come back next month.</string>
+    <string name="daily_freeze_none_left_body">You have used this month’s freezes. They come back next month.</string>
     <string name="daily_freeze_nothing_title">Nothing to freeze</string>
     <string name="daily_freeze_nothing_body">There is no missed day a freeze would bring back right now.</string>
     <string name="daily_freeze_unavailable_title">Not right now</string>
@@ -122,4 +122,98 @@
     <string name="month_short_10">Oct</string>
     <string name="month_short_11">Nov</string>
     <string name="month_short_12">Dec</string>
+
+    <string name="achievements_title">Achievements</string>
+    <string name="achievements_summary">%1$s of %2$s earned</string>
+    <string name="achievements_progress">%1$s / %2$s</string>
+    <string name="achievements_earned">Earned</string>
+    <string name="achievements_locked">Keep going</string>
+    <string name="achievements_hidden_name">???</string>
+    <string name="achievements_hidden_body">A surprise. You will know it when you find it.</string>
+    <string name="achievements_unlocked_toast">Badge unlocked</string>
+    <string name="achievements_off_title">Achievements are off</string>
+    <string name="achievements_off_body">Nothing has been lost. Every level you finish is still recorded, so switching them back on in Settings shows your real history.</string>
+    <string name="settings_achievements">Achievements</string>
+    <string name="settings_achievements_show">Show achievements</string>
+    <string name="settings_achievements_show_body">Badges and unlock toasts. Turning this off keeps recording in the background, so switching it back on shows real history rather than a blank grid.</string>
+    <string name="settings_progress_local_title">Progress lives on this device</string>
+    <string name="settings_progress_local_body">There are no accounts, so levels, streaks and badges do not survive a reinstall or move to a new phone.</string>
+
+    <string name="share_cta">Share</string>
+    <string name="share_title_level">Sodogku · Level %1$d</string>
+    <string name="share_title_daily">Sodogku Daily · %1$s %2$d</string>
+    <!-- The daily share when the date is somehow unavailable. -->
+    <string name="share_title_daily_plain">Sodogku Daily</string>
+    <string name="share_streak">🔥 %1$d day streak</string>
+    <string name="share_footer">sodogku.app</string>
+
+    <!-- Achievement copy. Every id in AchievementId has a name and a body here, and
+         the exhaustive `when` in AchievementCopy.kt is what forces that. -->
+    <string name="achievement_first_steps_name">First Steps</string>
+    <string name="achievement_first_steps_body">Clear your first level.</string>
+    <string name="achievement_good_dog_name">Good Dog</string>
+    <string name="achievement_good_dog_body">Clear 10 levels.</string>
+    <string name="achievement_best_in_show_name">Best in Show</string>
+    <string name="achievement_best_in_show_body">Clear 100 levels.</string>
+    <string name="achievement_top_dog_name">Top Dog</string>
+    <string name="achievement_top_dog_body">Clear all 500 levels.</string>
+    <string name="achievement_perfect_form_name">Perfect Form</string>
+    <string name="achievement_perfect_form_body">Clear a level without losing a single bone.</string>
+    <string name="achievement_flawless_ten_name">Flawless Ten</string>
+    <string name="achievement_flawless_ten_body">Clear 10 in a row without losing a bone. A failed attempt breaks the run too.</string>
+    <string name="achievement_comeback_name">Comeback</string>
+    <string name="achievement_comeback_body">Clear a level after losing two bones.</string>
+    <string name="achievement_no_help_needed_name">No Help Needed</string>
+    <string name="achievement_no_help_needed_body">Clear 25 levels without a sniff or a treat.</string>
+    <string name="achievement_speed_demon_name">Speed Demon</string>
+    <string name="achievement_speed_demon_body">Clear any level in under 30 seconds.</string>
+    <string name="achievement_blitz_name">Blitz</string>
+    <string name="achievement_blitz_body">Clear a 7x7 or bigger in under a minute.</string>
+    <string name="achievement_high_roller_name">High Roller</string>
+    <string name="achievement_high_roller_body">Score 20,000 points on one level. Only the big boards pay that well.</string>
+    <string name="achievement_chain_of_eight_name">Chain of Eight</string>
+    <string name="achievement_chain_of_eight_body">Place eight dogs in a row without a wrong guess.</string>
+    <string name="achievement_show_dog_name">Show Dog</string>
+    <string name="achievement_show_dog_body">Take 10 levels to three paws.</string>
+    <string name="achievement_pedigree_name">Pedigree</string>
+    <string name="achievement_pedigree_body">Take 50 levels to three paws.</string>
+    <string name="achievement_grid_seven_name">Grid Seven</string>
+    <string name="achievement_grid_seven_body">Clear a 7x7 board.</string>
+    <string name="achievement_grid_ten_name">Grid Ten</string>
+    <string name="achievement_grid_ten_body">Clear a 10x10 board.</string>
+    <string name="achievement_fetch_daily_name">Fetch Daily</string>
+    <string name="achievement_fetch_daily_body">Clear a daily challenge.</string>
+    <string name="achievement_daily_devotion_name">Daily Devotion</string>
+    <string name="achievement_daily_devotion_body">Keep a daily streak going for 7 days.</string>
+    <string name="achievement_faithful_name">Faithful</string>
+    <string name="achievement_faithful_body">Keep a daily streak going for 30 days.</string>
+    <string name="achievement_night_owl_name">Night Owl</string>
+    <string name="achievement_night_owl_body">Clear a level between 1am and 5am.</string>
+    <string name="achievement_early_bird_name">Early Bird</string>
+    <string name="achievement_early_bird_body">Clear a level between 5am and 8am.</string>
+    <!-- Paywall (C8). No apostrophes anywhere in this file on purpose. -->
+    <string name="paywall_title">Sodogku Pro</string>
+    <string name="paywall_subtitle">One purchase. No ads, no waiting, and a few more dogs on your side.</string>
+    <string name="paywall_benefit_no_ads">No ads, ever</string>
+    <string name="paywall_benefit_offline">Unlimited offline play</string>
+    <string name="paywall_benefit_free_helps">Free continues, free skips and free streak freezes</string>
+    <string name="paywall_benefit_boosters">3 Sniffs and 3 Treats at the start of every attempt</string>
+    <string name="paywall_benefit_jump">Jump to the first level of any band you have reached</string>
+    <string name="paywall_buy">Get Pro</string>
+    <string name="paywall_buy_priced">Get Pro for %1$s</string>
+    <string name="paywall_one_time">One time purchase. No subscription.</string>
+    <string name="paywall_restore">Restore purchases</string>
+    <string name="paywall_not_now">Not now</string>
+    <string name="paywall_already_pro">You already have Pro. Thank you.</string>
+    <string name="paywall_purchase_failed">That did not go through. You have not been charged.</string>
+    <string name="paywall_store_unavailable">The store is not available on this device.</string>
+    <string name="paywall_nothing_to_restore">No purchase found on this store account.</string>
+    <string name="paywall_store_unreachable">Could not reach the store. Try again in a moment.</string>
+
+    <!-- Offline block (SPEC 6) -->
+    <string name="offline_block_title">No connection</string>
+    <string name="offline_block_body">Sodogku is free because of the ads, and there is no way to load one right now. Reconnect to keep playing, or get Pro and play offline as much as you like.</string>
+    <string name="offline_block_still_offline">Still nothing. Check wifi or mobile data.</string>
+    <string name="offline_block_retry">Try again</string>
+    <string name="offline_block_go_pro">Get Pro</string>
 </resources>

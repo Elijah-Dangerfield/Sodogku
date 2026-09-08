@@ -18,6 +18,24 @@
 	<string>Sodogku</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>We'd like to send you notifications.</string>
+	<!--
+	  AdMob reads this before any app code runs, which is why the ad unit ids
+	  live in shared Kotlin (`AdUnits.kt`) and the *app* id lives here. The
+	  value below is Google's published sample app id and it pairs with the
+	  sample units in `AdUnits.IosTest`. Replace it at the same time as
+	  `AdUnits.useTestUnits` flips. A missing key crashes the SDK at start; a
+	  wrong one silently serves nothing.
+	-->
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<!--
+	  The App Tracking Transparency prompt, SPEC 7.2. Shown before the first ad
+	  request rather than at launch, so the player is asked at a moment where
+	  the answer means something. Apple rejects builds that request the IDFA
+	  without this key.
+	-->
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This lets us show ads that are more relevant to you. Sodogku is free because of them.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>processing</string>

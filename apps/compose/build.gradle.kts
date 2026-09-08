@@ -88,12 +88,15 @@ kotlin {
             implementation(projects.libraries.levels)
             implementation(projects.libraries.scoring)
             implementation(projects.libraries.ads)
+            implementation(projects.libraries.ads.impl)
             implementation(projects.libraries.billing)
+            implementation(projects.libraries.billing.impl)
             implementation(projects.libraries.progress)
             implementation(projects.libraries.progress.impl)
             implementation(projects.libraries.achievements)
             implementation(projects.libraries.achievements.impl)
             implementation(projects.libraries.sharing)
+            implementation(projects.libraries.sharing.impl)
 
             implementation(projects.libraries.storage)
             implementation(projects.libraries.storage.impl)
@@ -112,6 +115,10 @@ kotlin {
             implementation(projects.features.game.impl)
             implementation(projects.features.settings)
             implementation(projects.features.settings.impl)
+            implementation(projects.features.achievements)
+            implementation(projects.features.achievements.impl)
+            implementation(projects.features.paywall)
+            implementation(projects.features.paywall.impl)
 
             implementation(libs.atomicfu)
             

@@ -44,6 +44,16 @@ data class AppData(
     val reduceAnimations: Boolean = false,
 
     /**
+     * Whether badges are *shown* — the grid and the unlock toast.
+     *
+     * Display only. `AchievementsRepository` keeps recording while this is
+     * false, deliberately, so a player who switches them back on months later
+     * sees the history they actually earned instead of an empty grid. Nothing
+     * that writes to the achievement log may read this.
+     */
+    val achievementsVisible: Boolean = true,
+
+    /**
      * Held consumables. These are *not* capped at three — a refill tops up to
      * three, but clearing levels grants extra, so the store is a reward for
      * playing rather than a meter that only ever empties.
@@ -77,6 +87,19 @@ data class AppData(
 
     /** Epoch-ms — last review prompt the coordinator forwarded to the platform. 0 = never. */
     val lastReviewPromptAt: Long = 0L,
+
+    /**
+     * Whether this device owns Sodogku Pro, cached **true until proven false**
+     * (SPEC 5.2). Written only by `RealEntitlements`: set on a purchase or a
+     * restore, and cleared *only* on an explicit "not entitled" from the store.
+     * A store we could not reach leaves it alone, which is what keeps a paying
+     * customer ad-free on a train.
+     *
+     * There is no account and no server receipt store, so this plus the store's
+     * own restore is the whole of the entitlement. It dies with the install,
+     * and Settings says so.
+     */
+    val isProEntitled: Boolean = false,
 ) {
     /**
      * Get the visit count for a screen by its tracking key.

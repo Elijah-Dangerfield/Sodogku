@@ -13,6 +13,8 @@ kotlin {
             // For `FeedbackRoute`, which still lives in :features:home because
             // :features:game:impl navigates to it. See docs/decisions.md.
             implementation(projects.features.home)
+            // For `AchievementsRoute` — the badge grid is reached from here.
+            implementation(projects.features.achievements)
 
             implementation(projects.libraries.core)
             implementation(projects.libraries.sodogku)

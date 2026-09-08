@@ -6,6 +6,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.toRoute
 import com.sodogku.features.game.GameRoute
 import com.sodogku.features.home.FeedbackRoute
+import com.sodogku.features.settings.SettingsRoute
 import com.sodogku.libraries.flowroutines.ObserveEvents
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.Router
@@ -21,19 +22,29 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @ContributesBinding(AppScope::class, multibinding = true)
 @Inject
 class GameFeatureEntryPoint(
-    private val gameViewModelFactory: (levelId: Int) -> GameViewModel,
+    private val gameViewModelFactory: (levelId: Int, isDaily: Boolean) -> GameViewModel,
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
         screen<GameRoute> { backStackEntry ->
             val route = backStackEntry.toRoute<GameRoute>()
-            val viewModel: GameViewModel = viewModel { gameViewModelFactory(route.levelId) }
+            val viewModel: GameViewModel = viewModel {
+                gameViewModelFactory(route.levelId, route.daily)
+            }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
             val haptics = rememberHaptics(enabled = state.haptics)
 
             viewModel.ObserveEvents { event ->
                 when (event) {
                     GameEvent.NavigateBack -> router.goBack()
+                    // Both packs get a route of their own rather than a mode
+                    // swapped into the current screen: the route is what a
+                    // process death restores, and an id alone does not say
+                    // which pack it came from.
+                    is GameEvent.OpenDaily -> router.navigate(
+                        GameRoute(levelId = event.levelId, daily = true),
+                    )
+                    is GameEvent.OpenLevel -> router.navigate(GameRoute(levelId = event.levelId))
                     is GameEvent.Marked -> haptics.play(Feel.Mark)
                     is GameEvent.PlacedDog -> haptics.play(Feel.Place)
                     is GameEvent.Struck -> haptics.play(Feel.Strike)
@@ -44,6 +55,7 @@ class GameFeatureEntryPoint(
                     GameEvent.OpenPrivacy -> router.openWebLink(PrivacyUrl)
                     GameEvent.OpenTerms -> router.openWebLink(TermsUrl)
                     GameEvent.OpenFeedback -> router.navigate(FeedbackRoute())
+                    GameEvent.OpenSettings -> router.navigate(SettingsRoute())
                 }
             }
 

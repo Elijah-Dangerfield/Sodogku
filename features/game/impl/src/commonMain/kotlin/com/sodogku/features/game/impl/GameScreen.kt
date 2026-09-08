@@ -21,7 +21,10 @@ import com.sodogku.libraries.ui.components.game.RewardButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import com.sodogku.features.achievements.AchievementCopy
 import com.sodogku.libraries.ui.PreviewContent
+import com.sodogku.libraries.ui.components.feedback.UnlockToastItem
+import com.sodogku.libraries.ui.components.feedback.UnlockToasts
 import com.sodogku.libraries.ui.components.FullScreenLoader
 import com.sodogku.libraries.ui.components.Screen
 import com.sodogku.libraries.ui.components.board.BoardCell
@@ -46,6 +49,8 @@ import com.sodogku.system.Motion
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.achievements_unlocked_toast
+import sodogku.libraries.resources.generated.resources.daily_streak_label
 import sodogku.libraries.resources.generated.resources.game_level_label
 import sodogku.libraries.resources.generated.resources.game_score_label
 import sodogku.libraries.resources.generated.resources.game_rule_no_touching
@@ -86,7 +91,7 @@ fun GameScreen(
                 state = state,
                 levelId = level.id,
                 onOpenLevels = { onAction(GameAction.LevelsOpened) },
-                onSettings = { dialog = GameDialog.Settings },
+                onSettings = { onAction(GameAction.OpenSettings) },
                 onExplainBones = { onAction(GameAction.BoosterTapped(Consumable.Bone)) },
             )
 
@@ -127,18 +132,50 @@ fun GameScreen(
                 }
             }
 
+            // Over the sheet, not inside it. Several badges can land at once — a
+            // first clear can earn First Steps, Perfect Form and Speed Demon in
+            // the same second — and they must not push Next level down the card.
+            // Gone entirely when the player has turned badges off.
+            if (state.showAchievements && state.newBadges.isNotEmpty()) {
+                UnlockToasts(
+                    items = state.newBadges.map { badge ->
+                        UnlockToastItem(
+                            glyph = AchievementCopy.glyph(badge.id),
+                            label = stringResource(Res.string.achievements_unlocked_toast),
+                            title = stringResource(AchievementCopy.name(badge.id)),
+                        )
+                    },
+                    onDismiss = {},
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(padding)
+                        .padding(top = Dimension.D700),
+                )
+            }
+
             LastBoneWarning(state = state, onAction = onAction)
 
             SniffHint(state = state, onAction = onAction)
 
             LevelDrawer(
                 open = state.drawerOpen,
-                currentLevelId = level.id,
+                currentLevelId = level.id.takeIf { !state.isDaily },
                 unlockedThrough = state.unlockedThrough,
                 canJumpAnywhere = state.isPro,
                 records = state.records,
                 onPick = { onAction(GameAction.GoToLevel(it)) },
                 onDismiss = { onAction(GameAction.LevelsClosed) },
+                daily = state.daily,
+                isDailyBoard = state.isDaily,
+                onPlayDaily = { onAction(GameAction.PlayDaily) },
+                onUseFreeze = { onAction(GameAction.UseFreeze) },
+            )
+        }
+
+        state.freezeMessage?.let { message ->
+            FreezeMessageDialog(
+                message = message,
+                onDismiss = { onAction(GameAction.DismissFreezeMessage) },
             )
         }
 
@@ -185,10 +222,20 @@ private fun GameHeader(
         IconButton(icon = Icons.Menu(null), onClick = onOpenLevels)
 
         Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D1000)) {
-            HeaderStat(
-                label = stringResource(Res.string.game_level_label),
-                value = levelId.toString(),
-            )
+            // A daily's level id is a position in the daily pool, which means
+            // nothing to the player and reads as a campaign level they have not
+            // reached. The streak is the number that belongs here instead.
+            if (state.isDaily) {
+                HeaderStat(
+                    label = stringResource(Res.string.daily_streak_label),
+                    value = (state.daily?.streak ?: 0).toString(),
+                )
+            } else {
+                HeaderStat(
+                    label = stringResource(Res.string.game_level_label),
+                    value = levelId.toString(),
+                )
+            }
             HeaderStat(
                 label = stringResource(Res.string.game_score_label),
                 value = null,

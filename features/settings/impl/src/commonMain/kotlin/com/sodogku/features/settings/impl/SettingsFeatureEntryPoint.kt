@@ -3,6 +3,7 @@ package com.sodogku.features.settings.impl
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
+import com.sodogku.features.achievements.AchievementsRoute
 import com.sodogku.features.home.FeedbackRoute
 import com.sodogku.features.settings.SettingsRoute
 import com.sodogku.features.settings.impl.feedback.FeedbackEvent
@@ -34,6 +35,7 @@ class SettingsFeatureEntryPoint(
                 when (event) {
                     SettingsEvent.NavigateBack -> router.goBack()
                     SettingsEvent.OpenFeedback -> router.navigate(FeedbackRoute())
+                    SettingsEvent.OpenAchievements -> router.navigate(AchievementsRoute())
                     // The legal pages are hosted (GitHub Pages, from `pages/`),
                     // so they open in a browser rather than as in-app screens.
                     is SettingsEvent.OpenLink -> router.openWebLink(event.url)

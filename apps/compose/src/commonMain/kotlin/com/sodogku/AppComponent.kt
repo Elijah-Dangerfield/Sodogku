@@ -4,6 +4,7 @@ import com.sodogku.libraries.core.AppState
 import com.sodogku.libraries.core.AutoInit
 import com.sodogku.libraries.navigation.DeepLinkBridge
 import com.sodogku.libraries.navigation.impl.DelegatingRouter
+import com.sodogku.libraries.sharing.ShareLauncher
 import com.sodogku.libraries.telemetry.impl.JankMonitor
 import com.sodogku.libraries.telemetry.impl.StartupReporter
 import com.sodogku.libraries.sodogku.Telemetry
@@ -37,6 +38,14 @@ interface AppComponent {
     val startupReporter: StartupReporter
     val shakeHandler: ShakeHandler
     val deepLinkBridge: DeepLinkBridge
+
+    /**
+     * The platform share sheet, provided into the composition as
+     * [com.sodogku.libraries.ui.system.LocalShareSheet]. It is pulled out here
+     * rather than injected into a ViewModel because a share's title and streak
+     * line are string resources, so only a composable can build one.
+     */
+    val shareLauncher: ShareLauncher
 
     /**
      * Production app-wide state (offline banner etc.). Backed by

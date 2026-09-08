@@ -48,7 +48,7 @@ import sodogku.libraries.resources.generated.resources.settings_title
 import sodogku.libraries.resources.generated.resources.settings_version
 
 /** Which explainer is open, if any. */
-enum class GameDialog { Rules, Bones, Settings }
+enum class GameDialog { Rules, Bones }
 
 /**
  * Everything the board can put in front of the player.
@@ -81,14 +81,6 @@ fun GameDialogHost(
             when (dialog) {
                 GameDialog.Rules -> RulesContent()
                 GameDialog.Bones -> BonesContent()
-                GameDialog.Settings -> SettingsContent(
-                    state = state,
-                    onAction = onAction,
-                    onOpenPrivacy = onOpenPrivacy,
-                    onOpenTerms = onOpenTerms,
-                    onOpenFeedback = onOpenFeedback,
-                    appVersion = appVersion,
-                )
             }
             ButtonPrimary(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(Res.string.common_close))
@@ -162,51 +154,6 @@ private fun BonesContent() {
     )
 }
 
-@Composable
-private fun SettingsContent(
-    state: GameState,
-    onAction: (GameAction) -> Unit,
-    onOpenPrivacy: () -> Unit,
-    onOpenTerms: () -> Unit,
-    onOpenFeedback: () -> Unit,
-    appVersion: String,
-) {
-    Text(text = stringResource(Res.string.settings_title), typography = AppTheme.typography.Heading.H700)
-
-    SettingToggle(
-        title = stringResource(Res.string.settings_colorblind),
-        body = stringResource(Res.string.settings_colorblind_body),
-        checked = state.colorblind,
-        onToggle = { onAction(GameAction.ToggleColorblind) },
-    )
-    SettingToggle(
-        title = stringResource(Res.string.settings_haptics),
-        body = stringResource(Res.string.settings_haptics_body),
-        checked = state.haptics,
-        onToggle = { onAction(GameAction.ToggleHaptics) },
-    )
-    SettingToggle(
-        title = stringResource(Res.string.settings_reduce_animations),
-        body = stringResource(Res.string.settings_reduce_animations_body),
-        checked = state.reduceAnimations,
-        onToggle = { onAction(GameAction.ToggleReduceAnimations) },
-    )
-
-    ButtonGhost(onClick = onOpenFeedback, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(Res.string.settings_feedback))
-    }
-    ButtonGhost(onClick = onOpenPrivacy, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(Res.string.settings_privacy))
-    }
-    ButtonGhost(onClick = onOpenTerms, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(Res.string.settings_terms))
-    }
-    Text(
-        text = stringResource(Res.string.settings_version, appVersion),
-        typography = AppTheme.typography.Caption.C300,
-        color = AppTheme.colors.textSecondary,
-    )
-}
 
 @Composable
 private fun SettingToggle(

@@ -468,7 +468,7 @@ in flight. Both now move in one `updateState`.
 
 ---
 
-## C6 · Daily challenge — **logic DONE** (2026-09-07), card UI outstanding
+## C6 · Daily challenge — **DONE** (2026-09-07)
 
 **Unblocked by** C5.
 
@@ -501,15 +501,19 @@ interface DailyRepository {
 `resetsIn` and `enabled`, plus a computed `playable`. The card should do no date arithmetic of its
 own — everything in one status comes from one snapshot of the clock.
 
+### The card — **DONE** (2026-09-07)
+
+`DailyCard` in `:libraries:ui` (with previews), rendered at the top of `LevelDrawer` and absent
+entirely when either flag is off. `GameRoute` gained `daily: Boolean`, `GameViewModel` an
+`isDaily` assisted arg and a `DailyRepository`, and the drawer's card, the header stat, the win
+sheet and the loss sheet all read `state.isDaily`. 15 new ViewModel tests, 62 in the file.
+
 ### What is left
 
-- **The card itself**, and the route that opens the board from `packIndex`. Note that daily and
-  campaign level ids share a number line (daily level 7 is not campaign level 7), so whatever
-  launches the game needs the *pack* as well as the id — `GameViewModel` currently resolves its
-  level against `LevelPacks.campaign` only.
-- **Telemetry.** `daily.started` / `daily.completed` / `daily.streak_broken` / `daily.freeze_used`
-  are specced in section 14 and not emitted; the streak is available at every one of those call
-  sites.
+- **Telemetry.** `daily.started`, `daily.completed` and `daily.freeze_used` are emitted through
+  `logEvent`; `daily.streak_broken` is not, because nothing on the client is told when a streak
+  ends — the fold simply returns a smaller number on the next read. Emitting it needs a
+  "streak as of last read" to compare against, which is the counter this design refuses.
 - **Sharing** (C10) reads `history()`.
 
 ### What it discovered
@@ -528,12 +532,35 @@ own — everything in one status comes from one snapshot of the clock.
 - `LevelPacks.dailyIndexFor(epochDay)` was added next to `dailyFor` so the stored `levelIndex` and
   the board come from the same wrap.
 
-**Not verified:** nothing was run on a device — there is no UI to run. The Room queries themselves
-are unexercised for the same reason `level_progress`'s are (a KMP Room database needs a native
-driver the host JVM test source set does not have); the tests drive an in-memory DAO that
-reproduces the `IGNORE` conflict behaviour the schema depends on. The first thing the card should
-prove on device is that a completed daily survives a process death, because that is the one path
-these tests cannot see.
+### What the card discovered
+
+- **The shared number line reaches further than the pack lookup.** Resolving the board against the
+  right pack is the obvious half. The other half is every place a level id is treated as campaign
+  progress: `progress.record`, `onAttemptStarted`, `onCompleted`, and `maxOf(unlocked, level.id)`
+  in two places — a daily would have unlocked campaign levels up to its own id. The drawer had it
+  too, and that one was only visible on device: it scrolled the campaign list to the daily's id
+  and highlighted a locked stranger as "current". `currentLevelId` is now nullable for exactly
+  that reason.
+- **A lost daily cannot be written when the bones run out.** `daily_result` takes one row per date
+  and never updates it, and the spec allows a failed daily to be revived with a rewarded ad. Write
+  the failure at the loss and the revive's clear can never land. It is written when the player
+  walks away from the loss sheet instead — see `decisions.md` for the force-quit hole that leaves.
+- **The daily's level id is not a number to show anyone.** It is a position in a 730-board pool
+  that reads as a campaign level nobody has reached. The header shows the streak instead.
+- **Compose resources do not honour Android's `\'` escape.** `Play today\'s board` rendered the
+  backslash on device. Typographic apostrophes throughout instead.
+
+**Verified on device** (Android emulator, `scripts/dev/drive.py`): the card renders at the top of
+the drawer with the date, streak, countdown and CTA; the daily opens its own 7×7 board with
+"Streak" where "Level" usually sits; clearing it shows three paws and "1 day streak"; and after a
+force-stop and relaunch the card reads "Today's board is done" with the paws intact and no CTA —
+which is the process-death path the C6 logic tests could not see. Campaign level 2 was still
+locked afterwards.
+
+**Not verified:** the freeze offer and its five outcome dialogs were never seen on a device. The
+offer only appears for a missed day that a freeze would reconnect, and producing one needs the
+device clock moved, which this emulator refuses without root. Unit tests cover every branch and
+the dialog has previews. The Room queries remain unexercised for the reason the logic entry gives.
 
 ---
 
@@ -712,6 +739,42 @@ more than a line, and until they are wired the achievements that read them canno
 - **Completionist** (three paws on a whole band) needs the band's level count, which lives in the
   pack — the achievements module would have to depend on the content it is meant to be independent
   of. Show Dog (10) and Pedigree (50) replace it.
+
+### The UI half — **DONE** (2026-09-07)
+
+`:features:achievements` (+ impl), the settings entry point and toggle, the share intent, and the
+unlock toast as a design-system component. 12 new view-model tests, 3 new share tests, 3 new
+settings tests; detekt clean; Android and iOS both compile.
+
+- **The badge grid** shows all 21, locked included, with progress. Locked tiles keep their shape
+  and fade their glyph; earned ones take an accent border. The two hidden badges render as `???`
+  with a `?` face until earned, and report **no** progress at all — a mystery badge that showed
+  "0 / 1" would still say "one clear does it", which is the half of the surprise worth keeping.
+- **Copy for all 21** in `strings.xml`, resolved by an exhaustive `when (AchievementId)` in
+  `AchievementCopy`. It lives in the feature's **api** module, not its impl, so the win sheet can
+  use it — see `decisions.md`.
+- **The settings toggle** writes one boolean to `AppData.achievementsVisible` and stops. Recording
+  is untouched, which is asserted by a test that turns badges off, moves the history on, and turns
+  them back on.
+- **The share sheet** is `Intent.ACTION_SEND` through a chooser on Android and
+  `UIActivityViewController` on iOS, behind `ShareLauncher` in a new `:libraries:sharing:impl` —
+  the same shape as `WebLinkLauncher`. It reaches composables through `LocalShareSheet` rather than
+  a ViewModel, because the share's words are string resources.
+
+**Verified on a device** (Pixel 4a, `08291JEC211015`): the grid, the detail sheet, the toast, the
+Android chooser opening with the formatted share text, and the toggle removing the Achievements row
+from Settings and surviving a force-stop.
+
+**Not wired, and handed over as a diff:** the share button on the win sheet and the unlock toast on
+the game screen. `:features:game:impl` was being edited concurrently, so those five hunks were
+written and reviewed but not applied, and not compiled in place.
+
+### Discovered: nothing navigates to `SettingsRoute`
+
+`:features:settings` has worked since C11a and is unreachable — the board's gear opens the in-place
+`GameDialog.Settings` sheet instead, and no `router.navigate(SettingsRoute())` exists anywhere in
+the app. The achievements grid hangs off that unreachable page. One navigation call fixes it, from
+a file this chunk was not allowed to touch. Recorded in `decisions.md`.
 
 ### Discovered: a schema bump wipes the campaign
 

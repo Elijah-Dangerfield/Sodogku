@@ -51,6 +51,7 @@ import com.sodogku.libraries.ui.snackbar.showDebugSnackBar
 import com.sodogku.libraries.ui.system.LocalAppState
 import com.sodogku.libraries.ui.system.LocalBuildInfo
 import com.sodogku.libraries.ui.system.LocalClock
+import com.sodogku.libraries.ui.system.LocalShareSheet
 import com.sodogku.system.AppThemeProvider
 import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.seconds
@@ -124,7 +125,10 @@ fun App(appComponent: AppComponent) {
         LocalAppState provides appState,
         LocalClock provides appComponent.provideClock(),
         LocalBuildInfo provides BuildInfo,
-        LocalDialogHostState provides dialogHostState
+        LocalDialogHostState provides dialogHostState,
+        // Provided once at the root: every screen that can build a share
+        // string reads this rather than being handed a launcher.
+        LocalShareSheet provides appComponent.shareLauncher,
     ) {
         AppThemeProvider {
             Box(modifier = Modifier.fillMaxSize()) {

@@ -73,6 +73,15 @@ class AppStateImpl(
         .map { it.value.isOffline }
         .stateIn(appScope, SharingStarted.Eagerly, initialValue = false)
 
+    /**
+     * The OS half on its own. Consumers that reach a *third party* rather than
+     * our backend — the ad SDK is the one that exists — must use this, because
+     * our server being down says nothing about whether AdMob is reachable.
+     */
+    override val isDeviceOffline: StateFlow<Boolean> = connectivityObserver.observe()
+        .map { osOnline -> !osOnline }
+        .stateIn(appScope, SharingStarted.Eagerly, initialValue = false)
+
     // Block state is unwired in V1; see PreviewAppState for the contract.
     // Kept on the interface for future overlay use-cases.
     override val isBlockActive: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow()

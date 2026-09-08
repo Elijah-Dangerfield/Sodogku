@@ -1,6 +1,10 @@
 package com.sodogku.system
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -26,6 +30,20 @@ inline fun <T : Any> Modifier.thenIfNotNull(
     factory: Modifier.(T) -> Modifier
 ): Modifier {
     return if (value != null) then(factory(Modifier, value)) else this
+}
+
+/**
+ * A tap target with no ripple and no bounce.
+ *
+ * For the two jobs where feedback would be wrong: a scrim that dismisses what
+ * is above it, and the card on top of that scrim, which needs a click handler
+ * only so that reading it does not count as tapping outside. Anything the
+ * player is meant to *press* should use `bounceClick` instead.
+ */
+@Composable
+fun Modifier.quietClickable(onClick: () -> Unit): Modifier {
+    val interactionSource = remember { MutableInteractionSource() }
+    return clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
 }
 
 fun Modifier.background(

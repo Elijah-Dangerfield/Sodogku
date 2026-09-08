@@ -75,6 +75,8 @@ include(":features:game")
 include(":features:game:impl")
 include(":features:settings")
 include(":features:settings:impl")
+include(":features:paywall")
+include(":features:paywall:impl")
 
     // Libraries
     include(":libraries:config")
@@ -94,13 +96,18 @@ include(":features:settings:impl")
 include(":libraries:achievements")
 include(":libraries:achievements:impl")
 include(":libraries:ads")
+include(":libraries:ads:impl")
 include(":libraries:billing")
+include(":libraries:billing:impl")
 include(":libraries:levels")
 include(":libraries:progress")
 include(":libraries:progress:impl")
 include(":libraries:puzzle")
 include(":libraries:scoring")
 include(":libraries:sharing")
+include(":libraries:sharing:impl")
+include(":features:achievements")
+include(":features:achievements:impl")
     // No api sibling on purpose: the public surface is the `logEvent`
     // extension in :libraries:core; this impl only hosts the experimental
     // opentelemetry-kotlin dependency + the GrafanaLogTree wiring.

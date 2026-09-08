@@ -24,6 +24,10 @@ kotlin {
             implementation(projects.libraries.levels)
             implementation(projects.libraries.progress)
             implementation(projects.libraries.achievements)
+            // AchievementCopy, for the unlock toast's badge names.
+            implementation(projects.features.achievements)
+            implementation(projects.features.settings)
+            implementation(projects.libraries.sharing)
             implementation(projects.libraries.scoring)
             implementation(projects.libraries.ads)
             implementation(projects.libraries.billing)

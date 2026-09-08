@@ -20,6 +20,10 @@ kotlin {
             api(projects.libraries.resources)
             // TODO honestly the sodogku library should expose the component that require sodogku domain
             implementation(projects.libraries.sodogku)
+            // `api`, not `implementation`: `LocalShareSheet` exposes
+            // `ShareLauncher` in its public type, so every consumer of the
+            // design system has to be able to name it.
+            api(projects.libraries.sharing)
 
             api(compose.ui)
             api(compose.uiUtil)

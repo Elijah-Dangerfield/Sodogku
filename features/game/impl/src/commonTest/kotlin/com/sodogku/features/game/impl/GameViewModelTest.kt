@@ -13,6 +13,12 @@ import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
 import com.sodogku.libraries.progress.ProgressRepository
+import com.sodogku.libraries.progress.daily.DailyOutcome
+import com.sodogku.libraries.progress.daily.DailyRepository
+import com.sodogku.libraries.progress.daily.DailyResult
+import com.sodogku.libraries.progress.daily.DailyStatus
+import com.sodogku.libraries.progress.daily.FreezeOffer
+import com.sodogku.libraries.progress.daily.FreezeResult
 import com.sodogku.libraries.achievements.Achievement
 import com.sodogku.libraries.achievements.AchievementState
 import com.sodogku.libraries.achievements.AchievementsRepository
@@ -21,6 +27,7 @@ import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.scoring.ScoringConfig
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
@@ -30,6 +37,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TestTimeSource
 import kotlinx.coroutines.flow.Flow
@@ -702,22 +710,239 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(0, badges.recorded.last().treatsUsed, "spends must not carry across attempts")
     }
 
+    @Test
+    fun aDailyResolvesAgainstTheDailyPackAndIgnoresTheRoutesId() = runUnitTest {
+        // The two packs share a number line, so an id alone does not name a
+        // board. The route's id is only a hint; the status is what decides,
+        // because the board and the date it will be recorded against have to
+        // come from one snapshot.
+        val vm = viewModel(levelId = 1, isDaily = true, daily = FakeDaily(levelId = DailyLevel))
+
+        val opened = assertNotNull(vm.state.level)
+        assertEquals(DailyLevel, opened.id)
+        assertEquals(LevelPacks.daily.byId(DailyLevel), opened)
+        assertTrue(
+            opened != LevelPacks.campaign.byId(DailyLevel),
+            "daily $DailyLevel and campaign $DailyLevel are different boards",
+        )
+        assertTrue(vm.state.isDaily)
+        assertEquals(GamePhase.Playing, vm.state.phase)
+    }
+
+    @Test
+    fun aSpentDayDoesNotOpen() = runUnitTest {
+        // One attempt per day. The repository would refuse the write anyway, so
+        // opening the board would hand someone a run whose score can never land.
+        val daily = FakeDaily(result = completedToday())
+
+        val vm = viewModel(isDaily = true, daily = daily)
+
+        assertEquals(null, vm.state.level)
+        assertEquals(GamePhase.Loading, vm.state.phase)
+        assertTrue(daily.writes.isEmpty())
+    }
+
+    @Test
+    fun aDailyClearIsWrittenToTheDailyAndNotToCampaignProgress() = runUnitTest {
+        val daily = FakeDaily(levelId = DailyLevel)
+        val progress = InMemoryProgress()
+        val vm = viewModel(isDaily = true, daily = daily, progress = progress)
+
+        solveCurrent(vm)
+
+        assertEquals(GamePhase.Won, vm.state.phase)
+        val written = daily.writes.single()
+        assertEquals(DailyDate, written.date)
+        assertEquals(DailyOutcome.Completed, written.outcome)
+        assertEquals(vm.state.score.total, written.score)
+        assertEquals(vm.state.paws, written.paws)
+
+        assertTrue(
+            progress.all().isEmpty(),
+            "a daily may not touch campaign progress — not even an attempt row",
+        )
+        assertEquals(LevelRecord.FIRST_LEVEL_ID, progress.unlockedThrough())
+        assertEquals(
+            LevelRecord.FIRST_LEVEL_ID,
+            vm.state.unlockedThrough,
+            "daily $DailyLevel must not unlock campaign $DailyLevel",
+        )
+    }
+
+    @Test
+    fun aDailyOpeningDoesNotWidenTheCampaignFrontier() = runUnitTest {
+        // The drawer unlocks against `unlockedThrough`, and the level on screen
+        // is normally proof the player reached it. It is no such proof here.
+        val progress = InMemoryProgress()
+        progress.onCompleted(StarterDogLevel, score = 1, paws = 1, timeMs = 1)
+        val vm = viewModel(isDaily = true, daily = FakeDaily(levelId = DailyLevel), progress = progress)
+
+        vm.takeAction(GameAction.LevelsOpened)
+
+        assertEquals(StarterDogLevel + 1, vm.state.unlockedThrough)
+    }
+
+    @Test
+    fun aDailyClearReachesTheAchievementLogWithTheStreakItProduced() = runUnitTest {
+        // The streak *after* the write, which is the whole point: reading it
+        // before recording the clear reports the number the player had
+        // yesterday, and the log has no way to notice.
+        val badges = RecordingAchievements()
+        val vm = viewModel(isDaily = true, daily = FakeDaily(levelId = DailyLevel), achievements = badges)
+
+        solveCurrent(vm)
+
+        val recorded = badges.recorded.single()
+        assertEquals(PlayMode.Daily, recorded.mode)
+        assertEquals(DailyLevel, recorded.levelId)
+        assertTrue(recorded.completed)
+        assertEquals(OpeningStreak + 1, recorded.dailyStreakDays)
+        assertEquals(OpeningStreak + 1, vm.state.dailyStreak, "the win sheet shows the same number")
+    }
+
+    @Test
+    fun aCampaignClearIsStillCampaignAndCarriesNoStreak() = runUnitTest {
+        val badges = RecordingAchievements()
+        val vm = viewModel(achievements = badges)
+
+        solve(vm)
+
+        val recorded = badges.recorded.single()
+        assertEquals(PlayMode.Campaign, recorded.mode)
+        assertEquals(0, recorded.dailyStreakDays)
+    }
+
+    @Test
+    fun aLostDailyIsSpentOnlyWhenThePlayerWalksAway() = runUnitTest {
+        // Writing the loss the moment the bones run out would lock the day
+        // against the clear an ad revive could still earn — `daily_result` takes
+        // one row per date and never updates it.
+        val daily = FakeDaily(levelId = DailyLevel)
+        val vm = viewModel(isDaily = true, daily = daily)
+
+        loseCurrent(vm)
+        assertEquals(GamePhase.Lost, vm.state.phase)
+        assertTrue(daily.writes.isEmpty(), "the revive is still on the table")
+
+        vm.takeAction(GameAction.Leave)
+
+        val written = daily.writes.single()
+        assertEquals(DailyOutcome.Failed, written.outcome)
+        assertEquals(DailyDate, written.date)
+    }
+
+    @Test
+    fun aRevivedDailyCanStillBeCleared() = runUnitTest {
+        val daily = FakeDaily(levelId = DailyLevel)
+        val vm = viewModel(isDaily = true, daily = daily)
+        loseCurrent(vm)
+
+        vm.takeAction(GameAction.ContinueAfterLoss)
+        assertEquals(GamePhase.Playing, vm.state.phase)
+        solveCurrent(vm)
+
+        assertEquals(DailyOutcome.Completed, daily.writes.single().outcome)
+    }
+
+    @Test
+    fun aDailyCannotBeRestarted() = runUnitTest {
+        val vm = viewModel(isDaily = true, daily = FakeDaily(levelId = DailyLevel))
+        loseCurrent(vm)
+
+        vm.takeAction(GameAction.Retry)
+
+        assertEquals(GamePhase.Lost, vm.state.phase, "a second run at today's board is a replay")
+    }
+
+    @Test
+    fun aLostCampaignLevelWritesNothingToTheDaily() = runUnitTest {
+        val daily = FakeDaily()
+        val vm = viewModel(daily = daily)
+
+        repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
+        vm.takeAction(GameAction.Leave)
+
+        assertTrue(daily.writes.isEmpty())
+    }
+
+    @Test
+    fun theCardFollowsTheObservedStatus() = runUnitTest {
+        // Observed rather than fetched, because the repository re-emits at local
+        // midnight and a drawer left open has to pick the new board up.
+        val vm = viewModel(daily = FakeDaily(levelId = DailyLevel))
+
+        val status = assertNotNull(vm.state.daily)
+        assertEquals(DailyDate, status.date)
+        assertEquals(DailyLevel, status.levelId)
+        assertEquals(OpeningStreak, status.streak)
+        assertTrue(status.playable)
+    }
+
+    @Test
+    fun playingTheDailyFromTheDrawerClosesIt() = runUnitTest {
+        val vm = viewModel(daily = FakeDaily(levelId = DailyLevel))
+        vm.takeAction(GameAction.LevelsOpened)
+
+        vm.takeAction(GameAction.PlayDaily)
+
+        assertFalse(vm.state.drawerOpen)
+        assertEquals(PlainLevel, vm.state.level?.id, "the daily opens on its own route, not in place")
+    }
+
+    @Test
+    fun everyFreezeOutcomeSaysSomething() = runUnitTest {
+        // A freeze that resolves silently is indistinguishable from a crash, and
+        // Declined — the player closing the ad early — is the branch most likely
+        // to be read as one.
+        val cases = listOf(
+            FreezeResult.Applied(DailyDate, streak = 9) to FreezeMessage.Applied(9),
+            FreezeResult.Declined to FreezeMessage.Declined,
+            FreezeResult.NoneLeft to FreezeMessage.NoneLeft,
+            FreezeResult.NothingToFreeze to FreezeMessage.NothingToFreeze,
+        )
+        cases.forEach { (result, expected) ->
+            val daily = FakeDaily(freezeResult = result)
+            val vm = viewModel(daily = daily)
+
+            vm.takeAction(GameAction.UseFreeze)
+
+            assertEquals(expected, vm.state.freezeMessage, "$result was not reported")
+            assertEquals(1, daily.freezesRequested)
+
+            vm.takeAction(GameAction.DismissFreezeMessage)
+            assertEquals(null, vm.state.freezeMessage)
+        }
+    }
+
+    @Test
+    fun aFreezeThatBlowsUpIsStillAnswered() = runUnitTest {
+        val vm = viewModel(daily = FakeDaily(freezeThrows = true))
+
+        vm.takeAction(GameAction.UseFreeze)
+
+        assertEquals(FreezeMessage.Unavailable, vm.state.freezeMessage)
+    }
+
     private val clock = TestTimeSource()
 
     private fun viewModel(
         levelId: Int = PlainLevel,
+        isDaily: Boolean = false,
         adGate: AdGate = FixedAdGate(RewardOutcome.Rewarded),
         entitlements: Entitlements = FreeEntitlementsFake(),
         cache: AppCache = InMemoryAppCache(),
         progress: ProgressRepository = InMemoryProgress(),
+        daily: DailyRepository = FakeDaily(),
         achievements: AchievementsRepository = RecordingAchievements(),
     ) = GameViewModel(
         levelId,
+        isDaily,
         adGate,
         entitlements,
         clock,
         cache,
         progress,
+        daily,
         achievements,
         // Fixed rather than the system clock: `localHour` is an input to the
         // time-of-day badges, so a test that read the real clock would pass or
@@ -746,6 +971,33 @@ class GameViewModelTest : CoroutineTest() {
         (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
     }
 
+    /** Solves whatever board the ViewModel actually opened, pack and all. */
+    private fun solveCurrent(vm: GameViewModel) {
+        val open = assertNotNull(vm.state.level, "nothing to solve — the board never opened")
+        (0 until open.size).forEach { row ->
+            vm.commit(open.board.cellAt(row, open.solution[row]))
+        }
+    }
+
+    /** Spends every bone on the open board. */
+    private fun loseCurrent(vm: GameViewModel) {
+        val open = assertNotNull(vm.state.level)
+        repeat(ScoringConfig.MAX_LIVES) { strike ->
+            val row = strike % open.size
+            val col = (0 until open.size).first { it != open.solution[row] }
+            vm.commit(open.board.cellAt(row, col))
+        }
+    }
+
+    private fun completedToday(): DailyResult = DailyResult(
+        date = DailyDate,
+        levelIndex = DailyLevel - 1,
+        outcome = DailyOutcome.Completed,
+        score = 4_200,
+        paws = 3,
+        timeMs = 90_000,
+    )
+
     private fun cellFor(row: Int): Int = level.board.cellAt(row, level.solution[row])
 
     private fun wrongCellIn(row: Int): Int {
@@ -772,6 +1024,19 @@ class GameViewModelTest : CoroutineTest() {
     private companion object {
         const val FixedHour = 12
 
+        /** Arbitrary, and deliberately not "today" — nothing here reads a clock. */
+        val DailyDate = LocalDate(2026, 9, 7)
+
+        /**
+         * A daily id that also exists in the campaign, so a test asserting the
+         * right pack is asserting something. Daily 200 is a 6x6, campaign 200 an
+         * 8x8.
+         */
+        const val DailyLevel = 200
+
+        /** Days already in the bag when a daily test starts. */
+        const val OpeningStreak = 4
+
         /** Arbitrary but fixed: 2026-01-01T12:00:00Z, so `localHour` is 12 in UTC. */
         val FixedClock = object : Clock {
             override fun now(): Instant = Instant.parse("2026-01-01T12:00:00Z")
@@ -788,6 +1053,90 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Just past the commit window, so a second tap is a second note. */
         val LateGap = 400.milliseconds
+    }
+
+    /**
+     * In-memory [DailyRepository] that keeps the three rules the game leans on.
+     *
+     * A date with a result is never overwritten (the primary key does that in
+     * Room), `playable` follows from the result exactly as [DailyStatus] defines
+     * it, and **a clear moves the streak**. The last one matters: a ViewModel
+     * that read the streak before writing the clear would still look right
+     * against a fake whose streak never changed.
+     */
+    private class FakeDaily(
+        date: LocalDate = DailyDate,
+        levelId: Int = DailyLevel,
+        streak: Int = OpeningStreak,
+        enabled: Boolean = true,
+        result: DailyResult? = null,
+        freezeOffer: FreezeOffer? = null,
+        private val freezeResult: FreezeResult = FreezeResult.NothingToFreeze,
+        private val freezeThrows: Boolean = false,
+    ) : DailyRepository {
+
+        val writes = mutableListOf<DailyResult>()
+        var freezesRequested = 0
+            private set
+
+        private val state = MutableStateFlow(
+            DailyStatus(
+                date = date,
+                packIndex = levelId - 1,
+                levelId = levelId,
+                result = result,
+                streak = streak,
+                freezeOffer = freezeOffer,
+                resetsIn = 6.hours,
+                enabled = enabled,
+            ),
+        )
+
+        override fun observe(): Flow<DailyStatus> = state
+
+        override suspend fun status(): DailyStatus = state.value
+
+        override suspend fun history(): List<DailyResult> = writes.toList()
+
+        override suspend fun onCompleted(date: LocalDate, score: Int, paws: Int, timeMs: Long) {
+            write(date, DailyOutcome.Completed, score, paws, timeMs)
+        }
+
+        override suspend fun onFailed(date: LocalDate, timeMs: Long) {
+            write(date, DailyOutcome.Failed, score = 0, paws = 0, timeMs = timeMs)
+        }
+
+        override suspend fun useFreeze(): FreezeResult {
+            freezesRequested++
+            if (freezeThrows) error("no ad service")
+            return freezeResult
+        }
+
+        override suspend fun reset() {
+            writes.clear()
+        }
+
+        private fun write(
+            date: LocalDate,
+            outcome: DailyOutcome,
+            score: Int,
+            paws: Int,
+            timeMs: Long,
+        ) {
+            if (writes.any { it.date == date }) return
+            val snapshot = state.value
+            val result = DailyResult(date, snapshot.packIndex, outcome, score, paws, timeMs)
+            writes += result
+            if (date != snapshot.date) return
+            state.value = snapshot.copy(
+                result = result,
+                streak = if (outcome == DailyOutcome.Completed) {
+                    snapshot.streak + 1
+                } else {
+                    snapshot.streak
+                },
+            )
+        }
     }
 
     /** In-memory [AppCache], so a settings toggle can be asserted without disk. */

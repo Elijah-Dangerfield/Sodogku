@@ -245,7 +245,13 @@ in the genre and it costs almost nothing given a bundled pack.
   a campaign level, but only once. The lock is the `daily_result` primary key, so it holds
   whatever the clock is set to. The result is recorded against the date whose board was played,
   so an attempt that runs through midnight counts for the day it started and leaves the new day
-  unplayed.
+  unplayed. A clear is written the moment it happens; a **loss is written when the player leaves
+  the loss sheet**. This is the one place §1.4's "write the failure the moment the third bone
+  lands" cannot hold: `daily_result` takes one row per date and never updates it, so a failure
+  written at the third bone would lock the day against the clear a revive can still earn. The cost
+  is that force-quitting at the loss sheet leaves the day open — accepted, for the same reason
+  nothing else in the daily defends against a moved clock. See `decisions.md`.
+  Starting the board over is not offered on the daily at all.
 - **Streak.** Consecutive days with a completed daily, **recomputed from the stored results on
   every read** rather than counted. Local. A missed day resets it. Today does not have to be done
   yet — a run through yesterday stands all day, including after today has been played and lost.
@@ -254,8 +260,13 @@ in the genre and it costs almost nothing given a bundled pack.
   frozen day bridges the gap without counting toward the total, and is only offered when covering
   it would actually reconnect a run. A day the player attempted and lost is not missed and cannot
   be frozen. This is the single most reliable ad impression in the app.
-- **Entry point.** A prominent card at the top of the level map with the day's date, the streak
-  count, and a done/not-done state.
+- **Entry point.** A card at the top of the **level drawer** — there is no level map; the puzzle
+  is the home screen and the level list slides out over it. The card carries the day's date, the
+  streak, a done / not-done state (with the day's paw rating once it is done), a countdown to the
+  next board, and the freeze offer when there is one. The board opens on its own route, so the
+  campaign level underneath is still there on back. While the daily is the board on screen, the
+  header shows the streak where the level number usually sits — a daily's id is a position in a
+  730-board pool and reads as a campaign level nobody has reached.
 - **Sharing.** The daily is what people share, because everyone had the same board.
 
 `daily.enabled` is a remote config kill switch, and `features.dailyChallenge` is the rollout flag.
@@ -638,8 +649,17 @@ resources the UI maps with an exhaustive `when`, so adding an achievement fails 
 somebody writes the words for it rather than shipping a badge captioned
 `achievement_top_dog_name`.
 
-Toggleable in Settings, which suppresses toasts and hides the tab but keeps recording, so
+Toggleable in Settings, which suppresses toasts and hides the way in but keeps recording, so
 re-enabling shows accurate history. The toggle deliberately does not reach the repository.
+
+There is no tab: the grid is a page reached from a row in Settings, and switching badges off is
+what removes that row. The toggle itself stays put, or there would be no way back. The screen keeps
+an "achievements are off" panel behind the hidden row for anything that lands on it anyway, and
+that panel says outright that recording carried on — the reading that would stop somebody turning
+badges back on is the one where turning them off threw the history away.
+
+Locked badges are shown with their progress; the two hidden ones show as `???` and report **no**
+progress until earned. "0 / 1" under a mystery badge still says a single clear does it.
 
 ---
 
@@ -677,6 +697,11 @@ the emoji and the numbers, and holds no English and no date formatting of its ow
 
 Share from the win sheet, the daily card, and a level-map long-press. `share.tapped` is worth
 watching closely, it is the cheapest organic growth channel the app has.
+
+Because every word is passed in, the only thing in the app that can *build* a share is a composable
+— `stringResource` is the only way to resolve them. So the platform launcher reaches screens as
+`LocalShareSheet` rather than as a ViewModel dependency, and the design system's `ShareButton` owns
+the formatting: a screen supplies the board and what to call it, and nothing else.
 
 ---
 

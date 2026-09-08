@@ -88,14 +88,27 @@ a session join.
 
 | Event | Attributes | Fires |
 |---|---|---|
-| `game.level_started` | `level_id`, `size`, `difficulty`, `attempt_number` | Every attempt, including a retry after a loss and a jump from the level pane. Not on resume from background |
-| `game.level_completed` | `level_id`, `size`, `difficulty`, `duration_ms`, `score`, `paws`, `strikes_used`, `attempt_number` | The last dog lands. `duration_ms` is monotonic from the attempt's start, so backgrounding does not inflate it |
-| `game.level_failed` | `level_id`, `duration_ms`, `dogs_placed`, `attempt_number` | The third bone goes. `dogs_placed` is how far they got, which is the difference between "too hard" and "unlucky" |
+| `game.level_started` | `level_id`, `size`, `difficulty`, `attempt_number`, `mode` | Every attempt, including a retry after a loss and a jump from the level pane. Not on resume from background |
+| `game.level_completed` | `level_id`, `size`, `difficulty`, `duration_ms`, `score`, `paws`, `strikes_used`, `attempt_number`, `mode` | The last dog lands. `duration_ms` is monotonic from the attempt's start, so backgrounding does not inflate it |
+| `game.level_failed` | `level_id`, `duration_ms`, `dogs_placed`, `attempt_number`, `mode` | The third bone goes. `dogs_placed` is how far they got, which is the difference between "too hard" and "unlucky" |
+| `daily.started` | `date`, `streak` | Today's board is opened from the card. `level_id` is deliberately absent: it is a position in the daily pool and means nothing next to a campaign id |
+| `daily.completed` | `date`, `streak`, `score` | A daily clear is written. `streak` is the number *after* the write, so it is the run the player just extended |
+| `daily.freeze_used` | `streak` | A rewarded ad covered a missed day |
 | `game.continued` | `level_id` | A rewarded continue after a loss, board intact |
 | `game.bones_refilled` | `level_id` | The standing ad offer on the board, or the refill button on the lose sheet |
 | `game.booster_used` | `booster` (`sniff`/`treat`), `level_id` | A charge is actually spent |
 | `game.booster_no_op` | `booster`, `level_id` | A booster was asked for and **declined to spend**, because it had nothing to show. Should be rare; a rise means the hint engine is running out of things to say earlier than it should, which is a difficulty-calibration signal and not a UI one |
 | `game.booster_refilled` | `booster`, `to` | An ad topped a consumable up. `to` is the resulting holding, not the amount granted — refills never reduce, so the two differ for anyone above the floor |
+
+`mode` is `campaign` or `daily`, and it is on every game event rather than only the daily ones
+because level ids are ambiguous without it — the two packs share a number line, so `level_id: 7`
+names two different boards and any query that groups by it silently mixes them.
+
+`daily.streak_broken` is specced in SPEC §14 and **not emitted.** Nothing on the client is told
+when a streak ends: the streak is folded from stored results on every read, so a broken one is
+simply a smaller number next time somebody asks. Firing the event would need a remembered
+"streak as of last read" to compare against, which is exactly the counter that design refuses.
+The same fact is derivable server-side from the gaps between `daily.completed` events.
 
 ### The one that pays for itself
 

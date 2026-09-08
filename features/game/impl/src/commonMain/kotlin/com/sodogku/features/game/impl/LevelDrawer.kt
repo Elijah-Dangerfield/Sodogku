@@ -31,9 +31,13 @@ import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
+import com.sodogku.libraries.progress.daily.DailyOutcome
+import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.ui.bounceClick
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
+import com.sodogku.libraries.ui.components.game.DailyCard
+import com.sodogku.libraries.ui.components.game.DailyCardState
 import com.sodogku.libraries.ui.components.game.PawRating
 import com.sodogku.libraries.ui.components.icon.Icon
 import com.sodogku.libraries.ui.components.icon.Icons
@@ -43,11 +47,25 @@ import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
 import com.sodogku.system.Radii
 import com.sodogku.system.clip
+import kotlinx.datetime.number
 import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.daily_date
 import sodogku.libraries.resources.generated.resources.levels_reward
 import sodogku.libraries.resources.generated.resources.levels_size
 import sodogku.libraries.resources.generated.resources.levels_title
+import sodogku.libraries.resources.generated.resources.month_short_1
+import sodogku.libraries.resources.generated.resources.month_short_10
+import sodogku.libraries.resources.generated.resources.month_short_11
+import sodogku.libraries.resources.generated.resources.month_short_12
+import sodogku.libraries.resources.generated.resources.month_short_2
+import sodogku.libraries.resources.generated.resources.month_short_3
+import sodogku.libraries.resources.generated.resources.month_short_4
+import sodogku.libraries.resources.generated.resources.month_short_5
+import sodogku.libraries.resources.generated.resources.month_short_6
+import sodogku.libraries.resources.generated.resources.month_short_7
+import sodogku.libraries.resources.generated.resources.month_short_8
+import sodogku.libraries.resources.generated.resources.month_short_9
 
 /**
  * The level list, as a pane that slides in over the board.
@@ -66,12 +84,21 @@ import sodogku.libraries.resources.generated.resources.levels_title
 @Composable
 fun BoxScope.LevelDrawer(
     open: Boolean,
-    currentLevelId: Int,
+    /**
+     * The campaign level on screen, or null when the board on screen is not one
+     * — the daily's id is a position in another pack, and passing it here both
+     * highlighted the wrong row and scrolled the list to a stranger.
+     */
+    currentLevelId: Int?,
     unlockedThrough: Int,
     canJumpAnywhere: Boolean,
     records: Map<Int, LevelRecord>,
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
+    daily: DailyStatus? = null,
+    isDailyBoard: Boolean = false,
+    onPlayDaily: () -> Unit = {},
+    onUseFreeze: () -> Unit = {},
     width: Dp = DrawerWidth,
 ) {
     val slide = animateFloatAsState(if (open) 1f else 0f, Motion.Pop)
@@ -104,10 +131,26 @@ fun BoxScope.LevelDrawer(
             modifier = Modifier.padding(bottom = Dimension.D500),
         )
 
+        // Absent, not greyed, when either flag is off. A card that says the daily
+        // exists but cannot be opened is a support ticket; a kill switch has to
+        // leave nothing behind.
+        if (daily != null && daily.enabled) {
+            DailyCardSlot(
+                status = daily,
+                isCurrentBoard = isDailyBoard,
+                onPlay = onPlayDaily,
+                onFreeze = onUseFreeze,
+                modifier = Modifier.padding(bottom = Dimension.D500),
+            )
+        }
+
         val levels = remember { LevelPacks.campaign.levels }
         val listState = rememberLazyListState()
+        // Opens on the level being played, or on the frontier when the board on
+        // screen belongs to the other pack.
+        val scrollTo = (currentLevelId ?: unlockedThrough) - 1
         LaunchedEffect(open) {
-            if (open) listState.scrollToItem((currentLevelId - 1).coerceAtLeast(0))
+            if (open) listState.scrollToItem(scrollTo.coerceAtLeast(0))
         }
 
         LazyColumn(
@@ -128,6 +171,46 @@ fun BoxScope.LevelDrawer(
             }
         }
     }
+}
+
+/**
+ * [DailyStatus] rendered, and the only place the daily is turned into copy.
+ *
+ * The status is one snapshot of the clock, so everything here is a lookup on it
+ * — no date is derived, compared or advanced. The month name comes out of string
+ * resources rather than a formatter so it translates with the rest of the app.
+ */
+@Composable
+private fun DailyCardSlot(
+    status: DailyStatus,
+    isCurrentBoard: Boolean,
+    onPlay: () -> Unit,
+    onFreeze: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DailyCard(
+        dateLabel = stringResource(
+            Res.string.daily_date,
+            stringResource(MonthNames[status.date.month.number - 1]),
+            status.date.day,
+        ),
+        streak = status.streak,
+        state = when (status.result?.outcome) {
+            null -> if (isCurrentBoard) DailyCardState.Current else DailyCardState.Open
+            DailyOutcome.Completed -> DailyCardState.Completed
+            DailyOutcome.Failed -> DailyCardState.Failed
+            // A freeze only ever covers a *missed* day, so today cannot be
+            // frozen — but a clock moved backwards can put one here, and "out of
+            // bones" would be a lie about a day nobody played.
+            DailyOutcome.Frozen -> DailyCardState.Completed
+        },
+        paws = status.result?.paws ?: 0,
+        resetsIn = status.resetsIn,
+        freezesRemaining = status.freezeOffer?.freezesRemaining,
+        onPlay = onPlay,
+        onFreeze = onFreeze,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -193,6 +276,22 @@ private fun LevelRow(
         }
     }
 }
+
+/** Short month names, indexed by month number minus one. Also the share title's. */
+internal val MonthNames = listOf(
+    Res.string.month_short_1,
+    Res.string.month_short_2,
+    Res.string.month_short_3,
+    Res.string.month_short_4,
+    Res.string.month_short_5,
+    Res.string.month_short_6,
+    Res.string.month_short_7,
+    Res.string.month_short_8,
+    Res.string.month_short_9,
+    Res.string.month_short_10,
+    Res.string.month_short_11,
+    Res.string.month_short_12,
+)
 
 private val DrawerWidth = Dimension.D1900 * 2.6f
 private const val CurrentTint = 0.22f

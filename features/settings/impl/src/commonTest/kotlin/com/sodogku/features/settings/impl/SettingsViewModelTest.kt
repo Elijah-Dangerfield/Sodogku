@@ -81,6 +81,38 @@ class SettingsViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun theAchievementToggleWritesTheDisplayFlagAndNothingElse() = runUnitTest {
+        // The whole point of this toggle is what it does *not* touch. It writes
+        // one boolean into AppData; the achievement log carries on recording,
+        // which is what makes turning badges back on show real history. If this
+        // ever grows a second effect, the equality below is what catches it.
+        val cache = InMemoryAppCache()
+        val vm = viewModel(cache)
+        assertTrue(vm.state.achievementsVisible, "badges are shown by default")
+
+        vm.takeAction(SettingsAction.ToggleAchievements)
+
+        assertFalse(vm.state.achievementsVisible)
+        assertEquals(AppData(achievementsVisible = false), cache.get())
+    }
+
+    @Test
+    fun theAchievementGridIsItsOwnDestination() = runUnitTest {
+        val vm = viewModel(InMemoryAppCache())
+
+        vm.takeAction(SettingsAction.OpenAchievements)
+
+        assertEquals(SettingsEvent.OpenAchievements, vm.eventFlow.first())
+    }
+
+    @Test
+    fun theAchievementToggleOpensShowingWhatIsAlreadySaved() = runUnitTest {
+        val vm = viewModel(InMemoryAppCache(AppData(achievementsVisible = false)))
+
+        assertFalse(vm.state.achievementsVisible)
+    }
+
+    @Test
     fun theVersionIsOnScreenFromTheFirstFrame() = runUnitTest {
         // Part of the initial state rather than loaded, because it is the one
         // thing on this screen a support conversation asks for.

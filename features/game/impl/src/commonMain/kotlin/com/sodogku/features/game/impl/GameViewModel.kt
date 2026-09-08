@@ -1,5 +1,6 @@
 package com.sodogku.features.game.impl
 
+import androidx.lifecycle.viewModelScope
 import com.sodogku.libraries.ads.AdGate
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
@@ -9,6 +10,7 @@ import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.logging.KLog
 import com.sodogku.libraries.core.logging.logEvent
 import com.sodogku.libraries.flowroutines.SEAViewModel
+import com.sodogku.libraries.flowroutines.collectIn
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.achievements.Achievement
@@ -17,8 +19,12 @@ import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
+import com.sodogku.libraries.progress.daily.DailyRepository
+import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.DeviceTimeZone
+import com.sodogku.libraries.progress.daily.FreezeResult
 import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
 import com.sodogku.libraries.progress.ProgressRepository
 import com.sodogku.libraries.puzzle.HintFinder
@@ -50,6 +56,12 @@ enum class GamePhase { Loading, Playing, Won, Lost }
 @Inject
 class GameViewModel(
     @Assisted private val levelId: Int,
+    /**
+     * Which pack [levelId] is from. Fixed for the life of the ViewModel, because
+     * it is the route that survives a process death — a mode this could switch
+     * into would be lost the moment the app was backgrounded mid-puzzle.
+     */
+    @Assisted private val isDaily: Boolean,
     private val adGate: AdGate,
     private val entitlements: Entitlements,
     /**
@@ -60,6 +72,7 @@ class GameViewModel(
     private val clock: TimeSource.WithComparableMarks,
     private val appCache: AppCache,
     private val progress: ProgressRepository,
+    private val daily: DailyRepository,
     private val achievements: AchievementsRepository,
     /**
      * Wall clock, not [clock]. The monotonic one cannot answer "what time of day
@@ -96,8 +109,21 @@ class GameViewModel(
      */
     private var recordBeforeAttempt: LevelRecord = LevelRecord.unplayed(levelId)
 
+    /**
+     * The day whose board is being played, captured when the attempt opens.
+     *
+     * Every daily write is keyed on this rather than on "now", so an attempt that
+     * starts at 23:58 and ends at 00:01 counts for the board it was started on
+     * and leaves the new day genuinely unplayed.
+     */
+    private var dailyDate: LocalDate? = null
+
     init {
         takeAction(GameAction.Load)
+        // The card lives in the drawer of every board, daily or not, and the
+        // repository re-emits at local midnight — so a drawer left open past
+        // midnight picks up the new board without this screen watching a clock.
+        daily.observe().collectIn(viewModelScope) { takeAction(GameAction.DailyChanged(it)) }
     }
 
     override suspend fun handleAction(action: GameAction) {
@@ -110,7 +136,7 @@ class GameViewModel(
             GameAction.DismissBoosterPrompt -> action.updateState { it.copy(boosterPrompt = null) }
             GameAction.Retry -> action.restart()
             GameAction.ContinueAfterLoss -> action.continueAfterLoss()
-            GameAction.Leave -> sendEvent(GameEvent.NavigateBack)
+            GameAction.Leave -> action.leave()
             GameAction.DismissWarning -> action.updateState {
                 it.copy(warning = null, hintCells = emptySet())
             }
@@ -122,9 +148,14 @@ class GameViewModel(
             GameAction.LevelsOpened -> action.loadRecords()
             GameAction.LevelsClosed -> action.updateState { it.copy(drawerOpen = false) }
             is GameAction.GoToLevel -> action.goToLevel(action.levelId)
+            is GameAction.DailyChanged -> action.updateState { it.copy(daily = action.status) }
+            GameAction.PlayDaily -> action.playDaily()
+            GameAction.UseFreeze -> action.useFreeze()
+            GameAction.DismissFreezeMessage -> action.updateState { it.copy(freezeMessage = null) }
             GameAction.OpenPrivacy -> sendEvent(GameEvent.OpenPrivacy)
             GameAction.OpenTerms -> sendEvent(GameEvent.OpenTerms)
             GameAction.OpenFeedback -> sendEvent(GameEvent.OpenFeedback)
+            GameAction.OpenSettings -> sendEvent(GameEvent.OpenSettings)
             is GameAction.TimerTick -> action.updateState { it.copy(elapsedMs = elapsedMs()) }
         }
     }
@@ -138,6 +169,7 @@ class GameViewModel(
                 colorblind = settings?.colorblindMode == true,
                 haptics = settings?.hapticsEnabled != false,
                 reduceAnimations = settings?.reduceAnimations == true,
+                showAchievements = settings?.achievementsVisible != false,
                 isPro = entitlements.isPro.value,
                 sniffs = settings?.sniffs ?: ConsumableRefillTo,
                 treats = settings?.treats ?: ConsumableRefillTo,
@@ -148,13 +180,39 @@ class GameViewModel(
             )
         }
 
-        val level = LevelPacks.campaign.byId(levelId)
+        val level = if (isDaily) todaysBoard() else LevelPacks.campaign.byId(levelId)
         if (level == null) {
-            logger.e { "No level $levelId in the campaign pack" }
+            logger.e { "No level $levelId in the $modeName pack" }
             sendEvent(GameEvent.NavigateBack)
             return
         }
         startAttempt(level)
+    }
+
+    /**
+     * The daily board, resolved from the repository rather than from [levelId].
+     *
+     * The route's id came from a card that was drawn at some earlier moment, and
+     * the board and the date the result is written against have to come from one
+     * snapshot of the clock — otherwise a screen opened a second before midnight
+     * records yesterday's board against today.
+     *
+     * Returns null when the day is already spent. One attempt per day is the
+     * repository's rule and it would refuse the write anyway, but letting someone
+     * play a board whose score can never be recorded is worse than not opening
+     * it.
+     */
+    private suspend fun todaysBoard(): LevelDefinition? {
+        val status = Catching { daily.status() }
+            .logOnFailure { "Failed to read the daily status" }
+            .getOrNull()
+            ?: return null
+        if (!status.playable) {
+            logger.i { "The daily for ${status.date} is already spent" }
+            return null
+        }
+        dailyDate = status.date
+        return LevelPacks.daily.byId(status.levelId)
     }
 
     private suspend fun GameAction.startAttempt(level: LevelDefinition) {
@@ -165,23 +223,33 @@ class GameViewModel(
         warnedAboutLastBone = false
         sniffsUsed = 0
         treatsUsed = 0
-        // Before `onAttemptStarted`, so the snapshot is genuinely pre-attempt.
-        recordBeforeAttempt = Catching { progress.record(level.id) }
-            .logOnFailure { "Failed to read the prior record for level ${level.id}" }
-            .getOrNull()
-            ?: LevelRecord.unplayed(level.id)
+        // Campaign progress is keyed on level id alone, and the two packs share
+        // that number line, so every read and every write here is skipped for a
+        // daily. Reading campaign level 7's record for daily level 7 would be
+        // wrong quietly; writing it would hand out a campaign unlock.
+        recordBeforeAttempt = if (isDaily) {
+            LevelRecord.unplayed(level.id)
+        } else {
+            Catching { progress.record(level.id) }
+                .logOnFailure { "Failed to read the prior record for level ${level.id}" }
+                .getOrNull()
+                ?: LevelRecord.unplayed(level.id)
+        }
         logger.logEvent(
             "game.level_started",
             "level_id" to level.id,
             "size" to level.size,
             "difficulty" to level.difficulty,
             "attempt_number" to attemptNumber,
+            "mode" to modeName,
         )
         // Recorded when the level opens rather than when it is cleared: an
         // abandoned attempt still happened, and it is what unlocks the level's
         // own row so `unlockedThrough` can see it.
-        Catching { progress.onAttemptStarted(level.id) }
-            .logOnFailure { "Failed to record the start of level ${level.id}" }
+        if (!isDaily) {
+            Catching { progress.onAttemptStarted(level.id) }
+                .logOnFailure { "Failed to record the start of level ${level.id}" }
+        }
         val unlocked = unlockedThrough()
 
         // The starter dog is folded into this one update rather than applied by
@@ -212,12 +280,25 @@ class GameViewModel(
                 colorblind = it.colorblind,
                 haptics = it.haptics,
                 reduceAnimations = it.reduceAnimations,
+                showAchievements = it.showAchievements,
                 isPro = it.isPro,
                 records = it.records,
-                unlockedThrough = maxOf(unlocked, level.id),
+                unlockedThrough = campaignFrontier(unlocked, level.id),
+                daily = it.daily,
+                isDaily = isDaily,
             )
         }
     }
+
+    /**
+     * How far the campaign has opened, given a level that is now on screen.
+     *
+     * A daily board's id says nothing about campaign progress — daily level 7 is
+     * not campaign level 7 — so it may never widen the frontier the drawer
+     * unlocks against.
+     */
+    private fun campaignFrontier(unlocked: Int, currentLevelId: Int): Int =
+        if (isDaily) unlocked else maxOf(unlocked, currentLevelId)
 
     /**
      * How far the drawer opens.
@@ -362,13 +443,20 @@ class GameViewModel(
             "paws" to paws,
             "strikes_used" to (ScoringConfig.MAX_LIVES - state.livesRemaining),
             "attempt_number" to attemptNumber,
+            "mode" to modeName,
         )
-        // Every metric here is a *best*, not a last: the repository keeps the
-        // better of what it holds and what this attempt scored, so a replay can
-        // never cost the player a three-paw clear. It also opens the next level,
-        // which is why nothing else writes an unlock.
-        Catching { progress.onCompleted(level.id, finished.total, paws, duration) }
-            .logOnFailure { "Failed to record the clear of level ${level.id}" }
+        val streak = if (isDaily) {
+            recordDailyClear(finished.total, paws, duration)
+        } else {
+            // Every metric here is a *best*, not a last: the repository keeps the
+            // better of what it holds and what this attempt scored, so a replay
+            // can never cost the player a three-paw clear. It also opens the next
+            // level, which is why nothing else writes an unlock — and why a daily
+            // must not come through here at all.
+            Catching { progress.onCompleted(level.id, finished.total, paws, duration) }
+                .logOnFailure { "Failed to record the clear of level ${level.id}" }
+            NoStreak
+        }
         val unlocked = unlockedThrough()
         val earnedBadges = recordAttempt(
             level,
@@ -377,6 +465,7 @@ class GameViewModel(
             duration,
             completed = true,
             livesRemaining = state.livesRemaining,
+            dailyStreakDays = streak,
         )
 
         sendEvent(GameEvent.Won)
@@ -388,9 +477,32 @@ class GameViewModel(
                 elapsedMs = duration,
                 unlockedThrough = maxOf(it.unlockedThrough, unlocked),
                 newBadges = earnedBadges,
+                dailyStreak = streak,
             )
         }
     }
+
+    /**
+     * Locks in today's result and reports the streak it leaves behind.
+     *
+     * The streak is re-read *after* the write and handed back as a value, rather
+     * than pulled off `state.daily` later: the observed status arrives on its own
+     * dispatch, so the win sheet would otherwise show the streak as it stood
+     * before the clear that produced it.
+     */
+    private suspend fun recordDailyClear(score: Int, paws: Int, duration: Long): Int {
+        val date = dailyDate ?: return NoStreak
+        Catching { daily.onCompleted(date, score, paws, duration) }
+            .logOnFailure { "Failed to record the daily clear for $date" }
+        val streak = currentStreak()
+        logger.logEvent("daily.completed", "date" to date.toString(), "streak" to streak, "score" to score)
+        return streak
+    }
+
+    private suspend fun currentStreak(): Int = Catching { daily.status().streak }
+        .logOnFailure { "Failed to read the daily streak" }
+        .getOrNull()
+        ?: NoStreak
 
     /**
      * Hands the finished attempt to the achievement log and reports what it
@@ -411,11 +523,12 @@ class GameViewModel(
         duration: Long,
         completed: Boolean,
         livesRemaining: Int,
+        dailyStreakDays: Int,
     ): List<Achievement> {
         val now = wallClock.now()
         val result = LevelResult(
             levelId = level.id,
-            mode = PlayMode.Campaign,
+            mode = if (isDaily) PlayMode.Daily else PlayMode.Campaign,
             size = level.size,
             completed = completed,
             score = card.total,
@@ -427,6 +540,7 @@ class GameViewModel(
             treatsUsed = treatsUsed,
             isFirstClear = completed && recordBeforeAttempt.state != LevelState.Completed,
             previousBestPaws = recordBeforeAttempt.bestPaws,
+            dailyStreakDays = dailyStreakDays,
             localHour = now.toLocalDateTime(deviceTimeZone.current()).hour,
             finishedAt = now.toEpochMilliseconds(),
         )
@@ -450,8 +564,17 @@ class GameViewModel(
             "duration_ms" to elapsedMs(),
             "dogs_placed" to state.placed.placedCount,
             "attempt_number" to attemptNumber,
+            "mode" to modeName,
         )
         val duration = elapsedMs()
+        // Read, not written. A lost daily is not spent here: the player can still
+        // trade an ad for the board back, and `daily_result` takes one row per
+        // day, so writing the failure now would lock a loss over a clear they
+        // went on to earn. The day is spent by [leave] instead.
+        //
+        // The streak itself is unaffected either way — a run through yesterday
+        // stands all day today, including after today has been played and lost.
+        val streak = if (isDaily) currentStreak() else NoStreak
         val earnedBadges = recordAttempt(
             level,
             Scoring.strike(state.score),
@@ -459,10 +582,34 @@ class GameViewModel(
             duration,
             completed = false,
             livesRemaining = livesRemaining,
+            dailyStreakDays = streak,
         )
         updateState {
-            it.copy(phase = GamePhase.Lost, elapsedMs = duration, newBadges = earnedBadges)
+            it.copy(
+                phase = GamePhase.Lost,
+                elapsedMs = duration,
+                newBadges = earnedBadges,
+                dailyStreak = streak,
+            )
         }
+    }
+
+    /**
+     * Leaving, and the moment a lost daily becomes a spent one.
+     *
+     * Walking away from the loss sheet is the player declining the revive, and it
+     * is the only point at which a failed daily is final. Force-quitting there
+     * instead leaves the day open, which is a loophole and a deliberate one: the
+     * daily is device-local with no leaderboard, and nothing else in it tries to
+     * stop someone cheating themselves either.
+     */
+    private suspend fun GameAction.leave() {
+        val date = dailyDate
+        if (isDaily && state.phase == GamePhase.Lost && date != null) {
+            Catching { daily.onFailed(date, elapsedMs()) }
+                .logOnFailure { "Failed to record the daily loss for $date" }
+        }
+        sendEvent(GameEvent.NavigateBack)
     }
 
     /**
@@ -543,7 +690,8 @@ class GameViewModel(
      */
     private suspend fun GameAction.nextLevel() {
         val current = state.level ?: return
-        val next = LevelPacks.campaign.byId(current.id + 1)
+        // There is no next daily. Tomorrow's board is tomorrow's.
+        val next = if (isDaily) null else LevelPacks.campaign.byId(current.id + 1)
         if (next == null) {
             sendEvent(GameEvent.NavigateBack)
             return
@@ -568,7 +716,10 @@ class GameViewModel(
         updateState {
             it.copy(
                 records = records,
-                unlockedThrough = maxOf(unlocked, it.level?.id ?: LevelRecord.FIRST_LEVEL_ID),
+                unlockedThrough = campaignFrontier(
+                    unlocked,
+                    it.level?.id ?: LevelRecord.FIRST_LEVEL_ID,
+                ),
                 // Opened together with the data, in one update. Flipping the flag
                 // first would show a pane of locked rows for a frame while the
                 // records were still loading.
@@ -581,12 +732,57 @@ class GameViewModel(
         val target = LevelPacks.campaign.byId(levelId) ?: return
         if (!entitlements.isPro.value && levelId > state.unlockedThrough) return
         updateState { it.copy(drawerOpen = false) }
+        // Crossing packs cannot be a swap. Which pack this ViewModel plays is
+        // fixed at construction because the route is what a process death
+        // restores, so leaving the daily means a new route.
+        if (isDaily) {
+            sendEvent(GameEvent.OpenLevel(levelId))
+            return
+        }
         attemptNumber = 1
         startAttempt(target)
     }
 
+    /** Opens today's board on its own route, from the card in the drawer. */
+    private suspend fun GameAction.playDaily() {
+        val status = state.daily ?: return
+        if (!status.playable) return
+        updateState { it.copy(drawerOpen = false) }
+        logger.logEvent("daily.started", "date" to status.date.toString(), "streak" to status.streak)
+        sendEvent(GameEvent.OpenDaily(status.levelId))
+    }
+
+    /**
+     * Trades an ad for a missed day, and says what happened either way.
+     *
+     * The repository shows the ad and owns the monthly cap, so this only routes
+     * the answer. Every branch surfaces something: a freeze that silently does
+     * nothing is indistinguishable from a crash, and [FreezeResult.Declined] —
+     * the player closing the ad early — is the branch most likely to be read as
+     * one.
+     */
+    private suspend fun GameAction.useFreeze() {
+        val result = Catching { daily.useFreeze() }
+            .logOnFailure { "Failed to use a streak freeze" }
+            .getOrNull()
+        val message = when (result) {
+            is FreezeResult.Applied -> {
+                logger.logEvent("daily.freeze_used", "streak" to result.streak)
+                FreezeMessage.Applied(result.streak)
+            }
+            FreezeResult.Declined -> FreezeMessage.Declined
+            FreezeResult.NoneLeft -> FreezeMessage.NoneLeft
+            FreezeResult.NothingToFreeze -> FreezeMessage.NothingToFreeze
+            null -> FreezeMessage.Unavailable
+        }
+        updateState { it.copy(freezeMessage = message) }
+    }
+
     private suspend fun GameAction.restart() {
         val level = state.level ?: return
+        // One attempt per day. Starting over would be a second run at a board
+        // whose score is already committed to a date.
+        if (isDaily) return
         attemptNumber++
         startAttempt(level)
     }
@@ -735,7 +931,12 @@ class GameViewModel(
 
     private fun elapsedMs(): Long = attemptStartedAt.elapsedNow().inWholeMilliseconds
 
+    private val modeName: String get() = if (isDaily) "daily" else "campaign"
+
     private companion object {
+        /** What a campaign attempt reports for a number only the daily has. */
+        const val NoStreak = 0
+
         /** Levels that open with one dog already placed, as a teaching aid. */
         const val StarterDogThroughLevel = 25
 
@@ -797,6 +998,13 @@ data class GameState(
     /** Stills instead of animated dogs, and a shorter board entrance. */
     val reduceAnimations: Boolean = false,
 
+    /**
+     * The Settings toggle for badges. Display only — `AchievementsRepository`
+     * keeps recording either way, so this gates the toast and nothing else. A
+     * player who turns them back on sees real history rather than a blank grid.
+     */
+    val showAchievements: Boolean = true,
+
     /** How far the player has reached; the level drawer unlocks up to it. */
     val unlockedThrough: Int = LevelRecord.FIRST_LEVEL_ID,
 
@@ -838,6 +1046,26 @@ data class GameState(
      * gates can be true while the data behind it is still empty.
      */
     val drawerOpen: Boolean = false,
+
+    /**
+     * Today's daily, or null before the first status arrives. One snapshot of the
+     * clock: date, board, streak, freeze offer and reset countdown all agree with
+     * each other, and the card does no date arithmetic of its own.
+     */
+    val daily: DailyStatus? = null,
+
+    /** Whether *this* board is the daily, rather than a campaign level. */
+    val isDaily: Boolean = false,
+
+    /**
+     * The streak as of this attempt, for the outcome sheet. Set from the value
+     * the write returned rather than read back off [daily], which arrives on its
+     * own dispatch and would show the streak from before the clear.
+     */
+    val dailyStreak: Int = 0,
+
+    /** The answer to a freeze the player just asked for. */
+    val freezeMessage: FreezeMessage? = null,
 ) {
     val placedCells: Set<Int> get() = placed.cells().toSet()
 
@@ -846,8 +1074,27 @@ data class GameState(
     val dogsRequired: Int get() = level?.size ?: 0
 }
 
+/**
+ * What came of a streak freeze. Every [FreezeResult] maps to one of these, plus
+ * [Unavailable] for a repository call that threw — five answers, five things the
+ * player can be told, and no silent branch.
+ */
+sealed interface FreezeMessage {
+    data class Applied(val streak: Int) : FreezeMessage
+    data object Declined : FreezeMessage
+    data object NoneLeft : FreezeMessage
+    data object NothingToFreeze : FreezeMessage
+    data object Unavailable : FreezeMessage
+}
+
 sealed interface GameEvent {
     data object NavigateBack : GameEvent
+
+    /** Today's daily, on its own route, from the card in the drawer. */
+    data class OpenDaily(val levelId: Int) : GameEvent
+
+    /** A campaign level picked from the drawer of a board in the other pack. */
+    data class OpenLevel(val levelId: Int) : GameEvent
 
     /** For sound and haptics; the cell animates itself. */
     data class PlacedDog(val cell: Int) : GameEvent
@@ -855,6 +1102,7 @@ sealed interface GameEvent {
     data class Marked(val cell: Int) : GameEvent
 
     data object Won : GameEvent
+    data object OpenSettings : GameEvent
     data object OpenPrivacy : GameEvent
     data object OpenTerms : GameEvent
     data object OpenFeedback : GameEvent
@@ -893,6 +1141,14 @@ sealed interface GameAction {
 
     data object LevelsClosed : GameAction
     data class GoToLevel(val levelId: Int) : GameAction
+
+    /** A new daily snapshot: a result was written, or the local date rolled over. */
+    data class DailyChanged(val status: DailyStatus) : GameAction
+
+    data object PlayDaily : GameAction
+    data object UseFreeze : GameAction
+    data object DismissFreezeMessage : GameAction
+    data object OpenSettings : GameAction
     data object OpenPrivacy : GameAction
     data object OpenTerms : GameAction
     data object OpenFeedback : GameAction

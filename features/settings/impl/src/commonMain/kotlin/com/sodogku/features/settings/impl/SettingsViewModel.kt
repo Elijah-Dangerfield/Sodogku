@@ -42,6 +42,8 @@ class SettingsViewModel(
             SettingsAction.ToggleHaptics -> action.toggleHaptics()
             SettingsAction.ToggleReduceAnimations -> action.toggleReduceAnimations()
             SettingsAction.ToggleColorblind -> action.toggleColorblind()
+            SettingsAction.ToggleAchievements -> action.toggleAchievements()
+            SettingsAction.OpenAchievements -> sendEvent(SettingsEvent.OpenAchievements)
             SettingsAction.OpenTerms -> sendEvent(SettingsEvent.OpenLink(termsUrl()))
             SettingsAction.OpenPrivacy -> sendEvent(SettingsEvent.OpenLink(privacyUrl()))
             SettingsAction.OpenFeedback -> sendEvent(SettingsEvent.OpenFeedback)
@@ -59,6 +61,7 @@ class SettingsViewModel(
                 hapticsEnabled = saved.hapticsEnabled,
                 reduceAnimations = saved.reduceAnimations,
                 colorblindMode = saved.colorblindMode,
+                achievementsVisible = saved.achievementsVisible,
             )
         }
     }
@@ -84,6 +87,22 @@ class SettingsViewModel(
         persist { it.copy(colorblindMode = next) }
     }
 
+    /**
+     * Display only.
+     *
+     * This writes one boolean to [AppCache] and stops there. It deliberately
+     * does **not** reach `AchievementsRepository`: the fact log keeps recording
+     * while badges are switched off, so a player who turns them back on months
+     * later sees what they actually earned instead of starting from zero. If
+     * this ever grows a second line that touches the repository, that is the
+     * bug.
+     */
+    private suspend fun SettingsAction.toggleAchievements() {
+        val next = !state.achievementsVisible
+        updateState { it.copy(achievementsVisible = next) }
+        persist { it.copy(achievementsVisible = next) }
+    }
+
     private suspend fun persist(transform: (AppData) -> AppData) {
         Catching { appCache.update(transform) }
             .logOnFailure { "Failed to persist a setting" }
@@ -94,12 +113,20 @@ data class SettingsState(
     val hapticsEnabled: Boolean = true,
     val reduceAnimations: Boolean = false,
     val colorblindMode: Boolean = false,
+
+    /**
+     * Whether badges are shown. Display only — the achievement log keeps
+     * recording either way, which is why the row that opens the grid is hidden
+     * rather than the grid being emptied.
+     */
+    val achievementsVisible: Boolean = true,
     val appVersion: String = "",
 )
 
 sealed interface SettingsEvent {
     data object NavigateBack : SettingsEvent
     data object OpenFeedback : SettingsEvent
+    data object OpenAchievements : SettingsEvent
 
     /** Terms and privacy are hosted pages, so they open in a browser. */
     data class OpenLink(val url: String) : SettingsEvent
@@ -111,6 +138,8 @@ sealed interface SettingsAction {
     data object ToggleHaptics : SettingsAction
     data object ToggleReduceAnimations : SettingsAction
     data object ToggleColorblind : SettingsAction
+    data object ToggleAchievements : SettingsAction
+    data object OpenAchievements : SettingsAction
     data object OpenTerms : SettingsAction
     data object OpenPrivacy : SettingsAction
     data object OpenFeedback : SettingsAction
