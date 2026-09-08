@@ -825,11 +825,20 @@ checked, not queries seen working.
 | `tutorial-funnel.json` | Step drop-off across the guided first three levels, and where the skippers gave up |
 
 **What is blocked on the credentials, precisely.** Everything about *rendering*: whether a panel
-type suits its data, whether a threshold is set at a sensible number, whether the histogram bucket
-sizes are right, whether any query is too expensive at real volume, and whether the LogQL is
-accepted by Grafana Cloud's Loki as written. What is **not** blocked and has been done: every file
-parses, every query names an event and attributes that a `logEvent` call actually emits, and the
-datasource uid (`grafanacloud-logs`) was read off a live Grafana Cloud stack rather than guessed.
+type suits its data, whether a threshold sits at a sensible number, whether the histogram bucket
+sizes are right, whether any query is too expensive at real volume, and whether a table's
+transformations produce the columns intended. Nobody has looked at one of these boards.
+
+**What is not blocked, and was done.** Every file parses. Every query names an event and
+attributes that a `logEvent` call actually emits. The datasource uid (`grafanacloud-logs`) was read
+off a live Grafana Cloud stack rather than guessed — it is the uid Grafana Cloud provisions Loki
+under in every stack, and the README has a one-liner to rewrite it if a Sodogku stack differs. And
+**every distinct LogQL shape on the six boards was sent to a real Grafana Cloud Loki and came back
+accepted** — nested `count by`, `unwrap` with a `by` clause, bare `max_over_time`, the `!=""`
+presence filter, regex alternation. That stack holds no Sodogku data, so each returned zero rows,
+but a malformed query returns HTTP 400 there rather than zero rows, which is what makes the empty
+answer worth something. The stack belongs to another project and nothing on it was created,
+modified or deleted.
 
 **The test that makes a rename fail.** `DashboardQueryContractTest`
 (`:libraries:telemetry:impl`, androidUnitTest) parses every query in `ops/grafana/` and every

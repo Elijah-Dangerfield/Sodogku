@@ -19,10 +19,14 @@ nothing in the app surfaced it.
 ## What has to exist first
 
 **Nothing on these boards has ever rendered real data.** No Sodogku build has shipped telemetry —
-the Grafana Cloud OTLP endpoint and write token are still on the list in SPEC §20. Every query is
-written against `docs/practices/app-events.md` and checked against the `logEvent` calls that feed
-it (see "How they are kept honest" below), but none of them has been run against a Loki that holds
-a single Sodogku record.
+the Grafana Cloud OTLP endpoint and write token are still on the list in SPEC §20.
+
+What has been checked: every query is written against `docs/practices/app-events.md` and held to
+the `logEvent` calls that feed it by a test (see "How they are kept honest" below), and every
+distinct LogQL shape here was sent to a real Grafana Cloud Loki and accepted. What has **not** been
+checked is everything about rendering — panel types, thresholds, histogram buckets, table
+transformations, query cost at real volume. Nobody has looked at one of these with data on it.
+Expect to adjust.
 
 Before importing:
 

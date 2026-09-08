@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -66,12 +67,15 @@ fun IconButton(
     @Composable
     fun Button(modifier: Modifier) {
         Surface(
-            // The label lives on the `Icon` inside, and `Surface` does not merge,
-            // so without this the node a screen reader lands on — the clickable
-            // one — is the one node in the stack with nothing on it, and the
-            // label sits on a child it may or may not read. Merged, the button
-            // *is* its label.
-            modifier = modifier.semantics(mergeDescendants = true) {},
+            // The label is moved onto the button and off the picture inside it.
+            // Left on the `Icon`, it lands on a node of its own two levels down
+            // — measured in a `uiautomator` dump as a 28dp unfocusable child of
+            // a 48dp focusable button with nothing on it — and whether a reader
+            // finds it is up to the reader. Here it is on the thing being
+            // pressed, which is the thing being described.
+            modifier = modifier.semantics(mergeDescendants = true) {
+                icon.contentDescription?.let { contentDescription = it }
+            },
             contentPadding = PaddingValues(padding),
             color = backgroundColor,
             contentColor = iconColor,
@@ -82,7 +86,7 @@ fun IconButton(
             interactionSource = interactionSource
         ) {
             Icon(
-                icon = icon,
+                icon = icon.copy(contentDescription = null),
                 size = iconSize
             )
         }
