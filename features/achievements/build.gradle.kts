@@ -30,6 +30,9 @@ kotlin {
 
         commonTest.dependencies {
             implementation(projects.libraries.achievements)
+            // `AchievementCopyTest` compares `StringResource`s by key rather than
+            // resolving them, which still needs the type on the test classpath.
+            implementation(compose.components.resources)
         }
     }
 }

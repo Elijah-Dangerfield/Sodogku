@@ -75,10 +75,20 @@ data class LevelResult(
     val finishedAt: Long,
 ) {
     /**
+     * Which board this was, across both packs.
+     *
+     * The two packs share a level-id number line — campaign 7 and daily 7 are
+     * different boards — so anything that remembers a level between attempts has
+     * to carry the mode with it. [AchievementCounters] does, for the rematch
+     * counter.
+     */
+    val levelKey: String get() = "${mode.name}:$levelId"
+
+    /**
      * Stable identity for this attempt, so recording it twice is a no-op rather
      * than a double count. Two attempts at one level cannot end in the same
      * millisecond, and an attempt replayed from the log carries its original
      * timestamp.
      */
-    val key: String get() = "${mode.name}:$levelId:$finishedAt"
+    val key: String get() = "$levelKey:$finishedAt"
 }

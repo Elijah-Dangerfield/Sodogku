@@ -125,7 +125,7 @@ a session join.
 | Event | Attributes | Fires |
 |---|---|---|
 | `game.level_started` | `level_id`, `size`, `difficulty`, `attempt_number`, `mode` | Every attempt, including a retry after a loss and a jump from the level pane. Not on resume from background |
-| `game.level_completed` | `level_id`, `size`, `difficulty`, `duration_ms`, `score`, `paws`, `strikes_used`, `attempt_number`, `mode` | The last dog lands. `duration_ms` is monotonic from the attempt's start, so backgrounding does not inflate it |
+| `game.level_completed` | `level_id`, `size`, `difficulty`, `duration_ms`, `score`, `paws`, `strikes_used`, `sniffs_used`, `treats_used`, `attempt_number`, `mode` | The last dog lands. `duration_ms` is monotonic from the attempt's start, so backgrounding does not inflate it. `score` is what was **banked** — net of the boosters `sniffs_used` and `treats_used` count, and the same number the record and the lifetime total get. Without those two, a fall in median score reads as a difficulty change when it may be players leaning harder on hints, and the two want opposite fixes |
 | `game.level_failed` | `level_id`, `duration_ms`, `dogs_placed`, `attempt_number`, `mode` | The third bone goes. `dogs_placed` is how far they got, which is the difference between "too hard" and "unlucky" |
 | `daily.started` | `date`, `streak` | Today's board is opened from the card. `level_id` is deliberately absent: it is a position in the daily pool and means nothing next to a campaign id |
 | `daily.completed` | `date`, `streak`, `score` | A daily clear is written. `streak` is the number *after* the write, so it is the run the player just extended |
@@ -186,6 +186,8 @@ combination — a dashboard that treats it as an anomaly has the rule backwards.
 | `ads.offline_block` | `placement`, `grace_levels_used` | The offline grace ran out and the block screen went up. Should be rare; a rise means the grace is too tight |
 | `iap.purchase_result` | `outcome`, `error_kind`, `trigger` | A purchase flow ends, in any way |
 | `purchase.failed` | `product_id`, `error`, `attempt`, `final` | A store call failed and is being retried. `final` marks the attempt that gave up |
+
+| `game.commit` | `level_id`, `correct`, `on_marked`, `mode` | Every deliberate placement, the second of two taps. `on_marked` says the square was already crossed off — a rise there is a *legibility* problem, the crosses not reading as "ruled out", rather than a difficulty one |
 
 ### The one that pays for itself
 

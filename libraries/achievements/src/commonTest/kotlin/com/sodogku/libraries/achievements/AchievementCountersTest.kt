@@ -27,14 +27,14 @@ class AchievementCountersTest {
     }
 
     @Test
-    fun neutralResult_movesNothingButTheLevelCount() {
+    fun neutralResult_movesNothingButTheLevelCountAndTheClock() {
         val counters = foldAll(result())
 
         val moved = Stat.entries.filter { counters[it] != 0L }
         assertEquals(
-            listOf(Stat.LevelsCleared, Stat.LargestGridCleared),
+            listOf(Stat.LevelsCleared, Stat.LargestGridCleared, Stat.MinutesPlayed),
             moved,
-            "the fixture clears one 4x4 and must not do anything else by accident",
+            "the fixture clears one 4x4 in a minute and must not do anything else by accident",
         )
     }
 
@@ -168,6 +168,115 @@ class AchievementCountersTest {
         base.fold(result(levelId = 2))
 
         assertEquals(before, Stat.entries.associateWith { base[it] })
+    }
+
+    @Test
+    fun aRematchCountsOnlyAfterTheLevelHasBeatenYou() {
+        val straightThrough = foldAll(result(levelId = 1))
+        assertEquals(0, straightThrough[Stat.RedemptionClears], "winning first time is not a rematch")
+
+        val counters = foldAll(
+            result(levelId = 1, completed = false, strikes = 3),
+            result(levelId = 1),
+            result(levelId = 1),
+        )
+
+        assertEquals(1, counters[Stat.RedemptionClears], "and replaying the level again is not a second one")
+    }
+
+    @Test
+    fun aRematchIsNotConfusedAcrossThePacks() {
+        // Campaign 7 and daily 7 are different boards on a shared number line,
+        // so a loss on one must not arm a rematch on the other.
+        val counters = foldAll(
+            result(levelId = 7, mode = PlayMode.Campaign, completed = false, strikes = 3),
+            result(levelId = 7, mode = PlayMode.Daily),
+        )
+
+        assertEquals(0, counters[Stat.RedemptionClears])
+    }
+
+    @Test
+    fun minutesPlayed_addUpAcrossEveryAttempt_andSurviveTruncation() {
+        // Thirty half-minute attempts is fifteen minutes. Rounding each one to
+        // whole minutes as it lands would report zero.
+        val counters = (1..30).fold(AchievementCounters.Empty) { acc, index ->
+            acc.fold(result(levelId = index, timeMs = 30_000))
+        }
+
+        assertEquals(15, counters[Stat.MinutesPlayed])
+    }
+
+    @Test
+    fun minutesPlayed_countALostAttempt_andIgnoreAMissingClock() {
+        val counters = foldAll(
+            result(completed = false, strikes = 3, timeMs = 120_000),
+            result(timeMs = 0),
+        )
+
+        assertEquals(2, counters[Stat.MinutesPlayed], "time spent losing is still time spent")
+    }
+
+    @Test
+    fun theOtherTwoStreaksBreakOnTheSameThingsTheFlawlessOneDoes() {
+        val counters = foldAll(
+            result(paws = 3, sniffsUsed = 0),
+            result(paws = 3, sniffsUsed = 0),
+            result(completed = false, paws = 0, strikes = 3, sniffsUsed = 0),
+            result(paws = 3, sniffsUsed = 0),
+        )
+
+        assertEquals(1, counters[Stat.ThreePawStreak])
+        assertEquals(2, counters[Stat.BestThreePawStreak])
+        assertEquals(1, counters[Stat.BoosterFreeStreak])
+        assertEquals(2, counters[Stat.BestBoosterFreeStreak])
+    }
+
+    @Test
+    fun theBigBoardCountersNeedTheBoardToBeBig() {
+        val counters = foldAll(
+            result(size = 6, strikes = 0, timeMs = 45_000),
+            result(size = 7, strikes = 0, timeMs = 45_000),
+            result(size = 10, strikes = 2, timeMs = 200_000),
+        )
+
+        assertEquals(2, counters[Stat.BigBoardClears], "a 6x6 is not a big board")
+        assertEquals(1, counters[Stat.MaxBoardClears])
+        assertEquals(1, counters[Stat.FlawlessBigBoardClears])
+        assertEquals(1, counters[Stat.BigBoardComebackClears])
+        assertEquals(1, counters[Stat.MaxBoardSprintClears])
+        assertEquals(1, counters[Stat.BigBoardSprintClears], "200s is not a minute")
+    }
+
+    @Test
+    fun theDailyCountersIgnoreTheCampaignAndViceVersa() {
+        val counters = foldAll(
+            result(mode = PlayMode.Campaign, strikes = 0, paws = 3),
+            result(mode = PlayMode.Daily, strikes = 0, paws = 3),
+        )
+
+        assertEquals(1, counters[Stat.DailyFlawlessClears])
+        assertEquals(1, counters[Stat.DailyThreePawClears])
+        assertEquals(2, counters[Stat.FlawlessClears], "the daily is still a clean clear")
+    }
+
+    @Test
+    fun assistedClears_needBothKindsOfHelp() {
+        val counters = foldAll(
+            result(sniffsUsed = 2, treatsUsed = 0),
+            result(sniffsUsed = 0, treatsUsed = 2),
+            result(sniffsUsed = 1, treatsUsed = 1),
+        )
+
+        assertEquals(1, counters[Stat.AssistedClears])
+    }
+
+    @Test
+    fun aFlashClearIsAlsoASprint_butNotTheOtherWayRound() {
+        val counters = foldAll(result(timeMs = 9_000), result(timeMs = 20_000))
+
+        assertEquals(1, counters[Stat.FlashClears])
+        assertEquals(2, counters[Stat.SprintClears])
     }
 
     @Test

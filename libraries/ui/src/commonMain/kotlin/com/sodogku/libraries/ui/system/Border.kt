@@ -32,9 +32,24 @@ data class Border(val color: ColorResource, val width: Dp = StandardBorderWidth)
 
 val StandardBorderWidth = 1.dp
 
-fun Modifier.border(border: Border): Modifier = this.border(
+/**
+ * A border, in the shape the thing being bordered actually is.
+ *
+ * [radius] defaults to square, which is what this used to do unconditionally and
+ * is why it needs saying: a rounded card that also clips its content leaves a
+ * square border's four corners *outside* the clip, so they are cut off and the
+ * card ends up with four blue lines and four bare corners. It is a two-pixel
+ * bug that only exists at the corners and only on a rounded surface, which is
+ * exactly the kind that survives review.
+ *
+ * Pass the same radius the surface is clipped to, and put this **before** the
+ * clip in the chain — `Modifier.border` draws its stroke on top of the content,
+ * so a clip that comes after it shaves the stroke's outer edge instead.
+ */
+fun Modifier.border(border: Border, radius: Radius = Radii.None): Modifier = this.border(
     width = border.width,
-    color = border.color.color
+    color = border.color.color,
+    shape = radius.shape
 )
 
 @Composable

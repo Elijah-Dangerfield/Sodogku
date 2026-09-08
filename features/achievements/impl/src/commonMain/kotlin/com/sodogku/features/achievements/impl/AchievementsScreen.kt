@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import com.sodogku.features.achievements.AchievementCopy
+import com.sodogku.libraries.achievements.AchievementGroup
 import com.sodogku.libraries.achievements.AchievementId
 import com.sodogku.libraries.ui.Border
 import com.sodogku.libraries.ui.PreviewContent
@@ -26,6 +27,7 @@ import com.sodogku.libraries.ui.components.NonLazyVerticalGrid
 import com.sodogku.libraries.ui.components.ProgressRow
 import com.sodogku.libraries.ui.components.Screen
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
+import com.sodogku.libraries.ui.components.dialog.Dialog
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.header.TopBar
@@ -38,7 +40,6 @@ import com.sodogku.system.VerticalSpacerD300
 import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.system.VerticalSpacerD800
 import com.sodogku.system.clip
-import com.sodogku.system.quietClickable
 import com.sodogku.system.thenIf
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -59,9 +60,13 @@ import sodogku.libraries.resources.generated.resources.common_close
  *
  * Locked badges are **shown**, with how far along they are. A grid that only
  * held what a player already has is a trophy case; the ones they have not got
- * are the reason to open it. The two hidden badges are the exception, and they
- * are hidden rather than absent — a grey card with "???" says there is
- * something there to find, which is the whole point of a surprise.
+ * are the reason to open it. The hidden badges are the exception, and they are
+ * hidden rather than absent — a grey card with "???" says there is something
+ * there to find, which is the whole point of a surprise.
+ *
+ * The grid is drawn shelf by shelf. At twenty-one badges the catalog's ordering
+ * carried the grouping on its own; at seventy-three it does not, and an
+ * unlabelled wall of tiles is a bag rather than a set of ladders.
  */
 @Composable
 fun AchievementsScreen(
@@ -99,8 +104,11 @@ fun AchievementsScreen(
                 )
             }
 
+            // Renders nothing in place: the design system's dialog registers
+            // itself with the host mounted in `App.kt` and is drawn over the
+            // whole window, top bar included.
             state.selected?.let { badge ->
-                BadgeDetailSheet(
+                BadgeDetailDialog(
                     badge = badge,
                     onDismiss = { onAction(AchievementsAction.CloseDetail) },
                 )
@@ -129,15 +137,25 @@ private fun BadgeGrid(
             typography = AppTheme.typography.Heading.H600,
         )
 
-        VerticalSpacerD800()
+        state.sections.forEach { section ->
+            VerticalSpacerD800()
 
-        NonLazyVerticalGrid(
-            columns = GridColumns,
-            data = state.badges,
-            verticalSpacing = Dimension.D400,
-            horizontalSpacing = Dimension.D400,
-        ) { _, badge ->
-            BadgeTile(badge = badge, onClick = { onAction(AchievementsAction.Select(badge.id)) })
+            Text(
+                text = stringResource(AchievementCopy.groupName(section.group)),
+                typography = AppTheme.typography.Heading.H700,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            VerticalSpacerD300()
+
+            NonLazyVerticalGrid(
+                columns = GridColumns,
+                data = section.badges,
+                verticalSpacing = Dimension.D400,
+                horizontalSpacing = Dimension.D400,
+            ) { _, badge ->
+                BadgeTile(badge = badge, onClick = { onAction(AchievementsAction.Select(badge.id)) })
+            }
         }
 
         VerticalSpacerD800()
@@ -160,6 +178,11 @@ private fun BadgeTile(badge: Badge, onClick: () -> Unit) {
             .bounceClick(onClick = onClick)
             .fillMaxWidth()
             .aspectRatio(1f)
+            // The earned outline is in the card's own shape and sits *outside*
+            // the clip. Both halves matter: a square border on a rounded card
+            // loses its corners, and a border drawn inside the clip has its
+            // outer edge shaved off by it.
+            .thenIf(badge.unlocked) { border(Border(AppTheme.colors.accentPrimary), Radii.Card) }
             .clip(Radii.Card)
             .background(
                 if (badge.unlocked) {
@@ -168,7 +191,6 @@ private fun BadgeTile(badge: Badge, onClick: () -> Unit) {
                     AppTheme.colors.surfaceSecondary.color
                 },
             )
-            .thenIf(badge.unlocked) { border(Border(AppTheme.colors.accentPrimary)) }
             .padding(Dimension.D300),
     ) {
         // Colour separates the two states weakly here — the locked surface and
@@ -209,31 +231,21 @@ private fun BadgeTile(badge: Badge, onClick: () -> Unit) {
 /**
  * The badge, full size, with what it takes to earn it.
  *
- * In-place over a scrim rather than a navigation destination: it is a look at
- * something already on screen, and pushing a route for it would put a back
- * press between the player and the grid they were browsing.
+ * The design system's [Dialog], not a hand-rolled scrim. The first version was
+ * a `Box` with a background inside the screen's content slot, and it paid for
+ * that three times over: no entrance animation (the card and its scrim simply
+ * appeared, a single frame apart from nothing), no back-press handling, and a
+ * scrim that stopped at the top bar because it could only cover its own
+ * sibling. A new surface should get all of that from the design system without
+ * its author knowing the rules exist.
  */
 @Composable
-private fun BadgeDetailSheet(badge: Badge, onDismiss: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppTheme.colors.backgroundOverlay.color)
-            .quietClickable(onClick = onDismiss),
-    ) {
+private fun BadgeDetailDialog(badge: Badge, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Dimension.D500),
-            modifier = Modifier
-                // Swallows taps that land on the card. Without it the card is
-                // part of the scrim's hit area and reading the badge closes it.
-                .quietClickable(onClick = {})
-                .padding(horizontal = Dimension.D800)
-                .fillMaxWidth()
-                .clip(Radii.Card)
-                .background(AppTheme.colors.surfacePrimary.color)
-                .padding(Dimension.D800),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(text = badge.face(), typography = AppTheme.typography.Display.D1400)
             Text(
@@ -373,11 +385,53 @@ private fun AchievementsOffPreview() {
 private fun previewState(): AchievementsState = AchievementsState(
     loading = false,
     badges = listOf(
-        Badge(AchievementId.FirstSteps, unlocked = true, mystery = false, 1f, 1L, 1L),
-        Badge(AchievementId.GoodDog, unlocked = false, mystery = false, 0.4f, 4L, 10L),
-        Badge(AchievementId.BestInShow, unlocked = false, mystery = false, 0f, 0L, 100L),
-        Badge(AchievementId.SpeedDemon, unlocked = true, mystery = false, 1f, 1L, 1L),
-        Badge(AchievementId.ChainOfEight, unlocked = false, mystery = false, 0.75f, 6L, 8L),
-        Badge(AchievementId.NightOwl, unlocked = false, mystery = true, 0f, 0L, 1L),
+        badge(
+            id = AchievementId.FirstSteps,
+            group = AchievementGroup.Campaign,
+            unlocked = true,
+            progress = 1f,
+            current = 1L,
+        ),
+        badge(
+            id = AchievementId.GoodDog,
+            group = AchievementGroup.Campaign,
+            progress = 0.4f,
+            current = 4L,
+            target = 10L,
+        ),
+        badge(id = AchievementId.BestInShow, group = AchievementGroup.Campaign, target = 100L),
+        badge(
+            id = AchievementId.SpeedDemon,
+            group = AchievementGroup.Speed,
+            unlocked = true,
+            progress = 1f,
+            current = 1L,
+        ),
+        badge(
+            id = AchievementId.ChainOfEight,
+            group = AchievementGroup.Score,
+            progress = 0.75f,
+            current = 6L,
+            target = 8L,
+        ),
+        badge(id = AchievementId.NightOwl, group = AchievementGroup.Secrets, mystery = true),
     ),
+)
+
+private fun badge(
+    id: AchievementId,
+    group: AchievementGroup,
+    unlocked: Boolean = false,
+    mystery: Boolean = false,
+    progress: Float = 0f,
+    current: Long = 0L,
+    target: Long = 1L,
+): Badge = Badge(
+    id = id,
+    group = group,
+    unlocked = unlocked,
+    mystery = mystery,
+    progress = progress,
+    current = current,
+    target = target,
 )

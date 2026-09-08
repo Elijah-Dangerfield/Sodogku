@@ -1344,13 +1344,13 @@ per-call-site concern and nothing failed when a call site forgot.
 
 | # | Item | State |
 |---|---|---|
-| R1 | **Score stays 0 in campaign.** The header shows the *current attempt's* score, which starts at zero each level. The ask is one persistent lifetime score, earned from every board including the daily, weighted by hints used and level difficulty | |
+| R1 | **Score stays 0 in campaign.** The header shows the *current attempt's* score, which starts at zero each level. The ask is one persistent lifetime score, earned from every board including the daily, weighted by hints used and level difficulty | done — see below |
 | R2 | Header lift-on-scroll drops a shadow on all four sides; it should only fall below | |
 | R3 | Tutorial: teach on a **throwaway demo board**, not level 1. Highlight the actual column or colour a rule is about, not just the chip. Block "continue" until the player really has crossed a square off / placed a dog, and let the mark finish drawing first | |
 | R4 | Sniff and Treat read oddly. The wanted look is the retro one from `Workspace/Cards`: the background duplicated and offset down, rather than the gradient-and-sheen currently there. Colours are right | |
 | R5 | A background on the welcome screen — **blocked, files not on disk** | |
 | R6 | A dialog when the dog counter (1/4) is tapped | |
-| R7 | Achievements: the earned border is clipped by the card's own shape; the detail dialog does not animate; grow the catalog toward ~75; more of them hidden until earned | |
+| R7 | Achievements: the earned border is clipped by the card's own shape; the detail dialog does not animate; grow the catalog toward ~75; more of them hidden until earned | **DONE** (2026-09-08) |
 | R8 | Placing a dog auto-crosses too much and does the player's reasoning for them | |
 | R9 | Confirm the daily is fully separate from the campaign, explain that in a first-run dialog, and settle whether any completed board feeds the streak or only the daily | |
 | R10 | Level rewards are too frequent. Front-load them and thin out as levels climb | |
@@ -1366,6 +1366,92 @@ per-call-site concern and nothing failed when a call site forgot.
 and now the welcome backgrounds. Four sets described in chat, none on the
 filesystem — images pasted into a message do not reach it. They need saving into
 `art/source/` before any of it can be wired.
+
+### R1 · One score, and hints that cost — **DONE** (2026-09-08)
+
+The engine was never broken. `GameScreen` rendered `state.score.total` — the
+*current attempt's* card — so every campaign level opened at zero, and the daily
+looked different only because its header shows a streak.
+
+**The header now shows one lifetime total, derived and never counted.**
+`LifetimeScore` (`:libraries:progress`) folds every `LevelRecord.bestScore` and
+every `DailyResult.score` into one number, read when a board opens. No stored
+tally, for the reason the daily streak has none — see `decisions.md`.
+
+**The double-count rule**, which is the whole of the interesting logic:
+`banked - bankedForThisBoard + max(bankedForThisBoard, attemptScore)`. Everything
+else the player has banked, plus the better of this board's own best and the
+attempt on screen. It climbs with every dog on a fresh level, and a replay moves
+it only once the attempt beats the old best. A lost attempt contributes nothing.
+Both directions are pinned by tests, because either one alone passes a wrong
+implementation; mutation-checked in both (`banked + attempt` fails four, `banked`
+fails five).
+
+**Boosters cost points and deliberately cost no paws.**
+`scoring.boosterPenaltyRate` (0.15) is multiplicative per sniff or treat spent in
+the attempt. Paws are rated on the pre-penalty total, which is identical to
+scaling par by the same factor — otherwise three paws would be unreachable for
+anyone who took a hint, starting with every player the tutorial *tells* to spend a
+sniff and a treat on level 2. Difficulty was already priced by
+`Scoring.complete`; nothing was added for it.
+
+**Seen on the emulator, fresh install.** Level 1 cleared for 4,083 with the header
+climbing as dogs landed (0 → 1,057 → 4,083); level 2 opened at 4,083 and survived
+a force-stop and relaunch; **replaying level 1** for 4,071 left the total at
+4,083 rather than 8,154; clearing level 2 took it to 8,346; and replaying level 2
+**with one sniff** banked 3,622 against the 4,263 the same board paid unaided —
+85%, exactly one booster — with the same two paws and the total correctly
+unmoved.
+
+**Also emitted:** `sniffs_used` and `treats_used` on `game.level_completed`, which
+SPEC §14 always listed. Without them a fall in median score reads as a difficulty
+change when it may be players leaning harder on hints.
+
+**Not verified:** iOS, as ever — `compileKotlinIosSimulatorArm64` is green and the
+app has still never run there. And the header's number is plain digits, so a
+player who clears most of the campaign will be looking at seven of them; it fits
+the layout at 360dp by measurement, but nobody has seen it.
+
+### R7 · Achievements — **DONE** (2026-09-08)
+
+**The clipped border was a shape, not an order.** `Modifier.border(Border)` in the
+design system never took a shape, so it drew a *rectangle* — and `BadgeTile`
+clipped the card round before drawing it, so the four corners of the rectangle
+were the four bits the clip removed. `border(border, radius)` now takes the radius
+and the tile passes `Radii.Card` **before** the clip: Compose's border draws its
+stroke on top of the content, so a clip after it would shave the stroke's outer
+edge instead of leaving it alone. Screenshotted at 3x either side of the change.
+
+**The detail sheet is on the design system's `Dialog` now**, not a hand-rolled
+scrim, which was the standing instruction and also the cheapest fix. Frame by
+frame off a `screenrecord`, the old one went from nothing to a fully formed card
+between two consecutive frames; the new one takes about six, the scrim fading
+under a card that scales up and overshoots. Two things came free: back-press
+closes it, and the scrim covers the whole window rather than stopping at the top
+bar, which it did because it could only cover its own sibling.
+
+**21 badges to 73**, in nine labelled shelves. Sixteen new counters, all folded
+from fields the `achievement_fact` log already carries, so every one back-fills
+from a player's existing history. The catalog is grouped now because at
+seventy-three tiles the ordering could no longer carry the grouping on its own,
+and the nine hidden ones are gathered under "Secrets" so a mystery tile cannot be
+narrowed down by the shelf it sits on. Full reasoning, including the four ideas
+turned down, is in `decisions.md`.
+
+**Stopped two short of 75 rather than pad.** What a further batch needs the game
+to *record*, not the fold to compute: the level's **difficulty tier** and the
+**local date** are both absent from `LevelResult`, and adding either means editing
+`:features:game:impl`, which this chunk stayed out of.
+
+**Measured on the emulator.** Scrolling the 73-tile grid end to end six times:
+6.6% janky, p50 16ms, p90 18ms, p99 31ms. Settings, scrolled the same way in the
+same build, is 3.1% / 16 / 17 / 19 — so the median is the emulator's floor and the
+grid costs a slightly fatter tail. It is still a `NonLazyVerticalGrid`, which
+composes all 73 tiles; the honest next step if the catalog grows again is a lazy
+grid, and that is blocked on `TopBar` taking something other than a `ScrollState`
+for its lift-on-scroll.
+
+**Not verified:** iOS runtime, as ever.
 
 ---
 

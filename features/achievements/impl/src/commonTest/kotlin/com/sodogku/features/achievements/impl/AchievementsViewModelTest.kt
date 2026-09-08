@@ -36,6 +36,29 @@ class AchievementsViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun theShelvesHoldEveryBadgeExactlyOnce_inTheCatalogsOwnOrder() = runUnitTest {
+        // The grid draws `sections`, not `badges`, so a badge that fell out of
+        // the grouping would be invisible while every count still added up.
+        val vm = viewModel()
+
+        assertEquals(
+            Achievements.sections.map { it.group },
+            vm.state.sections.map { it.group },
+            "the shelves are the catalog's, in the catalog's order",
+        )
+        assertEquals(
+            Achievements.catalog.map { it.id },
+            vm.state.sections.flatMap { section -> section.badges.map { it.id } },
+        )
+        vm.state.sections.forEach { section ->
+            assertTrue(
+                section.badges.all { it.group == section.group },
+                "${section.group} holds a badge from somewhere else",
+            )
+        }
+    }
+
+    @Test
     fun earnedBadgesReadAsEarnedAndTheRestDoNot() = runUnitTest {
         val vm = viewModel(
             FakeAchievements(

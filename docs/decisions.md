@@ -6,6 +6,125 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-08 — seventy-three badges, and every one of them off the log the game already keeps
+
+The catalog went from 21 to 73. The rule it was built under was not "reach 75", it was **every
+new counter has to come out of fields `achievement_fact` already stores**, because a stat that
+needs a new column starts everybody at zero and a stat that needs a new `LevelResult` field means
+editing `:features:game:impl`, which this chunk stayed out of. Sixteen new stats, no new fields,
+so all 73 back-fill from a player's existing history the first time anything is folded.
+
+**Two of them are a new shape, and they are the reason `AchievementCounters` grew two fields.**
+The class was `Map<Stat, Long>` and nothing else, which is exactly right for a counter that only
+looks at one attempt. `RedemptionClears` ("clear a level that beat you") cannot be answered that
+way — nothing about a single attempt says it is a rematch — so the fold carries the set of level
+keys the player has failed and not yet come back to. `MinutesPlayed` carries milliseconds at full
+precision and divides for display, because a hundred forty-second attempts each rounded to whole
+minutes as they land is a hundred zeroes. Neither is a `Stat`; both are what the fold has to
+remember to compute one.
+
+The rematch set is keyed on `LevelResult.levelKey` (`mode:levelId`), not on the id. Campaign 7 and
+daily 7 are different boards on a shared number line, which has already caused one round of bugs
+recorded further down this file, and a loss on one must not arm a rematch on the other.
+
+**It answers SPEC 8's rejected "Marathon" honestly.** That was turned down because *session*
+length is not a property of an attempt and nothing tracks it. That is still true. Cumulative time
+on the boards is a sum of `timeMs`, which is exactly a property of an attempt, so it is a badge
+this log can actually justify.
+
+**What was turned down, and why, since the ask was "ideally 75":**
+
+- **A lifetime-score badge.** R1 landed `LifetimeScore` in `:libraries:progress` while this was in
+  flight. The fold could sum `score` itself, but that sum is a *different number* from the one the
+  header shows (theirs is weighted, and a replay only counts once), and two numbers in one app
+  both called the total score is a support ticket. The `BestScore` ladder covers the axis.
+- **"Cleared a level in every hour of the day."** Reachable, and it asks somebody to set an alarm
+  for 3am twice. A badge that is only earnable by being annoyed at is not worth a tile.
+- **A play-count ladder** ("finished 500 attempts"). It is the same tile as "cleared 500 levels"
+  with a lower bar, which is the definition of padding here.
+- **`DistinctSizesCleared` at 7.** Sizes only appear in ascending campaign order, so "cleared all
+  seven board sizes" and "cleared a 10x10" are the same event. Two badges, one moment.
+- **Anything keyed on difficulty tier or on the calendar date.** `LevelResult` records neither.
+  Those are the next batch and they need the *game* to start recording, not the fold to get
+  cleverer.
+
+**The stopping point was 73, not 75.** Two more rungs would have been two more rungs.
+
+**Targets that describe the game are now checked against the game.**
+`AchievementEngineTest.everyAchievementInTheCatalogCanBeEarned` proves each target is reachable by
+*some* history, which is a statement about the fold and nothing else — it would happily bless a
+40,000-point badge on a formula whose ceiling is 31,760, or an eleven-long combo on a board that
+holds ten dogs. `AchievementReachabilityTest` takes a **test-only** dependency on
+`:libraries:levels` and `:libraries:scoring` and asks the shipped packs instead: par is the most
+the formula can ever pay, a combo cannot outlive its board, and the campaign is 500 levels long.
+Its `when` over `Stat` has no `else`, so a new stat has to answer "what bounds this" rather than
+inherit "nothing does". Main source stays dependency-free.
+
+That test is what set two of the numbers. `Jackpot` is 26,000 against a hard ceiling of 31,760
+(a difficulty-4 10x10 at par) and a *practical* ceiling near 29,700, so it is a fast clean run on
+the biggest board and nothing else. `Unbroken` is 10 because ten placements is the whole of a
+10x10 — there is no eleventh rung to add, ever.
+
+**Hidden badges are all in one section rather than each sitting with its criterion.** A mystery
+tile filed under "Speed" has already given away the half of the surprise worth keeping. The
+section is called Secrets, it holds all nine, and a test pins that the two sets are equal in both
+directions.
+
+**The grid is grouped now, and `Achievements.sections` is the source of truth** with `catalog` as
+its flattening — one list, not two, so a badge cannot be in the catalog and off the screen. At 21
+tiles the catalog's ordering carried the grouping implicitly, as its own comment claimed; at 73 it
+does not, and the screen was a wall.
+
+**The copy test is the one that will actually fire.** The exhaustive `when`s guarantee every badge
+has *a* name, a description and a face; they cannot notice the mistake that happens when
+seventy-three rows get typed out, which is a copy-pasted line leaving two badges sharing one
+badge's words. `AchievementCopyTest` compares `StringResource`s by key, so it needs no Compose
+harness to ask.
+
+## 2026-09-08 — a border has to know what shape the thing is, and be drawn outside the clip
+
+The earned badge tile drew a blue outline and the card's rounded clip cut its four corners off.
+Two separate mistakes, and fixing either one alone leaves a visible fault.
+
+**`Modifier.border(Border)` never took a shape**, so it drew a rectangle. On a rounded card the
+corners of that rectangle are precisely the pixels the clip removes, so the tile ended up with
+four straight blue lines and four bare corners. It takes a `Radius` now, defaulting to square,
+which is what it always did.
+
+**And the border has to come *before* the clip in the chain.** Compose's border draws the content
+and then strokes on top of it, so a clip that comes afterwards is inside the border node and
+shaves the stroke's own outer edge — a rounded border in the right shape, still a pixel thin at
+the corners. Ordered the other way the stroke lands on top of everything, unclipped, at full
+width.
+
+Worth writing down because the code read correctly at every step: a `Border` type, a `clip`, a
+`background`, all design-system calls in a plausible order. It is a two-pixel bug that only exists
+at the corners and only on a rounded surface, and the only thing that settles it is a zoomed
+screenshot before and after.
+
+## 2026-09-08 — the badge detail sheet moves onto the design system's dialog
+
+It was an in-place `Box` with a scrim inside the screen's content slot, and it paid for that three
+times. No entrance animation, which is what the report was about: frame by frame off a
+`screenrecord`, it went from nothing to a fully formed card and a fully dark scrim between two
+consecutive frames. No back-press handling. And a scrim that stopped at the top bar, because a
+sibling drawn in the content slot cannot cover the `Scaffold`'s app bar.
+
+All three were already solved in `:libraries:ui`'s `Dialog` — the spring entrance recorded further
+down this file, `BackHandler`, and a host mounted at the root of `App.kt` that draws over the whole
+window. The card also pads itself, so the call site lost its own padding.
+
+This is the standing instruction working as intended and the reason it exists: the sheet was
+written separately, so it got none of it, and nothing failed. A surface that reimplements a
+design-system behaviour does not look broken, it looks slightly worse in three ways nobody
+attributes to the same cause.
+
+**What it does not fix:** the dialog is composed conditionally (`state.selected?.let { … }`), so
+its *exit* is not animated — the host entry is disposed the moment the selection clears. That is
+how `GameDialogHost` behaves too, and matching it was deliberate: an exit animation here needs the
+caller to hold the last-shown badge alive while the card leaves, and doing that at one call site is
+how a design system grows two dismissal conventions.
+
 ## 2026-09-08 — the board says where it is and what is on it, and offers placement as an action
 
 `BoardCell` draws its fill, its region glyph and its cross rather than composing them, which is
@@ -2408,3 +2527,75 @@ using it. `DeepSurface` pulls it out so they can, and two ways of drawing
 `Modifier.glossy` stays for the level pane's reward chip, which is a badge rather
 than a control. A press-in lip on something that cannot be pressed promises a tap
 that does nothing, which is the same class of lie the paragraph above is about.
+
+## 2026-09-08 — one lifetime score, folded from the records rather than counted
+
+Reported: *"why is my score staying at 0? … I see score when I play a daily board
+but not for the normal campaign mode ones. It should all be one score I think
+right?"* The engine was fine. The header rendered `state.score.total`, which is
+the **current attempt's** card, so every campaign level opened at zero and the
+whole scoring system looked broken from the only place a player can see it.
+
+**Decision: there is no lifetime counter.** The number in the header is a fold —
+every `level_progress.best_score` plus every `daily_result.score`, summed when a
+board opens. Same argument as the daily streak: a stored tally has no witness. If
+a crash between two writes or a bug in one call site leaves it wrong, nothing on
+the device can tell, progress is device-local so there is no server copy to
+arbitrate, and the player reports a number we can neither verify nor rebuild.
+Ship a fix to a fold and every past bug is retroactively corrected on the next
+read. The cost is two table reads per level opened, no joins.
+
+**The rule that is easy to get wrong**, and the reason `LifetimeScore.withAttempt`
+is a named function with its own tests rather than a `+` at a call site:
+
+```
+shown = banked - bankedForThisBoard + max(bankedForThisBoard, attemptScore)
+```
+
+Everything else the player has banked, plus the better of *this board's own best*
+and the attempt on screen. A record only ever improves, so an attempt at a level
+worth 5,000 may not add a second 5,000 as it goes — otherwise replaying the
+shortest 4x4 in the pack is the fastest way to earn in the game. Both directions
+are pinned, because each one alone passes a wrong implementation: a test that a
+replay does not double-count passes against "ignore the attempt entirely", and a
+test that the number climbs passes against "always add". Checked by mutation —
+`banked + attempt` fails four tests, `banked` fails five.
+
+A **lost** attempt contributes nothing. `GameState.lifetimeScore` drops the
+attempt when the phase is `Lost`, because the loss banks no record and points
+left on the header that no row will ever hold are a lie that a retry silently
+corrects.
+
+## 2026-09-08 — a booster costs points, and deliberately costs no paws
+
+The other half of the same report: the score should reflect "how many hints they
+used". `scoring.boosterPenaltyRate` (0.15) is multiplicative per sniff or treat
+spent in the attempt — one banks 0.85 of the run, two 0.72, five 0.44.
+
+**Multiplicative rather than a flat deduction** so that no number of boosters can
+drive a score negative (nothing downstream has to clamp), the cost is the same
+wherever in the attempt the help was taken, and it scales with the board rather
+than needing a second per-size coefficient.
+
+**It does not move the paw rating, and that is the interesting call.** Subtract
+points and leave `Scoring.parScore` alone and three paws quietly becomes
+unreachable for anyone who used a hint — including every player following the
+tutorial, which *instructs* a sniff and a treat on level 2. So a teaching aid
+would permanently cost the lesson's own board a paw, and nothing in the explainer
+says so. The fix is arithmetic rather than a special case: because the cost is a
+multiplier and the paw thresholds are fractions of par, rating the run on the
+pre-penalty total is exactly the same as scaling par by the same factor
+(`score × f ≥ par × f × 0.85` is `score ≥ par × 0.85`). Paws say how the board
+was solved; the banked score says what the help was worth; neither has to know
+about the other.
+
+The alternative considered was charging at the moment of the spend, so the header
+visibly dips when a sniff is used. Rejected: a flat cost early in a 4x4 takes the
+running total below zero, and a percentage of a total that is still growing makes
+an identical hint cost wildly different amounts depending on when it was taken.
+
+**Difficulty was already in the score** — `Scoring.complete` multiplies the
+completion bonus by `1 + (difficulty - 1) × difficultyBonusRate`, so a tier-4
+board pays 1.6x a tier-1 board of the same size, and grid size scales every
+placement on top of that. The user's "how complex the table was" is already
+priced; a second difficulty term would have double-counted it.

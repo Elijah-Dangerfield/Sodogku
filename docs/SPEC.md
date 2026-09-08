@@ -52,7 +52,7 @@ level.
 | Tap the same cell twice inside 320ms | Commits a guess. Correct: dog pops in, points fly up, auto-mark fires. Wrong: red X, shake, a bone. |
 | Tap a rule chip | Pulses the cells of the relevant grouping. |
 | Tap the Level stat | Opens an explainer: where this board sits in the campaign, its grid size, and its difficulty in words. On a daily it explains the streak instead, because that is the number the header shows there. |
-| Tap the Score stat | Opens an explainer: how points are earned (per placement, combo, speed, completion bonus) and what the paws measure against par. Names no coefficient, since they all live in remote config. |
+| Tap the Score stat | Opens an explainer: what the lifetime total is and how a replay affects it, how points are earned (per placement, combo, speed, completion bonus), what boosters cost, and what the paws measure against par. Names no coefficient, since they all live in remote config. |
 
 **The safe gesture is the cheap one.** A single tap only ever writes or erases a note, so the
 destructive action takes deliberate effort. The second tap is recognised in `GameViewModel` rather
@@ -82,6 +82,19 @@ before having to reason about any of them. It scores nothing, so it cannot infla
 Score is the headline number, shown in the header next to the level. Time is tracked underneath
 for records and achievements but is not the primary display.
 
+**The header shows one lifetime score, not the attempt's.** It is every board the player has
+banked — campaign bests (`level_progress.best_score`) plus every daily result — summed on demand,
+never counted into a stored total. Same argument as the daily streak (section 13.4): a tally that
+drifts has no witness and no server copy to rebuild from, and a fold makes a past bug
+retroactively fixable.
+
+While a board is open the number is *everything else the player has banked, plus the better of
+this board's own best and the attempt on screen*. So it climbs as dogs land on a level being
+played for the first time, and replaying a cleared level moves it only once the attempt passes
+the old best — and then only by the difference, because the record it will be written to keeps
+the better of the two. A lost attempt contributes nothing: the number drops back the moment the
+bones run out.
+
 Per correct placement:
 
 ```
@@ -108,6 +121,23 @@ Level completion bonus:
 bonus = completionBase × size × (1 + (difficulty - 1) × difficultyBonusRate)
                               × (1 + livesRemaining × livesBonusRate)
 ```
+
+Boosters cost points:
+
+```
+banked = earned × (1 - scoring.boosterPenaltyRate) ^ (sniffs + treats spent this attempt)
+```
+
+At the default 0.15 one sniff banks 85% of the run and two bank 72%. Multiplicative rather than a
+flat deduction, so nothing can drive a score negative, the cost is the same wherever in the
+attempt the help was taken, and it scales with the board. The banked number is what the record,
+the win sheet, the share text, the achievement log and `game.level_completed` all carry.
+
+**Boosters do not move the paw rating.** Paws are measured on what the run earned before the
+cost. Because the cost is a multiplier and the thresholds are fractions of par, that is the same
+arithmetic as scaling par by the same factor — and it keeps three paws reachable for anyone who
+took a hint, including every player following the tutorial, which *instructs* a sniff and a treat
+on level 2. Paws say how the board was solved; the score says what the help was worth.
 
 Praise text floats over the board on high-multiplier placements: "Nice", "Great", "Excellent",
 "Perfect". Purely cosmetic, thresholds in config.
@@ -444,7 +474,8 @@ which is why `apps/admin/config-manifest-registry.json` must list **every** decl
 
 `scoring.basePerPlacement` (100), `scoring.completionBase` (250), `scoring.comboStep` (0.08),
 `scoring.comboMax` (2.0), `scoring.speedWindowMs` (8000), `scoring.speedMaxMultiplier` (1.6),
-`scoring.livesBonusRate` (0.5), `scoring.difficultyBonusRate` (0.2), `scoring.twoPawFraction`
+`scoring.livesBonusRate` (0.5), `scoring.difficultyBonusRate` (0.2),
+`scoring.boosterPenaltyRate` (0.15), `scoring.twoPawFraction`
 (0.60), `scoring.threePawFraction` (0.85), and the four praise cutoffs.
 
 **Daily**
@@ -724,29 +755,36 @@ Every criterion is one shape: a counter reached a number. Anything that cannot b
 becomes a new counter in the fold rather than a new kind of criterion, which is what keeps
 progress-toward-unlock a division rather than a special case.
 
-| Achievement | Earned by |
-|---|---|
-| First Steps / Good Dog / Best in Show / Top Dog | 1, 10, 100, 500 campaign levels cleared (levels, not clears — a replay does not count) |
-| Perfect Form | a clear that cost no bones |
-| Flawless Ten | 10 consecutive flawless clears; a strike *or* a failed attempt breaks it |
-| Comeback | cleared after losing two bones |
-| No Help Needed | 25 clears with no sniff and no treat |
-| Speed Demon | any level inside 30s |
-| Blitz | a 7x7 or bigger inside 60s |
-| High Roller | 20,000 points on one level (par on a 10x10 is ~30,500, on a 4x4 ~6,400) |
-| Chain of Eight | a run of 8 consecutive correct placements |
-| Show Dog / Pedigree | 10 and 50 levels taken to three paws, counted the first time each gets there |
-| Grid Seven / Grid Ten | clear a 7x7, clear a 10x10 |
-| Fetch Daily | one daily cleared |
-| Daily Devotion / Faithful | a 7 and a 30 day daily streak |
-| Night Owl (hidden) | a clear between 1am and 5am |
-| Early Bird (hidden) | a clear between 5am and 8am |
+**The catalog is 73 badges across 9 shelves**, and the shelf is what the grid draws — at 21 the
+catalog's ordering carried the grouping implicitly, at 73 it does not. `Achievements.sections` is
+the source of truth and `catalog` is its flattening, so a badge cannot be in one and off the other.
 
-Two from the first draft did not survive contact with what the game records. **Marathon** (a
-30-minute session) needs session length, which nothing tracks and which is not a property of an
-attempt. **Completionist** (three paws on a whole band) needs the band's level count, which lives
-in the pack — so the achievements module would have to depend on the content it is supposed to be
-independent of; Show Dog and Pedigree replace it with count milestones.
+| Shelf | n | What is on it |
+|---|---|---|
+| The campaign | 12 | 1 / 10 / 25 / 50 / 100 / 250 / 500 campaign levels cleared (levels, not clears — a replay does not count); first 7x7 and first 10x10; 10 and 50 big-board clears; 25 full-size clears |
+| Clean play | 8 | 1 / 25 / 100 clears that cost no bones; 3 / 10 / 25 of them consecutively (a strike *or* a failed attempt breaks the run); 1 and 10 on a 7x7 or bigger |
+| The hard way | 9 | 1 / 10 / 50 clears after losing two bones, and one of those on a big board; 25 / 100 / 250 clears with no sniff and no treat, and 20 / 50 of those in a row |
+| Speed | 6 | 1 / 25 / 100 clears inside 30s; 1 and 10 big boards inside 60s; a 10x10 inside 5 minutes |
+| Score and combos | 6 | 5,000 / 20,000 / 26,000 points on one level; runs of 5, 8 and 10 consecutive correct placements |
+| Paws | 9 | 1 / 10 / 50 / 150 / 300 levels taken to three paws, counted the first time each gets there; 5 and 20 of them in a row; 1 and 10 full-size boards at three paws |
+| Daily challenge | 11 | 1 / 10 / 50 / 150 dailies cleared; 3 / 7 / 30 / 100 day streaks; 1 and 10 dailies with no bones lost; 10 dailies at three paws |
+| Time on the boards | 3 | 1, 10 and 50 hours summed across every recorded attempt |
+| Secrets (all hidden) | 9 | come back to a level that beat you, and do it 10 times; finish a board on both a sniff and a treat; a clear inside 10s, and 10 of them; a clear between 1am and 5am, and 10 of them; the same between 5am and 8am |
+
+Every target that describes *the game* rather than the player is checked against the shipped packs
+and the scoring formula by a test, because a badge nobody can ever earn looks exactly like a
+working one. The two it sets: the top score badge is 26,000 against a hard ceiling of 31,760 (a
+difficulty-4 10x10 at par, and par is the most the formula can pay), and the longest combo badge is
+10 because ten placements is the whole of a 10x10.
+
+Three from the first draft did not survive contact with what the game records. **Completionist**
+(three paws on a whole band) needs the band's level count, which lives in the pack — so the
+achievements module would have to depend on the content it is supposed to be independent of; the
+three-paw ladder replaces it with count milestones. **Marathon** (a 30-minute *session*) needs
+session length, which nothing tracks and which is not a property of an attempt; "time on the
+boards" is the honest version, since that is a sum of `timeMs`. And nothing can key on a level's
+**difficulty tier** or on the **calendar date**, because `LevelResult` records neither — those are
+what a further batch of badges would need the game to start storing.
 
 The catalog carries **no display copy**, only stable ids. Names and descriptions are string
 resources the UI maps with an exhaustive `when`, so adding an achievement fails the build until
@@ -762,8 +800,13 @@ an "achievements are off" panel behind the hidden row for anything that lands on
 that panel says outright that recording carried on — the reading that would stop somebody turning
 badges back on is the one where turning them off threw the history away.
 
-Locked badges are shown with their progress; the two hidden ones show as `???` and report **no**
-progress until earned. "0 / 1" under a mystery badge still says a single clear does it.
+Locked badges are shown with their progress; the hidden ones show as `???` and report **no**
+progress until earned. "0 / 1" under a mystery badge still says a single clear does it. All nine
+sit together under "Secrets" rather than each on the shelf its criterion belongs to — a mystery
+tile filed under "Speed" has already narrowed itself down.
+
+Tapping a badge opens the design system's `Dialog`, not a bespoke overlay, so it gets the spring
+entrance, back-press dismissal and full-window scrim by default.
 
 ---
 

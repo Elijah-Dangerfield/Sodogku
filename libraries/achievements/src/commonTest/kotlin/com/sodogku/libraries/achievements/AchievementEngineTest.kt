@@ -180,6 +180,46 @@ class AchievementEngineTest {
         assertEquals(AchievementId.entries.size, Achievements.catalog.size, "duplicate definition")
     }
 
+    @Test
+    fun everySectionHasBadgesInIt_andEveryGroupHasASection() {
+        Achievements.sections.forEach { section ->
+            assertTrue(section.achievements.isNotEmpty(), "${section.group} is an empty shelf")
+        }
+        assertEquals(
+            AchievementGroup.entries.toSet(),
+            Achievements.sections.map { it.group }.toSet(),
+            "a group with no section draws a header over nothing",
+        )
+        assertEquals(
+            AchievementGroup.entries.size,
+            Achievements.sections.size,
+            "a group listed twice splits its shelf in half",
+        )
+    }
+
+    @Test
+    fun everyHiddenBadgeIsInTheSecretsSection_andNothingElseIs() {
+        // A mystery tile sitting under "Speed" has already given away the half
+        // of the surprise worth keeping.
+        val hidden = Achievements.catalog.filter { it.hidden }.map { it.id }.toSet()
+        val secrets = Achievements.sections
+            .first { it.group == AchievementGroup.Secrets }
+            .achievements
+            .map { it.id }
+            .toSet()
+
+        assertEquals(secrets, hidden)
+        assertTrue(hidden.isNotEmpty(), "the whole point of the section is that it has something in it")
+    }
+
+    @Test
+    fun aLadderNeverRepeatsARung() {
+        // Two badges on the same counter at the same number are one badge with a
+        // spare, and both unlock on the same attempt.
+        val rungs = Achievements.catalog.map { it.stat to it.target }
+        assertEquals(rungs.size, rungs.toSet().size, "two badges share a stat and a target")
+    }
+
     private fun randomHistory(random: Random, count: Int): List<LevelResult> = (1..count).map { index ->
         result(
             levelId = random.nextInt(1, 500),
