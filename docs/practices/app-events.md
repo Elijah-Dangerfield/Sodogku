@@ -138,6 +138,24 @@ The same fact is derivable server-side from the gaps between `daily.completed` e
 | `tutorial.step_viewed` | `level_id`, `step` | Each coach mark in the guided run over levels 1 to 3. `step` names the lesson, not its index, so inserting one does not shift the meaning of every prior data point |
 | `tutorial.completed` | `last_step`, `skipped` | Once, when the script ends or the player skips. `last_step` on a skip is the whole value of the event: it says *where* people give up, which is the only actionable thing a tutorial funnel produces |
 
+## Launch gates
+
+One event, from `LaunchGateViewModel` (`:features:gate:impl`). During an incident the first
+question is how many installs are actually behind the wall, and it is the one question the
+backend cannot answer — a maintenance gate exists precisely because our server is the thing that
+is down. This pipe goes direct to Grafana, so it still ships.
+
+| Event | Attributes | Fires |
+|---|---|---|
+| `gate.raised` | `gate`, `blocking` | A gate appears, on the **edge only**. `gate` is one of `force_update` / `maintenance` / `legal_reaccept` / `maintenance_banner` / `legal_updated` / `soft_update`; `blocking` says which half of the split it is. Every gate resolve re-runs on every `AppData` write, so this is deduped on the gate's identity — an operator rewording a maintenance message does not read as a second incident |
+
+`gate` is a fixed string rather than the Kotlin class name: these are dashboard keys and a rename
+in the client should not silently start a new series.
+
+**There is no `gate.cleared`.** The interesting quantity is how many devices reached a wall, and
+that is a count of `gate.raised`; a lift event would be a second series measuring the same
+incident from the other end, and it never fires for the players who simply stop opening the app.
+
 ## Monetization
 
 `ads.result` is the one to watch. SPEC 4.2 requires that an ad failure never costs the player the

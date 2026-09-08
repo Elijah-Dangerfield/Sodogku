@@ -121,6 +121,29 @@ data class AppData(
      * and Settings says so.
      */
     val isProEntitled: Boolean = false,
+
+    /**
+     * The `legal.termsVersion` / `legal.privacyVersion` this device has accepted,
+     * and when. `legalAcceptedAt` of 0 means *never asked*, which is a different
+     * state from "accepted version 0" and is why the timestamp is load-bearing
+     * rather than a record: a fresh install is seeded with whatever the current
+     * versions are, because the version gate exists to notice a *change* since
+     * acceptance and there has not been one yet.
+     *
+     * Under the no-accounts rule there is no server-side record of consent and
+     * no need for one (SPEC 7.3).
+     */
+    val acceptedTermsVersion: Int = 0,
+    val acceptedPrivacyVersion: Int = 0,
+    val legalAcceptedAt: Long = 0L,
+
+    /**
+     * The `upgrade.softUpdateVersionCode` the player has already waved away. The
+     * suggestion is a banner, not a block, so it has to stay dismissed — but
+     * only for the version it was dismissed at, so raising the soft-update
+     * target later asks again.
+     */
+    val softUpdateDismissedFor: Int = 0,
 ) {
     /**
      * Get the visit count for a screen by its tracking key.

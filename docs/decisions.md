@@ -6,6 +6,97 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — a blocking launch gate is rendered instead of the nav host, not navigated to
+
+`AccessDeniedRoute` and `OfflineBlockRoute` are both nav destinations that swallow back. That
+works for them because both are *reactions* to something the player just did. The launch gates are
+not: they are a verdict on the launch itself, and the requirement is that they cannot be got
+around at all.
+
+So `LaunchGateHost` wraps `AppNavigation` in `App.kt` and, when a gate is blocking, returns the
+gate screen and never composes the nav host. There is no back stack entry to pop, no destination
+for a deep link to resolve to, and `App.kt`'s deep-link collector drops incoming URLs while a
+block is up rather than queueing them — a link that fired the moment a maintenance window ended
+would land minutes late on a screen nobody asked for.
+
+**What this costs, plainly:** a block lifting mid-session rebuilds the nav graph, so the player
+returns to the start destination rather than to where they were. The in-progress board survives
+(it is in `AppData`), and the alternative — an opaque full-screen overlay with the app still live
+underneath — keeps a screen running that a deep link could still navigate while the wall is up.
+A gate that is merely on top of the app is not a gate.
+
+**A notice is drawn over the content in a `Box`, with the content first.** Deliberately not a
+`Column` with the banner above it: inserting a sibling *before* the content changes its slot, and
+Compose throws away the nav host and every screen under it every time a banner appears or goes.
+
+The gate state is read inside the host and never in `App`, for the reason `SplashGate` already
+documents — a state read in `App` recomposes the root, and the root rebuilding the graph has
+pushed a duplicate start destination once before.
+
+## 2026-09-07 — a config value read in an `AutoInit` constructor can never change
+
+Found by running the review prompt on a device with an override set, and watching it do nothing.
+
+`AutoInit` singletons construct in `Application.onCreate`. `AppConfigMap` at that moment is
+`LazyAppConfigMap`, whose `map` getter falls back to `fallbackConfig.map` until the config stream
+has emitted — which it has not, because the cached snapshot has not been read off disk yet. So a
+`ConfiguredValue` resolved in an `AutoInit` constructor resolves to the **bundled default, on
+every cold start, forever**. It is injected, it is named, it is read, and it is inert.
+
+`ReviewPromptOnMilestoneLevel` now awaits `configStream().first()` before reading
+`app.reviewPromptAfterLevel`. Worth stating as a general rule, because nothing catches it:
+`ConfigValuesAreReadTest` is a text search and this passes it, and a unit test hands the class a
+config map that already has the value in it. **Anything resolving config inside an `AutoInit`
+constructor has this bug**, and the symptom is a console that appears to work.
+
+## 2026-09-07 — the legal gate seeds a first launch rather than prompting it
+
+`legal.termsVersion` ships as 1 and `AppData.acceptedTermsVersion` defaults to 0, so on the
+letter of "compare accepted against config" every fresh install is already out of date — and with
+a `forceReacceptBelow` set, walled out of a game it has never played.
+
+`AppData` therefore carries `legalAcceptedAt`, and 0 means **never asked**, which is a different
+state from "accepted version 0". The first resolve on a device with no record writes the versions
+in hand and gates nothing. The version gate exists to notice a *change* since acceptance, and on a
+first launch there has not been one.
+
+**The re-accept floor is capped, per document, at the version actually on offer.** A
+`forceReacceptBelow` of 5 against a `termsVersion` of 2 is unsatisfiable: accepting records 2, 2 is
+still under 5, and the player is walled out permanently by a config they can do nothing about.
+Capping per document rather than as a whole matters too — terms can move while privacy does not,
+and a floor applied to both would leave the privacy record permanently short of a version that
+does not exist. Every block this raises is one the accept button can clear, and
+`LaunchGatesTest` asserts the clearing, not just the raising.
+
+**Closing the non-blocking banner is the acceptance**, and the copy says so. That is the split
+SPEC 7.3 draws: a material change forces consent, a minor one takes continued use as consent. The
+version travels on the gate object and on the action rather than being re-read at the tap, so a
+refresh landing between the frame and the tap cannot record consent to something nobody was shown.
+
+## 2026-09-07 — a maintenance gate with no message is treated as no gate
+
+`upgrade.maintenanceMode` and `upgrade.maintenanceMessage` are two keys, so "blocking, with no
+message" is exactly what a half-finished admin write looks like from the client. It is also a wall
+with nothing written on it: the operator's text is the entire content of the screen, so raising it
+without one strands the player on a blank apology.
+
+Both keys or neither, in both modes. This is the one rule in the gates that is a judgement rather
+than a default, and it is the shape a partial config would take, which is one of the four failure
+modes SPEC 4.2 names.
+
+Casing is forgiving on the mode itself (`Blocking` works) for the same reason the boolean parser
+is — the console takes raw text and that is not a mistake worth punishing — but anything outside
+the three declared words resolves to `off`. That forgiveness lives in the gate resolver, not in
+`AppMaintenanceMode`: a `StringConfigValue` hands back what was written, `allowedValues` is a QA
+menu hint rather than a filter, and `MonetizationFailsOpenTest` pins that split so it stays
+deliberate.
+
+**Blocking order is force-update, then maintenance, then legal.** An update is the only one of the
+three the player can act on permanently, and it also replaces the client that is reading this
+config; telling somebody on an unsupported build to come back after maintenance sends them back to
+the same wall tomorrow. Legal is last because consent to keep using an app is worth nothing while
+the app is unusable.
+
 ## 2026-09-07 — Pro's per-attempt boosters are a floor, not an assignment
 
 SPEC 5.1 says Pro "starts every attempt with 3 Sniffs and 3 Treats", and the obvious reading of
@@ -1785,3 +1876,15 @@ The consumable counts are deliberately *not* observed. This ViewModel is their
 writer, and echoing its own writes back in would fight the spend it just made.
 One-way for state you own, observed for state someone else owns, is the rule the
 two halves are split on.
+
+## 2026-09-07 — the device driver was tapping the screen on every launch
+
+`scripts/dev/drive.py launch` ran `monkey -p <pkg> -c LAUNCHER 1`. Monkey's
+trailing count is the number of *random events* it injects after starting the
+app, so every launch all session fired a stray tap into the first frame. It
+dismissed a banner mid-test twice while an agent was verifying it.
+
+This is the worst shape a test-tooling bug can take: it does not fail, it makes
+the app look like it did something it did not, and every screenshot taken through
+it is one interaction ahead of where you think you are. Replaced with
+`am start -W -n <pkg>/<activity>`, which starts the app and does nothing else.

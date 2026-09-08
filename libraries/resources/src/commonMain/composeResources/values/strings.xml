@@ -300,5 +300,4 @@
     <string name="notice_legal_action">Read</string>
     <string name="notice_soft_update">There is a newer Sodogku waiting for you.</string>
     <string name="notice_soft_update_action">Update</string>
-    <string name="notice_dismiss">Dismiss</string>
 </resources>

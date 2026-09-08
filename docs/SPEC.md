@@ -473,7 +473,9 @@ registry were already built against `upgrade.*`, so the `app.*` naming would hav
 the one control that has to work in an emergency editing a key no client reads. Every
 one of these defaults to 0 or `off`: a force-update gate is the only config value that
 can brick every install at once, so a missing, partial or unreachable config has to
-resolve to "block nobody".
+resolve to "block nobody". Section 7.4 says what each one does and how they are
+ordered; `LaunchGatesTest` drives them from a config map and is where the four failure
+modes (absent, malformed, partial, unsatisfiable) are pinned.
 
 **Telemetry** (already in the template)
 
@@ -651,13 +653,54 @@ most of the world.
 
 ### 7.3 Terms and privacy acceptance
 
-`:libraries:legal` holds a version gate. Versions and URLs come from config, so publishing new
-terms is a config change, not a release. On launch, compare accepted versions in `AppData`
-against config: behind `forceReacceptBelow` means a blocking sheet, otherwise a dismissible
-banner. Acceptance is recorded locally with a timestamp. No accounts means no server-side record
-and no need for one.
+`:features:gate` holds the version gate, alongside the force-update and maintenance gates it
+shares a shape with (see 7.4). Versions and URLs come from config, so publishing new terms is a
+config change, not a release. On launch, compare accepted versions in `AppData` against config:
+behind `forceReacceptBelow` blocks, otherwise a dismissible banner. Acceptance is recorded locally
+with a timestamp. No accounts means no server-side record and no need for one.
+
+Three rules the implementation added, each because the straightforward reading bricks somebody:
+
+- **A first launch is seeded, not prompted.** `AppData.legalAcceptedAt` of 0 means *never asked*,
+  which is not the same as "accepted version 0"; the first resolve records the versions in hand
+  and gates nothing. Without this, every fresh install starts out of date against a shipped
+  `termsVersion` of 1 — and, with a floor set, walled out of a game it has never played.
+- **`forceReacceptBelow` is capped per document at the version on offer.** A floor of 5 against a
+  `termsVersion` of 2 is unsatisfiable: accepting records 2 and the wall stays up forever.
+- **Closing the non-blocking banner is the acceptance**, and the copy says so. The blocking sheet
+  is what a material change gets; continued use is what a minor one gets.
+
+The blocking prompt is a full screen rather than the "sheet" this section originally said, for the
+reason in 7.4: a sheet sits on a screen the player can still reach, and this one must not.
 
 The template already generates `pages/privacy.html` and `pages/terms.html` through GitHub Pages.
+Neither page is written yet.
+
+### 7.4 The launch gates
+
+Force update, maintenance and legal re-accept are one decision — should this launch proceed? —
+read from `upgrade.*` and `legal.*` at the moment it is made, never captured at construction, so
+an operator's change lands on the next config refresh rather than after a force-quit nobody
+performs mid-incident.
+
+A **blocking** gate is rendered *instead of* the navigation host, not navigated to. There is no
+back stack entry to pop, no destination for a deep link to reach, and deep links are dropped while
+a block is up. A **notice** is a dismissible banner drawn over whatever the player was doing.
+At most one of each, in these orders:
+
+| | Order | Why |
+|---|---|---|
+| Blocking | force update → maintenance → legal | An update is the only permanent fix, and it also replaces the client reading this config. Consent is worth nothing while the app is unusable. |
+| Notice | maintenance → legal → soft update | The incident outranks the paperwork, which outranks the suggestion. |
+
+`upgrade.maintenanceMode` needs `upgrade.maintenanceMessage` to be non-blank in either mode: two
+keys means "mode without message" is what a half-finished write looks like, and the operator's
+text is the whole content of the screen. Anything outside `off` / `banner` / `blocking` (casing
+aside) resolves to off. The soft-update banner's dismissal is persisted against the version code
+it was made at, so raising the target asks again and nothing else does.
+
+`app.reviewPromptAfterLevel` sits with these: clearing that campaign level asks
+`ReviewPromptCoordinator`, which keeps its own rationing (3-day install age, 30-day floor) on top.
 
 ---
 

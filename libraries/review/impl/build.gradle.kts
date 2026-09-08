@@ -18,12 +18,20 @@ kotlin {
             implementation(projects.libraries.sodogku)
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.storage)
+            // `app.reviewPromptAfterLevel`, and the campaign record that says
+            // when it was cleared. Both api modules; the coordinator itself
+            // stays free of either.
+            implementation(projects.libraries.config)
+            implementation(projects.libraries.progress)
         }
         commonTest.dependencies {
             implementation(projects.libraries.flowroutines.testing)
             implementation(projects.libraries.review)
             implementation(projects.libraries.sodogku)
             implementation(projects.libraries.storage)
+            implementation(projects.libraries.config)
+            implementation(projects.libraries.progress)
+            implementation(libs.kotlinx.coroutines.test)
         }
 
         androidMain.dependencies {

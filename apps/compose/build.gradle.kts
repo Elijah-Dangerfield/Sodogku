@@ -119,6 +119,8 @@ kotlin {
             implementation(projects.features.achievements.impl)
             implementation(projects.features.paywall)
             implementation(projects.features.paywall.impl)
+            implementation(projects.features.gate)
+            implementation(projects.features.gate.impl)
 
             implementation(libs.atomicfu)
             

@@ -1,5 +1,7 @@
 package com.sodogku
 
+import com.sodogku.features.gate.impl.LaunchGateHost
+import com.sodogku.features.gate.impl.LaunchGateViewModel
 import com.sodogku.libraries.config.values.FeatureSharing
 import com.sodogku.libraries.core.AppState
 import com.sodogku.libraries.core.AutoInit
@@ -22,6 +24,16 @@ import kotlin.time.TimeSource
 interface AppComponent {
     val featureEntryPoints: Set<FeatureEntryPoint>
     val appViewModel: AppViewModel  // Singleton, shared between MainActivity and App
+
+    /**
+     * The force-update / maintenance / legal-re-accept gates.
+     *
+     * Pulled out here rather than reached through a nav destination because a
+     * blocking gate is rendered *instead of* the nav host — see [LaunchGateHost].
+     * Singleton for the same reason [appViewModel] is: `App.kt` and the deep-link
+     * collector have to be asking the same instance whether the app is blocked.
+     */
+    val launchGateViewModel: LaunchGateViewModel
     val delegatingRouter: DelegatingRouter
     val telemetry: Telemetry
 

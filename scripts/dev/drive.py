@@ -15,6 +15,7 @@ import sys
 import time
 
 PKG = "com.sodogku.debug"
+LAUNCH_ACTIVITY = "com.sodogku.MainActivity"
 SERIAL = ["-s", "emulator-5554"]
 
 
@@ -57,7 +58,15 @@ def main() -> int:
         adb("shell", "am", "force-stop", PKG)
         if "--fresh" in sys.argv:
             adb("shell", "pm", "clear", PKG)
-        adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1")
+        # `monkey ... 1` launches the app, and monkey's trailing count is the
+        # number of *random events* it then injects — so every launch fired a
+        # stray tap into the first frame. It dismissed a banner mid-test twice
+        # before anyone noticed, which is the worst kind of test tooling bug:
+        # it makes the app look like it did something it did not.
+        adb("shell", "am", "start", "-W",
+            "-a", "android.intent.action.MAIN",
+            "-c", "android.intent.category.LAUNCHER",
+            "-n", f"{PKG}/{LAUNCH_ACTIVITY}")
         # Wait for the app to actually be resumed. A fixed sleep races the boot
         # gate, which holds for up to eight seconds waiting on remote config.
         deadline = time.time() + 60

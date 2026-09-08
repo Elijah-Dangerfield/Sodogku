@@ -77,6 +77,11 @@ include(":features:settings")
 include(":features:settings:impl")
 include(":features:paywall")
 include(":features:paywall:impl")
+// The launch gates: force update, maintenance, legal re-accept. It has no
+// routes on purpose — a blocking gate is rendered instead of the nav host, not
+// navigated to, so there is nothing to pop it off or deep-link past.
+include(":features:gate")
+include(":features:gate:impl")
 
     // Libraries
     include(":libraries:config")

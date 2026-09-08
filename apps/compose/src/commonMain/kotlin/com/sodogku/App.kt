@@ -21,6 +21,7 @@ import androidx.navigation.NavUri
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.sodogku.features.gate.impl.LaunchGateHost
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.BuildInfo
@@ -69,6 +70,7 @@ fun App(appComponent: AppComponent) {
 
     val shakeHandler = remember { appComponent.shakeHandler }
     val deepLinkBridge = remember { appComponent.deepLinkBridge }
+    val launchGateViewModel = remember { appComponent.launchGateViewModel }
 
     // Boot-warm every @AutoInit singleton. Resolving the Set forces each
     // contributor to construct, running their `init {}` blocks —
@@ -86,8 +88,18 @@ fun App(appComponent: AppComponent) {
         }
     }
 
-    LaunchedEffect(navController, deepLinkBridge) {
+    LaunchedEffect(navController, deepLinkBridge, launchGateViewModel) {
         deepLinkBridge.urls.collect { url ->
+            // Dropped rather than queued while a launch gate is blocking. The
+            // nav host is not composed behind a blocking gate, so nothing would
+            // render — but a queued deep link would fire the moment the block
+            // lifted, which is a link arriving minutes late at a screen the
+            // player is no longer expecting. Read off the ViewModel rather than
+            // from composition so this collector never recomposes App.
+            if (launchGateViewModel.state.blocking != null) {
+                KLog.w { "Dropping deep link behind a blocking launch gate: $url" }
+                return@collect
+            }
             Catching {
                 val request = NavDeepLinkRequest.Builder.fromUri(NavUri(url)).build()
                 navController.handleDeepLink(request)
@@ -153,15 +165,26 @@ fun App(appComponent: AppComponent) {
                 val startDestination by appViewModel.startDestination.collectAsState()
                 val route = startDestination
                 if (bootComplete && route != null) {
-                    AppNavigation(
-                        navController = navController,
-                        floatingWindowNavigator = floatingWindowNavigator,
-                        featureEntryPoints = appComponent.featureEntryPoints,
-                        startDestination = route,
-                        router = router,
-                        telemetry = appComponent.telemetry,
-                        jankMonitor = appComponent.jankMonitor,
-                    )
+                    // The launch gates wrap the whole app rather than sitting on
+                    // it as a route: a blocking gate is rendered *instead of* the
+                    // nav host, so there is no back stack entry to pop and no
+                    // deep link that can land behind it. The gate state is read
+                    // inside the host, never here — a state read in App
+                    // recomposes the root and rebuilds the nav graph.
+                    LaunchGateHost(
+                        viewModel = launchGateViewModel,
+                        onOpenLink = router::openWebLink,
+                    ) {
+                        AppNavigation(
+                            navController = navController,
+                            floatingWindowNavigator = floatingWindowNavigator,
+                            featureEntryPoints = appComponent.featureEntryPoints,
+                            startDestination = route,
+                            router = router,
+                            telemetry = appComponent.telemetry,
+                            jankMonitor = appComponent.jankMonitor,
+                        )
+                    }
                 } else {
                     BootLoadingScreen()
                 }
