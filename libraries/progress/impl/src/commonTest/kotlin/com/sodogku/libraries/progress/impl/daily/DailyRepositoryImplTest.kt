@@ -1,7 +1,6 @@
 package com.sodogku.libraries.progress.impl.daily
 
 import com.sodogku.libraries.ads.AdGate
-import com.sodogku.libraries.ads.AdOutcome
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
@@ -703,7 +702,6 @@ private class FakeAdGate(var outcome: RewardOutcome = RewardOutcome.Rewarded) : 
         return outcome
     }
 
-    override suspend fun showInterstitial(placement: AdPlacement): AdOutcome = AdOutcome.NotShown
 
     override fun preload(placement: AdPlacement) = Unit
 }

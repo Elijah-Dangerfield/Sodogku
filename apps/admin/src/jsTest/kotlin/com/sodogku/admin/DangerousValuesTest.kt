@@ -44,8 +44,6 @@ class DangerousValuesTest {
         assertNotNull(dangerousWarning("daily.enabled", "false"))
         assertNotNull(dangerousWarning("features.sharing", "false"))
         assertNotNull(dangerousWarning("features.dailyChallenge", "false"))
-        assertNotNull(dangerousWarning("ads.appOpenEnabled", "true"))
-        assertNotNull(dangerousWarning("ads.bannerOnLevelMap", "true"))
     }
 
     /**
@@ -64,7 +62,6 @@ class DangerousValuesTest {
         assertNull(dangerousWarning("ads.enabled", "true"))
         assertNull(dangerousWarning("daily.enabled", "true"))
         assertNull(dangerousWarning("features.sharing", "true"))
-        assertNull(dangerousWarning("ads.appOpenEnabled", "false"))
     }
 
     @Test

@@ -2073,7 +2073,7 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S11 | **Win celebration.** Golden paws zip up into the score and the score counts up on an odometer. `Workspace/Cards` `PlayPokerScreen` has the pattern | |
 | S12 | **Streaks, properly.** After the first few puzzles, a full-screen non-skippable "tap the paws to start your streak" that fills in a greyed-out thing. A streak page that appears on crossing a threshold and animates the day filling in, with haptics. The streak visible somewhere in the app — a flame icon as a small circular button with a badge, which `Workspace/Virtu` already has. Tapping it opens the streak page with no animation. Longest streak shown there. A weekly present for keeping it. Possibly the Duolingo trick of decaying the iOS app icon as the streak dies | |
 | S13 | Game Center on iOS | |
-| S14 | **Ads only for bones and sniffs**, nothing else. That constrains how generously streaks and rewards can be handed out, especially with a weekly prize in play | |
+| S14 | **Ads only for bones and sniffs**, nothing else. That constrains how generously streaks and rewards can be handed out, especially with a weekly prize in play | **DONE** (2026-09-08) — see below |
 | S15 | Great telemetry across the puzzle and all of the above. Players will complain about losing a streak and we need to be able to answer | |
 | S16 | "Beat 84.6% of players" on the win dialog. Decide whether that is real data or a qualitative message derived from the player's own run | |
 | S17 | A trophy on each of the floating achievement pills | **DONE** (2026-09-08) |
@@ -2281,3 +2281,53 @@ this change: one dependency line in `apps/compose/build.gradle.kts`, the streak
 button placed in the level pane, and a three-line `pendingPrompt()` check wherever
 a level finishes. Until those land the streak page is unreachable at runtime and
 none of this has been seen on a device.
+
+
+### S14 · Every ad is one the player asked for (2026-09-08)
+
+The audit first, because the answer changed the shape of the work. Every
+placement, with its actual production caller rather than what SPEC 5.3 claims:
+
+| Placement | Format | Caller | Verdict |
+|---|---|---|---|
+| `continue_level` | Rewarded | `refillBones()` from the lose sheet | kept |
+| `booster_grant` | Rewarded | `refillBones()` and `refill()` | kept |
+| `skip_level` | Rewarded | `SkipRepositoryImpl.skip()` | kept |
+| `streak_freeze` | Rewarded | `useFreeze()` and `restoreStreak()` | kept |
+| `level_complete` | Interstitial | **none** | deleted |
+| `app_open` | App Open | **none** | deleted |
+| `map_banner` | Banner | **none** | deleted |
+
+So "everything else" was three formats that had never shown an ad. The
+interstitial had a triple gate, three remote keys, a session counter and a
+cooldown, and no call site; the other two could not be reached at all.
+
+**The line is not consumables versus everything.** All four survivors are
+rewarded and all four are asked for: the player taps a control that says an ad is
+coming and gets something for it. Two are also load-bearing — take the ad out of
+`SkipRepositoryImpl` and a skip becomes free, take it out of `DailyRepositoryImpl`
+and freezes and restores become free — which is an economy change wearing an ad
+change's clothes, and not what was asked for.
+
+Deleted: `AdGate.showInterstitial`, `AdOutcome`, `AdPlacement.LevelComplete`,
+three of the four `AdFormat` entries, `AdShowResult.Completed`, the AdMob
+interstitial and app-open load and show paths, their ad unit ids, the
+interstitial bookkeeping on `AdStateCache` and `AdSession`, six config keys with
+their fallbacks and registry rows, and the admin console's warning for turning on
+a format that no longer exists. About 450 lines.
+
+`AdFormat` keeps its enum with one entry deliberately: the SDK request shape is
+per-format and the Swift side names it, so serving a second format later should
+be an entry there rather than a parameter threaded through the network.
+
+**Two config tests were removed and replaced by a stronger one.** They asserted
+that the intrusive formats defaulted *off* and that interstitials were rationed by
+three gates. That guarded a weaker property, since the formats existed and were
+one remote flip away. `AdPolicyTest` now asserts the enum contains only
+`Rewarded`, that every placement maps to it, and names the four placements
+individually, so adding one that is not rewarded has to be argued for in a test.
+
+The `UNWIRED` config debt list went from 6 names to 3. The three that went were
+listed as stubs whose feature did not exist, and the honest resolution turned out
+to be the other option that list offers: delete the key rather than build the
+thing.

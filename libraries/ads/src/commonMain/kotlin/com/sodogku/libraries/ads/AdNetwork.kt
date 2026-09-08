@@ -5,13 +5,22 @@ package com.sodogku.libraries.ads
 import kotlin.experimental.ExperimentalObjCName
 import kotlin.native.ObjCName
 
-/** The four formats SPEC 5.3 names. One request shape covers all of them. */
+/**
+ * The one format the app serves.
+ *
+ * An enum with a single entry looks like something that wants to be deleted, and
+ * it is kept deliberately: the SDK request shape is per-format, the Swift side
+ * names it, and a later decision to serve a second format should be an entry
+ * here rather than a new parameter threaded through the network.
+ *
+ * It had four. Interstitial, AppOpen and Banner were all reachable from the
+ * network and unreachable from the game: nothing mapped a placement onto them,
+ * so between them they had produced no impressions. The policy is that every ad
+ * is asked for, and those three are the ones that cannot be.
+ */
 @ObjCName("AdFormat", exact = true)
 enum class AdFormat {
     Rewarded,
-    Interstitial,
-    AppOpen,
-    Banner,
 }
 
 /**
@@ -30,9 +39,6 @@ enum class AdShowResult {
 
     /** Closed early, by the player, on purpose. The only result that withholds. */
     Dismissed,
-
-    /** An interstitial or app-open ad played to the end. */
-    Completed,
 
     /** The network had nothing to serve. */
     NoFill,

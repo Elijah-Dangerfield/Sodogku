@@ -33,10 +33,6 @@ class AdSession(
         return interstitials
     }
 
-    fun recordInterstitial() {
-        rollIfNeeded()
-        interstitials++
-    }
 
     private fun rollIfNeeded() {
         val current = sessionTracker.current.id

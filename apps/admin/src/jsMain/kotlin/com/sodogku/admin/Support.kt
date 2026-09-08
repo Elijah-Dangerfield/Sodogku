@@ -152,21 +152,17 @@ private fun defeatsFailOpen(path: String, value: String): String? = when {
 
 private fun changesWhatEveryoneSees(path: String, value: String): String? = when {
     path == "ads.enabled" && value.asBoolean() == false ->
-        "This stops every ad call in the app — interstitial, rewarded and app-open — so there is " +
-            "no ad revenue until it is turned back on. Continue?"
+        "This stops every rewarded ad in the app, which is every ad the app has, so there is no " +
+            "ad revenue and no way to refill a booster until it is turned back on. Continue?"
     path == "daily.enabled" && value.asBoolean() == false ->
         "This removes the Daily Challenge for everyone. It runs off the bundled pool, so an " +
             "outage is never the reason to do this. Continue?"
     path.startsWith("features.") && value.asBoolean() == false ->
         "This hides a shipped feature from every player until it is turned back on. Continue?"
-    path in OptInAdFormatPaths && value.asBoolean() == true ->
-        "This ad format ships off. Turning it on puts an ad in front of every player. Continue?"
     else -> null
 }
 
 private val OfflineGracePaths = setOf("ads.offlineGraceLevels", "ads.offlineGraceMinutes")
-
-private val OptInAdFormatPaths = setOf("ads.appOpenEnabled", "ads.bannerOnLevelMap")
 
 /** The value as plain text, whether it arrived JSON-encoded or as a half-typed field. */
 private fun String.asText(): String = (parseJsonOrNull(this) as? JsonPrimitive)?.contentOrNull ?: trim()

@@ -37,10 +37,8 @@ data class AdState(
     val firstSeenAtMs: Long = 0L,
 
     /** Epoch-ms of the last interstitial actually shown. 0 = never. */
-    val lastInterstitialAtMs: Long = 0L,
 
     /** Levels finished since the last interstitial, for `ads.interstitialEveryNLevels`. */
-    val levelsSinceInterstitial: Int = 0,
 
     /**
      * Epoch-ms of the **first ad gate that could not be served offline**, which

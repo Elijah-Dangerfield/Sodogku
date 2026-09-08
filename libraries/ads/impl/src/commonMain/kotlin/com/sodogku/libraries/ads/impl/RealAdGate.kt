@@ -1,7 +1,6 @@
 package com.sodogku.libraries.ads.impl
 
 import com.sodogku.libraries.ads.AdGate
-import com.sodogku.libraries.ads.AdOutcome
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.AdNetwork
 import com.sodogku.libraries.ads.AdShowResult
@@ -10,9 +9,6 @@ import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
 import com.sodogku.libraries.billing.PaywallCoordinator
 import com.sodogku.libraries.config.values.AdsEnabled
-import com.sodogku.libraries.config.values.AdsInterstitialCooldownSec
-import com.sodogku.libraries.config.values.AdsInterstitialEveryNLevels
-import com.sodogku.libraries.config.values.AdsInterstitialsPerSessionMax
 import com.sodogku.libraries.config.values.AdsNewUserGraceLevels
 import com.sodogku.libraries.config.values.AdsNewUserGraceMinutes
 import com.sodogku.libraries.config.values.AdsOfflineGraceLevels
@@ -82,9 +78,6 @@ class RealAdGate(
     private val adsEnabled: AdsEnabled,
     private val newUserGraceLevels: AdsNewUserGraceLevels,
     private val newUserGraceMinutes: AdsNewUserGraceMinutes,
-    private val interstitialEveryNLevels: AdsInterstitialEveryNLevels,
-    private val interstitialCooldownSec: AdsInterstitialCooldownSec,
-    private val interstitialsPerSessionMax: AdsInterstitialsPerSessionMax,
     private val rewardedPlacements: AdsRewardedPlacements,
     private val offlineGraceLevels: AdsOfflineGraceLevels,
     private val offlineGraceMinutes: AdsOfflineGraceMinutes,
@@ -109,11 +102,6 @@ class RealAdGate(
         Catching { rewarded(placement) }
             .logOnFailure { "Rewarded ad path threw for $placement; granting anyway" }
             .getOrElse { RewardOutcome.Failed(it::class.simpleName ?: "unknown") }
-
-    override suspend fun showInterstitial(placement: AdPlacement): AdOutcome =
-        Catching { interstitial(placement) }
-            .logOnFailure { "Interstitial path threw for $placement" }
-            .getOrElse { AdOutcome.Failed(it::class.simpleName ?: "unknown") }
 
     override fun preload(placement: AdPlacement) {
         if (entitlements.isPro.value) return
@@ -172,7 +160,7 @@ class RealAdGate(
         )
 
         return when (outcome.result) {
-            AdShowResult.Rewarded, AdShowResult.Completed -> {
+            AdShowResult.Rewarded -> {
                 // SPEC 6: the offline grace resets on a *successful ad view*,
                 // not on reconnect. Coming back online without watching
                 // anything means the debt is still owed.
@@ -278,66 +266,6 @@ class RealAdGate(
     }
 
     /**
-     * The `level_complete` interstitial and its triple gate.
-     *
-     * Every call is one finished level, so the N-levels counter ticks here
-     * whether or not an ad ends up showing — otherwise a player held back by
-     * the cooldown would need N *more* levels afterwards.
-     */
-    private suspend fun interstitial(placement: AdPlacement): AdOutcome {
-        val state = adState.update { it.copy(levelsSinceInterstitial = it.levelsSinceInterstitial + 1) }
-
-        val skipReason = when {
-            entitlements.isPro.value -> "pro"
-            !adsEnabled() -> "ads_disabled"
-            appState.isDeviceOffline.value -> "offline"
-            inNewUserGrace() -> "new_user_grace"
-            state.levelsSinceInterstitial < interstitialEveryNLevels() -> "every_n_levels"
-            withinCooldown(state) -> "cooldown"
-            session.interstitialsShown() >= interstitialsPerSessionMax() -> "session_cap"
-            else -> null
-        }
-        if (skipReason != null) {
-            logger.d { "Interstitial suppressed at ${placement.configId}: $skipReason" }
-            return AdOutcome.NotShown
-        }
-
-        logger.logEvent(
-            "ads.gate_shown",
-            "placement" to placement.configId,
-            "device_offline" to false,
-        )
-
-        val started = now()
-        network.prepare()
-        val outcome = network.show(placement.format)
-        logger.logEvent(
-            "ads.result",
-            "placement" to placement.configId,
-            "outcome" to outcome.result.name,
-            "latency_ms" to (now() - started),
-            "error_kind" to outcome.errorKind,
-        )
-
-        return when (outcome.result) {
-            AdShowResult.Completed, AdShowResult.Dismissed, AdShowResult.Rewarded -> {
-                session.recordInterstitial()
-                adState.update {
-                    it.copy(levelsSinceInterstitial = 0, lastInterstitialAtMs = now())
-                }
-                AdOutcome.Shown
-            }
-
-            // Nothing was shown, so nothing is spent: the counters stay where
-            // they are and the next level tries again. A no-fill that reset the
-            // N-levels counter would quietly halve the ad load every time
-            // inventory got thin, which is the opposite of what it is for.
-            AdShowResult.NoFill, AdShowResult.NotShown, AdShowResult.Offline -> AdOutcome.NotShown
-            AdShowResult.Failed -> AdOutcome.Failed(outcome.errorKind ?: "sdk")
-        }
-    }
-
-    /**
      * SPEC 5.3: no ads before level 5 or the first 5 minutes. Two legs because
      * a fast player and a slow player fail different halves of the same intent,
      * and **both** have to be past for an ad to show.
@@ -357,10 +285,6 @@ class RealAdGate(
         return now() - firstSeen < minutes * MILLIS_PER_MINUTE
     }
 
-    private fun withinCooldown(state: AdState): Boolean {
-        if (state.lastInterstitialAtMs == 0L) return false
-        return now() - state.lastInterstitialAtMs < interstitialCooldownSec() * MILLIS_PER_SECOND
-    }
 
     /**
      * Both legs of SPEC 6's "three levels or twenty minutes, whichever comes

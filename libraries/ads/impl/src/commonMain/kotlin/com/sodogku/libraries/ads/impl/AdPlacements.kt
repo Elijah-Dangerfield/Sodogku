@@ -8,7 +8,6 @@ import com.sodogku.libraries.config.values.AdsRewardedPlacements
 /** Which SDK format a placement asks the network for. SPEC 5.3. */
 internal val AdPlacement.format: AdFormat
     get() = when (this) {
-        AdPlacement.LevelComplete -> AdFormat.Interstitial
         AdPlacement.ContinueLevel,
         AdPlacement.BoosterGrant,
         AdPlacement.SkipLevel,
@@ -24,7 +23,6 @@ internal val AdPlacement.format: AdFormat
  */
 internal val AdPlacement.configId: String
     get() = when (this) {
-        AdPlacement.LevelComplete -> "level_complete"
         AdPlacement.ContinueLevel -> AdsRewardedPlacements.CONTINUE_LEVEL
         AdPlacement.BoosterGrant -> AdsRewardedPlacements.BOOSTER_GRANT
         AdPlacement.SkipLevel -> AdsRewardedPlacements.SKIP_LEVEL
@@ -44,7 +42,6 @@ internal val AdPlacement.paywallTrigger: PaywallTrigger?
     get() = when (this) {
         AdPlacement.ContinueLevel -> PaywallTrigger.ContinueLevel
         AdPlacement.SkipLevel -> PaywallTrigger.SkipLevel
-        AdPlacement.LevelComplete,
         AdPlacement.BoosterGrant,
         AdPlacement.StreakFreeze,
         -> null

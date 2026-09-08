@@ -56,93 +56,11 @@ class AdsNewUserGraceMinutes(appConfigMap: AppConfigMap) : IntConfigValue(appCon
     override val default = 5
 }
 
-/**
- * Levels between automatic interstitials. Three is the genre norm: the player
- * never opts in and never waits on the ad to advance, so the frequency is the
- * only thing standing between "monetized" and "hostile". It is one leg of a
- * triple gate with [AdsInterstitialCooldownSec] and
- * [AdsInterstitialsPerSessionMax] — a player who clears three 4x4 levels in a
- * minute is caught by the cooldown, and a long session is caught by the ceiling.
- */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class AdsInterstitialEveryNLevels(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
-    override val name = "Interstitial every N levels"
-    override val path = "ads.interstitialEveryNLevels"
-    override val default = 3
-}
 
-/**
- * Minimum wall-clock gap between interstitials. The N-levels counter alone lets a
- * fast run on the tutorial band stack ads a few seconds apart; a minute is long
- * enough that two ads never read as one interruption.
- */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class AdsInterstitialCooldownSec(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
-    override val name = "Interstitial cooldown (seconds)"
-    override val path = "ads.interstitialCooldownSec"
-    override val default = 60
-}
 
-/**
- * Hard ceiling on interstitials per session, whatever the other two gates allow.
- * Eight is generous for a normal session and only binds on the multi-hour ones,
- * which are exactly the sessions worth protecting.
- */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class AdsInterstitialsPerSessionMax(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
-    override val name = "Interstitials per session max"
-    override val path = "ads.interstitialsPerSessionMax"
-    override val default = 8
-}
 
-/**
- * App-open ad on cold start. Off until we decide we want it: it is the most
- * intrusive format in the app because it lands before the player has done
- * anything, and turning it on is a deliberate revenue decision rather than a
- * default.
- */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class AdsAppOpenEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
-    override val name = "App open ad enabled"
-    override val path = "ads.appOpenEnabled"
-    override val default = false
-}
 
-/**
- * Hours between app-open ads. Only meaningful when [AdsAppOpenEnabled] is on;
- * four hours means a player who checks in at breakfast and again at lunch sees
- * one, not two.
- */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class AdsAppOpenCooldownHours(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
-    override val name = "App open cooldown (hours)"
-    override val path = "ads.appOpenCooldownHours"
-    override val default = 4
-}
 
-/**
- * Banner on the level map. Off by default, and the map is the *only* surface it
- * may ever appear on — a banner over a grid with 44pt touch targets wrecks the
- * one interaction the whole game is made of.
- */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class AdsBannerOnLevelMap(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
-    override val name = "Banner on level map"
-    override val path = "ads.bannerOnLevelMap"
-    override val default = false
-}
 
 /**
  * What happens on the third strike. `CONTINUE` offers a rewarded ad to restore a
@@ -239,12 +157,6 @@ fun adsConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>> = list
     AdsEnabled(appConfigMap),
     AdsNewUserGraceLevels(appConfigMap),
     AdsNewUserGraceMinutes(appConfigMap),
-    AdsInterstitialEveryNLevels(appConfigMap),
-    AdsInterstitialCooldownSec(appConfigMap),
-    AdsInterstitialsPerSessionMax(appConfigMap),
-    AdsAppOpenEnabled(appConfigMap),
-    AdsAppOpenCooldownHours(appConfigMap),
-    AdsBannerOnLevelMap(appConfigMap),
     AdsFailureMode(appConfigMap),
     AdsOfflineGraceLevels(appConfigMap),
     AdsOfflineGraceMinutes(appConfigMap),

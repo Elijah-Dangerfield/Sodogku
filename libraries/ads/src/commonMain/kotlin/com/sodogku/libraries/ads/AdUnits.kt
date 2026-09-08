@@ -40,10 +40,7 @@ object AdUnits {
 
     /** https://developers.google.com/admob/android/test-ads — reserved sample units. */
     object AndroidTest {
-        const val interstitial = "ca-app-pub-3940256099942544/1033173712"
         const val rewarded = "ca-app-pub-3940256099942544/5224354917"
-        const val appOpen = "ca-app-pub-3940256099942544/9257395921"
-        const val banner = "ca-app-pub-3940256099942544/6300978111"
 
         /** For the manifest, not for a request. */
         const val applicationId = "ca-app-pub-3940256099942544~3347511713"
@@ -51,10 +48,7 @@ object AdUnits {
 
     /** https://developers.google.com/admob/ios/test-ads — reserved sample units. */
     object IosTest {
-        const val interstitial = "ca-app-pub-3940256099942544/4411468910"
         const val rewarded = "ca-app-pub-3940256099942544/1712485313"
-        const val appOpen = "ca-app-pub-3940256099942544/5575463023"
-        const val banner = "ca-app-pub-3940256099942544/2934735716"
 
         /** For `Info.plist`'s `GADApplicationIdentifier`, not for a request. */
         const val applicationId = "ca-app-pub-3940256099942544~1458002511"
@@ -62,18 +56,12 @@ object AdUnits {
 
     /** Real Android units. Empty until the AdMob app exists — see [useTestUnits]. */
     object AndroidLive {
-        const val interstitial = ""
         const val rewarded = ""
-        const val appOpen = ""
-        const val banner = ""
     }
 
     /** Real iOS units. Empty until the AdMob app exists — see [useTestUnits]. */
     object IosLive {
-        const val interstitial = ""
         const val rewarded = ""
-        const val appOpen = ""
-        const val banner = ""
     }
 
     /**
@@ -85,15 +73,9 @@ object AdUnits {
     fun android(format: AdFormat): String = pick(
         test = when (format) {
             AdFormat.Rewarded -> AndroidTest.rewarded
-            AdFormat.Interstitial -> AndroidTest.interstitial
-            AdFormat.AppOpen -> AndroidTest.appOpen
-            AdFormat.Banner -> AndroidTest.banner
         },
         live = when (format) {
             AdFormat.Rewarded -> AndroidLive.rewarded
-            AdFormat.Interstitial -> AndroidLive.interstitial
-            AdFormat.AppOpen -> AndroidLive.appOpen
-            AdFormat.Banner -> AndroidLive.banner
         },
     )
 
@@ -101,15 +83,9 @@ object AdUnits {
     fun ios(format: AdFormat): String = pick(
         test = when (format) {
             AdFormat.Rewarded -> IosTest.rewarded
-            AdFormat.Interstitial -> IosTest.interstitial
-            AdFormat.AppOpen -> IosTest.appOpen
-            AdFormat.Banner -> IosTest.banner
         },
         live = when (format) {
             AdFormat.Rewarded -> IosLive.rewarded
-            AdFormat.Interstitial -> IosLive.interstitial
-            AdFormat.AppOpen -> IosLive.appOpen
-            AdFormat.Banner -> IosLive.banner
         },
     )
 

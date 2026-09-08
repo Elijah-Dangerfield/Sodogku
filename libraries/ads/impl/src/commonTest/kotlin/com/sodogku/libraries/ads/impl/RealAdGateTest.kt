@@ -1,16 +1,12 @@
 package com.sodogku.libraries.ads.impl
 
 import com.sodogku.libraries.ads.AdFormat
-import com.sodogku.libraries.ads.AdOutcome
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.AdShowOutcome
 import com.sodogku.libraries.ads.AdShowResult
 import com.sodogku.libraries.billing.PaywallTrigger
 import com.sodogku.libraries.config.AppConfigMap
 import com.sodogku.libraries.config.values.AdsEnabled
-import com.sodogku.libraries.config.values.AdsInterstitialCooldownSec
-import com.sodogku.libraries.config.values.AdsInterstitialEveryNLevels
-import com.sodogku.libraries.config.values.AdsInterstitialsPerSessionMax
 import com.sodogku.libraries.config.values.AdsNewUserGraceLevels
 import com.sodogku.libraries.config.values.AdsNewUserGraceMinutes
 import com.sodogku.libraries.config.values.AdsOfflineGraceLevels
@@ -58,6 +54,16 @@ class RealAdGateTest : CoroutineTest() {
     // ------------------------------------------------------------------
     // Fail open
     // ------------------------------------------------------------------
+
+    @Test
+    fun aProPlayerNeverSeesAnAdAndAlwaysGetsTheReward() = runUnitTest {
+        entitlements.setPro(true)
+
+        val rewarded = gate().showRewarded(AdPlacement.ContinueLevel)
+
+        assertEquals(RewardOutcome.Rewarded, rewarded)
+        assertEquals(emptyList(), network.shown, "Pro was shown an ad")
+    }
 
     @Test
     fun dismissedIsTheOnlyOutcomeThatWithholds() = runUnitTest {
@@ -129,17 +135,6 @@ class RealAdGateTest : CoroutineTest() {
         assertEquals(emptyList(), network.shown)
     }
 
-    @Test
-    fun aProPlayerNeverSeesAnAdAndAlwaysGetsTheReward() = runUnitTest {
-        entitlements.setPro(true)
-
-        val rewarded = gate().showRewarded(AdPlacement.ContinueLevel)
-        val interstitial = gate().showInterstitial(AdPlacement.LevelComplete)
-
-        assertEquals(RewardOutcome.Rewarded, rewarded)
-        assertEquals(AdOutcome.NotShown, interstitial)
-        assertEquals(emptyList(), network.shown)
-    }
 
     @Test
     fun consentIsAlwaysRequestedBeforeTheFirstShow() = runUnitTest {
@@ -296,98 +291,8 @@ class RealAdGateTest : CoroutineTest() {
     }
 
     // ------------------------------------------------------------------
-    // Interstitial triple gate
     // ------------------------------------------------------------------
 
-    @Test
-    fun theInterstitialWaitsForNLevels() = runUnitTest {
-        val gate = gate(
-            ads = mapOf(
-                "interstitialEveryNLevels" to 3,
-                "interstitialCooldownSec" to 0,
-            ),
-        )
-        network.outcome = AdShowOutcome(AdShowResult.Completed)
-
-        assertEquals(AdOutcome.NotShown, gate.showInterstitial(AdPlacement.LevelComplete))
-        assertEquals(AdOutcome.NotShown, gate.showInterstitial(AdPlacement.LevelComplete))
-        assertEquals(AdOutcome.Shown, gate.showInterstitial(AdPlacement.LevelComplete))
-        assertEquals(AdOutcome.NotShown, gate.showInterstitial(AdPlacement.LevelComplete))
-    }
-
-    @Test
-    fun theCooldownHoldsAnInterstitialTheLevelCounterWouldAllow() = runUnitTest {
-        val gate = gate(
-            ads = mapOf(
-                "interstitialEveryNLevels" to 1,
-                "interstitialCooldownSec" to 60,
-            ),
-        )
-        network.outcome = AdShowOutcome(AdShowResult.Completed)
-
-        assertEquals(AdOutcome.Shown, gate.showInterstitial(AdPlacement.LevelComplete))
-        clock.advanceSeconds(30)
-        assertEquals(AdOutcome.NotShown, gate.showInterstitial(AdPlacement.LevelComplete))
-        clock.advanceSeconds(31)
-        assertEquals(AdOutcome.Shown, gate.showInterstitial(AdPlacement.LevelComplete))
-    }
-
-    @Test
-    fun theSessionCapHoldsInterstitialsTheOtherTwoGatesWouldAllow() = runUnitTest {
-        val gate = gate(
-            ads = mapOf(
-                "interstitialEveryNLevels" to 1,
-                "interstitialCooldownSec" to 0,
-                "interstitialsPerSessionMax" to 2,
-            ),
-        )
-        network.outcome = AdShowOutcome(AdShowResult.Completed)
-
-        assertEquals(AdOutcome.Shown, gate.showInterstitial(AdPlacement.LevelComplete))
-        assertEquals(AdOutcome.Shown, gate.showInterstitial(AdPlacement.LevelComplete))
-        assertEquals(AdOutcome.NotShown, gate.showInterstitial(AdPlacement.LevelComplete))
-
-        // A new session is a new ceiling — that is the whole reason the counter
-        // is in memory rather than on disk.
-        sessions.roll()
-        assertEquals(AdOutcome.Shown, gate.showInterstitial(AdPlacement.LevelComplete))
-    }
-
-    @Test
-    fun aNoFillDoesNotSpendTheLevelCounter() = runUnitTest {
-        val gate = gate(
-            ads = mapOf(
-                "interstitialEveryNLevels" to 2,
-                "interstitialCooldownSec" to 0,
-            ),
-        )
-        network.outcome = AdShowOutcome(AdShowResult.NoFill)
-
-        gate.showInterstitial(AdPlacement.LevelComplete)
-        assertEquals(AdOutcome.NotShown, gate.showInterstitial(AdPlacement.LevelComplete))
-
-        network.outcome = AdShowOutcome(AdShowResult.Completed)
-        assertEquals(
-            AdOutcome.Shown,
-            gate.showInterstitial(AdPlacement.LevelComplete),
-            "A no-fill must not push the next interstitial N levels further out",
-        )
-    }
-
-    @Test
-    fun interstitialsNeverFireOffline() = runUnitTest {
-        appState.isDeviceOffline.value = true
-        val gate = gate(
-            ads = mapOf(
-                "interstitialEveryNLevels" to 1,
-                "interstitialCooldownSec" to 0,
-            ),
-        )
-
-        assertEquals(AdOutcome.NotShown, gate.showInterstitial(AdPlacement.LevelComplete))
-        assertEquals(emptyList(), network.shown)
-        assertEquals(0, paywall.offlineBlocks, "An automatic ad the player never asked for owes no grace")
-    }
 
     // ------------------------------------------------------------------
     // Paywall handoff
@@ -566,9 +471,6 @@ class RealAdGateTest : CoroutineTest() {
             adsEnabled = AdsEnabled(map),
             newUserGraceLevels = AdsNewUserGraceLevels(map),
             newUserGraceMinutes = AdsNewUserGraceMinutes(map),
-            interstitialEveryNLevels = AdsInterstitialEveryNLevels(map),
-            interstitialCooldownSec = AdsInterstitialCooldownSec(map),
-            interstitialsPerSessionMax = AdsInterstitialsPerSessionMax(map),
             rewardedPlacements = AdsRewardedPlacements(map),
             offlineGraceLevels = AdsOfflineGraceLevels(map),
             offlineGraceMinutes = AdsOfflineGraceMinutes(map),

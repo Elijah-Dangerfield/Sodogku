@@ -9,9 +9,6 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.OnUserEarnedRewardListener
 import com.google.android.gms.ads.RequestConfiguration
-import com.google.android.gms.ads.appopen.AppOpenAd
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.android.ump.ConsentInformation
@@ -85,8 +82,6 @@ class AdMobAdNetwork(
     private var initialised = false
 
     private var rewarded: RewardedAd? = null
-    private var interstitial: InterstitialAd? = null
-    private var appOpen: AppOpenAd? = null
 
     override suspend fun prepare() {
         if (initialised) return
@@ -107,12 +102,6 @@ class AdMobAdNetwork(
         return Catching {
             when (format) {
                 AdFormat.Rewarded -> showRewarded(activity)
-                AdFormat.Interstitial -> showInterstitial(activity)
-                AdFormat.AppOpen -> showAppOpen(activity)
-                // A banner is a view in a layout, not something you "show" and
-                // wait on. `ads.bannerOnLevelMap` is off by default and the map
-                // owns its own slot when it wants one.
-                AdFormat.Banner -> AdShowOutcome(AdShowResult.NotShown, "banner_is_not_a_full_screen_format")
             }
         }
             .logOnFailure { "AdMob show threw for $format" }
@@ -126,9 +115,6 @@ class AdMobAdNetwork(
             Catching {
                 when (format) {
                     AdFormat.Rewarded -> if (rewarded == null) rewarded = loadRewarded().getOrNull()
-                    AdFormat.Interstitial -> if (interstitial == null) interstitial = loadInterstitial().getOrNull()
-                    AdFormat.AppOpen -> if (appOpen == null) appOpen = loadAppOpen().getOrNull()
-                    AdFormat.Banner -> Unit
                 }
             }.logOnFailure { "AdMob preload failed for $format" }
         }
@@ -218,40 +204,7 @@ class AdMobAdNetwork(
         }
     }
 
-    private suspend fun showInterstitial(activity: Activity): AdShowOutcome {
-        val ad = interstitial ?: loadInterstitial().getOrElse { return it.toOutcome() }
-        interstitial = null
 
-        val dismissal = withContext(dispatchers.main) {
-            suspendCancellableCoroutine { cont ->
-                ad.fullScreenContentCallback = resumeOnceCallback(cont::isActive) { cont.resume(it) }
-                ad.show(activity)
-            }
-        }
-        preload(AdFormat.Interstitial)
-
-        return when (dismissal) {
-            is Dismissal.Failed -> AdShowOutcome(AdShowResult.Failed, dismissal.kind)
-            Dismissal.Closed -> AdShowOutcome(AdShowResult.Completed)
-        }
-    }
-
-    private suspend fun showAppOpen(activity: Activity): AdShowOutcome {
-        val ad = appOpen ?: loadAppOpen().getOrElse { return it.toOutcome() }
-        appOpen = null
-
-        val dismissal = withContext(dispatchers.main) {
-            suspendCancellableCoroutine { cont ->
-                ad.fullScreenContentCallback = resumeOnceCallback(cont::isActive) { cont.resume(it) }
-                ad.show(activity)
-            }
-        }
-
-        return when (dismissal) {
-            is Dismissal.Failed -> AdShowOutcome(AdShowResult.Failed, dismissal.kind)
-            Dismissal.Closed -> AdShowOutcome(AdShowResult.Completed)
-        }
-    }
 
     private suspend fun loadRewarded(): Catching<RewardedAd> = load { cont ->
         RewardedAd.load(
@@ -265,29 +218,7 @@ class AdMobAdNetwork(
         )
     }
 
-    private suspend fun loadInterstitial(): Catching<InterstitialAd> = load { cont ->
-        InterstitialAd.load(
-            context,
-            AdUnits.android(AdFormat.Interstitial),
-            AdRequest.Builder().build(),
-            object : InterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: InterstitialAd) = cont(Catching.success(ad))
-                override fun onAdFailedToLoad(error: LoadAdError) = cont(Catching.failure(error.asThrowable()))
-            },
-        )
-    }
 
-    private suspend fun loadAppOpen(): Catching<AppOpenAd> = load { cont ->
-        AppOpenAd.load(
-            context,
-            AdUnits.android(AdFormat.AppOpen),
-            AdRequest.Builder().build(),
-            object : AppOpenAd.AppOpenAdLoadCallback() {
-                override fun onAdLoaded(ad: AppOpenAd) = cont(Catching.success(ad))
-                override fun onAdFailedToLoad(error: LoadAdError) = cont(Catching.failure(error.asThrowable()))
-            },
-        )
-    }
 
     /**
      * A load that never calls back would suspend a rewarded continue forever,

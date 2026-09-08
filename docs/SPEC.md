@@ -515,12 +515,6 @@ which is why `apps/admin/config-manifest-registry.json` must list **every** decl
 | `ads.enabled` | true | Master kill switch. False means no ad calls at all. |
 | `ads.newUserGraceLevels` | 5 | No ads at all before this level. |
 | `ads.newUserGraceMinutes` | 5 | No ads in the first N minutes of first session. |
-| `ads.interstitialEveryNLevels` | 3 | Levels between automatic interstitials. |
-| `ads.interstitialCooldownSec` | 60 | Minimum wall-clock gap between interstitials. |
-| `ads.interstitialsPerSessionMax` | 8 | Hard ceiling. |
-| `ads.appOpenEnabled` | false | App-open ad on cold start. Off until we want it. |
-| `ads.appOpenCooldownHours` | 4 | |
-| `ads.bannerOnLevelMap` | false | Banner on the map. Never on the board. |
 | `ads.failureMode` | CONTINUE | `CONTINUE` or `LOCK`. |
 | `ads.offlineGraceLevels` | 3 | |
 | `ads.offlineGraceMinutes` | 20 | |
@@ -682,13 +676,21 @@ is not what shipped casual puzzle games do. The normal shape:
 
 | Placement | Type | Trigger |
 |---|---|---|
-| `level_complete` | Interstitial | Fires **automatically** after a level, subject to the N-levels / cooldown / session-cap triple gate. The player never waits on it to advance and never opts in. |
 | `continue_level` | Rewarded | Third strike, restore the whole set of bones, keep the board. The lose sheet's one revive. |
 | `booster_grant` | Rewarded | Earn a Sniff or a Treat, or top bones up from the standing offer on a board still in play. |
 | `skip_level` | Rewarded | After 2 failed attempts. |
 | `streak_freeze` | Rewarded | Cover a missed daily, or restore a run of them. Both, deliberately: they are the same placement to an operator, and a second id would be half a kill switch. `daily.freeze_used` and `daily.streak_restored` tell them apart in reporting. |
-| `app_open` | App Open | Cold start, off by default. |
-| `map_banner` | Banner | Level map only, off by default. Never on the board, it wrecks touch targets. |
+
+**Every one of them is rewarded, and that is the policy rather than an accident
+of what got built.** The player taps a control that says an ad is coming and gets
+something for it. There is no format here that interrupts.
+
+`level_complete` (interstitial), `app_open` and `map_banner` were all specified
+and all deleted on 2026-09-08. Between them they had produced no impressions,
+because nothing ever called them: the interstitial had a triple gate, three
+remote keys and no call site, and the other two could not be reached at all.
+`AdPolicyTest` now pins the enum, so a format that is not rewarded has to be
+argued for in a test rather than merely added.
 
 Three things that matter more than the frequency numbers:
 
@@ -1128,7 +1130,7 @@ position back and the campaign, which has Start over, does not.
 `acceptedPrivacyVersion`, `cachedAdFreeEntitlement`, `bones`, `sniffCount`, `treatCount`,
 `skipsUsedToday`, `skipsDate`,
 `adGrantsToday`, `adGrantsDate`, `levelsSinceLastInterstitial`, `lastInterstitialAt`,
-`interstitialsThisSession`, `offlineGraceLevelsUsed`, `offlineGraceStartedAt`,
+`offlineGraceLevelsUsed`, `offlineGraceStartedAt`,
 `firstLaunchAt`, `totalPlayTimeMs`, `sessionsPlayed`, `longestSessionMs`.
 
 `dailyStreak`, `lastDailyDate` and `freezesUsedThisMonth` were listed here and are **not** stored.

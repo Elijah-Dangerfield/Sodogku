@@ -125,7 +125,13 @@ class ConfigValuesAreReadTest {
         const val MIN_SOURCE_FILES = 200
 
         /**
-         * The debt. It is now 6 names.
+         * The debt. It is now 3 names.
+         *
+         * It was 6 until the ad formats nobody asked for were deleted. The
+         * three that went — app-open enabled, its cooldown, and the level-map
+         * banner — were listed here as stubs whose *feature* did not exist, and
+         * the honest resolution turned out to be the other one this list offers:
+         * delete the key rather than build the thing.
          *
          * It was 39 when this test was written, not the 37 the decisions entry
          * and the KDoc above both claim — the prose miscounted and the set is
@@ -145,15 +151,6 @@ class ConfigValuesAreReadTest {
          * searching harder, which is why each line below says which it is.
          */
         val UNWIRED = setOf(
-            // Ads. The banner needs a component on a level map we do not have,
-            // and app-open needs both an `AdPlacement` and a cold-start hook —
-            // `AdFormat.AppOpen` reaches the SDK but no gate ever asks for it,
-            // so the cooldown has nothing to space out. Both formats default
-            // off, so these are stubs rather than gaps.
-            "AdsAppOpenEnabled",
-            "AdsBannerOnLevelMap",
-            "AdsAppOpenCooldownHours",
-
             // `LOCK` is an arm that was never built: nothing anywhere locks a
             // level after a third strike, and `RealAdGate` documents that it
             // does not consult this key on the reward path on purpose. Wiring

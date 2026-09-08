@@ -1,7 +1,6 @@
 package com.sodogku.features.game.impl
 
 import com.sodogku.libraries.ads.AdGate
-import com.sodogku.libraries.ads.AdOutcome
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
@@ -3699,7 +3698,6 @@ class GameViewModelTest : CoroutineTest() {
             return outcome
         }
 
-        override suspend fun showInterstitial(placement: AdPlacement): AdOutcome = AdOutcome.NotShown
         override fun preload(placement: AdPlacement) = Unit
     }
 

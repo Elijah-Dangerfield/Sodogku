@@ -1,7 +1,6 @@
 package com.sodogku.libraries.progress.impl
 
 import com.sodogku.libraries.ads.AdGate
-import com.sodogku.libraries.ads.AdOutcome
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
@@ -272,7 +271,6 @@ private class CountingAdGate(private val outcome: RewardOutcome) : AdGate {
         return outcome
     }
 
-    override suspend fun showInterstitial(placement: AdPlacement): AdOutcome = AdOutcome.NotShown
     override fun preload(placement: AdPlacement) = Unit
 }
 
