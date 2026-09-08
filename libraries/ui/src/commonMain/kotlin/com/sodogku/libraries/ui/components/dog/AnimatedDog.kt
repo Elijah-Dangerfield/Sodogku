@@ -17,7 +17,10 @@ import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.imageResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.dog_flop_sheet
 import sodogku.libraries.resources.generated.resources.dog_look_sheet
+import sodogku.libraries.resources.generated.resources.dog_pant_sheet
+import sodogku.libraries.resources.generated.resources.dog_tilt_sheet
 
 /**
  * The dog, alive: looking about, blinking, settling.
@@ -33,18 +36,24 @@ import sodogku.libraries.resources.generated.resources.dog_look_sheet
  * not an animation. Packed at board resolution it is one 240KB image shared by
  * every cell.
  *
- * [frameOffset] staggers where a dog starts in the loop. Without it every dog on
- * the board blinks in unison, which reads as a rendering glitch rather than as
- * a row of animals.
+ * [frameOffset] staggers where a dog starts in the loop, and [variant] picks
+ * which loop. Without either, every dog on the board does the same thing at the
+ * same instant, which reads as a rendering glitch rather than as a row of
+ * animals.
+ *
+ * A dog keeps the loop it was given for as long as it is on screen. Switching
+ * mid-attempt would draw the eye away from the puzzle, which is the opposite of
+ * what idle motion is for.
  */
 @Composable
 fun AnimatedDog(
     size: Dp,
     modifier: Modifier = Modifier,
     frameOffset: Int = 0,
+    variant: Int = 0,
     playing: Boolean = true,
 ) {
-    val sheet = imageResource(Res.drawable.dog_look_sheet)
+    val sheet = imageResource(DogLoops[variant.mod(DogLoops.size)])
     val frame = remember { mutableIntStateOf(frameOffset % FrameCount) }
 
     LaunchedEffect(playing) {
@@ -78,6 +87,22 @@ private fun DrawScope.drawSheetFrame(
         filterQuality = FilterQuality.High,
     )
 }
+
+/**
+ * The idle loops a placed dog can be given. All four are head-only and legible
+ * at cell size; body animations would be unreadable at 34dp.
+ *
+ * They are separate sheets rather than one big one because a board only ever
+ * shows a handful of dogs, and Compose caches each `imageResource` — so the
+ * loops that are actually in play are the only ones decoded.
+ */
+private val DogLoops
+    @Composable get() = listOf(
+        Res.drawable.dog_look_sheet,
+        Res.drawable.dog_tilt_sheet,
+        Res.drawable.dog_pant_sheet,
+        Res.drawable.dog_flop_sheet,
+    )
 
 /** Must match `scripts/build_dog_sprites.py --frames`. */
 private const val FrameCount = 30

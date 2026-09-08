@@ -60,6 +60,15 @@ data class ScoringConfig(
     val perfectPraiseAt: Double = 2.3,
 ) {
     init {
+        // These two are the only Ints, and they were the only fields unguarded.
+        // Both land here from remote config, where a dropped minus sign gave
+        // every player three paws for scoring zero: par went negative, so any
+        // score cleared it.
+        require(basePerPlacement > 0) { "basePerPlacement must be positive" }
+        require(completionBase > 0) { "completionBase must be positive" }
+        require(basePerPlacement <= MAX_POINT_VALUE && completionBase <= MAX_POINT_VALUE) {
+            "point values must be at most $MAX_POINT_VALUE, so scoring cannot overflow"
+        }
         require(comboMax >= 1.0) { "comboMax must be at least 1.0" }
         require(speedMaxMultiplier >= 1.0) { "speedMaxMultiplier must be at least 1.0" }
         require(speedWindowMs > 0) { "speedWindowMs must be positive" }
@@ -74,6 +83,14 @@ data class ScoringConfig(
     companion object {
         /** Lives per attempt. Three bones, matching the header. */
         const val MAX_LIVES: Int = 3
+
+        /**
+         * Ceiling on the two Int point values. `ScoreCard` multiplies them by
+         * the board size as Ints before widening to Double, so a value in the
+         * hundreds of millions wraps negative. A million is four orders of
+         * magnitude above anything a tuning pass would plausibly want.
+         */
+        const val MAX_POINT_VALUE: Int = 1_000_000
 
         val Default: ScoringConfig = ScoringConfig()
     }

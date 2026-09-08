@@ -105,6 +105,26 @@ class LevelPackVerificationTest {
     }
 
     @Test
+    fun everyBakedDifficultyMatchesWhatTheEngineNowSays() {
+        // The baked number is a cache of `Difficulty.score`, and nothing else
+        // checked the two still agree. When a tier-2 technique was fixed on
+        // 2026-09-07 the whole pack silently re-rated and every other test here
+        // stayed green, because they only ask whether the stored numbers are
+        // in range and ordered — not whether they are still true.
+        //
+        // A failure here means the engine changed and the packs need
+        // regenerating: `./gradlew :tools:level-generator:run`.
+        val stale = (LevelPacks.campaign.levels + LevelPacks.daily.levels)
+            .mapNotNull { level ->
+                val scored = Difficulty.score(level.board)
+                "level ${level.id}: stored ${level.difficulty}, engine says $scored"
+                    .takeIf { scored != level.difficulty }
+            }
+
+        assertTrue(stale.isEmpty(), "${stale.size} level(s) re-rated:\n${stale.take(10).joinToString("\n")}")
+    }
+
+    @Test
     fun encodingRoundTrips() {
         LevelPacks.campaign.levels.forEach { level ->
             assertEquals(level, LevelCodec.decode(LevelCodec.encode(level)))

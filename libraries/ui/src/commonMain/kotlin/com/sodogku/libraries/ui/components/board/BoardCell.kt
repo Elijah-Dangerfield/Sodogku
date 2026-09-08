@@ -81,7 +81,10 @@ fun BoardCell(
     colorblind: Boolean = false,
     strikeNonce: Int = 0,
     entranceDelayMillis: Int = 0,
-    /** Staggers the placed dog's idle loop so a board of them is not in lockstep. */
+    /**
+     * Staggers the placed dog's idle loop and picks which loop it gets, so a
+     * board of them is not in lockstep. Any stable per-cell number works.
+     */
     animationOffset: Int = 0,
     /** False swaps the living dog for a still, for the battery setting. */
     animated: Boolean = true,
@@ -175,6 +178,7 @@ fun BoardCell(
                 AnimatedDog(
                     size = size * DogFraction,
                     frameOffset = animationOffset,
+                    variant = animationOffset,
                     modifier = dogModifier,
                 )
             } else {

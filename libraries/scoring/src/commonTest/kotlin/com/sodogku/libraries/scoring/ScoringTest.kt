@@ -242,6 +242,37 @@ class ScoringTest {
     }
 
     @Test
+    fun configRejectsPointValuesThatBreakScoring() {
+        // These two arrive from remote config, and both were unguarded. A
+        // dropped minus sign put par below zero, so every player cleared the
+        // three-paw threshold by scoring nothing at all; a value in the hundreds
+        // of millions overflowed the `Int * size` inside `ScoreCard` before it
+        // widened to Double, and came out negative for the same reason.
+        listOf(
+            "negative base" to { ScoringConfig(basePerPlacement = -100) },
+            "zero base" to { ScoringConfig(basePerPlacement = 0) },
+            "negative completion" to { ScoringConfig(completionBase = -250) },
+            "overflowing base" to { ScoringConfig(basePerPlacement = 300_000_000) },
+            "overflowing completion" to { ScoringConfig(completionBase = 300_000_000) },
+        ).forEach { (name, build) ->
+            assertTrue(runCatching(build).isFailure, "$name must not be constructible")
+        }
+    }
+
+    @Test
+    fun theLargestLegalConfigStillScoresPositively() {
+        // The ceiling is only worth having if everything under it is safe, so
+        // check the corner rather than trusting the arithmetic.
+        val extreme = ScoringConfig(
+            basePerPlacement = ScoringConfig.MAX_POINT_VALUE,
+            completionBase = ScoringConfig.MAX_POINT_VALUE,
+        )
+
+        assertTrue(Scoring.parScore(BIGGEST_BOARD, MAX_DIFFICULTY, extreme) > 0)
+        assertTrue(Scoring.placement(ScoreCard.Empty, BIGGEST_BOARD, null, extreme).points > 0)
+    }
+
+    @Test
     fun everyCoefficientIsOverridable() {
         // The whole point of the config object: remote config has to be able to
         // move these without a release.
@@ -258,5 +289,9 @@ class ScoringTest {
 
     private companion object {
         const val ABSOLUTE_TOLERANCE = 1e-9
+
+        /** The widest board the campaign ships, and the deepest tier it rates. */
+        const val BIGGEST_BOARD = 10
+        const val MAX_DIFFICULTY = 5
     }
 }

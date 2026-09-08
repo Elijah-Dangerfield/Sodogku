@@ -56,11 +56,14 @@ object HintFinder {
     fun nextCell(board: Board, placed: Solution): Int? {
         if (placed.isComplete) return null
         if (board.ruleViolations(placed).isNotEmpty()) return null
+        // Solving up front rather than after `deducePlacement` is the whole
+        // guard: see [isDeadEnd]. It costs well under a millisecond even at
+        // 10x10, so there is nothing to save by deferring it.
+        val solution = PuzzleSolver.solve(board, placed) ?: return null
 
         val grid = CandidateGrid.of(board, placed)
         deducePlacement(grid)?.let { return it }
 
-        val solution = PuzzleSolver.solve(board, placed) ?: return null
         return mostConstrainedUnresolvedCell(board, grid, solution)
     }
 
@@ -94,10 +97,14 @@ object HintFinder {
      * this returned an empty list there, so a hint could be spent for nothing.
      * What matters to the player is the cells that were open when they asked and
      * are provably shut now, however the engine got there.
+     *
+     * [limit] has no default. Left unbounded this returns every non-dog square on
+     * the board — 90 of 100 at 10x10 — which hands over the answer by exclusion.
+     * That is never what a caller wants, so it has to be an explicit choice.
      */
-    fun ruledOutCells(board: Board, placed: Solution, limit: Int = Int.MAX_VALUE): List<Int> {
+    fun ruledOutCells(board: Board, placed: Solution, limit: Int): List<Int> {
         if (placed.isComplete || limit <= 0) return emptyList()
-        if (board.ruleViolations(placed).isNotEmpty()) return emptyList()
+        if (isDeadEnd(board, placed)) return emptyList()
 
         val grid = CandidateGrid.of(board, placed)
         val alreadyKnown = (0 until board.cellCount).filterNot { grid.isCandidate(it) }.toSet()
@@ -116,6 +123,23 @@ object HintFinder {
         }
         return found.take(limit)
     }
+
+    /**
+     * True when [placed] can no longer be completed.
+     *
+     * Breaking no rule is not the same as still being winnable: a partial can be
+     * perfectly legal and have zero completions. Every technique below is sound,
+     * which is exactly the problem — reason soundly from a false premise and the
+     * engine will confidently rule out the square the answer is sitting on. It
+     * did, on 12% of legal-but-dead partials.
+     *
+     * Today's flow marks a wrong guess rather than placing it, so [placed] should
+     * only ever hold correct dogs and this should never fire. It is one undo or
+     * restore-state feature away from mattering, and a hint crossing out the
+     * answer is the worst failure this library has available.
+     */
+    private fun isDeadEnd(board: Board, placed: Solution): Boolean =
+        board.ruleViolations(placed).isNotEmpty() || PuzzleSolver.solve(board, placed) == null
 
     private fun mostConstrainedUnresolvedCell(
         board: Board,

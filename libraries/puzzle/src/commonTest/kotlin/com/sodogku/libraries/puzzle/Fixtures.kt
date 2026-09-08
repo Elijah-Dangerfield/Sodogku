@@ -74,5 +74,20 @@ object Fixtures {
         return null
     }
 
+    /**
+     * A unique board at a size [uniqueBoard] cannot reach. Random mutation
+     * converges at small sizes and not at all from 9x9 up, so this takes the
+     * same targeted-refinement path the real generator uses.
+     */
+    fun uniqueLargeBoard(size: Int, random: Random, attempts: Int = 20): Pair<Board, Solution>? {
+        repeat(attempts) {
+            val seed = BoardFactory.randomSolution(size, random) ?: return@repeat
+            val grown = BoardFactory.growRegions(seed, random)
+            val refined = BoardFactory.refineToUnique(grown, seed, random) ?: return@repeat
+            PuzzleSolver.uniqueSolutionOrNull(refined)?.let { return refined to it }
+        }
+        return null
+    }
+
     private const val MUTATION_ROUNDS = 12
 }

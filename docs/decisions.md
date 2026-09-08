@@ -347,3 +347,69 @@ the arbiter rather than pre-checking for races.
 
 **Why:** one procedure for schema change (add the next `V##__name.sql`, never edit
 an applied one), and idempotency that's correct under concurrency.
+
+## 2026-09-07 — the adjacency technique was half-blind, and the packs were re-rated
+
+`adjacencyConfinement` swept rows and columns in one loop, and the guard that
+skipped a resolved *row* skipped the *column* of the same index with it. Rows
+resolve constantly mid-solve, so a slab of tier-2 reasoning disappeared exactly
+when a board is most constrained, and the engine reached for a tier-4
+contradiction where a tier-2 fact was sitting in plain sight.
+
+Measured over 200 random unique boards: 4% were mis-rated, always *too hard*, by
+up to two tiers. Split into two sweeps, one per axis. Regenerating the campaign
+moved 14 levels down out of tier 4 (122 → 108) into tiers 2 and 3. Nearly half
+the pack's lines changed, because difficulty feeds candidate acceptance and band
+ordering, so a re-rating cascades through the generator's RNG stream.
+
+The reason this was invisible: the baked difficulty is a cache of
+`Difficulty.score`, and nothing compared the two. `LevelPackVerificationTest` only
+asked whether the stored numbers were in range and non-decreasing, which stale
+numbers satisfy perfectly. `everyBakedDifficultyMatchesWhatTheEngineNowSays` now
+re-derives every one, so any future retiering fails the build with the command to
+fix it instead of shipping a pack that describes an engine we no longer have.
+
+`DeductionEngineTest.shallowerTechniquesAreAlwaysPreferred` could never have
+caught it either: it compares `nextStep` against `nextStep(maxTier - 1)`, which
+runs the same broken technique. An engine compared only against itself agrees
+with itself.
+
+## 2026-09-07 — a hint may not reason from a dead end
+
+`ruledOutCells` checked `ruleViolations` and stopped there. Breaking no rule is
+not the same as still being winnable: a partial can be legal and have zero
+completions. Every technique in the engine is sound, which is precisely the
+danger — reason soundly from a false premise and it will confidently cross out
+the square the answer is on. It did, on 12% of legal-but-dead partials.
+
+Both hint entry points now establish satisfiability first. `nextCell` already had
+the solve and could not reach it, because `deducePlacement` returned before it;
+the solve moved above. It costs under a millisecond at 10x10.
+
+Not reachable in today's flow — a wrong guess marks the cell and costs a bone
+rather than placing a dog, so `placed` only ever holds correct dogs. It is one
+undo or restore-state feature away from mattering, and the KDoc already promised
+the guarantee.
+
+Related: `ruledOutCells` lost its `limit = Int.MAX_VALUE` default. Unbounded it
+returns every non-dog square — 90 of 100 at 10x10 — so the convenient overload
+was the one that hands over the answer by exclusion for the price of one sniff.
+
+## 2026-09-07 — three tests that passed on `emptyList()`
+
+The sniff-spent-for-nothing bug found on device had no regression test, and could
+not have had one: all three tests covering `ruledOutCells` passed against a stub
+returning an empty list. One asserted `none { it in truth }` (vacuous when
+empty), one asserted `size <= 3` when the bug was size 0, and one asserted empty
+on a finished board, which returns before the function body runs.
+
+The lesson is narrower than "test more": an assertion of the form "nothing bad is
+in the output" says nothing at all about an empty output, and it is the natural
+shape to reach for when the property under test is soundness. Every such
+assertion now has a companion that the output is non-empty.
+
+`aHintAlwaysHasSomethingToSay` only asserts over the opening half of a board.
+Late on, the auto-marks have already crossed off everything derivable — measured
+at 5 of 7 placed with one candidate per open row — so there is genuinely nothing
+to reveal, and the ViewModel declines to spend the sniff. Asserting a reveal
+there would be asserting a lie.

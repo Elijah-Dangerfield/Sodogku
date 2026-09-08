@@ -22,6 +22,10 @@ class Board(
 
     init {
         require(size >= MIN_SIZE) { "Board size must be at least $MIN_SIZE, was $size" }
+        // Not a product limit — it is the width of the solver's bitmasks. Above
+        // it the solver reports "no solutions" for boards that have plenty,
+        // silently, in the code that decides whether a level is playable.
+        require(size <= MAX_SIZE) { "Board size must be at most $MAX_SIZE, was $size" }
         require(regions.size == size * size) {
             "Expected ${size * size} region entries for a ${size}x$size board, got ${regions.size}"
         }
