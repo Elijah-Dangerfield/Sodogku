@@ -111,8 +111,16 @@ class ShippedConfigSchemaTest {
         val nonsense = JsonObject(mapOf("definitely" to JsonPrimitive("not the right shape")))
         val unprotected = entries.map { it.path }.filter { schema.validateValue(it, nonsense) == null }
 
+        // Derived rather than listed. A hardcoded set had to be edited every
+        // time a structured key was added, and editing it is indistinguishable
+        // from the mistake this catches: a scalar key whose type went missing
+        // also lands in `unprotected`, and appending it would look like the same
+        // routine update.
+        val structured = pathsOfType("json").toSet()
+        assertTrue(structured.size >= MINIMUM_JSON_KEYS, "only ${structured.size} json keys, so the derivation is off")
+
         assertEquals(
-            setOf("ads.rewardedPlacements", "paywall.triggers"),
+            structured,
             unprotected.toSet(),
             "A config key accepts any value the admin console cares to send. For a `json` key " +
                 "that is expected (the client's decode falls back to the default); for anything " +
@@ -134,6 +142,9 @@ class ShippedConfigSchemaTest {
         )
     }
 }
+
+/** `ads.rewardedPlacements`, `paywall.triggers`, `boosters.treatSchedule`. */
+private const val MINIMUM_JSON_KEYS = 3
 
 private const val MINIMUM_KEY_COUNT = 40
 

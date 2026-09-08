@@ -14,7 +14,7 @@ import com.sodogku.libraries.config.values.BoostersProTreatsPerAttempt
 import com.sodogku.libraries.config.values.BoostersRefillTo
 import com.sodogku.libraries.config.values.BoostersStartingSniffs
 import com.sodogku.libraries.config.values.BoostersStartingTreats
-import com.sodogku.libraries.config.values.BoostersTreatEveryNLevels
+import com.sodogku.libraries.config.values.BoostersTreatSchedule
 import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.FeatureBoosters
 import com.sodogku.libraries.config.values.ProgressionSkipAfterFailedAttempts
@@ -63,7 +63,7 @@ import me.tatarka.inject.annotations.Inject
 /**
  * What one qualifying first clear pays.
  *
- * One, because `boosters.treatEveryNLevels` already tunes how generous the
+ * One, because `boosters.treatSchedule` already tunes how generous the
  * ladder is, and two dials for one number is how the two end up disagreeing.
  * File-level rather than in the ViewModel's companion because the level pane
  * prints it, and a pane advertising a different number from the one the game
@@ -141,7 +141,7 @@ class GameViewModel(
     private val startingTreats: BoostersStartingTreats,
     private val refillTo: BoostersRefillTo,
     /** How often a first clear pays a Treat. Zero or less pays none. */
-    private val treatEveryNLevels: BoostersTreatEveryNLevels,
+    private val treatSchedule: BoostersTreatSchedule,
     private val proSniffsPerAttempt: BoostersProSniffsPerAttempt,
     private val proTreatsPerAttempt: BoostersProTreatsPerAttempt,
     private val skipAfterFailedAttempts: ProgressionSkipAfterFailedAttempts,
@@ -324,7 +324,7 @@ class GameViewModel(
                 isPro = entitlements.isPro.value,
                 boostersEnabled = boostersEnabled(),
                 refillTo = refillTo(),
-                treatEveryNLevels = treatEveryNLevels(),
+                treatBands = treatSchedule(),
                 // Null is "never granted any", which is what a fresh install
                 // looks like — so the opening grant comes from config rather
                 // than from a default baked into the record that stores it.
@@ -575,7 +575,7 @@ class GameViewModel(
                 showAchievements = it.showAchievements,
                 boostersEnabled = it.boostersEnabled,
                 refillTo = it.refillTo,
-                treatEveryNLevels = it.treatEveryNLevels,
+                treatBands = it.treatBands,
                 isPro = it.isPro,
                 records = it.records,
                 unlockedThrough = campaignFrontier(unlocked, level.id),
@@ -1044,7 +1044,7 @@ class GameViewModel(
     }
 
     /**
-     * The Treat every `boosters.treatEveryNLevels` levels pays out.
+     * The Treat `boosters.treatSchedule` says this level pays out.
      *
      * **First clear only.** A replay pays nothing, because a level that paid
      * every time it was finished would be a treat printer with no ad in front of
@@ -1066,8 +1066,7 @@ class GameViewModel(
         firstClear: Boolean,
     ): Boolean {
         if (isDaily || !firstClear) return false
-        val every = treatEveryNLevels()
-        if (every <= 0 || level.id % every != 0) return false
+        if (!treatSchedule.paysTreatAt(level.id)) return false
 
         var held = 0
         updateState {

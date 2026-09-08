@@ -3,7 +3,9 @@ package com.sodogku.libraries.config.values
 import com.sodogku.libraries.config.AppConfigMap
 import com.sodogku.libraries.config.ConfiguredValue
 import com.sodogku.libraries.config.IntConfigValue
+import com.sodogku.libraries.config.JsonConfigValue
 import com.sodogku.libraries.config.QaConfigValue
+import kotlinx.serialization.builtins.ListSerializer
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
@@ -78,18 +80,32 @@ class BoostersStartingTreats(appConfigMap: AppConfigMap) : IntConfigValue(appCon
 }
 
 /**
- * Levels between free Treat grants. A Treat places a correct dog outright, which
- * makes it the stronger of the two boosters, so it is granted on a slower clock
- * than the Sniff. Five levels is slow enough that holding a few means something
- * and fast enough that a stuck player can see the next one coming.
+ * Which levels pay a free Treat, as a curve. See [paysTreatAt] for the shape and
+ * why it is bands rather than a formula.
+ *
+ * This replaces a single "every N levels" integer. A Treat places a correct dog
+ * outright, which makes it the stronger of the two boosters, and paying one on a
+ * fixed clock meant the late campaign handed out sixty of them to a player who
+ * was already holding a stack. One number could not say "often at first, rarely
+ * later", so the number became a schedule.
+ *
+ * Structured, so it is tuned server-side rather than by shipping a build. That
+ * matters more here than for most keys: this one is the game's whole difficulty
+ * relief valve, and getting the curve right is a job for play data.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class BoostersTreatEveryNLevels(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
-    override val name = "Treat every N levels"
-    override val path = "boosters.treatEveryNLevels"
-    override val default = 5
+class BoostersTreatSchedule(appConfigMap: AppConfigMap) : JsonConfigValue<List<TreatBand>>(
+    appConfigMap = appConfigMap,
+    serializer = ListSerializer(TreatBand.serializer()),
+) {
+    override val name = "Treat schedule"
+    override val path = "boosters.treatSchedule"
+    override val default = DefaultTreatBands
+
+    /** Whether clearing [level] for the first time pays a Treat. */
+    fun paysTreatAt(level: Int): Boolean = value.paysTreatAt(level)
 }
 
 /**
@@ -149,7 +165,7 @@ fun progressionConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>
     ProgressionLookaheadCount(appConfigMap),
     BoostersStartingSniffs(appConfigMap),
     BoostersStartingTreats(appConfigMap),
-    BoostersTreatEveryNLevels(appConfigMap),
+    BoostersTreatSchedule(appConfigMap),
     BoostersAdGrantsPerDay(appConfigMap),
     BoostersProSniffsPerAttempt(appConfigMap),
     BoostersProTreatsPerAttempt(appConfigMap),

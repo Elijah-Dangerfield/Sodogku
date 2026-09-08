@@ -224,8 +224,14 @@ The one place the three diverge is Pro's per-attempt floor, which covers Sniffs 
 not Bones. A floor is a starting hand for something you choose to spend; bones are only ever
 spent by being wrong, so a bone floor would be a difficulty setting rather than a hand. See §1.4.
 
-**The level reward, concretely.** Clearing a level whose id is a multiple of
-`boosters.treatEveryNLevels` (default 5) grants **one Treat**, on the **first clear only**. A
+**The level reward, concretely.** Clearing a level that `boosters.treatSchedule` pays on grants
+**one Treat**, on the **first clear only**. The schedule is a list of bands — each applies from
+its `fromLevel` until the next one starts, and within a band a level pays when its id is a
+multiple of that band's `everyNLevels`. The shipped bands are every 3rd from level 1, every 6th
+from 21, every 12th from 61 and every 25th from 151: 34 Treats across the campaign, against the
+100 a flat every-fifth rule paid. Dense at the start, where a Treat teaches and the player has no
+stash, and sparse later, where they are already holding several and a reward on a metronome has
+stopped reading as a reward. A
 replay pays nothing: a level that paid every time it was finished would be an ad-free treat
 printer, and the shortest 4x4 in the pack would be the whole economy. The level pane marks every
 row that pays, and marks the ones already collected as spent, so the ladder is visible before it
@@ -512,7 +518,7 @@ which is why `apps/admin/config-manifest-registry.json` must list **every** decl
 | `progression.lookaheadCount` | 5 |
 | `boosters.startingSniffs` | 3 |
 | `boosters.startingTreats` | 3 |
-| `boosters.treatEveryNLevels` | 5 |
+| `boosters.treatSchedule` | 3 from L1, 6 from L21, 12 from L61, 25 from L151 |
 | `boosters.adGrantsPerDay` | 5 |
 | `boosters.proSniffsPerAttempt` | 3 |
 | `boosters.proTreatsPerAttempt` | 3 |

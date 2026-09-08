@@ -5,6 +5,8 @@ import com.sodogku.libraries.config.impl.serialization.ConfigJsonConverter
 import com.sodogku.libraries.config.mergeWith
 import com.sodogku.libraries.config.values.AdsFailureMode
 import com.sodogku.libraries.config.values.AdsRewardedPlacements
+import com.sodogku.libraries.config.values.DefaultTreatBands
+import com.sodogku.libraries.config.values.asFallbackConfig
 import com.sodogku.libraries.config.values.PaywallTriggers
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logging.KLog
@@ -88,7 +90,7 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
     "boosters" to mapOf(
         "startingSniffs" to 3,
         "startingTreats" to 3,
-        "treatEveryNLevels" to 5,
+        "treatSchedule" to DefaultTreatBands.asFallbackConfig(),
         "adGrantsPerDay" to 5,
         "proSniffsPerAttempt" to 3,
         "proTreatsPerAttempt" to 3,

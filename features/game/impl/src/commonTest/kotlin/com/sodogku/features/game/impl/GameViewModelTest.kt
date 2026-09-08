@@ -13,7 +13,9 @@ import com.sodogku.libraries.config.values.BoostersProTreatsPerAttempt
 import com.sodogku.libraries.config.values.BoostersRefillTo
 import com.sodogku.libraries.config.values.BoostersStartingSniffs
 import com.sodogku.libraries.config.values.BoostersStartingTreats
-import com.sodogku.libraries.config.values.BoostersTreatEveryNLevels
+import com.sodogku.libraries.config.values.BoostersTreatSchedule
+import com.sodogku.libraries.config.values.TreatBand
+import com.sodogku.libraries.config.values.asFallbackConfig
 import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.FeatureBoosters
 import com.sodogku.libraries.config.values.ProgressionSkipAfterFailedAttempts
@@ -1986,9 +1988,10 @@ class GameViewModelTest : CoroutineTest() {
 
     @Test
     fun theCadenceIsTheConfiguredOneAndNotAHardcodedFive() = runUnitTest {
-        // The half that stops a `% 5` passing. Level 201 pays on a cadence of 3
-        // and not on the default of 5; level 200 is the other way round.
-        val config = configOf("boosters.treatEveryNLevels" to 3)
+        // The half that stops a hardcoded cadence passing. Level 201 pays on a
+        // schedule of every third and not on the shipped one; 200 is the other
+        // way round.
+        val config = configOf("boosters.treatSchedule" to everyN(THREE))
         val onThree = viewModel(levelId = PlainRewardlessLevel, config = config)
         val offThree = viewModel(levelId = RewardLevel, config = config)
         val beforeOn = onThree.state.treats
@@ -2003,7 +2006,7 @@ class GameViewModelTest : CoroutineTest() {
 
     @Test
     fun aCadenceOfZeroPaysNothingRatherThanDividingByIt() = runUnitTest {
-        val vm = viewModel(levelId = RewardLevel, config = configOf("boosters.treatEveryNLevels" to 0))
+        val vm = viewModel(levelId = RewardLevel, config = configOf("boosters.treatSchedule" to everyN(0)))
         val before = vm.state.treats
 
         solveCurrent(vm)
@@ -2053,9 +2056,9 @@ class GameViewModelTest : CoroutineTest() {
 
     @Test
     fun theLevelPaneIsToldTheCadenceItShouldAdvertise() = runUnitTest {
-        val vm = viewModel(config = configOf("boosters.treatEveryNLevels" to 7))
+        val vm = viewModel(config = configOf("boosters.treatSchedule" to everyN(SEVEN)))
 
-        assertEquals(7, vm.state.treatEveryNLevels)
+        assertEquals(listOf(TreatBand(fromLevel = 1, everyNLevels = SEVEN)), vm.state.treatBands)
     }
 
     @Test
@@ -2421,7 +2424,7 @@ class GameViewModelTest : CoroutineTest() {
         startingSniffs = BoostersStartingSniffs(config),
         startingTreats = BoostersStartingTreats(config),
         refillTo = BoostersRefillTo(config),
-        treatEveryNLevels = BoostersTreatEveryNLevels(config),
+        treatSchedule = BoostersTreatSchedule(config),
         proSniffsPerAttempt = BoostersProSniffsPerAttempt(config),
         proTreatsPerAttempt = BoostersProTreatsPerAttempt(config),
         skipAfterFailedAttempts = ProgressionSkipAfterFailedAttempts(config),
@@ -2592,14 +2595,21 @@ class GameViewModelTest : CoroutineTest() {
         const val DefaultProBoosters = 3
 
         /**
-         * A campaign level whose id is a multiple of `boosters.treatEveryNLevels`
-         * at its default of 5, and past the starter-dog band so the board opens
-         * empty. Level 200 is both.
+         * A campaign level the shipped `boosters.treatSchedule` pays on, and
+         * past the starter-dog band so the board opens empty. Level 200 is
+         * both: it sits in the every-twenty-fifth band and 200 divides by 25.
          */
         const val RewardLevel = 200
 
-        /** A level id that is *not* a multiple of 5, so a reward there is a bug. */
+        /** In the same band but not a multiple of it, so a reward there is a bug. */
         const val PlainRewardlessLevel = 201
+
+        const val THREE = 3
+        const val SEVEN = 7
+
+        /** A whole-campaign schedule at one rate, as the config map holds it. */
+        fun everyN(rate: Int): List<Map<String, Int>> =
+            listOf(TreatBand(fromLevel = 1, everyNLevels = rate)).asFallbackConfig()
     }
 
     /**

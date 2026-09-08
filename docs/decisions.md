@@ -433,12 +433,13 @@ The level pane already drew a bare 🦴 on the frontier row. Nothing granted any
 was advertising a prize that did not exist — which is a worse bug than a missing feature, because
 it is the kind a player notices and we do not.
 
-`boosters.treatEveryNLevels` (default 5) is now read in two places, and both matter:
+`boosters.treatSchedule` is now read in two places, and both matter:
 
-- `GameViewModel.win` grants one Treat when the id is a multiple of it.
+- `GameViewModel.win` grants one Treat when the schedule says the id pays.
 - The pane marks **every** row that pays, not just the frontier. One chip on one row is a
-  coincidence; a chip every fifth row down 500 rows is a ladder, and the ladder is the reason to
-  scroll the pane at all.
+  coincidence; chips marching down 500 rows are a ladder, and the ladder is the reason to scroll
+  the pane at all. They also visibly thin out as you scroll, which is the schedule's shape made
+  legible without a word of copy.
 
 **First clear only.** The record is read from `recordBeforeAttempt` — the snapshot taken when the
 level opened — because `progress.onCompleted` has already moved the live record to `Completed` by
@@ -580,7 +581,7 @@ What is left splits in two, and the split is the useful part. Most of them are
 keys whose **feature does not exist** — `progression.skipsPerDay` has no skip
 button and no per-day counter; `progression.lookaheadCount` describes a level
 map with silhouettes, and the level drawer deliberately shows every level with
-locks instead; `boosters.treatEveryNLevels` has no level reward to attach to;
+locks instead; `boosters.treatSchedule` has no level reward to attach to;
 `boosters.adGrantsPerDay` has nowhere to count; `boosters.proSniffsPerAttempt`
 is a Pro benefit SPEC 5.1 promises and the code does not implement.
 `ads.appOpenCooldownHours` has an `AdFormat.AppOpen` that reaches the SDK and no

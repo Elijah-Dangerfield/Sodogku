@@ -38,6 +38,8 @@ import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.game.DailyCard
 import com.sodogku.libraries.ui.components.game.DailyCardState
+import com.sodogku.libraries.config.values.TreatBand
+import com.sodogku.libraries.config.values.paysTreatAt
 import com.sodogku.libraries.ui.components.game.LevelRewardChip
 import com.sodogku.libraries.ui.components.game.PawRating
 import com.sodogku.libraries.ui.components.icon.Icon
@@ -97,12 +99,12 @@ fun BoxScope.LevelDrawer(
     canJumpAnywhere: Boolean,
     records: Map<Int, LevelRecord>,
     /**
-     * `boosters.treatEveryNLevels`, so the pane advertises the reward the game
+     * `boosters.treatSchedule`, so the pane advertises the reward the game
      * will actually pay. Zero shows none — which is what an operator setting the
      * key to zero means, and what the pane should say before the value has been
      * read rather than promising a prize on spec.
      */
-    treatEveryNLevels: Int,
+    treatBands: List<TreatBand>,
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
     daily: DailyStatus? = null,
@@ -176,7 +178,7 @@ fun BoxScope.LevelDrawer(
                     // Every level that pays, not just the frontier. The rewards
                     // are the reason to scroll 500 rows, and one chip on one row
                     // is a coincidence rather than a ladder.
-                    paysReward = treatEveryNLevels > 0 && level.id % treatEveryNLevels == 0,
+                    paysReward = treatBands.paysTreatAt(level.id),
                     onPick = onPick,
                 )
             }

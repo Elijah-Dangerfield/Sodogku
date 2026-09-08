@@ -18,7 +18,7 @@
   { "path": "progression.lookaheadCount", "type": "int", "default": 5, "description": "Unplayed levels shown as silhouettes past the current one." },
   { "path": "boosters.startingSniffs", "type": "int", "default": 3, "description": "Sniffs a brand-new player starts with." },
   { "path": "boosters.startingTreats", "type": "int", "default": 3, "description": "Treats a brand-new player starts with." },
-  { "path": "boosters.treatEveryNLevels", "type": "int", "default": 5, "description": "Levels between free Treat grants." },
+  { "path": "boosters.treatSchedule", "type": "json", "default": [ { "fromLevel": 1, "everyNLevels": 3 }, { "fromLevel": 21, "everyNLevels": 6 }, { "fromLevel": 61, "everyNLevels": 12 }, { "fromLevel": 151, "everyNLevels": 25 } ], "description": "Which levels pay a free Treat. Each band applies from its fromLevel until the next one starts; a level pays when it is a multiple of that band's everyNLevels." },
   { "path": "boosters.adGrantsPerDay", "type": "int", "default": 5, "description": "Rewarded-ad booster refills per day. Caps the refill, not the holding." },
   { "path": "boosters.proSniffsPerAttempt", "type": "int", "default": 3, "description": "Sniffs Pro starts every attempt with." },
   { "path": "boosters.proTreatsPerAttempt", "type": "int", "default": 3, "description": "Treats Pro starts every attempt with." },

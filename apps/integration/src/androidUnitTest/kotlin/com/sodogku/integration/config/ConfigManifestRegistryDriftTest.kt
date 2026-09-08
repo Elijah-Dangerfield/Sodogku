@@ -5,6 +5,7 @@ import com.sodogku.libraries.config.DoubleConfigValue
 import com.sodogku.libraries.config.FlagConfigValue
 import com.sodogku.libraries.config.IntConfigValue
 import com.sodogku.libraries.config.JsonConfigValue
+import com.sodogku.libraries.config.values.TreatBand
 import com.sodogku.libraries.config.LongConfigValue
 import com.sodogku.libraries.config.StringConfigValue
 import com.sodogku.libraries.config.impl.model.BasicMapAppConfig
@@ -254,6 +255,13 @@ private fun Any?.asJsonElement(): JsonElement = when (this) {
     is String -> JsonPrimitive(this)
     is Map<*, *> -> JsonObject(entries.associate { (key, value) -> key.toString() to value.asJsonElement() })
     is Iterable<*> -> JsonArray(map { it.asJsonElement() })
+    // The one typed model among the structured defaults. The rest are declared
+    // as plain maps and lists and fall out above; this needs its serializer, and
+    // naming it here rather than reflecting over @Serializable is deliberate —
+    // the `error` below is what tells whoever adds the *next* typed default that
+    // the registry comparison needs teaching about it, and reflection would
+    // silently swallow that.
+    is TreatBand -> Json.encodeToJsonElement(TreatBand.serializer(), this)
     else -> error("A ConfiguredValue default of type ${this::class.simpleName} can't be written as JSON")
 }
 

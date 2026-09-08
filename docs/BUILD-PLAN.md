@@ -1353,7 +1353,7 @@ per-call-site concern and nothing failed when a call site forgot.
 | R7 | Achievements: the earned border is clipped by the card's own shape; the detail dialog does not animate; grow the catalog toward ~75; more of them hidden until earned | **DONE** (2026-09-08) |
 | R8 | Placing a dog auto-crosses too much and does the player's reasoning for them | |
 | R9 | Confirm the daily is fully separate from the campaign, explain that in a first-run dialog, and settle whether any completed board feeds the streak or only the daily | |
-| R10 | Level rewards are too frequent. Front-load them and thin out as levels climb | |
+| R10 | Level rewards are too frequent. Front-load them and thin out as levels climb | **DONE** (2026-09-08) |
 | R11 | Run the beta workflow locally for a TestFlight build. Needs an App Store Connect record and a working `xcode-select` | |
 | R12 | The iOS splash is ugly. Just the still dog head, in the exact spot it sits on the first-launch screen, with the paw-print background fading in behind it — so launch reads as one continuous render rather than a splash then a screen | done except the paw print — see below |
 | R13 | Make sure the daily rolls at local midnight and the streak respects time zones. Add a way to restore a broken streak, which probably wants a config key | |
@@ -1685,3 +1685,48 @@ which is in the same position as the sad dog, the bone artwork and the welcome
 backgrounds: described in chat, never saved to disk. The ripple-in load was
 raised as a maybe and is deferred with it — it only makes sense as a reveal *of*
 that background.
+
+### R10 · A Treat curve instead of a metronome — **DONE** (2026-09-08)
+
+`boosters.treatEveryNLevels` paid one Treat every fifth level, from 5 to 500. A
+hundred free Treats, arriving at the same rate on level 480 as on level 5, which
+is backwards twice over: early on a Treat teaches and the player has no stash, so
+grants should be *denser* than they were; late on the player is holding several
+and a reward on a metronome has stopped reading as a reward.
+
+One integer cannot say "often at first, rarely later", so the key became
+`boosters.treatSchedule` — a list of bands, each applying from its `fromLevel`
+until the next one starts, paying when the level id is a multiple of that band's
+`everyNLevels`. Shipped: every 3rd from level 1, every 6th from 21, every 12th
+from 61, every 25th from 151. That is 34 Treats across the campaign against the
+old 100, and *six* across the first twenty levels against the old four.
+
+Bands rather than a decay formula, deliberately. `floor(3 * 1.004^level)` would
+be smoother and completely opaque — no player can look at it and know when the
+next Treat lands, and neither can whoever retunes this against play data. Four
+short objects are legible in the admin console, and in the level pane the chips
+visibly thin out as you scroll, which states the curve without a word of copy.
+
+Structured, so it is tuned server-side. This is the game's difficulty relief
+valve and the right curve is a question for real play data, not for an argument
+before release.
+
+**The test that mattered was not the one about the curve.** Swapping an `int` key
+for a `json` one turned up a real hole: `FallbackConfigCompletenessTest` resolves
+each value against the bundled map and compares it to the declared default, but
+`JsonConfigValue` *returns its default when a decode fails*. A misspelled field,
+or a typed Kotlin object where the pipeline expects plain collections, produces a
+value equal to the default — so the test passes and the key is dead. The new
+`BundledJsonConfigDecodesTest` checks the raw subtree instead, and its shape
+check is general: `toJsonElement` stringifies anything that is not a map, list or
+scalar, so a typed object in `BundledConfigDefaults` compiles, reads correctly,
+and silently fails at runtime. Mutation-checked by putting the typed bands in the
+fallback — caught only by the new test.
+
+`ShippedConfigSchemaTest` listed the structured keys by hand; it derives them from
+the registry now. A hardcoded set has to be edited whenever a structured key is
+added, and that edit is indistinguishable from the mistake the test exists to
+catch — a scalar key whose type went missing also lands in the unprotected set,
+and appending it would look like the same routine update. Verified that retyping
+a scalar as `json` now fails `ConfigManifestRegistryDriftTest` instead, which is
+the layer that owns registry-versus-declaration agreement.

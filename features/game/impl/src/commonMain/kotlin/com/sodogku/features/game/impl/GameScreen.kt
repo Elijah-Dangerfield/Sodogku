@@ -193,7 +193,7 @@ fun GameScreen(
                 unlockedThrough = state.unlockedThrough,
                 canJumpAnywhere = state.isPro,
                 records = state.records,
-                treatEveryNLevels = state.treatEveryNLevels,
+                treatBands = state.treatBands,
                 onPick = { onAction(GameAction.GoToLevel(it)) },
                 onDismiss = { onAction(GameAction.LevelsClosed) },
                 daily = state.daily,

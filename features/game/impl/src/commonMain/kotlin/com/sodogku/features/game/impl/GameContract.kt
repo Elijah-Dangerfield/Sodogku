@@ -2,6 +2,7 @@ package com.sodogku.features.game.impl
 
 import com.sodogku.libraries.achievements.Achievement
 import com.sodogku.libraries.achievements.AchievementsRepository
+import com.sodogku.libraries.config.values.TreatBand
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LifetimeScore
@@ -46,15 +47,16 @@ data class GameState(
     val refillTo: Int = 3,
 
     /**
-     * `boosters.treatEveryNLevels`, so the level pane marks the rows that pay.
+     * `boosters.treatSchedule`, so the level pane marks the rows that pay.
      *
-     * Zero by default rather than the config default. The pane promising a
+     * Empty by default rather than the config default. The pane promising a
      * reward the game has not confirmed is the bug this whole reward path
      * exists to close, and a value baked in here would be a second answer to a
      * question config already answers — the failure that made
-     * `boosters.startingSniffs` unwirable.
+     * `boosters.startingSniffs` unwirable. An empty schedule pays nothing, so
+     * the pre-config state marks no rows at all.
      */
-    val treatEveryNLevels: Int = 0,
+    val treatBands: List<TreatBand> = emptyList(),
 
     /**
      * True once the last campaign level is cleared, so the win sheet can say so
@@ -122,7 +124,7 @@ data class GameState(
      * `scoring.boosterPenaltyRate` as it stood for this attempt.
      *
      * Zero by default rather than the config default, for the reason
-     * [treatEveryNLevels] is: a board built before config has been read — a
+     * [treatBands] is: a board built before config has been read — a
      * preview, a test, the first frame — must not price help the operator has
      * not confirmed.
      */
