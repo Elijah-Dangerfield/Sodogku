@@ -6,6 +6,51 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — the tutorial's scrim reports taps instead of letting them through
+
+A guided step that says "tap the lit square" needs the lit square to work while the rest of the
+board is dead. The obvious build is a scrim that declines to consume taps landing inside a hole, so
+the board cell underneath handles them normally. **It does not work, and it fails silently.** A
+Compose `Modifier.pointerInput` node answers `sharePointerInputWithSiblings() = false`, so a
+sibling the overlay covers is not in the hit path at all — declining to consume changes nothing,
+because nothing else was ever going to be asked.
+
+`FocusScrim` now takes an `onTargetTap: (FocusTargetKey) -> Unit` and reports which lit thing was
+tapped; `TutorialCoachMark` maps the key back to a cell and dispatches the same `CellTapped` action
+the cell would have. Double tap still works because the two taps arrive as two actions and
+`GameViewModel` owns the 320ms window either way.
+
+The alternative was a custom `PointerInputModifierNode` overriding
+`sharePointerInputWithSiblings()`. It would restore the press animation on the lit cell, which the
+current version loses, but it buys that with a hand-rolled node in the design system and a much
+subtler failure mode. Not worth it for a lesson the player sees once.
+
+Two smaller calls came out of the same work. `Spotlight.targetsAreLive` defaults to **off**, so the
+last-bone warning keeps behaving as it did — a tap on the lit bones closes the warning rather than
+opening the bone explainer behind it. And `FocusScrim` hands its `content` the **union** of the lit
+rectangles rather than `first()`: the previous behaviour picked an arbitrary member of a set, which
+put the auto-mark card on top of two of the three squares it was describing.
+
+## 2026-09-07 — the tutorial's step pointer lives in the ViewModel, not in `GameState`
+
+`state` lags `updateState` by a dispatch, so `tutorialIndex`, the script, and whether the run is
+still active are plain fields on `GameViewModel`. The state only carries what the screen renders:
+the current step and the squares it points at. Two consequences worth knowing:
+
+- **Every advance is handed the board it should point at as parameters** (`level`, `placed`,
+  `autoMarks`, `justMarked`). The auto-mark lesson lights the squares a placement *just* added, and
+  that difference is computable only at the moment of the placement.
+- **A step whose target square does not exist is skipped, not shown.** `resolveFrame` walks forward
+  past any gesture step with nothing to point at. That branch is unreachable with the shipped
+  levels; it exists because the failure it prevents is a scrim over an untappable board on the
+  first level of the game, and a `noStepCanLeaveTheBoardUntappable` test asserting a property is
+  worth more than one asserting today's fifteen steps.
+
+`hasCompletedTutorial` is written when the level 3 script ends or on a skip, and never on the
+levels before it. Which levels have already been taught is a per-ViewModel set, so losing level 1
+and starting over does not replay seven coach marks, while quitting the app mid-lesson does replay
+them — somebody who left halfway has not had the lesson.
+
 ## 2026-09-07 — the offline grace reads the OS, not `AppState.isOffline`
 
 Running C8 on a device put the offline block screen up on full wifi. `AppState.isOffline`
@@ -1208,3 +1253,33 @@ opposite of what idle motion is for.
 
 Both sheets stay on disk. They are the right loops for a celebration or an empty
 state, where the motion *is* the point.
+
+## 2026-09-07 — 37 config keys that nothing reads
+
+A review found that all fourteen `scoring.*` keys are declared, in the fallback
+map, in the admin registry and rendered in the console with a typed editor — and
+that `GameViewModel` calls `Scoring.placement`, `complete` and `paws` letting the
+`config` parameter default to `ScoringConfig.Default`. The entire scoring tuning
+surface was decorative.
+
+Rather than fix the instance, `ConfigValuesAreReadTest` now scans the source tree
+for a mention of every declared value outside `:libraries:config`. It found **37**,
+not 14: the whole consumable economy, all of progression, the legal gate, the
+upgrade and maintenance gates, and three feature switches whose features shipped
+without reading them.
+
+This is the third time the same shape has cost us. `app.minSupportedVersion` was
+the client's name for a key the console edited as
+`upgrade.minSupportedVersionCode` — the kill switch, pointed at nothing. Every
+check we had verified that a key was *declared consistently*, and a key can be
+declared perfectly and be completely inert.
+
+The method is a text search, and its limit is stated in the test: it proves a
+class is named outside its own declaration, not that the value reaches a
+decision. A value injected and then ignored still passes. That is a much smaller
+hole than the one it closes, because forgetting to inject is the mistake people
+actually make.
+
+The 37 are baselined in `UNWIRED`, held by two tests: one fails if a new name
+appears, the other fails if a listed name gains a reader and is left behind. The
+list can only shrink.

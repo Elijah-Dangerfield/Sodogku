@@ -74,4 +74,14 @@ tasks.withType<Test>().configureEach {
     val registry = rootProject.file("apps/admin/config-manifest-registry.json")
     inputs.file(registry).withPropertyName("configManifestRegistry")
     systemProperty("sodogku.configManifestRegistry", registry.absolutePath)
+
+    // Same trick for the reader test: it greps the source tree, which Gradle
+    // cannot see either. The whole repo is the input, so this task reruns
+    // whenever anything at all changes — which is the honest cost of a test
+    // whose subject is "does any file mention this class".
+    val repo = rootProject.layout.projectDirectory
+    systemProperty("sodogku.repoRoot", repo.asFile.absolutePath)
+    inputs.dir(repo.dir("libraries")).withPropertyName("librariesForConfigReaderScan")
+    inputs.dir(repo.dir("features")).withPropertyName("featuresForConfigReaderScan")
+    inputs.dir(repo.dir("apps")).withPropertyName("appsForConfigReaderScan")
 }
