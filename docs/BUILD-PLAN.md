@@ -2066,7 +2066,7 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S4 | **Three paws feel unreachable.** Solving fast still lands on 2/3. Work out whether par, the thresholds or the multipliers are wrong | |
 | S5 | **A fake interstitial in debug builds**, so it is visible when a real one would show. A black screen saying "Ads go here" is enough, and it must be skippable. Separately: when an ad fails to load, fall back to a Sodogku Pro self-promo with a short forced dwell | |
 | S6 | **The Pro screen's entrance is wrong.** It slides up over Settings while Settings slides out to the left, and coming back Settings slides up from the bottom so it reads as the Pro screen moving. Settings should stay put and only the Pro screen should move | |
-| S7 | **The achievements dialog renders under the header** — the scrim is not full page. `Workspace/Cards` does dialogs the right way | |
+| S7 | **The achievements dialog renders under the header** — the scrim is not full page. `Workspace/Cards` does dialogs the right way | **already fixed** — verified on device, see below |
 | S8 | A trophy icon with a badge count beside the settings gear on the puzzle screen, the badge persisting until the player opens it | |
 | S9 | Tapping the bones bounces but does nothing | probably fixed 2026-09-08 (R14 batch) — **re-verify on device** |
 | S10 | **Some cells still refuse a double tap**, so a deliberate wrong placement is impossible. Losing the bone is the preferred outcome. Only a square that already holds a dog, or one that already failed, should refuse. Also worth exploring: telling the player *why* a placement failed — a toast, or a line drawn between the two conflicting squares — but only where doing so reveals nothing they did not already have | partly fixed 2026-09-08 (auto-marked squares, then red squares) — **re-verify; the "why" half is not started** |
@@ -2079,6 +2079,8 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | S17 | A trophy on each of the floating achievement pills | |
 | S18 | **Difficulty ramps too slowly.** It stays easy for too long | |
 | S19 | The shake dialog picks a random "sentient" title. Remove all of it and make it normal | **DONE** (2026-09-08) |
+| S20 | **The score dialog is far too much text**, and the score counts up very fast. Question whether the number should get that big at all | |
+| S21 | The broken-rule highlight is good and could be more colourful. Consider a small shake of the whole grid on a wrong guess | |
 
 ### Notes taken while logging these
 
@@ -2099,3 +2101,21 @@ thing rather than per feature.
 **Release log levels, from the same message:** release builds send info and above,
 and errors should be sampled at 100%. Worth confirming against the telemetry
 config rather than assuming.
+
+
+### S7 · Already fixed, confirmed rather than assumed (2026-09-08)
+
+Did not reproduce. `BadgeDetailDialog` goes through the design system's `Dialog`,
+which registers with a host mounted as the last child of the root `Box` in
+`App.kt` and therefore draws over the nav host, the header and the status bar.
+
+Verified by measurement rather than by eye, because by eye it looked wrong: on
+the screenshot the header reads as bright next to the dimmed grid. Sampling the
+page background down the left margin gives `(74,72,71)` at every y from 0 to
+2424, against `(248,242,237)` with no dialog open. The status bar strip is dimmed
+too. The header only *looks* undimmed because warm brown on a dark scrim still
+has high contrast.
+
+The KDoc on `BadgeDetailDialog` describes exactly the bug that was reported and
+says it was the reason the hand-rolled version was replaced, so this is a report
+against a build from before that change. Same shape as S9 and S10.
