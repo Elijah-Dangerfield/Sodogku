@@ -69,22 +69,47 @@ class ScoringTest {
 
     @Test
     fun speedMultiplierDecaysLinearlyAcrossTheWindow() {
-        assertEquals(config.speedMaxMultiplier, Scoring.speedMultiplier(0))
-        assertEquals(1.30, Scoring.speedMultiplier(config.speedWindowMs / 2), ABSOLUTE_TOLERANCE)
-        assertEquals(1.0, Scoring.speedMultiplier(config.speedWindowMs))
-        assertEquals(1.0, Scoring.speedMultiplier(config.speedWindowMs * 10))
+        val size = ScoringConfig.SPEED_WINDOW_REFERENCE_SIZE
+        val window = Scoring.speedWindowMsFor(size)
+
+        assertEquals(config.speedWindowMs, window, "the reference board gets the configured window")
+        assertEquals(config.speedMaxMultiplier, Scoring.speedMultiplier(size, 0))
+        assertEquals(1.30, Scoring.speedMultiplier(size, window / 2), ABSOLUTE_TOLERANCE)
+        assertEquals(1.0, Scoring.speedMultiplier(size, window))
+        assertEquals(1.0, Scoring.speedMultiplier(size, window * 10))
+    }
+
+    @Test
+    fun theSpeedWindowGrowsWithTheGrid() {
+        // The fix for "I solve fast and still get two paws". A flat window is
+        // an age on a 4x4 and a blink on a 10x10, so above about 6x6 every
+        // placement fell outside it and the multiplier was pinned at 1.0.
+        val small = Scoring.speedWindowMsFor(4)
+        val large = Scoring.speedWindowMsFor(10)
+
+        assertEquals(config.speedWindowMs, small)
+        assertEquals(small * 10 / 4, large)
+        assertTrue(
+            Scoring.speedMultiplier(10, TWELVE_SECONDS) > 1.0,
+            "twelve seconds on a 10x10 has to still be worth a bonus",
+        )
+        assertEquals(
+            1.0,
+            Scoring.speedMultiplier(4, TWELVE_SECONDS),
+            "the same twelve seconds on a 4x4 is not fast at all",
+        )
     }
 
     @Test
     fun unknownTimingScoresAtBaseRateRatherThanGuessing() {
-        assertEquals(1.0, Scoring.speedMultiplier(null))
+        assertEquals(1.0, Scoring.speedMultiplier(size = 8, millisSinceLastPlacement = null))
     }
 
     @Test
     fun negativeElapsedTimeCannotInflateTheBonus() {
         // A monotonic clock should never hand us this, but a backgrounded app
         // and a resumed timer are exactly where it would come from.
-        assertEquals(config.speedMaxMultiplier, Scoring.speedMultiplier(-5_000))
+        assertEquals(config.speedMaxMultiplier, Scoring.speedMultiplier(8, -5_000))
     }
 
     @Test
@@ -195,10 +220,12 @@ class ScoringTest {
     @Test
     fun aCleanButUnhurriedRunEarnsTwoPaws() {
         // The middle band has to be reachable too, or paws are just a
-        // pass/perfect flag.
+        // pass/perfect flag. Twenty seconds a move on an 8x8 is well past that
+        // board's speed window, so the bonus is gone and only the clean sheet
+        // is left.
         val size = 8
         var card = ScoreCard.Empty
-        repeat(size) { card = Scoring.placement(card, size, millisSinceLastPlacement = 12_000).card }
+        repeat(size) { card = Scoring.placement(card, size, millisSinceLastPlacement = 20_000).card }
         card = Scoring.complete(card, size, difficulty = 3, livesRemaining = 3)
 
         assertEquals(
@@ -206,6 +233,84 @@ class ScoringTest {
             Scoring.paws(card.total, size, difficulty = 3, completed = true),
             "scored ${card.total} against par ${Scoring.parScore(size, 3)}",
         )
+    }
+
+    @Test
+    fun allThreeRatingsAreReachableOnEveryBoardShapeTheCampaignShips() {
+        // The failure this exists for is a *rating nobody can get*, which no
+        // assertion about a particular score would catch: three paws was
+        // unreachable above 6x6 for months while every worked example above
+        // stayed green, because they all pick their own board.
+        //
+        // So it sweeps the shapes the packs actually contain — 4x4 to 10x10,
+        // tiers 1 to 4 (tier 5 is BEYOND_DEDUCTION and never ships) — and asks
+        // for each one that all three ratings have a run that earns them. The
+        // paces are wall-clock per row of board, not fractions of a config
+        // value, so a retune that quietly moves the window still has to keep
+        // real play inside the bands.
+        val failures = mutableListOf<String>()
+
+        (SMALLEST_BOARD..BIGGEST_BOARD).forEach { size ->
+            (1..SHIPPED_MAX_DIFFICULTY).forEach { difficulty ->
+                listOf(
+                    Triple(Scoring.THREE_PAWS, FAST_MS_PER_ROW, 0),
+                    Triple(Scoring.TWO_PAWS, UNHURRIED_MS_PER_ROW, 0),
+                    Triple(Scoring.ONE_PAW, SLOW_MS_PER_ROW, ScoringConfig.MAX_LIVES - 1),
+                ).forEach { (expected, msPerRow, strikes) ->
+                    val score = runAt(size, difficulty, msPerRow, strikes)
+                    val actual = Scoring.paws(score, size, difficulty, completed = true)
+                    if (actual != expected) {
+                        val fraction = score.toDouble() / Scoring.parScore(size, difficulty)
+                        failures += "${size}x$size tier $difficulty at ${msPerRow}ms/row with " +
+                            "$strikes strike(s): expected $expected paws, got $actual " +
+                            "(${(fraction * PERCENT).toInt()}% of par)"
+                    }
+                }
+            }
+        }
+
+        assertTrue(failures.isEmpty(), failures.joinToString("\n"))
+    }
+
+    @Test
+    fun theThirdPawIsWhatSpeedBuys() {
+        // The half the sweep above cannot say on its own: that the gap between
+        // two paws and three is the *pace*, on every board and not just the
+        // small ones. Pinned as a score comparison as well as a rating, so a
+        // window that stopped scaling would fail here with a readable number
+        // rather than only as a missing rating.
+        (SMALLEST_BOARD..BIGGEST_BOARD).forEach { size ->
+            val fast = runAt(size, difficulty = 4, msPerRow = FAST_MS_PER_ROW, strikes = 0)
+            val unhurried = runAt(size, difficulty = 4, msPerRow = UNHURRIED_MS_PER_ROW, strikes = 0)
+
+            assertTrue(
+                fast > unhurried,
+                "on ${size}x$size the fast run scored $fast and the unhurried one $unhurried",
+            )
+        }
+    }
+
+    /**
+     * A whole attempt at a steady pace of [msPerRow] per row of board per
+     * placement, with [strikes] wrong guesses taken early, returned as the
+     * total after the completion bonus.
+     *
+     * Per row rather than flat, because a move on a 10x10 is not the same
+     * amount of work as a move on a 4x4 and a test that pretended otherwise
+     * would be asking every board for the same wall clock.
+     */
+    private fun runAt(size: Int, difficulty: Int, msPerRow: Long, strikes: Int): Int {
+        var card = ScoreCard.Empty
+        repeat(size) { index ->
+            if (index in 1..strikes) card = Scoring.strike(card)
+            card = Scoring.placement(card, size, millisSinceLastPlacement = msPerRow * size).card
+        }
+        return Scoring.complete(
+            card,
+            size,
+            difficulty,
+            livesRemaining = ScoringConfig.MAX_LIVES - strikes,
+        ).total
     }
 
     @Test
@@ -376,5 +481,28 @@ class ScoringTest {
         /** The widest board the campaign ships, and the deepest tier it rates. */
         const val BIGGEST_BOARD = 10
         const val MAX_DIFFICULTY = 5
+
+        /** The narrowest board that has any legal placement at all. */
+        const val SMALLEST_BOARD = 4
+
+        /**
+         * Tier 5 is `Difficulty.BEYOND_DEDUCTION` — a board no reasoning
+         * solves — and `LevelPackVerificationTest` keeps it out of both packs,
+         * so no player ever meets one and the sweep does not rate one.
+         */
+        const val SHIPPED_MAX_DIFFICULTY = 4
+
+        /**
+         * Three paces, in milliseconds per row of board per placement, chosen
+         * as descriptions of play rather than as fractions of a coefficient:
+         * on a 10x10 they are 9, 25 and 40 seconds a move, or a minute and a
+         * half, four minutes and six and a half for the whole board.
+         */
+        const val FAST_MS_PER_ROW = 900L
+        const val UNHURRIED_MS_PER_ROW = 2_500L
+        const val SLOW_MS_PER_ROW = 4_000L
+
+        const val TWELVE_SECONDS = 12_000L
+        const val PERCENT = 100
     }
 }

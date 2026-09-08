@@ -17,7 +17,7 @@ import com.sodogku.libraries.levels.generated.DAILY_LEVEL_LINES
  */
 object LevelPacks {
 
-    const val PACK_VERSION: Int = 1
+    const val PACK_VERSION: Int = 2
 
     val campaign: LevelPack by lazy {
         LevelCodec.decodePack(PackKind.Campaign, PACK_VERSION, CAMPAIGN_LEVEL_LINES)

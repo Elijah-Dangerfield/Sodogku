@@ -1287,7 +1287,12 @@ class GameViewModelTest : CoroutineTest() {
         val vm = viewModel()
         val level = assertNotNull(vm.state.level)
         vm.commit(cellFor(row = 0))
-        vm.note(wrongCellIn(row = 2))
+        // `tappableWrongCellOn`, not `wrongCellIn`: the latter picks the first
+        // column that is not the answer without checking whether the board has
+        // already crossed that square off, so where it has, `note` clears the
+        // cross instead of drawing one and the fixture ends up with nothing to
+        // lose. Re-curving the campaign moved level 200 onto such a board.
+        vm.note(tappableWrongCellOn(vm))
         val placed = vm.state.placedCells
         val marks = vm.state.manualMarks
         assertTrue(placed.isNotEmpty() && marks.isNotEmpty(), "the fixture needs something to lose")

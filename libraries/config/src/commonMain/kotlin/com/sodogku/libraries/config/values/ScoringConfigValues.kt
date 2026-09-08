@@ -79,15 +79,22 @@ class ScoringComboMax(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigM
 
 /**
  * How long the speed bonus takes to decay from [ScoringSpeedMaxMultiplier] to
- * 1.0, measured from the previous placement. The decay is linear rather than
- * exponential so the pressure the player feels is proportional to the clock they
- * can see.
+ * 1.0, measured from the previous placement, **on a 4x4**. The window scales
+ * with the grid from there (`Scoring.speedWindowMsFor`), so 8000 here is 20
+ * seconds on a 10x10. The decay is linear rather than exponential so the
+ * pressure the player feels is proportional to the clock they can see.
+ *
+ * Raising this makes the third paw easier at every size at once, which is the
+ * lever to pull if telemetry says three-paw clears are too rare. It was a flat
+ * window until it turned out nobody places inside eight seconds on a 9x9, which
+ * pinned the multiplier at 1.0 and put three paws out of reach for the whole
+ * back half of the campaign.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
 class ScoringSpeedWindowMs(appConfigMap: AppConfigMap) : LongConfigValue(appConfigMap) {
-    override val name = "Speed window (ms)"
+    override val name = "Speed window (ms, at 4x4)"
     override val path = "scoring.speedWindowMs"
     override val default = 8_000L
 }

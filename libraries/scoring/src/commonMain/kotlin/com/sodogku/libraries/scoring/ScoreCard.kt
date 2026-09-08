@@ -59,7 +59,7 @@ object Scoring {
         config: ScoringConfig = ScoringConfig.Default,
     ): ScoredPlacement {
         val combo = comboMultiplier(card.combo, config)
-        val speed = speedMultiplier(millisSinceLastPlacement, config)
+        val speed = speedMultiplier(size, millisSinceLastPlacement, config)
         val multiplier = combo * speed
         val points = (config.basePerPlacement * size * multiplier).toInt()
 
@@ -125,12 +125,22 @@ object Scoring {
     }
 
     /**
-     * What a strong run is worth: every placement at full combo and full speed,
-     * finished without losing a life.
+     * The ceiling a run is rated against: every placement at full combo and at
+     * [ScoringConfig.speedMaxMultiplier], finished without losing a life.
      *
-     * This is derived rather than shipped in the pack precisely so the paw
-     * thresholds move when the coefficients do. Baking it into the level data
-     * would freeze what a three-paw clear means at generation time.
+     * Note what full speed means — the multiplier for a placement at *zero*
+     * elapsed milliseconds. Par is therefore a number no human equals, and is
+     * not meant to be: it is the scale the thresholds are fractions of, which is
+     * why [speedWindowMsFor] and not this function is where "how fast is fast"
+     * is decided. Read one without the other and the thresholds look arbitrary.
+     *
+     * Size-blind in its speed term on purpose, for the same reason: the window
+     * already knows about the grid, so pricing par by the grid twice would
+     * cancel the scaling straight back out.
+     *
+     * Derived rather than shipped in the pack so the paw thresholds move when
+     * the coefficients do. Baking it into the level data would freeze what a
+     * three-paw clear means at generation time.
      */
     fun parScore(
         size: Int,
@@ -168,18 +178,33 @@ object Scoring {
         (1.0 + streak.coerceAtLeast(0) * config.comboStep).coerceAtMost(config.comboMax)
 
     /**
+     * How long a placement on a [size] board has before the speed bonus is
+     * gone: [ScoringConfig.speedWindowMs] scaled by the grid.
+     *
+     * Linear in the number of rows, because that is roughly what a player has
+     * to sweep to place one dog — every row, column and region has to be
+     * re-read as the board fills. Squaring it would hand a 10x10 six times the
+     * thinking time of a 4x4 and make the third paw free at the top of the
+     * campaign; a flat window is the bug this replaced.
+     */
+    fun speedWindowMsFor(size: Int, config: ScoringConfig = ScoringConfig.Default): Long =
+        config.speedWindowMs * size.coerceAtLeast(1) / ScoringConfig.SPEED_WINDOW_REFERENCE_SIZE
+
+    /**
      * Decays linearly from [ScoringConfig.speedMaxMultiplier] to 1.0 across the
-     * window. Linear rather than exponential so the pressure a player feels is
-     * proportional to the clock they can see.
+     * board's window. Linear rather than exponential so the pressure a player
+     * feels is proportional to the clock they can see.
      */
     fun speedMultiplier(
+        size: Int,
         millisSinceLastPlacement: Long?,
         config: ScoringConfig = ScoringConfig.Default,
     ): Double {
         if (millisSinceLastPlacement == null) return 1.0
+        val window = speedWindowMsFor(size, config)
         val elapsed = millisSinceLastPlacement.coerceAtLeast(0)
-        if (elapsed >= config.speedWindowMs) return 1.0
-        val remaining = 1.0 - elapsed.toDouble() / config.speedWindowMs
+        if (elapsed >= window) return 1.0
+        val remaining = 1.0 - elapsed.toDouble() / window
         return 1.0 + (config.speedMaxMultiplier - 1.0) * remaining
     }
 

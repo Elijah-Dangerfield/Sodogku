@@ -20,6 +20,15 @@ package com.sodogku.libraries.scoring
  * worst possible completed run still landed at 63% of par — above the two-paw
  * line — so a single paw was unreachable and the rating carried no information.
  * Compressing the range is the failure mode to watch when retuning these.
+ *
+ * That failure came back at the other end, and what it looked like is worth
+ * knowing: the numbers below were all fine, but [speedWindowMs] was a flat 8000
+ * for every grid. Nobody places inside eight seconds on a 9x9, so the speed
+ * multiplier sat at 1.0 for every player on every large board, the score lost
+ * its speed term entirely, and a clean run landed at a fixed 73% of par whether
+ * it took two minutes or twenty. Three paws at 0.85 of par was unreachable for
+ * the whole back half of the campaign. The range has to stay wide *on the board
+ * being played*, not just on paper.
  */
 data class ScoringConfig(
     /** Points for one correct placement, before size and multipliers. */
@@ -34,7 +43,19 @@ data class ScoringConfig(
     /** Ceiling on the combo multiplier, so a 10x10 streak cannot run away. */
     val comboMax: Double = 2.0,
 
-    /** How long the speed bonus takes to decay to nothing, in milliseconds. */
+    /**
+     * How long the speed bonus takes to decay to nothing on the smallest board,
+     * in milliseconds. Bigger boards get proportionally longer — see
+     * [Scoring.speedWindowMsFor].
+     *
+     * A flat window was the bug behind "I solve fast and still get two paws".
+     * Eight seconds is an age on a 4x4 and a blink on a 10x10, so above about
+     * 6x6 every placement landed outside it and the speed multiplier was pinned
+     * at 1.0 for everyone. Par still priced speed at the maximum, so *every*
+     * clean run on a big board scored the same 73% of par however fast it was
+     * played, and the third paw at 0.85 was unreachable. Scaling the window with
+     * the grid is what makes "fast" mean fast *for this board*.
+     */
     val speedWindowMs: Long = 8_000,
 
     /** The speed multiplier for an instant placement; it decays linearly to 1.0. */
@@ -98,6 +119,19 @@ data class ScoringConfig(
     companion object {
         /** Lives per attempt. Three bones, matching the header. */
         const val MAX_LIVES: Int = 3
+
+        /**
+         * The grid [speedWindowMs] is quoted against: the smallest board the
+         * game ships. A 4x4 gets the configured window, a 10x10 two and a half
+         * times it.
+         *
+         * A constant rather than a config key on purpose. It is the *shape* of
+         * the relationship between thinking time and grid size, and section 4.1
+         * of the spec keeps shape in the binary; the magnitude is the config
+         * key next to it. Duplicated from `Board.MIN_SIZE` because scoring
+         * deliberately does not depend on `:libraries:puzzle`.
+         */
+        const val SPEED_WINDOW_REFERENCE_SIZE: Int = 4
 
         /**
          * Ceiling on the two Int point values. `ScoreCard` multiplies them by

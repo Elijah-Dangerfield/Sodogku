@@ -78,6 +78,61 @@ class LevelPackVerificationTest {
     }
 
     @Test
+    fun theCampaignIsTheCurveItDeclares() {
+        // The curve is the product and the pack is the only copy of it, so
+        // "regenerated with a different seed" and "quietly lost its ramp" used
+        // to look identical in a diff of 500 generated lines. This asserts the
+        // shipped order against `LevelCurve` level by level, which means a
+        // re-curve is a deliberate edit to a list a person can read.
+        val shipped = LevelPacks.campaign.levels.map { LevelShape(it.size, it.difficulty) }
+
+        assertEquals(LevelCurve.campaignShape.size, shipped.size)
+        val drifted = shipped.indices.filter { shipped[it] != LevelCurve.campaignShape[it] }
+        assertTrue(
+            drifted.isEmpty(),
+            "${drifted.size} level(s) off the declared curve, first at id ${drifted.firstOrNull()?.plus(1)}: " +
+                drifted.take(5).joinToString("\n") { index ->
+                    "  level ${index + 1}: pack has ${shipped[index]}, " +
+                        "curve says ${LevelCurve.campaignShape[index]}"
+                },
+        )
+    }
+
+    @Test
+    fun theDailyPoolHoldsTheMixItDeclares() {
+        // By multiset, not in order: the daily is shuffled on purpose, so
+        // there is no level 37 of the daily to pin.
+        val shipped = LevelPacks.daily.levels
+            .groupingBy { LevelShape(it.size, it.difficulty) }
+            .eachCount()
+        val declared = LevelCurve.dailyShape.groupingBy { it }.eachCount()
+
+        assertEquals(declared, shipped)
+    }
+
+    @Test
+    fun theCampaignReachesRealDifficultyInsideTheFirstSession() {
+        // The complaint this curve was rebuilt for: "it stays at easy
+        // difficulty for too long." Stated as the two boundaries a player
+        // feels rather than as a distribution, because a distribution can be
+        // right on average and still put the whole ramp after level 100.
+        //
+        // The window is generous on purpose — this is a floor on the pace of
+        // the ramp, not a restatement of `LevelCurve`, which the test above
+        // already pins exactly.
+        val firstTierThree = LevelPacks.campaign.levels.first { it.difficulty >= 3 }.id
+        val firstTierFour = LevelPacks.campaign.levels.first { it.difficulty >= 4 }.id
+
+        assertTrue(firstTierThree <= FIRST_REAL_DEDUCTION_BY, "first tier-3 level is $firstTierThree")
+        assertTrue(firstTierFour <= FIRST_CONTRADICTION_BY, "first tier-4 level is $firstTierFour")
+        assertEquals(
+            Difficulty.EASIEST,
+            LevelPacks.campaign.levels.first().difficulty,
+            "level 1 runs behind the tutorial and has to fall out on its own",
+        )
+    }
+
+    @Test
     fun eachCampaignBandOpensNoHarderThanItEnds() {
         LevelPacks.campaign.levels
             .groupBy { it.size }
@@ -170,5 +225,14 @@ class LevelPackVerificationTest {
     private companion object {
         const val EXPECTED_CAMPAIGN_SIZE = 500
         const val DAYS_IN_TWO_YEARS = 730
+
+        /**
+         * A first session is about half an hour, which on the opening bands is
+         * somewhere around forty levels. Both boundaries have to land inside
+         * it, or a player decides whether the game is worth their time on
+         * evidence that is nothing like the game.
+         */
+        const val FIRST_REAL_DEDUCTION_BY = 30
+        const val FIRST_CONTRADICTION_BY = 45
     }
 }

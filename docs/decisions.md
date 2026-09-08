@@ -6,6 +6,88 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-08 — The speed window scales with the grid, and the curve is a declared list
+
+Two changes, from two reports: "I keep getting 2/3 paws, I'm solving super fast"
+and "it stays at easy difficulty for too long".
+
+**The paw rating had a dead dimension.** `scoring.speedWindowMs` was a flat 8000
+for every board. Nobody places a dog inside eight seconds on a 9x9, so the speed
+multiplier was pinned at 1.0 for every player on every large board and the score
+lost its speed term entirely. Par still priced every placement at
+`speedMaxMultiplier` — the multiplier for a *zero millisecond* tap — so a clean
+run landed at a fixed fraction of par however fast it was played: 74% on a 10x10,
+76% on an 8x8. Three paws needed 85%. Two needed 60%, which is below the floor of
+any clean clear, so two paws was automatic and three was unreachable, and the
+rating carried one bit where it should carry two.
+
+Measured before the fix, uniform pace, no strikes, no boosters: three paws needed
+an average of **4.7 seconds per placement on a 10x10** — the whole board in under
+47 seconds — and 4.9 on an 8x8. With one strike it needed 1.5 seconds a move,
+which is not a pace, it is a coin flip on the tutorial board.
+
+The window is now `speedWindowMs × size / 4`: 8 seconds on a 4x4, 20 on a 10x10.
+Linear in rows because that is roughly what a player re-reads to place one dog.
+The config key and its default are untouched, so this is not a live-ops change;
+what moved is that the number is now quoted against the smallest board. Three
+paws now wants about 1.2 seconds per row per placement, which is 12 seconds a
+move and two minutes total on a 10x10 — fast, and possible.
+
+**Alternatives.** Lowering `threePawFraction` would have made three paws easier
+everywhere including on boards where it was already easy, and left the speed term
+dead. Pricing par at a reachable "par pace" names the same bug but leaves the
+in-run multiplier pinned at 1.0, so the player still gets no feedback that speed
+matters and the praise text never fires above 6x6. Scaling the window fixes the
+rating and the moment-to-moment signal with one dial.
+
+**The window scales with size and not with difficulty**, deliberately. Coupling
+it to the tier would mean re-curving the campaign silently re-tunes scoring, and
+those two want to be checkable apart. Difficulty already reaches the score
+through the completion bonus.
+
+**The campaign curve now lives in `:libraries:levels`, not in the generator.**
+`LevelCurve` declares each band as a grid size plus a list of tier runs, and
+`LevelPackVerificationTest` asserts the shipped pack matches it level by level.
+Before, the pack was the only record of the intended shape, so a deliberate
+re-curve and a band that quietly came up short were the same diff: 500 changed
+generated lines. The generator reads the same list, which is why it can now
+report *which tier* fell short rather than only a total.
+
+**The shape changed because tier 5 never ships.** `Difficulty.BEYOND_DEDUCTION`
+is a board no reasoning solves and the verification test keeps it out, so the
+whole ramp is 1 to 4 — a short ladder to spread over 500 levels. The old curve
+reached tier 3 at level 38 and tier 4 at level 92, and 46% of the campaign sat at
+tier 2, because every band restarted at its own easiest and the generator's
+natural yield is tier-2 heavy. The new one reaches tier 3 at 23 and tier 4 at 35.
+
+| | old | new |
+|---|---|---|
+| tier 1 | 57 | 2 |
+| tier 2 | 228 | 24 |
+| tier 3 | 107 | 142 |
+| tier 4 | 108 | 332 |
+| first tier 3 | level 38 | level 23 |
+| first tier 4 | level 92 | level 35 |
+
+Grid sizes are untouched — SPEC 1.7's table still holds — because size and tier
+are separate axes and making the ramp out of bigger boards would have been the
+cheap answer to the wrong question. Each band still opens a tier below where the
+last one closed: the grid just grew, which is its own difficulty jump, so the
+reasoning gets a breather while the player learns to read a wider board. That
+keeps roughly a quarter of the back half at tier 3 rather than a flat diet of the
+ceiling.
+
+**The daily changed too, but not into a ramp.** SPEC Q3 stands: every player
+meets the same board whatever level they are on, so it stays on 6x6 to 8x8 and
+stays shuffled. What it stopped doing is taking whatever the generator produced,
+which was 11% tier 1 and 60% tier 2 — reliably *easier* than the campaign level
+its player was on, which is the wrong signal from the thing that exists to bring
+them back. The pool is now 45% tier 2, 35% tier 3, 20% tier 4, with no tier 1 at
+all. Sizes are unchanged, so the three-to-five-minute budget is too.
+
+`LevelPacks.PACK_VERSION` goes to 2. Progress is keyed on level id and every id
+now points at a different board.
+
 ## 2026-09-08 — Auto-mark is a setting, not a trimmed rule
 
 **Decision:** "Cross off squares for me" is a Settings toggle, defaulting **on**, that changes what

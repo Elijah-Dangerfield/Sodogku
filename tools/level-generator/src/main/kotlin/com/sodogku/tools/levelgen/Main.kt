@@ -1,6 +1,8 @@
 package com.sodogku.tools.levelgen
 
+import com.sodogku.libraries.levels.CurveBand
 import com.sodogku.libraries.levels.LevelCodec
+import com.sodogku.libraries.levels.LevelCurve
 import com.sodogku.libraries.levels.LevelDefinition
 import java.io.File
 import kotlin.random.Random
@@ -44,16 +46,10 @@ private fun generateCampaign(seed: Int): List<LevelDefinition> {
     val generator = Generator(Random(seed))
     val levels = mutableListOf<LevelDefinition>()
 
-    CAMPAIGN_BANDS.forEach { band ->
+    LevelCurve.campaign.forEach { band ->
         val started = TimeSource.Monotonic.markNow()
-        val candidates = generator.build(band.size, band.count, band.maxDifficulty)
-        if (candidates.size < band.count) {
-            System.err.println(
-                "Band ${band.size}x${band.size} came up short: ${candidates.size}/${band.count}. " +
-                    "Raise the attempt budget or the refinement budget.",
-            )
-            exitProcess(1)
-        }
+        val candidates = generator.build(band)
+        reportShortfall("campaign", band, candidates)
         orderBand(candidates).forEach { levels += it.toLevel(levels.size + 1) }
         println("  ${band.size}x${band.size}: ${candidates.size} levels in ${started.elapsedNow()}")
     }
@@ -61,23 +57,41 @@ private fun generateCampaign(seed: Int): List<LevelDefinition> {
 }
 
 /**
+ * Fails the run when a band could not be filled, naming the tier that came up
+ * short rather than only the total.
+ *
+ * Which tier is the whole diagnosis: a band short on tier 4 means the budget is
+ * too tight for how rare a contradiction board is at that size, and a band
+ * short on tier 2 means the grid has run out of distinct shapes. Those want
+ * opposite fixes, and "48/60" says neither.
+ */
+private fun reportShortfall(pack: String, band: CurveBand, candidates: List<Candidate>) {
+    if (candidates.size >= band.count) return
+
+    val found = candidates.groupingBy { it.difficulty }.eachCount()
+    val missing = band.runs
+        .filter { found.getOrElse(it.tier) { 0 } < it.count }
+        .joinToString(", ") { "tier ${it.tier}: ${found.getOrElse(it.tier) { 0 }}/${it.count}" }
+    System.err.println(
+        "$pack band ${band.size}x${band.size} came up short ($missing). " +
+            "Raise the attempt budget, or ask the curve for fewer of that tier at this size.",
+    )
+    exitProcess(1)
+}
+
+/**
  * The daily pool is deliberately not the campaign curve. A daily is a three to
  * five minute habit, not a difficulty ramp, so it draws from a narrow band of
- * mid-sized boards and is left in generation order rather than sorted.
+ * mid-sized boards and is shuffled rather than sorted — see `LevelCurve`.
  */
 private fun generateDaily(seed: Int): List<LevelDefinition> {
     val generator = Generator(Random(seed + DAILY_SEED_OFFSET))
     val levels = mutableListOf<LevelDefinition>()
 
-    DAILY_BANDS.forEach { band ->
+    LevelCurve.daily.forEach { band ->
         val started = TimeSource.Monotonic.markNow()
-        val candidates = generator.build(band.size, band.count, band.maxDifficulty)
-        if (candidates.size < band.count) {
-            System.err.println(
-                "Daily ${band.size}x${band.size} came up short: ${candidates.size}/${band.count}",
-            )
-            exitProcess(1)
-        }
+        val candidates = generator.build(band)
+        reportShortfall("daily", band, candidates)
         candidates.forEach { levels += it.toLevel(levels.size + 1) }
         println("  daily ${band.size}x${band.size}: ${candidates.size} levels in ${started.elapsedNow()}")
     }
@@ -110,31 +124,6 @@ private fun write(dir: File, className: String, property: String, levels: List<L
 
 private fun Array<String>.optionValue(name: String): String? =
     indexOf(name).takeIf { it >= 0 && it + 1 < size }?.let { this[it + 1] }
-
-/** Grid size bands for the 500-level campaign, per docs/SPEC.md section 1.7. */
-private val CAMPAIGN_BANDS = listOf(
-    Band(size = 4, count = 10, maxDifficulty = TUTORIAL_MAX_DIFFICULTY),
-    Band(size = 5, count = 30, maxDifficulty = EARLY_MAX_DIFFICULTY),
-    Band(size = 6, count = 60),
-    Band(size = 7, count = 80),
-    Band(size = 8, count = 100),
-    Band(size = 9, count = 110),
-    Band(size = 10, count = 110),
-)
-
-/** Two years of dailies, drawn from mid-sized boards only. */
-private val DAILY_BANDS = listOf(
-    Band(size = 6, count = 240),
-    Band(size = 7, count = 250),
-    Band(size = 8, count = 240),
-)
-
-/** Levels 1 to 10 are the guided tutorial; nothing there may need more than a
- *  single confinement step. */
-private const val TUTORIAL_MAX_DIFFICULTY = 2
-
-/** The 5x5 band is still teaching. Sets are fine, contradictions are not. */
-private const val EARLY_MAX_DIFFICULTY = 3
 
 private const val DEFAULT_SEED = 20260907
 private const val DAILY_SEED_OFFSET = 104_729
