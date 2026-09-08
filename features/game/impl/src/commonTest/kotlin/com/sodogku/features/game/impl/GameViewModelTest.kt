@@ -427,6 +427,78 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun aSniffProposesCrossesRatherThanApplyingThem() = runUnitTest {
+        // The charge buys a proposal. Applying it without asking would take the
+        // decision away, and the player would have no way to see what changed.
+        val vm = viewModel()
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        settle()
+
+        assertTrue(vm.state.hintCells.isNotEmpty(), "the sniff proposed nothing, so this proves nothing")
+        assertTrue(
+            vm.state.hintCells.none { it in vm.state.manualMarks },
+            "the sniff crossed squares off without being asked",
+        )
+    }
+
+    @Test
+    fun keepingTheProposalTurnsItIntoThePlayersOwnCrosses() = runUnitTest {
+        val vm = viewModel()
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        settle()
+        val proposed = vm.state.hintCells
+        assertTrue(proposed.isNotEmpty(), "nothing was proposed")
+
+        vm.takeAction(GameAction.ApplyHint)
+        settle()
+
+        assertTrue(vm.state.manualMarks.containsAll(proposed), "the accepted squares were not crossed off")
+        assertTrue(vm.state.hintCells.isEmpty(), "the proposal stayed on screen after being accepted")
+    }
+
+    @Test
+    fun leavingTheProposalMarksNothing() = runUnitTest {
+        val vm = viewModel()
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        settle()
+        val marksBefore = vm.state.manualMarks
+        assertTrue(vm.state.hintCells.isNotEmpty(), "nothing was proposed")
+
+        vm.takeAction(GameAction.DiscardHint)
+        settle()
+
+        assertEquals(marksBefore, vm.state.manualMarks, "declining the hint still crossed squares off")
+        assertTrue(vm.state.hintCells.isEmpty())
+    }
+
+    @Test
+    fun anAcceptedProposalSurvivesBeingForceQuit() = runUnitTest {
+        // `applyHint` goes through `updateBoard` for this reason. Losing help
+        // the player spent a sniff on and then explicitly accepted would be
+        // worse than losing an unaccepted proposal.
+        val cache = InMemoryAppCache()
+        val first = viewModel(cache = cache)
+        first.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        first.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        settle()
+        val proposed = first.state.hintCells
+        assertTrue(proposed.isNotEmpty(), "nothing was proposed")
+        first.takeAction(GameAction.ApplyHint)
+        settle()
+
+        val resumed = viewModel(cache = cache)
+
+        assertTrue(
+            resumed.state.manualMarks.containsAll(proposed),
+            "the crosses the player accepted were gone after a relaunch",
+        )
+    }
+
+    @Test
     fun tappingADogThatIsAlreadyThereShakesInsteadOfDoingNothing() = runUnitTest {
         val vm = viewModel()
         vm.commit(cellFor(row = 0))
@@ -1289,9 +1361,10 @@ class GameViewModelTest : CoroutineTest() {
         vm.commit(cellFor(row = 0))
         // `tappableWrongCellOn`, not `wrongCellIn`: the latter picks the first
         // column that is not the answer without checking whether the board has
-        // already crossed that square off, so where it has, `note` clears the
-        // cross instead of drawing one and the fixture ends up with nothing to
-        // lose. Re-curving the campaign moved level 200 onto such a board.
+        // already crossed that square off, so on a board where it has, `note`
+        // clears the cross instead of drawing one and the fixture ends up with
+        // nothing to lose. Re-curving the campaign moved level 200 onto exactly
+        // such a board.
         vm.note(tappableWrongCellOn(vm))
         val placed = vm.state.placedCells
         val marks = vm.state.manualMarks

@@ -21,6 +21,7 @@ import sodogku.libraries.resources.generated.resources.board_cell_dog
 import sodogku.libraries.resources.generated.resources.board_cell_format
 import sodogku.libraries.resources.generated.resources.board_cell_empty
 import sodogku.libraries.resources.generated.resources.board_cell_marked
+import sodogku.libraries.resources.generated.resources.board_cell_proposed
 import sodogku.libraries.resources.generated.resources.board_cell_wrong
 import sodogku.libraries.resources.generated.resources.board_glyph_0
 import sodogku.libraries.resources.generated.resources.board_glyph_1
@@ -78,6 +79,7 @@ data class BoardCellLabels(
     val glyphs: List<String>,
     val empty: String,
     val marked: String,
+    val proposed: String,
     val wrong: String,
     val dog: String,
 
@@ -113,6 +115,10 @@ data class BoardCellLabels(
         BoardCellState.Empty -> empty
         BoardCellState.Marked -> marked
         BoardCellState.Wrong -> wrong
+        // A reader gets told it is provisional. The sighted cue is a fainter
+        // cross, which is exactly the kind of difference a state description
+        // has to carry in words instead.
+        BoardCellState.Proposed -> proposed
         BoardCellState.Occupied -> dog
     }
 }
@@ -208,18 +214,20 @@ fun rememberBoardCellLabels(): BoardCellLabels {
     )
     val empty = stringResource(Res.string.board_cell_empty)
     val marked = stringResource(Res.string.board_cell_marked)
+    val proposed = stringResource(Res.string.board_cell_proposed)
     val wrong = stringResource(Res.string.board_cell_wrong)
     val dog = stringResource(Res.string.board_cell_dog)
     val cellFormat = stringResource(Res.string.board_cell_format)
     val markAction = stringResource(Res.string.board_action_mark)
     val clearAction = stringResource(Res.string.board_action_clear)
     val placeAction = stringResource(Res.string.board_action_place)
-    return remember(regions, glyphs, empty, marked, wrong, dog, cellFormat, markAction) {
+    return remember(regions, glyphs, empty, marked, proposed, wrong, dog, cellFormat, markAction) {
         BoardCellLabels(
             regions = regions,
             glyphs = glyphs,
             empty = empty,
             marked = marked,
+            proposed = proposed,
             wrong = wrong,
             dog = dog,
             cellFormat = cellFormat,

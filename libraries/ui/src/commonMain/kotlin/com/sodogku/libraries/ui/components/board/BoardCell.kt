@@ -57,6 +57,20 @@ enum class BoardCellState {
      */
     Wrong,
 
+    /**
+     * Crossed off on the board's suggestion, not yet accepted by the player.
+     *
+     * A sniff used to spotlight the squares it ruled out and then let the
+     * highlight fade, which left the player holding the information in their
+     * head and the board looking exactly as it did before. Painting the crosses
+     * and asking for one tap to keep them turns the hint into something that
+     * lands on the board, and keeps it a decision rather than a fait accompli.
+     *
+     * Drawn as the same cross at reduced strength, because it *is* the same
+     * cross, one step away.
+     */
+    Proposed,
+
     /** A dog. */
     Occupied,
 }
@@ -168,7 +182,7 @@ fun BoardCell(
                 pop.animateTo(Motion.PopOvershoot, Motion.Pop)
                 pop.animateTo(1f, Motion.Tap)
             }
-            BoardCellState.Marked, BoardCellState.Wrong -> {
+            BoardCellState.Marked, BoardCellState.Wrong, BoardCellState.Proposed -> {
                 pop.snapTo(0f)
                 mark.animateTo(1f, tween(Motion.MarkDrawMillis))
             }
@@ -271,7 +285,13 @@ fun BoardCell(
                 }
 
                 if (mark.value > 0f) {
-                    val ink = if (state == BoardCellState.Wrong) StrikeInk else MarkInk
+                    val ink = when (state) {
+                        BoardCellState.Wrong -> StrikeInk
+                        // Same cross, drawn faint. A different colour would read
+                        // as a third kind of mark rather than as a weaker one.
+                        BoardCellState.Proposed -> MarkInk.copy(alpha = ProposedMarkAlpha)
+                        else -> MarkInk
+                    }
                     drawBoardMark(ink, BoardMark.Fraction, mark.value)
                 }
             }
@@ -382,6 +402,16 @@ private const val DogShadowDrop = 0.16f
  */
 private const val GlyphFraction = 0.42f
 private const val GlyphAlpha = 0.60f
+
+/**
+ * How faint a proposed cross is against a committed one.
+ *
+ * Low enough to read as provisional at a glance across a 10x10, high enough to
+ * survive the region fill underneath it. The white cross on a pastel is already
+ * a low-contrast pairing, so there is less headroom here than the number
+ * suggests.
+ */
+private const val ProposedMarkAlpha = 0.45f
 private const val DogFraction = 0.82f
 private const val ShakeCycles = 18f
 private const val ShakeAmplitudePx = 7f

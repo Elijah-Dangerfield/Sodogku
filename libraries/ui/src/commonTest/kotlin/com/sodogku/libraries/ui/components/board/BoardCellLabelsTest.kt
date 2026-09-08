@@ -94,6 +94,7 @@ class BoardCellLabelsTest {
             ),
             empty = "empty",
             marked = "crossed off",
+            proposed = "suggested, not yet kept",
             wrong = "wrong guess, cost a bone",
             dog = "dog",
             cellFormat = "Row %1\$d, column %2\$d, %3\$s",

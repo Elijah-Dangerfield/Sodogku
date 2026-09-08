@@ -254,7 +254,14 @@ data class GameState(
      */
     val tutorialCells: Set<Int> = emptySet(),
 
-    /** Squares a sniff has ruled out, spotlit until the player taps away. */
+    /**
+     * Squares a sniff has ruled out, drawn as faint crosses awaiting one tap.
+     *
+     * A **proposal**, not a result. It used to be a spotlight that faded, which
+     * left the player holding the answer in their head and the board looking
+     * exactly as it had before the charge was taken. Painting the crosses and
+     * asking to keep them puts the hint on the board and keeps it a decision.
+     */
     val hintCells: Set<Int> = emptySet(),
 
     /**
@@ -545,6 +552,12 @@ sealed interface GameAction {
     /** Back to wherever this board was opened from. Never spends anything. */
     data object Leave : GameAction
     data object DismissWarning : GameAction
+
+    /** Keep the squares the sniff proposed, as the player's own crosses. */
+    data object ApplyHint : GameAction
+
+    /** Throw the sniff's proposal away without marking anything. */
+    data object DiscardHint : GameAction
 
     /**
      * Trade an ad for a full set of bones. The one way back from zero, from the

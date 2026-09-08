@@ -312,6 +312,8 @@ class GameViewModel(
             GameAction.DismissWarning -> action.updateState {
                 it.copy(warning = null, hintCells = emptySet())
             }
+            GameAction.ApplyHint -> action.applyHint()
+            GameAction.DiscardHint -> action.updateState { it.copy(hintCells = emptySet()) }
             GameAction.RefillBones -> action.refillBones()
             is GameAction.BonesChanged -> action.updateState {
                 it.copy(livesRemaining = action.bones)
@@ -1971,6 +1973,35 @@ class GameViewModel(
                 hintCells = ruledOut,
             )
         }
+    }
+
+    /**
+     * Keeps the squares the sniff proposed.
+     *
+     * They become `manualMarks` rather than anything of their own, so from here
+     * on they are the player's crosses and behave like every other one: tappable
+     * away, saved with the board, and unaffected by the auto-mark setting. The
+     * sniff's job ends at proposing.
+     *
+     * Goes through `updateBoard` so the marks reach the snapshot. Spending a
+     * sniff and quitting used to lose the help entirely, which was half of an
+     * earlier bug; losing it *after* the player accepted it would be worse.
+     */
+    private suspend fun GameAction.applyHint() {
+        val proposed = state.hintCells
+        if (proposed.isEmpty()) return
+        updateBoard {
+            it.copy(
+                manualMarks = it.manualMarks + proposed,
+                hintCells = emptySet(),
+            )
+        }
+        logger.logEvent(
+            "game.hint_applied",
+            "squares" to proposed.size,
+            "level_id" to (state.level?.id ?: -1),
+            "mode" to modeName,
+        )
     }
 
     /** The free placement. Costs a treat, no bone, and no risk. */

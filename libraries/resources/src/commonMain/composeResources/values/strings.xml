@@ -109,6 +109,15 @@
     <string name="board_cell_format">Row %1$d, column %2$d, %3$s</string>
     <string name="board_cell_empty">empty</string>
     <string name="board_cell_marked">crossed off</string>
+    <string name="board_cell_proposed">suggested, not yet kept</string>
+
+    <!-- The sniff proposes rather than reveals. It paints faint crosses and waits
+         for one tap to keep them, so the hint lands on the board instead of in
+         the player's memory. -->
+    <string name="hint_apply">Cross them off</string>
+    <string name="hint_discard">Leave them</string>
+    <string name="hint_found_one">Your dog ruled out 1 square</string>
+    <string name="hint_found_many">Your dog ruled out %1$d squares</string>
     <string name="board_cell_wrong">wrong guess, cost a bone</string>
     <string name="board_cell_dog">dog</string>
     <string name="board_action_mark">Cross off</string>
