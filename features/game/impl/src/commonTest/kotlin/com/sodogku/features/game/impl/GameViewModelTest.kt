@@ -625,6 +625,40 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun aSettingChangedElsewhereReachesTheBoardWithoutARelaunch() = runUnitTest {
+        // The gear opens a real settings screen, so a player flips a switch and
+        // comes straight back. Reading AppData once at load meant the switch
+        // moved and the board did not: measured on a device, zero pixels changed
+        // until the next launch.
+        val cache = InMemoryAppCache()
+        val vm = viewModel(cache = cache)
+        assertFalse(vm.state.colorblind)
+        assertFalse(vm.state.reduceAnimations)
+
+        cache.update { it.copy(colorblindMode = true, reduceAnimations = true, hapticsEnabled = false) }
+
+        assertTrue(vm.state.colorblind, "the board has to pick the change up")
+        assertTrue(vm.state.reduceAnimations)
+        assertFalse(vm.state.haptics)
+    }
+
+    @Test
+    fun theBoardDoesNotEchoItsOwnConsumableWrites() = runUnitTest {
+        // The counts are deliberately not observed. This ViewModel is their
+        // writer, and feeding its own writes back in would fight the spend it
+        // just made — so a spend has to stick.
+        val cache = InMemoryAppCache()
+        val vm = viewModel(cache = cache)
+        val before = vm.state.treats
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Treat))
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Treat))
+
+        assertEquals(before - 1, vm.state.treats)
+        assertEquals(before - 1, cache.get().treats, "and reach disk")
+    }
+
+    @Test
     fun anAttemptSurvivesTheProcessBeingKilled() = runUnitTest {
         // The bug this exists for: booster spends were written to disk the moment
         // they happened and the board they paid for was not, so a force-quit

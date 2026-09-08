@@ -1678,3 +1678,19 @@ Sniff is blue and Treat is orange, and those are identities rather than theme
 roles. A player learns "the blue one shows me squares" long before they read the
 word, and that only holds if the colours never move. The standing ad offer is
 purple, so an offer never wears a booster's clothes.
+
+## 2026-09-07 — the board watches its settings instead of reading them once
+
+Once the gear opened a real settings screen, `GameViewModel` reading `AppData`
+at load stopped being enough: a player flips colourblind mode or reduce
+animations and comes straight back to the board. Measured on a device — the
+switch moved and zero pixels changed until the next launch.
+
+It now observes `appCache.updates`, mapped to the three settings that change
+what is on screen and `distinctUntilChanged` so unrelated `AppData` writes do
+not re-dispatch. This ViewModel makes several of those per move.
+
+The consumable counts are deliberately *not* observed. This ViewModel is their
+writer, and echoing its own writes back in would fight the spend it just made.
+One-way for state you own, observed for state someone else owns, is the rule the
+two halves are split on.

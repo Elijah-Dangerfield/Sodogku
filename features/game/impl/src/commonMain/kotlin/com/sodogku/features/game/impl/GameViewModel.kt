@@ -171,6 +171,23 @@ class GameViewModel(
 
     init {
         takeAction(GameAction.Load)
+
+        // The display settings are *observed*, not read once at load. The gear
+        // opens a real screen now, so a player flips colourblind mode or reduce
+        // animations and comes straight back to the board — and reading `AppData`
+        // once meant the switch moved and the board did not change until the
+        // next launch. Measured on a device: zero pixels changed.
+        //
+        // Only the three that change what is on screen. The consumable counts
+        // are deliberately absent: this ViewModel is their writer, and echoing
+        // its own writes back in would fight the spend it just made.
+        appCache.updates
+            .map { DisplaySettings(it.colorblindMode, it.hapticsEnabled, it.reduceAnimations) }
+            .distinctUntilChanged()
+            .onEach { display ->
+                takeAction(GameAction.DisplaySettingsChanged(display))
+            }
+            .launchIn(viewModelScope)
         // The card lives in the drawer of every board, daily or not, and the
         // repository re-emits at local midnight — so a drawer left open past
         // midnight picks up the new board without this screen watching a clock.
@@ -210,6 +227,13 @@ class GameViewModel(
             GameAction.TutorialAdvance -> action.tutorialTapped()
             GameAction.SkipTutorial -> action.skipTutorial()
             is GameAction.TimerTick -> action.updateState { it.copy(elapsedMs = elapsedMs()) }
+            is GameAction.DisplaySettingsChanged -> action.updateState {
+                it.copy(
+                    colorblind = action.settings.colorblind,
+                    haptics = action.settings.haptics,
+                    reduceAnimations = action.settings.reduceAnimations,
+                )
+            }
         }
     }
 
@@ -1536,6 +1560,19 @@ sealed interface GameEvent {
     data class Struck(val cell: Int) : GameEvent
 }
 
+/**
+ * The settings the board renders from.
+ *
+ * A value class rather than three parameters so the flow can be
+ * `distinctUntilChanged` on it — otherwise every unrelated `AppData` write, and
+ * this ViewModel makes several per move, would re-dispatch an action.
+ */
+data class DisplaySettings(
+    val colorblind: Boolean,
+    val haptics: Boolean,
+    val reduceAnimations: Boolean,
+)
+
 /** Something the game wants to stop and point at. */
 enum class GameWarning { LastBone }
 
@@ -1582,6 +1619,9 @@ sealed interface GameAction {
     data object UseFreeze : GameAction
     data object DismissFreezeMessage : GameAction
     data object OpenSettings : GameAction
+
+    /** The three settings that change what is on the board, as they change. */
+    data class DisplaySettingsChanged(val settings: DisplaySettings) : GameAction
     data object OpenPrivacy : GameAction
     data object OpenTerms : GameAction
     data object OpenFeedback : GameAction
