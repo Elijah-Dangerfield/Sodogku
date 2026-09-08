@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
@@ -58,8 +58,13 @@ private val ConfigRefreshTimeout = 5.seconds
  *
  * Note this is a *transition* trigger: a user who keeps the app foregrounded
  * uninterrupted never re-fetches mid-session — that would need polling, which we
- * deliberately don't do. The cached snapshot survives launches so the first frame
- * never blocks on the network.
+ * deliberately don't do.
+ *
+ * **The first frame never blocks on the network**, including on a fresh install.
+ * `configStream` starts from the bundled fallback and re-emits when a cached or
+ * fetched snapshot supersedes it, so `EnsureAppConfigLoaded` returns in
+ * milliseconds whether or not a server is reachable. Every declared key has a
+ * bundled default precisely so this is possible.
  *
  * Failure path: if the network fetch fails AND there's no prior cached snapshot,
  * the bundled fallback config is persisted so future `configStream` subscribers
@@ -86,8 +91,27 @@ class OfflineFirstAppConfigRepository @Inject constructor(
     private val refreshJobMutex = Mutex()
     private var lastFetchAtMs: Long? = null
 
+    /**
+     * The current config, starting from the bundled fallback rather than from
+     * nothing.
+     *
+     * This used to be `mapNotNull`, which meant a device with no cached snapshot
+     * emitted **nothing at all** until a fetch either succeeded or failed hard
+     * enough to persist the fallback. `EnsureAppConfigLoaded` awaits
+     * `configStream().first()`, so on a fresh install the first frame waited out
+     * the entire retry chain — measured at 8 seconds on an emulator with the
+     * server unreachable, which is every launch until the deploy lands and every
+     * offline launch after it.
+     *
+     * The file's own KDoc already promised the first frame never blocks on the
+     * network. It was true from the second launch onwards.
+     *
+     * A corrupt snapshot takes the same path: `decodeConfig` returns null, and
+     * an unreadable file is exactly as good a reason to start from the fallback
+     * as an absent one.
+     */
     private val cachedConfigFlow = configCache.updates
-        .mapNotNull { snapshot -> snapshot.configJson?.let(::decodeConfig) }
+        .map { snapshot -> snapshot.configJson?.let(::decodeConfig) ?: fallbackConfig }
 
     private val configStream: SharedFlow<AppConfigMap> = combine(
         configOverrideRepository.getOverridesFlow(),

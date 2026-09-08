@@ -2305,3 +2305,34 @@ anywhere in Sodogku. It would have put "Camera" on the Play listing. Removed,
 along with the camera methods on the iOS `NativeViewFactory` — the Swift
 implementations in `IOSNativeViewFactory.swift` are now unused and should go with
 them the next time anyone can build iOS, which is not from here.
+
+## 2026-09-08 — the first frame was blocking on a server that isn't deployed
+
+Reported as "stuck on splash". Measured on an emulator with the network off:
+**10 seconds** from cold start to the first real frame, every time.
+
+`EnsureAppConfigLoaded` awaits `configStream().first()`, and that stream was
+built with `mapNotNull` over the cached snapshot. On a device with no cached
+config — a fresh install, or a corrupt cache — it emitted *nothing*, so `first()`
+waited for a fetch to either succeed or fail hard enough that the failure path
+persisted the fallback. Offline, that meant sitting through the whole retry chain
+against `http://localhost/v1/app-config` until the 8-second boot timeout fired.
+
+The file's own KDoc already promised "the first frame never blocks on the
+network". It was true from the second launch onwards, which is why nobody caught
+it: on a dev machine you launch the app twice and the second one is fine.
+
+`configStream` now starts from the bundled fallback and re-emits when a cached or
+fetched snapshot supersedes it. Every declared key has a bundled default
+specifically so this is possible — SPEC section 4 requires it, and the app is
+meant to be fully playable with the server switched off. Cold boot offline is now
+**3.3 seconds**, measured the same way.
+
+A corrupt snapshot takes the same path, because an unreadable file is exactly as
+good a reason to start from the fallback as an absent one.
+
+Two things made this worse than it looked. The boot screen had just been changed
+to show the dog alone with the spinner delayed five seconds, so a ten-second boot
+looked like a frozen splash rather than a slow one — the change was right and it
+turned a visible wait into an invisible one. And `throwIfDebug` in the config
+decode path means a debug build was the one most likely to sit there.
