@@ -1888,3 +1888,27 @@ This is the worst shape a test-tooling bug can take: it does not fail, it makes
 the app look like it did something it did not, and every screenshot taken through
 it is one interaction ahead of where you think you are. Replaced with
 `am start -W -n <pkg>/<activity>`, which starts the app and does nothing else.
+
+## 2026-09-07 — splitting GameViewModel, as far as it splits cleanly
+
+It reached 1895 lines and 22 constructor parameters, because every chunk that
+needed the game added itself to it. Two extractions, both behaviour-preserving:
+
+`GameContract.kt` takes the state, events, actions and phases. Nothing there has
+behaviour; it is the vocabulary the screen and the ViewModel share, and reading
+"what can this screen do" no longer means scrolling past how it does it.
+
+`TutorialRunner.kt` takes the one responsibility in there with a state machine
+of its own — a script, a position in it, and which levels have already been
+guided. Those three fields sat among fifteen others that had nothing to do with
+them. It deliberately owns no `GameState`: deciding *which* coach mark shows is
+its business, putting it on screen is the ViewModel's, so every method returns a
+frame and changes nothing visible.
+
+That leaves about 1490 lines, which is still too big. The remaining seams — the
+consumable economy, the daily — all call `updateState`, which is a member
+extension on the SEAViewModel base and so cannot be reached from outside the
+class. Splitting those means a delegate that takes a `(GameState) -> GameState`
+rather than a plain move, and that is a change with real risk. Recorded rather
+than attempted, because it was not the day for it: three agents were editing
+this file.

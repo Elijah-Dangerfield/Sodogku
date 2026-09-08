@@ -1,0 +1,341 @@
+package com.sodogku.features.game.impl
+
+import com.sodogku.libraries.achievements.Achievement
+import com.sodogku.libraries.achievements.AchievementsRepository
+import com.sodogku.libraries.levels.LevelDefinition
+import com.sodogku.libraries.progress.LevelRecord
+import com.sodogku.libraries.progress.daily.DailyStatus
+import com.sodogku.libraries.progress.daily.FreezeResult
+import com.sodogku.libraries.puzzle.Solution
+import com.sodogku.libraries.scoring.Praise
+import com.sodogku.libraries.scoring.ScoreCard
+import com.sodogku.libraries.scoring.ScoringConfig
+import kotlinx.coroutines.flow.distinctUntilChanged
+
+
+
+/**
+ * What the game screen renders from, what it sends in, and what it sends out.
+ *
+ * Split out of `GameViewModel.kt` once that file passed 1600 lines. Nothing here
+ * has behaviour — it is the vocabulary the screen and the ViewModel share, and
+ * keeping it apart means reading "what can this screen do" no longer means
+ * scrolling past how it does it.
+ */
+
+/** Where the attempt is. Everything the screen renders keys off this. */
+enum class GamePhase { Loading, Playing, Won, Lost }
+
+data class GameState(
+    val level: LevelDefinition? = null,
+    val placed: Solution = Solution.empty(1),
+    val autoMarks: Set<Int> = emptySet(),
+    val manualMarks: Set<Int> = emptySet(),
+
+    /** What an ad tops a booster up to, so the prompt's copy matches the tap. */
+    val refillTo: Int = 3,
+
+    /**
+     * `boosters.treatEveryNLevels`, so the level pane marks the rows that pay.
+     *
+     * Zero by default rather than the config default. The pane promising a
+     * reward the game has not confirmed is the bug this whole reward path
+     * exists to close, and a value baked in here would be a second answer to a
+     * question config already answers — the failure that made
+     * `boosters.startingSniffs` unwirable.
+     */
+    val treatEveryNLevels: Int = 0,
+
+    /**
+     * True once the last campaign level is cleared, so the win sheet can say so
+     * instead of offering a next level that does not exist.
+     */
+    val campaignComplete: Boolean = false,
+
+    /**
+     * Auto-marks the player has tapped away.
+     *
+     * Held as an exclusion rather than by removing them from [autoMarks],
+     * because auto-marks are recomputed from [placed] on every move — anything
+     * taken out of that set would reappear on the next placement.
+     */
+    val clearedMarks: Set<Int> = emptySet(),
+
+    /**
+     * Squares that cost a bone. Tracked apart from [manualMarks] so they stay
+     * red: a square someone paid for reads differently from one they worked out.
+     */
+    val wrongGuesses: Set<Int> = emptySet(),
+    val livesRemaining: Int = ScoringConfig.MAX_LIVES,
+    val score: ScoreCard = ScoreCard.Empty,
+    val paws: Int = 0,
+    val elapsedMs: Long = 0,
+    val sniffs: Int = 0,
+    val treats: Int = 0,
+
+    /** Boosters whose first-use explainer the player has already seen. */
+    val explainedBoosters: Set<Consumable> = emptySet(),
+
+    /** The booster whose explainer or refill offer is open, if any. */
+    val boosterPrompt: Consumable? = null,
+    val phase: GamePhase = GamePhase.Loading,
+
+    /** Bumped per wrong tap so the same cell can shake twice in a row. */
+    val strikeNonce: Int = 0,
+    val strikeCell: Int? = null,
+
+    /** Bumped per placement so two identically-scored taps both animate. */
+    val pointsNonce: Int = 0,
+    val lastPoints: Int = 0,
+    val lastPraise: Praise = Praise.None,
+
+    /** Region glyphs on, for players who cannot separate the fills by hue. */
+    val colorblind: Boolean = false,
+
+    /** Vibration on marks, placements and strikes. */
+    val haptics: Boolean = true,
+
+    /** Stills instead of animated dogs, and a shorter board entrance. */
+    val reduceAnimations: Boolean = false,
+
+    /**
+     * The Settings toggle for badges. Display only — `AchievementsRepository`
+     * keeps recording either way, so this gates the toast and nothing else. A
+     * player who turns them back on sees real history rather than a blank grid.
+     */
+    val showAchievements: Boolean = true,
+
+    /**
+     * `features.boosters`, for the row of Sniff and Treat buttons. True by
+     * default so a board built before the flag is read — a preview, a test, a
+     * first launch with no network — has the economy rather than losing it.
+     * Bones are unaffected either way: three strikes is a game rule.
+     */
+    val boostersEnabled: Boolean = true,
+
+    /** How far the player has reached; the level drawer unlocks up to it. */
+    val unlockedThrough: Int = LevelRecord.FIRST_LEVEL_ID,
+
+    /**
+     * What the player has done with each level they have touched, keyed by id.
+     * Filled when the drawer opens; levels with no entry have never been played.
+     */
+    val records: Map<Int, LevelRecord> = emptyMap(),
+
+    /** Pro can jump to any level in the drawer, not just the ones reached. */
+    val isPro: Boolean = false,
+
+    /**
+     * True when advancing will play an ad first, so the win sheet can badge the
+     * button rather than springing one on the player. Wired to the config-driven
+     * frequency gate in C7; nothing sets it yet.
+     */
+    val adBeforeNextLevel: Boolean = false,
+
+    /** The free dog on early levels, so the UI can mark it as not the player's doing. */
+    val starterDogCell: Int? = null,
+
+    /** A one-shot spotlight the player has to dismiss. */
+    val warning: GameWarning? = null,
+
+    /**
+     * The guided lesson on screen, or null when the player is on their own.
+     * Drives the whole coach mark: the screen maps the step to a spotlight and
+     * a piece of copy and renders nothing else of its own.
+     */
+    val tutorial: TutorialStep? = null,
+
+    /**
+     * The board squares [tutorial] is pointing at, empty for a step that points
+     * at chrome instead. Held here rather than derived in the screen because
+     * which square a lesson picks depends on the answer, and the screen has no
+     * business knowing it.
+     */
+    val tutorialCells: Set<Int> = emptySet(),
+
+    /** Squares a sniff has ruled out, spotlit until the player taps away. */
+    val hintCells: Set<Int> = emptySet(),
+
+    /**
+     * Badges this attempt just unlocked, in catalog order. Empty is the normal
+     * answer; the outcome sheet shows them and nothing else needs to.
+     */
+    val newBadges: List<Achievement> = emptyList(),
+
+    /**
+     * Whether the level pane is showing. In state rather than in the screen's
+     * `remember` because everything the pane draws — [records], [unlockedThrough],
+     * [isPro] — is loaded here, and a flag that lives apart from the data it
+     * gates can be true while the data behind it is still empty.
+     */
+    val drawerOpen: Boolean = false,
+
+    /**
+     * Today's daily, or null before the first status arrives. One snapshot of the
+     * clock: date, board, streak, freeze offer and reset countdown all agree with
+     * each other, and the card does no date arithmetic of its own.
+     */
+    val daily: DailyStatus? = null,
+
+    /** Whether *this* board is the daily, rather than a campaign level. */
+    val isDaily: Boolean = false,
+
+    /**
+     * The streak as of this attempt, for the outcome sheet. Set from the value
+     * the write returned rather than read back off [daily], which arrives on its
+     * own dispatch and would show the streak from before the clear.
+     */
+    val dailyStreak: Int = 0,
+
+    /** The answer to a freeze the player just asked for. */
+    val freezeMessage: FreezeMessage? = null,
+
+    /**
+     * The Skip option, or null when this attempt has not earned one. Set on the
+     * loss that qualifies, and gone again the moment a fresh attempt opens.
+     */
+    val skip: SkipOffer? = null,
+
+    /**
+     * True when the clear just paid a Treat, so the win sheet can say so. The
+     * count in [treats] already includes it.
+     */
+    val treatAwarded: Boolean = false,
+) {
+    val placedCells: Set<Int> get() = placed.cells().toSet()
+
+    val dogsPlaced: Int get() = placed.placedCount
+
+    val dogsRequired: Int get() = level?.size ?: 0
+}
+
+/**
+ * The Skip on the lose sheet.
+ *
+ * Carries the allowance rather than just a boolean so the button can say how
+ * many are left — the cap is the surprising part of this feature, and a player
+ * who finds out about it by tapping a button that does nothing has been told
+ * badly.
+ */
+data class SkipOffer(
+    val remainingToday: Int,
+
+    /** Pro skips without watching anything, so the button drops its Ad badge. */
+    val free: Boolean = false,
+) {
+    val available: Boolean get() = remainingToday > 0
+}
+
+/**
+ * What came of a streak freeze. Every [FreezeResult] maps to one of these, plus
+ * [Unavailable] for a repository call that threw — five answers, five things the
+ * player can be told, and no silent branch.
+ */
+sealed interface FreezeMessage {
+    data class Applied(val streak: Int) : FreezeMessage
+    data object Declined : FreezeMessage
+    data object NoneLeft : FreezeMessage
+    data object NothingToFreeze : FreezeMessage
+    data object Unavailable : FreezeMessage
+}
+
+sealed interface GameEvent {
+    data object NavigateBack : GameEvent
+
+    /** Today's daily, on its own route, from the card in the drawer. */
+    data class OpenDaily(val levelId: Int) : GameEvent
+
+    /** A campaign level picked from the drawer of a board in the other pack. */
+    data class OpenLevel(val levelId: Int) : GameEvent
+
+    /** For sound and haptics; the cell animates itself. */
+    data class PlacedDog(val cell: Int) : GameEvent
+
+    data class Marked(val cell: Int) : GameEvent
+
+    data object Won : GameEvent
+    data object OpenSettings : GameEvent
+    data object OpenPrivacy : GameEvent
+    data object OpenTerms : GameEvent
+    data object OpenFeedback : GameEvent
+
+    data class Struck(val cell: Int) : GameEvent
+}
+
+/**
+ * The settings the board renders from.
+ *
+ * A value class rather than three parameters so the flow can be
+ * `distinctUntilChanged` on it — otherwise every unrelated `AppData` write, and
+ * this ViewModel makes several per move, would re-dispatch an action.
+ */
+data class DisplaySettings(
+    val colorblind: Boolean,
+    val haptics: Boolean,
+    val reduceAnimations: Boolean,
+)
+
+/** Something the game wants to stop and point at. */
+enum class GameWarning { LastBone }
+
+/** What the coach mark is showing, and where it is pointing. */
+data class TutorialFrame(val step: TutorialStep?, val cells: Set<Int>) {
+    companion object {
+        val None = TutorialFrame(step = null, cells = emptySet())
+    }
+}
+
+sealed interface GameAction {
+    data object Load : GameAction
+    data class CellTapped(val cell: Int) : GameAction
+    /** Tapping a booster button. May explain, use, or offer a refill. */
+    data class BoosterTapped(val consumable: Consumable) : GameAction
+
+    /** Confirmed from the explainer: spend one. */
+    data class BoosterConfirmed(val consumable: Consumable) : GameAction
+
+    /** Confirmed from the explainer: watch an ad to refill. */
+    data class BoosterRefillRequested(val consumable: Consumable) : GameAction
+
+    data object DismissBoosterPrompt : GameAction
+    data object Retry : GameAction
+    data object ContinueAfterLoss : GameAction
+    data object Leave : GameAction
+    data object DismissWarning : GameAction
+    data object RefillBones : GameAction
+
+    /** Trade an ad for the level, after enough attempts have failed. */
+    data object SkipLevel : GameAction
+    data object ToggleColorblind : GameAction
+    data object ToggleHaptics : GameAction
+    data object ToggleReduceAnimations : GameAction
+    data object NextLevel : GameAction
+
+    /** The drawer was opened, so its per-level records need reading. */
+    data object LevelsOpened : GameAction
+
+    data object LevelsClosed : GameAction
+    data class GoToLevel(val levelId: Int) : GameAction
+
+    /** A new daily snapshot: a result was written, or the local date rolled over. */
+    data class DailyChanged(val status: DailyStatus) : GameAction
+
+    data object PlayDaily : GameAction
+    data object UseFreeze : GameAction
+    data object DismissFreezeMessage : GameAction
+    data object OpenSettings : GameAction
+
+    /** The three settings that change what is on the board, as they change. */
+    data class DisplaySettingsChanged(val settings: DisplaySettings) : GameAction
+    data object OpenPrivacy : GameAction
+    data object OpenTerms : GameAction
+    data object OpenFeedback : GameAction
+
+    /** The coach mark was tapped, or its button was. Only moves a `Tap` step. */
+    data object TutorialAdvance : GameAction
+
+    /** Out of the guided run for good, from whichever step is showing. */
+    data object SkipTutorial : GameAction
+
+    data class TimerTick(val at: Long) : GameAction
+}

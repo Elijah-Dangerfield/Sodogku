@@ -1142,7 +1142,13 @@ being made — `libraries/ui/.../components/dialog/`. Every dialog in the app sh
 padding without its call site asking. The reason it kept recurring is that the padding was a
 per-call-site concern and nothing failed when a call site forgot.
 
-**Tracked debt.** `GameViewModel` is 1636 lines with 17 injected dependencies. It owns the board,
+**Tracked debt.** `GameViewModel` was 1895 lines with 22 constructor parameters. `GameContract.kt`
+(the state, events and actions) and `TutorialRunner.kt` (the script, the position in it, and which
+levels have been guided) are out, taking it to ~1490 — better, and still too big. The remaining
+seams are the consumable economy and the daily, both of which need `updateState` and so want a
+delegate that takes a state transform rather than a plain extraction. Original note follows.
+
+`GameViewModel` is 1636 lines with 17 injected dependencies. It owns the board,
 scoring, three consumables, the daily, achievements, the tutorial, progress, board persistence,
 display settings and ads, because every chunk that needed the game added itself here. It is the
 highest-churn file in the repo and the place quality decays first — five of the seven bugs found
