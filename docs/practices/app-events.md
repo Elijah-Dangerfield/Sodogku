@@ -301,3 +301,23 @@ the forwarding flag off never affects events.
 
 In-app feedback is not a Loki event: `FeedbackRepository` sends it straight to Sentry via
 `Telemetry.captureUserFeedback` (verbatim message, screenshots, session-log attachment).
+
+## Leaderboards (iOS only)
+
+Emitted by `RealLeaderboards` in `:libraries:leaderboards:impl`. One event, and it only ever
+fires on the way *out*, when the platform has actually accepted a value.
+
+| Event | Attributes | Fires |
+|---|---|---|
+| `leaderboard.submitted` | `board`, `value` | Game Center accepted a score. `board` is the `Leaderboard` enum name (`LifetimeScore`, `LongestStreak`), not the console id |
+
+There is deliberately no event for a failure. Every way a submission can fail (nobody signed in,
+Screen Time, offline, a region without Game Center, a board id that does not exist yet in App
+Store Connect) is a state the app is designed to be indifferent to, and most players on iOS will
+sit in one of them permanently. An event per refusal would be a high-volume series whose value
+never moves and whose only use is to make a healthy app look broken. Failures go to KLog at Warn,
+which the forwarding above already carries when something is genuinely wrong.
+
+Note that the absence of `leaderboard.submitted` is itself the signal worth watching: if the
+count goes to zero across a release after being non-zero, the ids in `Leaderboard` and the ids in
+App Store Connect have stopped matching.

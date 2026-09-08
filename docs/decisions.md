@@ -3218,3 +3218,162 @@ board was never saved at all while the old snapshot sat there. A daily opened
 over an unfinished campaign level could not save its own loss, so the day had
 nothing to come back to. Now a real snapshot always takes the slot and only a
 *clearing* write is held back.
+
+## 2026-09-08 — Game Center is the one leaderboard that needs no account
+
+Punch-list S13, in full: "Using the Game Center on iOS seems important idk how
+easy that is."
+
+### Why this is not the leaderboard `proposals.md` already refused
+
+`proposals.md` rules out leaderboards, and it is right about the reason:
+identity was deleted rather than disabled in C0, and anything that ranks players
+needs to know who they are. That argument names the cost as *ours*, and it is
+what also rules out the softer "you beat 60% of players" line, which needs a
+server that receives per-player results.
+
+Game Center is the exception, and it is an exception on exactly that axis. Apple
+owns the identity, hosts the scores, renders the UI, and moderates the display
+names. Nothing about it reaches `:libraries:identity`, `AuthGate`, or the Ktor
+server, and there is no per-player record anywhere in our systems afterwards.
+The thing that was expensive is free on one platform, and only on that platform.
+
+So the honest answer to "how easy is it" is: the plumbing is a day, and the
+number of decisions is larger than the amount of code.
+
+### Two boards, and the ones that were rejected
+
+`Leaderboard` has exactly two entries. A leaderboard is a shared room, and
+splitting a small player base across several empties all of them, so the test
+was not "could this be a board" but "would a stranger's name be next to yours on
+it in week one".
+
+**Lifetime score** and **longest daily streak** passed. Both already exist as a
+single monotonically increasing integer folded out of stored rows
+(`LifetimeScore.banked`, `StreakSummary.longest`), both are comparable between
+two people who have never played the same board, and they measure different
+things: one rewards volume, the other rewards turning up. A player who cannot
+win the first can plausibly win the second.
+
+**Per-level best score and best time, 500 of them.** Game Center allows 100
+leaderboards per app, so this does not fit arithmetically, and if it did, each
+board would hold the handful of people who happened to replay level 312.
+
+**The daily challenge as a recurring leaderboard.** This is the one that looks
+right and is not, and it is worth writing down so nobody re-proposes it. Game
+Center recurring boards roll on a fixed instant. Our daily rolls at device-local
+midnight (`DailyCalendar`), which was a deliberate call. A player in Auckland is
+therefore on tomorrow's puzzle while the board still says today, and the board
+would be ranking scores from two different puzzles against each other. Every fix
+costs either the local-midnight daily or a window we compute ourselves, and
+neither is worth a board.
+
+**Total paws** is a monotone function of score. Two boards that rank the same
+people in nearly the same order are one board and one distraction.
+
+**A weekly score board is the real gap**, and it is not built. An all-time score
+board is unwinnable for anyone arriving late, and the standard answer is a
+rolling window everybody starts level in. Game Center supports that natively.
+What is missing is on our side: `:libraries:progress` folds a lifetime total and
+nothing exposes "points earned since a date". That is a small addition there,
+then a one-line addition here.
+
+### The 73 achievements are not mirrored
+
+The case for mirroring is real. Game Center achievements show on a player's
+profile, pop up on unlock without us drawing anything, and some people collect
+them. The app already computes every unlock, so the wiring would be one call.
+
+It still loses, for three reasons that compound.
+
+**The cost is not code, it is 73 console forms.** Each needs a title, a
+pre-earned description, an earned description, a point value, and a 512x512
+image, all typed into App Store Connect by hand, and all localised there rather
+than in `:libraries:resources` where every other player-facing string in this
+app lives. That is 73 images the game does not have and 146 strings in a second
+place.
+
+**They cannot be taken back.** Once a version ships with an achievement, App
+Store Connect will not delete it. The catalog here is young enough that
+`AchievementReachabilityTest` exists precisely because entries have needed
+changing, and the moment one is mirrored, changing it means adding a second one
+next to a permanent tombstone.
+
+**It is a second source of truth for something the app already renders.** The
+in-app trophy case is the feature; Game Center would be a copy of it that can
+drift, gated behind a Settings toggle whose copy is about the in-app one.
+
+A curated subset was considered and is worse than both: a player seeing 8 of 73
+in Game Center learns that the mirror is unreliable. If this is ever revisited it
+should be all of them or none, and the honest trigger is somebody asking for it,
+not us deciding it would be nice.
+
+Nothing in the interface is shaped by this decision. `GameServices` has no
+achievement method, and adding one later is additive rather than a rewrite.
+
+### Kotlin/Native, not a Swift shim
+
+`AdNetwork` and `StoreBilling` are Swift objects handed into the graph through
+`IosAppComponent`, and it would have been easy to assume Game Center goes the
+same way. It should not. Those two wrap things Kotlin genuinely cannot reach:
+GoogleMobileAds is a third-party framework, and StoreKit 2 is Swift-only.
+GameKit is an ordinary Objective-C system framework, so Kotlin/Native already
+ships full bindings for it and a Swift file would only be a second place for the
+seam to drift from.
+
+That also removes the integration cost this would otherwise have carried:
+`GameCenterServices` binds itself in `iosMain`, so `IosAppComponent`,
+`create(...)` and `iOSApp.swift` are all untouched.
+
+### The authentication handler, which is where this goes wrong
+
+`GKLocalPlayer.authenticateHandler` is a subscription, not a callback, and three
+things about it are easy to get wrong.
+
+It is **set exactly once, ever**: assigning it again restarts authentication, so
+`startAuthentication()` is idempotent behind a flag that only the main queue
+touches. It **fires more than once**: first with a sign-in screen, later saying
+the player signed in, later still saying they signed out mid-session. So nothing
+here holds a continuation to resume, because resuming one twice is a crash;
+every answer is written into a `StateFlow` instead. And **the view controller it
+hands you is a request, not a notification**.
+
+That last one is the product call. We keep the sign-in screen and present it
+only if the player opens a leaderboard themselves. A full-screen sign-in that
+arrives on its own at launch, for a feature the game does not need, is exactly
+the interruption the fail-open rule exists to prevent. The cost is that a player
+signed out of Game Center never gets prompted unless they go looking, which is
+the right trade for a single-player puzzle game.
+
+### Fail open, made structural
+
+`Leaderboards` has no suspending method and no method that returns a result.
+There is no way to write a call site that waits on a leaderboard or branches on
+one, which is the fail-open rule expressed as a signature rather than a comment:
+an API handing back a `Boolean` would eventually get an `if` written around it.
+The only readable thing is `isOfferable`, and only to decide whether to draw an
+entry point.
+
+The one behaviour worth the class existing is holding a score earned before
+sign-in resolved. Authentication is slow and a board is quick, so the first
+score of a session routinely happens while Game Center is still deciding who the
+player is. Submitting it then does nothing, and without somewhere to put it, it
+is lost until the next board, which on a first session is often never. One slot
+per board, best value wins, flushed when authentication lands. In memory only,
+because every value is a running total the next board recomputes.
+
+### What the entitlement costs, and the trap in it
+
+`com.apple.developer.game-center` is now in `apps/ios/iosApp/iosApp.entitlements`.
+Simulator builds are ad-hoc signed and do not check entitlements against a
+profile, so **a green simulator build proves nothing about a device build**. The
+App ID needs the Game Center capability enabled before a signed build works;
+Xcode's automatic signing normally does that itself the first time it provisions
+the target, and a manual profile has to be regenerated. If a device or
+TestFlight build starts failing to sign, that is the first thing to check.
+
+One thing noticed while in that file and deliberately not changed:
+`com.apple.developer.applesignin` is still there, left over from the identity
+work C0 deleted, and nothing in the app enables it any more. Removing an
+entitlement is safe where adding one is not, but it is not this change's to
+make.

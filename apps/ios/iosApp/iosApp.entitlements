@@ -6,5 +6,14 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!-- Game Center. Required before GKLocalPlayer can authenticate against a
+	     signed build, and the matching capability has to be enabled on the App
+	     ID as well or signing fails. Automatic signing in Xcode normally does
+	     that for you the first time it provisions this target; a manual profile
+	     has to be regenerated. Simulator builds are ad-hoc signed and do not
+	     check this, so a green simulator build proves nothing about a device
+	     one. See docs/decisions.md, 2026-09-08. -->
+	<key>com.apple.developer.game-center</key>
+	<true/>
 </dict>
 </plist>
