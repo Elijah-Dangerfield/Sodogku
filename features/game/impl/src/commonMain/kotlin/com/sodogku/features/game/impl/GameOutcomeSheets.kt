@@ -13,6 +13,7 @@ import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.button.ButtonGhost
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.button.ButtonSecondary
+import com.sodogku.libraries.ui.components.dialog.ModalDialogDefaults
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.game.PawRating
@@ -206,6 +207,13 @@ private fun LostSheet(state: GameState, onAction: (GameAction) -> Unit, modifier
  * It needs its own surface, not just the scrim: the first pass laid the content
  * straight onto the dimmed board and the title was dark text on a dark
  * translucent grid, effectively invisible.
+ *
+ * Not a [com.sodogku.libraries.ui.components.dialog.Dialog], deliberately —
+ * `Dialog` dismisses on an outside tap, and a lose sheet that vanishes when the
+ * player taps the board behind it leaves them on a dead grid with no way to
+ * retry. It borrows the dialog's [ModalDialogDefaults.ContentPadding] so the two
+ * kinds of card do not drift apart, which is what a second copy of the numbers
+ * guaranteed.
  */
 @Composable
 private fun OutcomeLayout(modifier: Modifier, content: @Composable () -> Unit) {
@@ -217,7 +225,7 @@ private fun OutcomeLayout(modifier: Modifier, content: @Composable () -> Unit) {
             .fillMaxWidth()
             .clip(Radii.Card)
             .background(AppTheme.colors.surfacePrimary.color)
-            .padding(horizontal = Dimension.D800, vertical = Dimension.D900),
+            .padding(ModalDialogDefaults.ContentPadding),
     ) {
         content()
     }

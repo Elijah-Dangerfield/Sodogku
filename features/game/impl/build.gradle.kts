@@ -51,6 +51,9 @@ kotlin {
             implementation(projects.libraries.scoring)
             implementation(projects.libraries.ads)
             implementation(projects.libraries.billing)
+            // The dialog copy tests name StringResources directly.
+            implementation(projects.libraries.resources)
+            implementation(compose.components.resources)
             implementation(libs.kotlinx.coroutines.test)
         }
     }

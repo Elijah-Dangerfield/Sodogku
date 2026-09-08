@@ -51,6 +51,7 @@ import com.sodogku.libraries.ui.snackbar.showDebugSnackBar
 import com.sodogku.libraries.ui.system.LocalAppState
 import com.sodogku.libraries.ui.system.LocalBuildInfo
 import com.sodogku.libraries.ui.system.LocalClock
+import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.libraries.ui.system.LocalShareSheet
 import com.sodogku.system.AppThemeProvider
 import kotlin.reflect.typeOf
@@ -120,12 +121,17 @@ fun App(appComponent: AppComponent) {
     )
 
     val appState = remember { appComponent.appState }
+    val reduceAnimations by appViewModel.reduceAnimations.collectAsState()
 
     CompositionLocalProvider(
         LocalAppState provides appState,
         LocalClock provides appComponent.provideClock(),
         LocalBuildInfo provides BuildInfo,
         LocalDialogHostState provides dialogHostState,
+        // One provider for the whole tree: a component that moves on its own
+        // reads the setting rather than being handed it, so a new screen honours
+        // it without its author knowing it exists.
+        LocalReduceAnimations provides reduceAnimations,
         // Provided once at the root: every screen that can build a share
         // string reads this rather than being handed a launcher.
         LocalShareSheet provides appComponent.shareLauncher,

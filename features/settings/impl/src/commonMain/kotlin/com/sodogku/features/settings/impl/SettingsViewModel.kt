@@ -43,6 +43,7 @@ class SettingsViewModel(
             SettingsAction.ToggleReduceAnimations -> action.toggleReduceAnimations()
             SettingsAction.ToggleColorblind -> action.toggleColorblind()
             SettingsAction.ToggleAchievements -> action.toggleAchievements()
+            SettingsAction.RerunTutorial -> action.rerunTutorial()
             SettingsAction.OpenAchievements -> sendEvent(SettingsEvent.OpenAchievements)
             SettingsAction.OpenTerms -> sendEvent(SettingsEvent.OpenLink(termsUrl()))
             SettingsAction.OpenPrivacy -> sendEvent(SettingsEvent.OpenLink(privacyUrl()))
@@ -103,6 +104,22 @@ class SettingsViewModel(
         persist { it.copy(achievementsVisible = next) }
     }
 
+    /**
+     * Puts the guided first three levels back on.
+     *
+     * The flag is cleared *before* the navigation event goes out, because the
+     * board's ViewModel reads it once as it loads and a write that landed after
+     * that read would open level 1 with nothing to teach.
+     *
+     * This is the reason `hasCompletedTutorial` is a separate flag from
+     * `hasUserOnboarded`: replaying the lessons must not put the welcome screen
+     * back in front of someone with 200 levels behind them.
+     */
+    private suspend fun SettingsAction.rerunTutorial() {
+        persist { it.copy(hasCompletedTutorial = false) }
+        sendEvent(SettingsEvent.RerunTutorial)
+    }
+
     private suspend fun persist(transform: (AppData) -> AppData) {
         Catching { appCache.update(transform) }
             .logOnFailure { "Failed to persist a setting" }
@@ -128,6 +145,9 @@ sealed interface SettingsEvent {
     data object OpenFeedback : SettingsEvent
     data object OpenAchievements : SettingsEvent
 
+    /** Back to level 1 with the coach marks armed, replacing the back stack. */
+    data object RerunTutorial : SettingsEvent
+
     /** Terms and privacy are hosted pages, so they open in a browser. */
     data class OpenLink(val url: String) : SettingsEvent
 }
@@ -139,6 +159,7 @@ sealed interface SettingsAction {
     data object ToggleReduceAnimations : SettingsAction
     data object ToggleColorblind : SettingsAction
     data object ToggleAchievements : SettingsAction
+    data object RerunTutorial : SettingsAction
     data object OpenAchievements : SettingsAction
     data object OpenTerms : SettingsAction
     data object OpenPrivacy : SettingsAction

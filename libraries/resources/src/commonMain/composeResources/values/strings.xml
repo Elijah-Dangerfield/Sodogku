@@ -43,6 +43,22 @@
     <string name="bones_title">Bones</string>
     <string name="bones_body">Three bones per attempt. Placing a dog on the wrong square costs one. Run out and the attempt ends — but you can watch an ad for three more, or start the puzzle over.\n\nCrossing squares off is always free.</string>
 
+    <string name="level_explainer_title">Level %1$d</string>
+    <string name="level_explainer_body">Number %1$d of %2$d in the campaign. Clearing it unlocks the next one.</string>
+    <string name="level_explainer_grid">A %1$d×%1$d board, so %1$d dogs go on it. Boards grow as you climb.</string>
+    <string name="level_explainer_difficulty">Difficulty: %1$s</string>
+    <string name="level_difficulty_1">Gentle</string>
+    <string name="level_difficulty_2">Easy</string>
+    <string name="level_difficulty_3">Tricky</string>
+    <string name="level_difficulty_4">Tough</string>
+    <string name="level_difficulty_5">Fiendish</string>
+    <string name="level_explainer_daily_title">Daily streak</string>
+    <string name="level_explainer_daily_body">One fresh board a day, on a %1$d×%1$d grid. Clear it and your streak goes up; miss a day and it starts again, unless you spend a freeze.</string>
+
+    <string name="score_explainer_title">Score</string>
+    <string name="score_explainer_body">Every dog you place is worth points, and a bigger board pays more per dog. Land them one after another without a wrong guess and a combo multiplier builds; land them quickly and a speed bonus stacks on top. Finishing pays a bonus of its own, worth more on a hard board and more again for every bone you still have.</string>
+    <string name="score_explainer_paws">The paws at the end measure your score against par — what a clean, quick run on this board is worth. Three paws means you got close to it.</string>
+
     <string name="levels_title">Levels</string>
     <string name="levels_locked">Locked</string>
     <string name="levels_size">%1$d×%2$d</string>
@@ -81,6 +97,44 @@
     <string name="booster_have">You have %1$d</string>
     <string name="hint_title">No dogs here</string>
     <string name="hint_body">These squares are ruled out. Tap anywhere to carry on.</string>
+
+    <!-- Tutorial (SPEC 10). One title + body per TutorialStep; the exhaustive
+         `when` in TutorialCoachMark is what keeps this list honest. -->
+    <string name="tutorial_got_it">Got it</string>
+    <string name="tutorial_skip">Skip tutorial</string>
+    <string name="tutorial_rule_region_title">One dog per color</string>
+    <string name="tutorial_rule_region_body">Every colored block holds exactly one dog. Never two, never none.</string>
+    <string name="tutorial_rule_line_title">One per row and column</string>
+    <string name="tutorial_rule_line_body">The same across the grid. Each row gets one dog, and so does each column.</string>
+    <string name="tutorial_rule_touching_title">Dogs keep their distance</string>
+    <string name="tutorial_rule_touching_body">No two dogs may sit next to each other. Corners count as next to.</string>
+    <string name="tutorial_starter_dog_title">Here is one for free</string>
+    <string name="tutorial_starter_dog_body">The early levels start you off. Every square this one rules out is crossed off already.</string>
+    <string name="tutorial_mark_square_title">Cross a square off</string>
+    <string name="tutorial_mark_square_body">One tap marks a square as empty. It costs nothing, so mark freely. Try the lit square.</string>
+    <string name="tutorial_place_dog_title">Two taps places a dog</string>
+    <string name="tutorial_place_dog_body">Tap the lit square twice, quickly. A dog belongs here.</string>
+    <string name="tutorial_bones_title">Three bones an attempt</string>
+    <string name="tutorial_bones_body">Putting a dog on the wrong square costs one. Crossing squares off never does. Now finish the board.</string>
+    <string name="tutorial_place_and_watch_title">Place this one</string>
+    <string name="tutorial_place_and_watch_body">Two quick taps on the lit square, then watch what the board does.</string>
+    <string name="tutorial_auto_mark_title">The board marks for you</string>
+    <string name="tutorial_auto_mark_body">Every square that dog rules out was crossed off for you. On the bigger grids this is most of the work.</string>
+    <string name="tutorial_sniff_title">Sniff</string>
+    <string name="tutorial_sniff_body">Stuck? A sniff rules a few squares out. It never says where a dog goes, so the puzzle stays yours.</string>
+    <string name="tutorial_treat_title">Treat</string>
+    <string name="tutorial_treat_body">A treat places one dog correctly, with no bone at risk. Now finish this board.</string>
+    <string name="tutorial_no_touching_title">Nothing sits beside a dog</string>
+    <string name="tutorial_no_touching_body">A dog rules out every square it touches, corners included. That is the ring around this one.</string>
+    <string name="tutorial_try_wrong_title">Get one wrong on purpose</string>
+    <string name="tutorial_try_wrong_body">Two taps on the lit square. No dog lives there, and this one mistake is on us.</string>
+    <string name="tutorial_wrong_explained_title">That is a wrong guess</string>
+    <string name="tutorial_wrong_explained_body">Red means no dog, and it normally costs a bone. Yours are all still here.</string>
+    <string name="tutorial_graduation_title">You know how to play</string>
+    <string name="tutorial_graduation_body">Finish this board and the other 497 are yours. The three rules stay at the top if you ever want them.</string>
+
+    <string name="settings_rerun_tutorial">Replay the tutorial</string>
+    <string name="settings_rerun_tutorial_body">Runs the guided first three levels again, from the start.</string>
 
     <!-- Stands in for the reward art on the next level to play. Replace the glyph, not the key. -->
     <string name="levels_reward">🦴</string>

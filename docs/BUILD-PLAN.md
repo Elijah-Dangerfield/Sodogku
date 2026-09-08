@@ -934,6 +934,57 @@ mysteriously resets.
   route class did not, which is the one thing about this module that reads wrong. See
   `docs/decisions.md`.
 
+### C11b · The guided tutorial — **DONE** (2026-09-07)
+
+The second half of C11. Fifteen coach marks over campaign levels 1 to 3, driven from `GameState`
+so `GameScreen` stays a pure render, on top of the existing `Focus` spotlight rather than a second
+overlay system.
+
+**The curriculum** (`Tutorial.kt`, pure functions over a level and the board so far):
+
+- **Level 1** — the three rules one at a time off the permanent rule chips, the free starter dog,
+  then the two gestures: one tap crosses a square off, two taps place a dog. Ends on the bones.
+- **Level 2** — place a dog and watch auto-mark fire, with the squares *that placement just
+  crossed off* lit through the scrim. Then the sniff and the treat.
+- **Level 3** — the ring of squares a dog rules out by touching, then "get one wrong on purpose"
+  on a lit square that costs no bone (SPEC 10's free wrong tap), what the red X means, and the
+  sign-off.
+
+**What it took in the design system.** `Spotlight` grew `targetsAreLive` and `FocusScrim` grew an
+`onTargetTap`; `CoachMark` is a new component with a `@Preview`. The scrim also hands `content` the
+**union** of the lit rectangles rather than an arbitrary member, which is what makes a card under a
+five-square spotlight land under all five.
+
+**Two things the device found that no test would have.**
+
+- **A Compose overlay does not share pointer input with the siblings it covers.** The first pass
+  had the scrim decline to consume taps that landed in a hole, on the theory that the board cell
+  underneath would then see them. It never does — `Modifier.pointerInput` reports
+  `sharePointerInputWithSiblings() = false`, so the cell is simply not in the hit path. The scrim
+  now *reports* the tap by key and the feature turns it back into a `CellTapped`, which also keeps
+  double-tap timing where it belongs.
+- **A card that hangs below its anchor falls off the bottom of the screen** when the anchor is the
+  booster row. `CoachMark` flips above the anchor when there is no room below, measured against a
+  fixed reserve rather than the card's own height so it does not jump on its second frame.
+
+**Verified by driving it on an emulator**, all three levels start to finish: every coach mark
+screenshotted, the lit square accepting a single tap and a double tap through the scrim, auto-mark
+lighting exactly the three squares the placement added, the free wrong guess leaving all three
+bones, "Replay the tutorial" in Settings coming back to level 1 with the coach marks armed, and a
+skip mid-lesson leaving a board that still takes taps and staying skipped across a relaunch.
+
+**Two copy changes made because of what was on screen**, not because a test failed: the starter-dog
+body was cut to two lines because at three the card covered the crosses it was describing, and the
+adjacency body no longer claims those squares are out "for one reason only" when several are also
+out by row or column.
+
+### Still open in C11
+
+The **legal version gate** (`:libraries:legal`, blocking and non-blocking modes against
+`legal.termsVersion` / `legal.privacyVersion`) and the hosted `pages/privacy.html` /
+`pages/terms.html`. Settings already opens the URLs from config; nothing yet checks a version on
+launch.
+
 ---
 
 ## C12 · Art, theme, accessibility
@@ -980,13 +1031,13 @@ look a lot like Meowdoku. Everything below is feel, not function.
 
 | # | Item | Owner | State |
 |---|---|---|---|
-| P1 | Dialogs have poor padding | | |
+| P1 | Dialogs have poor padding | dialogs | **DONE** — fixed once in `Dialog`, not per call site |
 | P2 | The level pane needs a real reward indicator, not a bare emoji | | |
 | P3 | Dog idle loops read oddly. Keep `idle` and `look`; drop the shake; the rest occasional at most | | |
 | P4 | Some X marks cannot be undone. The red X (paid for) and a placed dog must stay; every other mark must clear | | |
-| P5 | Tapping Level and Score opens an explainer; both labels a size bigger | | |
+| P5 | Tapping Level and Score opens an explainer; both labels a size bigger | dialogs | **Dialogs done**, seen on device. The two lines in `GameScreen.kt` that make the stats tappable and bump the label are handed back as a diff — that file was owned by another chunk |
 | P6 | A rounder, more playful display face. Poppins is already everywhere; `FontFamily.kt` names Baloo 2 and Fredoka as drop-in OFL replacements | | |
-| P7 | A better dialog entrance animation | | |
+| P7 | A better dialog entrance animation | dialogs | **DONE** — springs up and overshoots on `Motion.Pop`, scrim fades under it, honours `reduceAnimations`. The floating-window nav host turned out not to control this |
 | P8 | Keep checking the app against Meowdoku screenshots | | |
 | P9 | Propose features, argued both ways, leaning conservative, each with a backend-driven-or-not call | | |
 | P10 | **Board state is lost.** Re-picking the level you are already on from the pane wipes every mark and placement. There is also no in-progress snapshot at all, so backgrounding loses the board — C5 promised one and it was never built | | |

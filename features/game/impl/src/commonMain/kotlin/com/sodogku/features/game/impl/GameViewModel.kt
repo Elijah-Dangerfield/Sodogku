@@ -101,6 +101,28 @@ class GameViewModel(
     private var treatsUsed = 0
 
     /**
+     * The guided run over levels 1 to 3.
+     *
+     * All of this is held in fields rather than read back off [state], which
+     * lags `updateState` by a dispatch — a step that advanced off a stale
+     * pointer would show the same coach mark twice and then skip one.
+     */
+    private var tutorialActive = false
+    private var tutorialScript: List<TutorialStep> = emptyList()
+    private var tutorialIndex = 0
+
+    /**
+     * Levels whose script has already run in this ViewModel, so losing level 1
+     * and starting over does not replay seven coach marks. A process death
+     * still resets it, which is the right answer: someone who left mid-lesson
+     * has not had the lesson.
+     */
+    private val guidedLevels = mutableSetOf<Int>()
+
+    /** SPEC 10: level 3 forgives one wrong guess while it is being taught. */
+    private var freeMistakeAvailable = false
+
+    /**
      * The level's history as it stood *before* this attempt touched it.
      *
      * Read at the start, because `onCompleted` overwrites it and the achievement
@@ -156,6 +178,8 @@ class GameViewModel(
             GameAction.OpenTerms -> sendEvent(GameEvent.OpenTerms)
             GameAction.OpenFeedback -> sendEvent(GameEvent.OpenFeedback)
             GameAction.OpenSettings -> sendEvent(GameEvent.OpenSettings)
+            GameAction.TutorialAdvance -> action.tutorialTapped()
+            GameAction.SkipTutorial -> action.skipTutorial()
             is GameAction.TimerTick -> action.updateState { it.copy(elapsedMs = elapsedMs()) }
         }
     }
@@ -179,6 +203,11 @@ class GameViewModel(
                     .orEmpty(),
             )
         }
+
+        // Read here and held in a field, not re-read per level: the flag is
+        // written the moment the tutorial ends, and `startAttempt` for the next
+        // level runs before that write has any chance to land.
+        tutorialActive = !isDaily && settings?.hasCompletedTutorial != true
 
         val level = if (isDaily) todaysBoard() else LevelPacks.campaign.byId(levelId)
         if (level == null) {
@@ -261,12 +290,22 @@ class GameViewModel(
         val opening = Solution.empty(level.size).let {
             if (giveStarter) it.withPlacement(starterRow, level.solution[starterRow]) else it
         }
+        val openingMarks = if (giveStarter) level.board.autoMarkedCells(opening) else emptySet()
+
+        tutorialScript = if (tutorialActive && level.id !in guidedLevels) {
+            Tutorial.scriptFor(level.id)
+        } else {
+            emptyList()
+        }
+        tutorialIndex = 0
+        freeMistakeAvailable = tutorialScript.isNotEmpty() && level.id == Tutorial.FREE_MISTAKE_LEVEL
+        val lesson = openFrame(level, opening, openingMarks)
 
         updateState {
             GameState(
                 level = level,
                 placed = opening,
-                autoMarks = if (giveStarter) level.board.autoMarkedCells(opening) else emptySet(),
+                autoMarks = openingMarks,
                 starterDogCell = if (giveStarter) {
                     level.board.cellAt(starterRow, level.solution[starterRow])
                 } else {
@@ -286,8 +325,120 @@ class GameViewModel(
                 unlockedThrough = campaignFrontier(unlocked, level.id),
                 daily = it.daily,
                 isDaily = isDaily,
+                tutorial = lesson.step,
+                tutorialCells = lesson.cells,
             )
         }
+    }
+
+    /**
+     * The lesson to show as a level opens.
+     *
+     * Separate from [advanceTutorial] only because there is no step to check a
+     * trigger against yet; both funnel into [resolveFrame], which is the single
+     * place that decides what is on screen.
+     */
+    private fun openFrame(
+        level: LevelDefinition,
+        placed: Solution,
+        autoMarks: Set<Int>,
+    ): TutorialFrame {
+        if (tutorialScript.isEmpty()) return TutorialFrame.None
+        val frame = resolveFrame(level, placed, autoMarks, justMarked = emptySet())
+        if (frame.step == null) guidedLevels += level.id
+        return frame
+    }
+
+    /**
+     * The next step that can actually be shown, and the squares it points at.
+     *
+     * A gesture step whose target square does not exist on this board — the
+     * player already crossed it off, or auto-mark swallowed it — is **skipped**
+     * rather than shown. Showing it would put the scrim up over a board with
+     * nothing tappable and no way forward, which is the one failure this
+     * tutorial is not allowed to have.
+     */
+    private fun resolveFrame(
+        level: LevelDefinition,
+        placed: Solution,
+        autoMarks: Set<Int>,
+        justMarked: Set<Int>,
+    ): TutorialFrame {
+        while (tutorialIndex < tutorialScript.size) {
+            val step = tutorialScript[tutorialIndex]
+            val cells = Tutorial.cellsFor(step, level, placed, autoMarks, justMarked)
+            if (Tutorial.triggerFor(step) == TutorialTrigger.Tap || cells.isNotEmpty()) {
+                logger.logEvent(
+                    "tutorial.step_viewed",
+                    "step" to step.name,
+                    "level_id" to level.id,
+                )
+                return TutorialFrame(step, cells)
+            }
+            tutorialIndex++
+        }
+        return TutorialFrame.None
+    }
+
+    /**
+     * Moves the guided run on, if [trigger] is what the current step was waiting
+     * for.
+     *
+     * Every board fact this needs arrives as a parameter. The callers are all
+     * mid-transition — the placement that fired the auto-marks has not reached
+     * `state` yet — and a step that read the board back off `state` would point
+     * at the board as it was before the move that earned the step.
+     */
+    private suspend fun GameAction.advanceTutorial(
+        trigger: TutorialTrigger,
+        level: LevelDefinition,
+        placed: Solution,
+        autoMarks: Set<Int>,
+        justMarked: Set<Int> = emptySet(),
+    ) {
+        val current = tutorialScript.getOrNull(tutorialIndex) ?: return
+        if (Tutorial.triggerFor(current) != trigger) return
+
+        tutorialIndex++
+        val frame = resolveFrame(level, placed, autoMarks, justMarked)
+        if (frame.step == null) {
+            guidedLevels += level.id
+            if (level.id == Tutorial.LAST_LEVEL) completeTutorial(skipped = false, at = current)
+        }
+        updateState { it.copy(tutorial = frame.step, tutorialCells = frame.cells) }
+    }
+
+    /** The coach mark's own dismissal, and the "Got it" button under it. */
+    private suspend fun GameAction.tutorialTapped() {
+        val level = state.level ?: return
+        advanceTutorial(TutorialTrigger.Tap, level, state.placed, state.autoMarks)
+    }
+
+    /**
+     * The way out, from any step.
+     *
+     * It clears the step *and* the script, so the scrim comes down and the board
+     * is immediately playable. A skip that only hid the card would leave the
+     * next trigger re-showing a lesson the player already refused.
+     */
+    private suspend fun GameAction.skipTutorial() {
+        val at = tutorialScript.getOrNull(tutorialIndex)
+        completeTutorial(skipped = true, at = at)
+        updateState { it.copy(tutorial = null, tutorialCells = emptySet()) }
+    }
+
+    private suspend fun completeTutorial(skipped: Boolean, at: TutorialStep?) {
+        tutorialActive = false
+        tutorialScript = emptyList()
+        tutorialIndex = 0
+        freeMistakeAvailable = false
+        logger.logEvent(
+            "tutorial.completed",
+            "skipped" to skipped,
+            "last_step" to (at?.name ?: "none"),
+        )
+        Catching { appCache.update { it.copy(hasCompletedTutorial = true) } }
+            .logOnFailure { "Failed to record the tutorial as finished" }
     }
 
     /**
@@ -347,6 +498,9 @@ class GameViewModel(
     /** Writes or erases the player's own cross. Free, and never a life. */
     private suspend fun GameAction.toggleMark(cell: Int) {
         if (cell in state.autoMarks) return
+        val level = state.level
+        val placed = state.placed
+        val marks = state.autoMarks
         sendEvent(GameEvent.Marked(cell))
         updateState {
             it.copy(
@@ -357,6 +511,7 @@ class GameViewModel(
                 },
             )
         }
+        if (level != null) advanceTutorial(TutorialTrigger.Marked, level, placed, marks)
     }
 
     /** The committed guess. This is the only path that can cost a life. */
@@ -377,11 +532,13 @@ class GameViewModel(
 
         val scored = Scoring.placement(state.score, level.size, since)
         val placed = state.placed.withPlacement(row, level.board.colOf(cell))
+        val marksBefore = state.autoMarks
+        val marks = level.board.autoMarkedCells(placed)
 
         updateState {
             it.copy(
                 placed = placed,
-                autoMarks = level.board.autoMarkedCells(placed),
+                autoMarks = marks,
                 manualMarks = it.manualMarks - cell,
                 score = scored.card,
                 lastPoints = scored.points,
@@ -390,6 +547,17 @@ class GameViewModel(
             )
         }
         sendEvent(GameEvent.PlacedDog(cell))
+
+        // Before the win check, so a placement that both finishes the lesson and
+        // finishes the board leaves the coach mark behind rather than under the
+        // outcome sheet.
+        advanceTutorial(
+            TutorialTrigger.Placed,
+            level,
+            placed,
+            marks,
+            justMarked = marks - marksBefore,
+        )
 
         // The finished card is handed on rather than re-read from `state`, which
         // lags this update by a dispatch — re-reading would drop the points for
@@ -403,7 +571,16 @@ class GameViewModel(
      * cost information as well as a life.
      */
     private suspend fun GameAction.strike(cell: Int) {
-        val remaining = state.livesRemaining - 1
+        // The guided level asks the player to get one wrong on purpose, so that
+        // one is on the house. Everything else about a strike still happens:
+        // the square goes red, the combo breaks, and the lesson that follows
+        // says what it would normally have cost.
+        val forgiven = freeMistakeAvailable
+        freeMistakeAvailable = false
+        val level = state.level
+        val placed = state.placed
+        val marks = state.autoMarks
+        val remaining = if (forgiven) state.livesRemaining else state.livesRemaining - 1
         updateState {
             it.copy(
                 score = Scoring.strike(it.score),
@@ -414,6 +591,7 @@ class GameViewModel(
             )
         }
         sendEvent(GameEvent.Struck(cell))
+        if (level != null) advanceTutorial(TutorialTrigger.Struck, level, placed, marks)
         when {
             remaining <= 0 -> lose(remaining)
             remaining == 1 && !warnedAboutLastBone -> {
@@ -739,6 +917,11 @@ class GameViewModel(
             sendEvent(GameEvent.OpenLevel(levelId))
             return
         }
+        // Picking the level you are already on is a way of closing the pane, not
+        // a request to start over. Restarting here threw away every mark and
+        // placement of an attempt in progress, which is what a player reported
+        // after opening the pane mid-puzzle and tapping the row they were on.
+        if (levelId == state.level?.id && state.phase == GamePhase.Playing) return
         attemptNumber = 1
         startAttempt(target)
     }
@@ -1030,6 +1213,21 @@ data class GameState(
     /** A one-shot spotlight the player has to dismiss. */
     val warning: GameWarning? = null,
 
+    /**
+     * The guided lesson on screen, or null when the player is on their own.
+     * Drives the whole coach mark: the screen maps the step to a spotlight and
+     * a piece of copy and renders nothing else of its own.
+     */
+    val tutorial: TutorialStep? = null,
+
+    /**
+     * The board squares [tutorial] is pointing at, empty for a step that points
+     * at chrome instead. Held here rather than derived in the screen because
+     * which square a lesson picks depends on the answer, and the screen has no
+     * business knowing it.
+     */
+    val tutorialCells: Set<Int> = emptySet(),
+
     /** Squares a sniff has ruled out, spotlit until the player taps away. */
     val hintCells: Set<Int> = emptySet(),
 
@@ -1113,6 +1311,13 @@ sealed interface GameEvent {
 /** Something the game wants to stop and point at. */
 enum class GameWarning { LastBone }
 
+/** What the coach mark is showing, and where it is pointing. */
+data class TutorialFrame(val step: TutorialStep?, val cells: Set<Int>) {
+    companion object {
+        val None = TutorialFrame(step = null, cells = emptySet())
+    }
+}
+
 sealed interface GameAction {
     data object Load : GameAction
     data class CellTapped(val cell: Int) : GameAction
@@ -1152,5 +1357,12 @@ sealed interface GameAction {
     data object OpenPrivacy : GameAction
     data object OpenTerms : GameAction
     data object OpenFeedback : GameAction
+
+    /** The coach mark was tapped, or its button was. Only moves a `Tap` step. */
+    data object TutorialAdvance : GameAction
+
+    /** Out of the guided run for good, from whichever step is showing. */
+    data object SkipTutorial : GameAction
+
     data class TimerTick(val at: Long) : GameAction
 }

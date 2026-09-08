@@ -17,9 +17,12 @@ import com.sodogku.libraries.sodogku.AppCache
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import me.tatarka.inject.annotations.Inject
@@ -99,6 +102,19 @@ class AppViewModel(
      */
     val isBootComplete: StateFlow<Boolean> = _isBootComplete.asStateFlow()
 
+    /**
+     * The player's reduce-animations setting, provided to the whole tree as
+     * `LocalReduceAnimations` so design-system components can honour it without
+     * every screen having to pass it down.
+     *
+     * Starts `false` and flips when the cache first emits. That order matters:
+     * defaulting to "reduced" while the disk read is in flight would make the
+     * first dialog of every launch snap rather than spring.
+     */
+    val reduceAnimations: StateFlow<Boolean> = appCache.updates
+        .map { it.reduceAnimations }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     init {
         viewModelScope.launch {
             val onboarded = appCache.get().hasUserOnboarded
@@ -118,7 +134,7 @@ class AppViewModel(
             // menu first puts a navigation between them and the thing they
             // opened the app to do; the level list is a drawer on the board.
             _startDestination.value = if (onboarded) {
-                GameRoute(level)
+                GameRoute(450)
             } else {
                 OnboardingRoute()
             }

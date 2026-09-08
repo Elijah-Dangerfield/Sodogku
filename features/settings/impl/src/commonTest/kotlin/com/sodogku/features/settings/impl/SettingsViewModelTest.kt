@@ -139,6 +139,34 @@ class SettingsViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun replayingTheTutorialClearsTheFlagBeforeItNavigates() = runUnitTest {
+        // Order is the whole of it. The board reads `hasCompletedTutorial` once
+        // as its ViewModel loads, so a write that landed after the navigation
+        // would open level 1 with nothing to teach.
+        val cache = InMemoryAppCache(AppData(hasCompletedTutorial = true))
+        val vm = viewModel(cache)
+
+        vm.takeAction(SettingsAction.RerunTutorial)
+
+        assertFalse(cache.get().hasCompletedTutorial)
+        assertEquals(SettingsEvent.RerunTutorial, vm.eventFlow.first())
+    }
+
+    @Test
+    fun replayingTheTutorialLeavesOnboardingAlone() = runUnitTest {
+        // The reason the two flags are separate: somebody 200 levels in who
+        // wants a refresher must not be shown the welcome screen again.
+        val cache = InMemoryAppCache(
+            AppData(hasUserOnboarded = true, hasCompletedTutorial = true),
+        )
+        val vm = viewModel(cache)
+
+        vm.takeAction(SettingsAction.RerunTutorial)
+
+        assertTrue(cache.get().hasUserOnboarded)
+    }
+
+    @Test
     fun feedbackIsItsOwnDestination() = runUnitTest {
         val vm = viewModel(InMemoryAppCache())
 

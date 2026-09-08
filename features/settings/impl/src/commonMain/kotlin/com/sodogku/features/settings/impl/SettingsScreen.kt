@@ -31,6 +31,8 @@ import sodogku.libraries.resources.generated.resources.settings_progress_local_b
 import sodogku.libraries.resources.generated.resources.settings_progress_local_title
 import sodogku.libraries.resources.generated.resources.settings_reduce_animations
 import sodogku.libraries.resources.generated.resources.settings_reduce_animations_body
+import sodogku.libraries.resources.generated.resources.settings_rerun_tutorial
+import sodogku.libraries.resources.generated.resources.settings_rerun_tutorial_body
 import sodogku.libraries.resources.generated.resources.settings_section_about
 import sodogku.libraries.resources.generated.resources.settings_section_play
 import sodogku.libraries.resources.generated.resources.settings_terms
@@ -91,6 +93,14 @@ fun SettingsScreen(
                         supporting = stringResource(Res.string.settings_colorblind_body),
                         checked = state.colorblindMode,
                         onToggle = { onAction(SettingsAction.ToggleColorblind) },
+                    ),
+                    // Sits with the playing settings rather than under About:
+                    // it changes what happens on the board, and it is the one
+                    // row here that navigates away from this screen.
+                    ListSectionItem(
+                        headlineText = stringResource(Res.string.settings_rerun_tutorial),
+                        supportingText = stringResource(Res.string.settings_rerun_tutorial_body),
+                        onClick = { onAction(SettingsAction.RerunTutorial) },
                     ),
                 ),
             )

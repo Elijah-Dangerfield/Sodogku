@@ -15,6 +15,8 @@ kotlin {
             implementation(projects.features.home)
             // For `AchievementsRoute` — the badge grid is reached from here.
             implementation(projects.features.achievements)
+            // For `GameRoute` — "Replay the tutorial" goes back to level 1.
+            implementation(projects.features.game)
 
             implementation(projects.libraries.core)
             implementation(projects.libraries.sodogku)

@@ -734,18 +734,31 @@ the formatting: a screen supplies the board and what to call it, and nothing els
 
 ## 10. Tutorial
 
-Levels 1 to 3 are guided, not a separate mode. Retheme the template's existing
-`:features:onboarding:impl`:
+Levels 1 to 3 are guided, not a separate mode. `:features:onboarding:impl` is the welcome screen
+in front of it; the teaching itself happens on the board, driven from `GameState` by
+`GameViewModel` and drawn by `TutorialCoachMark` on the `Focus` spotlight (section 16a).
 
-- **Level 1 (4x4):** one rule at a time. Highlight a region, "one dog per color". Only the correct
-  cell is tappable.
-- **Level 2 (4x4):** rows and columns. Show auto-mark firing, since it is the mechanic players
-  most need to understand.
-- **Level 3 (4x4):** adjacency and manual X-marking. Allow one wrong tap with no life charged.
+Fifteen steps, all 4x4:
+
+- **Level 1:** the three rules one at a time, each lighting its own permanent rule chip. Then the
+  free starter dog, then the two gestures — one tap crosses a square off, two taps place a dog —
+  each on a single lit square with the rest of the board dead. Ends on the bones.
+- **Level 2:** place a dog and watch auto-mark fire, with the squares *that placement just crossed
+  off* lit through the scrim. Then the sniff and the treat. Auto-mark is the mechanic players most
+  need to understand, and level 1 already showed its result around the starter dog.
+- **Level 3:** the ring of squares a dog rules out by touching, then a lit wrong square with "get
+  one wrong on purpose" — that guess costs no bone — then what the red X means, then the sign-off.
 - From level 4 the gloves come off.
 
-Coach-mark overlay with a spotlight cutout. Per-step events, because tutorial drop-off is where
-casual puzzle games bleed the most installs. Skippable, and re-runnable from Settings.
+A step is one of two shapes, and the difference is what stops it becoming a dead end. **A step you
+read** dismisses on a tap anywhere. **A step you do** keeps its lit square live, ignores taps
+everywhere else, and moves only on the gesture it asked for. Every step carries a skip.
+
+Per-step events (`tutorial.step_viewed`, `tutorial.completed`), because tutorial drop-off is where
+casual puzzle games bleed the most installs. Finishing level 3's script or skipping writes
+`AppData.hasCompletedTutorial`; **Settings → Replay the tutorial** clears it and returns to level 1
+with the back stack replaced. The flag is separate from `hasUserOnboarded` precisely so a replay
+does not put the welcome screen back in front of somebody 200 levels in.
 
 ---
 
@@ -770,9 +783,14 @@ increments `AppData.feedbacksGiven` and forwards the note through `FeedbackRepos
 **Sentry** as a user feedback report — there is no Sodogku feedback backend, and the "No accounts"
 rule means there will not be one. A send is never reported as failed; see section 13.4.
 
+**Replay the tutorial** sits in Playing rather than About: it changes what happens on the board,
+and it is the one row on this screen that navigates away from it. It clears
+`AppData.hasCompletedTutorial` *before* the navigation event goes out, because the board reads the
+flag once as its ViewModel loads.
+
 **Still to land**, mostly gated on chunks that own the state they toggle: sound (no audio yet),
 auto-mark and show-timer toggles, achievements on/off (C10), reset progress with a real
-confirmation, rerun tutorial, the Pro row with **Restore Purchases** (C8), ad partners and
+confirmation, the Pro row with **Restore Purchases** (C8), ad partners and
 reopening the consent form (C8), and rate-the-app (`:libraries:review`). Report-a-bug still exists
 as the template's Sentry-backed flow, reachable from the shake gesture and from error screens, and
 has not been surfaced in settings yet.

@@ -76,6 +76,25 @@ The events that motivated shipping direct-to-Grafana: what never reaches the bac
 Onboarding emits `onboarding.step_viewed` / `onboarding.auth_selected` / `onboarding.completed` /
 `onboarding.abandoned` (see `OnboardingViewModel`).
 
+### Tutorial
+
+The guided first three levels, from `GameViewModel`. Per-step rather than per-level because
+tutorial drop-off is where a casual puzzle game bleeds installs, and "they quit" is not an
+actionable finding — "they quit on the step that asks for a double tap" is.
+
+| Event | Attributes | Fires |
+|---|---|---|
+| `tutorial.step_viewed` | `step` (the `TutorialStep` name), `level_id` | Each time a coach mark comes up, including the first one as a guided level opens. A step that is skipped over because it has nothing to point at never fires |
+| `tutorial.completed` | `skipped`, `last_step` | Once. `skipped=false` means they finished level 3's script; `skipped=true` means they took the way out, and `last_step` says from where. Both write `AppData.hasCompletedTutorial`, so both are the end of it |
+
+`step` is the enum name and not an index on purpose: the curriculum will be reordered, and a
+funnel keyed on position would silently start comparing two different lessons. Drop-off is
+`step_viewed` counts down the sequence; the pair to watch is the two gesture steps
+(`MarkSquare`, `PlaceDog`), which are the only ones a player cannot leave by tapping anywhere.
+
+Replaying from Settings clears the flag and arms the run again, so a small number of repeat
+`tutorial.completed` events per install is expected rather than a bug.
+
 ## Gameplay
 
 Every one of these comes from `GameViewModel`. They carry `level_id` rather than a level *name*

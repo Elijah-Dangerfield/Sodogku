@@ -29,12 +29,17 @@ import com.sodogku.libraries.ui.components.FullScreenLoader
 import com.sodogku.libraries.ui.components.Screen
 import com.sodogku.libraries.ui.components.board.BoardCell
 import com.sodogku.libraries.ui.components.board.BoardCellState
+import com.sodogku.libraries.ui.components.board.BoardCellGap
+import com.sodogku.libraries.ui.components.board.BoardSurface
+import com.sodogku.libraries.ui.components.board.rememberPlacementPulse
 import com.sodogku.libraries.ui.components.game.BoosterButton
 import com.sodogku.libraries.ui.components.game.FloatingPoints
 import com.sodogku.libraries.ui.bounceClick
 import com.sodogku.libraries.ui.components.game.DogCounter
+import com.sodogku.libraries.ui.components.game.HudPill
 import com.sodogku.libraries.ui.components.game.LifeRow
 import com.sodogku.libraries.ui.components.game.RuleChip
+import com.sodogku.libraries.ui.components.game.RuleChipGroup
 import com.sodogku.libraries.ui.components.game.RuleDiagram
 import com.sodogku.libraries.ui.components.game.ScoreCounter
 import com.sodogku.libraries.ui.components.icon.IconButton
@@ -98,7 +103,7 @@ fun GameScreen(
             // The rules sit directly under the header rather than floating above
             // the board: they are reference material, and a gap between them and
             // the score reads as a hole on a small grid.
-            RuleChips(onExplain = { dialog = GameDialog.Rules })
+            RuleChips(state = state, onExplain = { dialog = GameDialog.Rules })
 
             Spacer(modifier = Modifier.weight(WEIGHT_FILL))
 
@@ -156,6 +161,10 @@ fun GameScreen(
             LastBoneWarning(state = state, onAction = onAction)
 
             SniffHint(state = state, onAction = onAction)
+
+            // Last of the three scrims, so a lesson is never dimmed by one of
+            // the others if they ever overlap.
+            TutorialCoachMark(state = state, onAction = onAction)
 
             LevelDrawer(
                 open = state.drawerOpen,
@@ -219,7 +228,14 @@ private fun GameHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top,
     ) {
-        IconButton(icon = Icons.Menu(null), onClick = onOpenLevels)
+        // White circles on the cream, rather than bare glyphs. Two icons
+        // floating on a page read as decoration; the same icons on discs read
+        // as the two things on this screen that are buttons.
+        IconButton(
+            icon = Icons.Menu(null),
+            onClick = onOpenLevels,
+            backgroundColor = AppTheme.colors.surfacePrimary,
+        )
 
         Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D1000)) {
             // A daily's level id is a position in the daily pool, which means
@@ -243,21 +259,30 @@ private fun GameHeader(
             )
         }
 
-        IconButton(icon = Icons.Settings(null), onClick = onSettings)
+        IconButton(
+            icon = Icons.Settings(null),
+            onClick = onSettings,
+            backgroundColor = AppTheme.colors.surfacePrimary,
+        )
     }
 
+    // Two pills, centred, next to each other. Pushed to opposite edges — which
+    // is what `SpaceBetween` did here — they stop being a pair and leave a hole
+    // down the middle of the screen exactly where the eye travels between the
+    // score and the board.
     Row(
         modifier = Modifier.fillMaxWidth().padding(bottom = Dimension.D400),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(Dimension.D400, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DogCounter(found = state.dogsPlaced, total = state.dogsRequired)
-        LifeRow(
-            remaining = state.livesRemaining,
+        HudPill(
             modifier = Modifier
                 .focusTarget(LivesFocusKey)
                 .bounceClick(onClick = onExplainBones),
-        )
+        ) {
+            LifeRow(remaining = state.livesRemaining)
+        }
     }
 }
 
@@ -294,24 +319,68 @@ private fun HeaderStat(
 }
 
 @Composable
-private fun RuleChips(onExplain: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D300)) {
+private fun RuleChips(state: GameState, onExplain: () -> Unit) {
+    val broken = brokenRule(state)
+    RuleChipGroup {
         RuleChip(
             diagram = RuleDiagram.OnePerRegion,
             label = stringResource(Res.string.game_rule_one_per_region),
+            modifier = Modifier.weight(WEIGHT_FILL).focusTarget(RuleChipFocusKeys[0]),
+            highlighted = broken == RuleDiagram.OnePerRegion,
             onClick = onExplain,
         )
         RuleChip(
             diagram = RuleDiagram.OnePerLine,
             label = stringResource(Res.string.game_rule_one_per_line),
+            modifier = Modifier.weight(WEIGHT_FILL).focusTarget(RuleChipFocusKeys[1]),
+            highlighted = broken == RuleDiagram.OnePerLine,
             onClick = onExplain,
         )
         RuleChip(
             diagram = RuleDiagram.NoTouching,
             label = stringResource(Res.string.game_rule_no_touching),
+            modifier = Modifier.weight(WEIGHT_FILL).focusTarget(RuleChipFocusKeys[2]),
+            highlighted = broken == RuleDiagram.NoTouching,
             onClick = onExplain,
         )
     }
+}
+
+/**
+ * Which of the three rules the player's last wrong guess ran into, or null when
+ * it ran into none of them.
+ *
+ * Null is the common answer and it matters that it is representable: most wrong
+ * guesses on a partly-solved board break no *visible* rule at all — the square
+ * simply is not where the dog goes, and nothing on screen yet says why. Pointing
+ * at a rule there would be inventing a reason.
+ *
+ * The order is deliberate and is not the order the chips are drawn in.
+ * Adjacency is checked first because it is the rule players forget, and because
+ * an orthogonally adjacent square also breaks the row-and-column rule — check
+ * that one first and the subtler answer is never reached. A diagonal neighbour
+ * breaks adjacency alone, which is exactly the case worth naming.
+ */
+internal fun brokenRule(state: GameState): RuleDiagram? {
+    val board = state.level?.board ?: return null
+    val cell = state.strikeCell?.takeIf { state.strikeNonce > 0 } ?: return null
+    val placed = state.placedCells
+    if (placed.isEmpty()) return null
+
+    val row = board.rowOf(cell)
+    val col = board.colOf(cell)
+    return when {
+        placed.any { touches(board.rowOf(it), board.colOf(it), row, col) } -> RuleDiagram.NoTouching
+        placed.any { board.regionAt(it) == board.regionAt(cell) } -> RuleDiagram.OnePerRegion
+        placed.any { board.rowOf(it) == row || board.colOf(it) == col } -> RuleDiagram.OnePerLine
+        else -> null
+    }
+}
+
+private fun touches(row: Int, col: Int, otherRow: Int, otherCol: Int): Boolean {
+    val dr = row - otherRow
+    val dc = col - otherCol
+    return dr in -1..1 && dc in -1..1 && !(dr == 0 && dc == 0)
 }
 
 /**
@@ -326,18 +395,29 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
     val level = state.level ?: return
     val size = level.size
 
-    BoxWithConstraints {
-        val cell = (maxWidth - CellGap * (size - 1)) / size
+    BoardSurface { BoardRows(state = state, size = size, onAction = onAction) }
+}
 
-        Column(verticalArrangement = Arrangement.spacedBy(CellGap)) {
+@Composable
+private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Unit) {
+    val level = state.level ?: return
+    val placement = rememberPlacementPulse(state.placedCells, size)
+
+    BoxWithConstraints {
+        val cell = (maxWidth - BoardCellGap * (size - 1)) / size
+
+        Column(verticalArrangement = Arrangement.spacedBy(BoardCellGap)) {
             repeat(size) { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(CellGap)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(BoardCellGap)) {
                     repeat(size) { col ->
                         val index = level.board.cellAt(row, col)
-                        val hinted = index in state.hintCells
+                        // Registering costs an `onGloballyPositioned` per cell,
+                        // so only the squares something is currently pointing at
+                        // carry one — not all 100 of a 10x10.
+                        val spotlit = index in state.hintCells || index in state.tutorialCells
                         BoardCell(
-                            modifier = if (hinted) {
-                                Modifier.focusTarget(hintKeyFor(index))
+                            modifier = if (spotlit) {
+                                Modifier.focusTarget(cellFocusKey(index))
                             } else {
                                 Modifier
                             },
@@ -346,6 +426,8 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
                             size = cell,
                             colorblind = state.colorblind,
                             strikeNonce = if (state.strikeCell == index) state.strikeNonce else 0,
+                            placementNonce = placement.nonce,
+                            placementRole = placement.roleOf(index),
                             entranceDelayMillis = if (state.reduceAnimations) {
                                 0
                             } else {
@@ -388,12 +470,14 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
         BoosterButton(
             label = stringResource(Res.string.game_sniff),
             count = state.sniffs,
+            modifier = Modifier.focusTarget(SniffFocusKey),
             enabled = state.phase == GamePhase.Playing,
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Sniff)) },
         )
         BoosterButton(
             label = stringResource(Res.string.game_treat),
             count = state.treats,
+            modifier = Modifier.focusTarget(TreatFocusKey),
             enabled = state.phase == GamePhase.Playing,
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Treat)) },
         )
@@ -406,9 +490,6 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
 }
 
 private const val WEIGHT_FILL = 1f
-
-/** Gutter between cells. Small enough that the board reads as one object. */
-private val CellGap = Dimension.D100
 
 @Preview
 @Composable
