@@ -13,6 +13,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.graphicsLayer
 
+/**
+ * A press that scales.
+ *
+ * **This does not name the control, and it cannot.** `Modifier.clickable`
+ * contributes a click action and a role and nothing else, so anything built from
+ * this comes out of a `uiautomator` dump as a focusable node with no accessible
+ * name and a separate unfocusable child holding the text. Every caller that takes
+ * a tap has to put a `contentDescription` on its own modifier, *before* calling
+ * this — see `RuleChip` or `BoosterButton`.
+ *
+ * Two tidier fixes were tried on a device and neither reached the tree:
+ * `Modifier.semantics(mergeDescendants = true) { }` inside this chain, both
+ * before and after the `clickable` (the labelled child stayed a separate node
+ * both times), and a `label` parameter on this function setting
+ * `contentDescription` here. The same `contentDescription`, set by the caller one
+ * link earlier in the chain, works. The difference is `composed { }`, which is
+ * deprecated for reasons of about this shape; rewriting this onto `Modifier.Node`
+ * is the real fix and would let the label move back in here where it belongs.
+ */
 fun Modifier.bounceClick(
     enabled: Boolean = true,
     mutableInteractionSource: MutableInteractionSource? = null,

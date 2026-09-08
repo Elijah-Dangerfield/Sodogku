@@ -15,6 +15,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalInspectionMode
 import com.sodogku.libraries.ui.PreviewContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.sodogku.libraries.ui.bounceClick
 import com.sodogku.libraries.ui.system.glossy
 import com.sodogku.libraries.ui.components.icon.Icon
@@ -78,6 +80,8 @@ fun RewardButton(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
         modifier = modifier
+            // Named here rather than via `bounceClick`, which cannot carry it.
+            .semantics { contentDescription = label }
             .bounceClick(enabled = enabled, onClick = onClick)
             .graphicsLayer {
                 scaleX = pulse.value

@@ -29,7 +29,12 @@ import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
 import com.sodogku.system.Radii
 import com.sodogku.libraries.ui.system.glossy
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.sodogku.system.clip
+import org.jetbrains.compose.resources.stringResource
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.booster_a11y
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -205,6 +210,7 @@ fun RuleChip(
         // bounceClick before clip/background, so the press scales the whole chip
         // rather than shrinking the label inside a stationary pill.
         modifier = modifier
+            .semantics { contentDescription = label }
             .bounceClick(onClick = onClick)
             .clip(Radii.Card)
             .background(AppTheme.colors.surfaceSecondary.color)
@@ -251,11 +257,16 @@ fun BoosterButton(
     enabled: Boolean = true,
     onClick: () -> Unit = {},
 ) {
+    val boosterLabel = stringResource(Res.string.booster_a11y, label, count)
     Box(modifier = modifier) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .padding(BadgeInset)
+                // The count belongs in the name: "Sniff" alone does not say
+                // whether tapping it will do anything. Set here rather than
+                // passed to `bounceClick`, which cannot carry it — see its KDoc.
+                .semantics { contentDescription = boosterLabel }
                 .bounceClick(enabled = enabled, onClick = onClick)
                 // Colour, a lit top and a shaded base. A white pill on a cream
                 // page is a shape you have to look for, and this is the row a

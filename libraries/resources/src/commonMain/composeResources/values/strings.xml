@@ -348,4 +348,6 @@
     <string name="settings_restore_restored">Restored. Pro is back on this device.</string>
     <string name="settings_restore_nothing">The store has no Sodogku Pro purchase for this account.</string>
     <string name="settings_restore_failed">Could not reach the store. Try again in a moment.</string>
+    <string name="game_bones_remaining">%1$d bones left</string>
+    <string name="booster_a11y">%1$s, %2$d left</string>
 </resources>

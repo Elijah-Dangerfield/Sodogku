@@ -50,6 +50,8 @@ import com.sodogku.libraries.ui.components.game.ScoreCounter
 import com.sodogku.libraries.ui.components.icon.IconButton
 import com.sodogku.libraries.ui.components.icon.Icons
 import com.sodogku.libraries.ui.system.coveredByOverlay
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.sodogku.libraries.ui.system.focusTarget
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.scoring.Praise
@@ -70,6 +72,7 @@ import sodogku.libraries.resources.generated.resources.game_score_label
 import sodogku.libraries.resources.generated.resources.game_rule_no_touching
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_line
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_region
+import sodogku.libraries.resources.generated.resources.game_bones_remaining
 import sodogku.libraries.resources.generated.resources.game_free_bones
 import sodogku.libraries.resources.generated.resources.game_sniff
 import sodogku.libraries.resources.generated.resources.game_treat
@@ -300,9 +303,14 @@ private fun GameHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DogCounter(found = state.dogsPlaced, total = state.dogsRequired)
+        // The bones are drawn, not written, so merging descendants finds
+        // nothing to merge — this is the one pill that has to state its own
+        // name. It is also the number a player most wants read back to them.
+        val bones = stringResource(Res.string.game_bones_remaining, state.livesRemaining)
         HudPill(
             modifier = Modifier
                 .focusTarget(LivesFocusKey)
+                .semantics { contentDescription = bones }
                 .bounceClick(onClick = onExplainBones),
         ) {
             LifeRow(remaining = state.livesRemaining)
@@ -329,9 +337,14 @@ private fun HeaderStat(
     onClick: () -> Unit,
     content: @Composable () -> Unit = {},
 ) {
+    val statLabel = if (value != null) "$label $value" else label
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.bounceClick(onClick = onClick),
+        modifier = Modifier
+            // The number is drawn by `content` for the score, so the stat has to
+            // say what it is; merged children would read "Level 1" as two nodes.
+            .semantics { contentDescription = statLabel }
+            .bounceClick(onClick = onClick),
     ) {
         Text(
             text = label,

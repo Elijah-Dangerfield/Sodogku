@@ -2336,3 +2336,42 @@ to show the dog alone with the spinner delayed five seconds, so a ten-second boo
 looked like a frozen splash rather than a slow one — the change was right and it
 turned a visible wait into an invisible one. And `throwIfDebug` in the config
 decode path means a debug build was the one most likely to sit there.
+
+## 2026-09-08 — naming the controls that `bounceClick` builds
+
+Reported as `IconButton` losing its `contentDescription`. It is not: `IconButton`
+was fixed earlier and a `uiautomator` dump shows `Levels`, `Settings` and `Back`
+on their clickable nodes. The unlabelled controls were the ones built on
+`Modifier.bounceClick` — the rule chips, the booster buttons, the standing ad
+offer, the bone counter and the Level/Score stats. Same diagnosis the report
+gave, a different component.
+
+`Modifier.clickable` contributes a click action and a role and nothing else, so
+each of these came out as a focusable node with no accessible name and a separate
+unfocusable child holding the text. The bone counter had nothing at all, being
+drawn rather than written.
+
+**Two tidier fixes were tried on a device and neither reached the tree**, which
+is the part worth writing down:
+
+- `Modifier.semantics(mergeDescendants = true) { }` inside `bounceClick`, both
+  before and after the `clickable`. The labelled child stayed a separate node in
+  the dump both times.
+- A `label` parameter on `bounceClick` setting `contentDescription` itself, tried
+  both inside the `composed { }` block and outside it.
+
+The identical `contentDescription`, set by the caller one link earlier in the
+chain, works. The difference is `composed { }`, which is deprecated for reasons
+of about this shape. Rewriting `bounceClick` onto `Modifier.Node` is the real fix
+and would let the label live in the modifier where it belongs; until then the
+KDoc says plainly that it cannot name a control and that every caller must.
+
+An explicit name is also the better answer on merit. A merged name is a
+concatenation — "Sniff 3" rather than "Sniff, 3 left" — and the bone row has
+nothing to merge in the first place.
+
+**One imperfection remains, measured rather than assumed.** The description lands
+on a wrapper node rather than on the node carrying `clickable="true"`. A reader
+walking the tree announces it correctly, which is why every label now shows up in
+a dump; but the described node and the pressed node are still two nodes, which is
+exactly what the `Modifier.Node` rewrite would collapse.
