@@ -1016,12 +1016,60 @@ body was cut to two lines because at three the card covered the crosses it was d
 adjacency body no longer claims those squares are out "for one reason only" when several are also
 out by row or column.
 
-### Still open in C11
+### C11c · The launch gates — **DONE** (2026-09-07)
 
-The **legal version gate** (`:libraries:legal`, blocking and non-blocking modes against
-`legal.termsVersion` / `legal.privacyVersion`) and the hosted `pages/privacy.html` /
-`pages/terms.html`. Settings already opens the URLs from config; nothing yet checks a version on
-launch.
+C11's remaining half, plus the two controls next to it that had the same problem. The legal
+version gate landed as `:features:gate` (+ impl) rather than the `:libraries:legal` the plan
+named, because it turned out to be one feature with three faces: force update, maintenance and
+legal re-accept are the same decision (should this launch proceed?) read from the same config
+block at the same moment.
+
+**Delivers**
+
+- **The legal version gate**, both modes. `legal.termsVersion` / `privacyVersion` against a new
+  `AppData` record; behind `legal.forceReacceptBelow` blocks, otherwise a dismissible banner
+  whose dismissal *is* the acceptance.
+- **The force-update gate.** Below `upgrade.minSupportedVersionCode` the app blocks with a store
+  link; below `upgrade.softUpdateVersionCode` a dismissible banner, and the dismissal persists
+  against the version it was made at.
+- **The maintenance screen.** `upgrade.maintenanceMode` is `off` / `banner` / `blocking`, with
+  `upgrade.maintenanceMessage` as raw operator text — the one piece of copy in the app that is
+  deliberately not a string resource.
+- **The review prompt trigger.** `app.reviewPromptAfterLevel` is watched in
+  `:libraries:review:impl`; clearing that level asks the existing `ReviewPromptCoordinator`,
+  which rations as before.
+- One design-system component, `NoticeBanner` in `:libraries:ui`, with previews.
+
+**Eight names left `UNWIRED`** in `ConfigValuesAreReadTest`, taking the debt from 14 to 6:
+`LegalTermsVersion`, `LegalPrivacyVersion`, `LegalForceReacceptBelow`, `AppMinSupportedVersion`,
+`AppSoftUpdateVersion`, `AppMaintenanceMode`, `AppMaintenanceMessage`, `AppReviewPromptAfterLevel`.
+
+**A blocking gate is rendered instead of the nav host, not navigated to.** There is no back stack
+entry to pop, no destination for a deep link to reach, and `App.kt` drops incoming deep links
+while a block is up. Verified on a device: two back presses leave the wall in place, and a
+`sodogku://game/5` intent starts the activity straight back onto it.
+
+**Everything here defaults to "block nobody", and that is tested rather than asserted in prose.**
+`LaunchGatesTest` drives the real `ConfiguredValue` classes from a config map through the
+resolver, so "an empty config gates nobody" covers the whole path. Half the file is the opposite
+direction — an operator who deliberately asks for the wall gets it — because every fail-open test
+on its own passes against a resolver that returns nothing.
+
+### What running it turned up
+
+- **`app.reviewPromptAfterLevel` was wired and inert, and only a device showed it.** The watcher
+  is an `AutoInit`, so it constructs in `Application.onCreate`, *before* the config stream has
+  emitted — where `AppConfigMap` still answers from the bundled fallback. Reading the threshold in
+  the constructor meant the key could never be anything but 10. It now waits on
+  `configStream().first()`. This is the same failure `UNWIRED` exists to catch, one layer down:
+  the value was injected, named, and read, and still could not be changed. **Anything else
+  resolving a config value inside an `AutoInit` constructor has this bug.**
+- The banner started as a `Card`, whose 28dp inset is sized for a page section. Over a live board
+  it hid the header and half the rule chips. It is a `Surface` with its own padding now.
+
+**Still open in C11:** the hosted `pages/privacy.html` / `pages/terms.html`. The gate and Settings
+both open the URLs from `legal.termsUrl` / `legal.privacyUrl`; the pages themselves are not
+written.
 
 ---
 
@@ -1070,7 +1118,7 @@ look a lot like Meowdoku. Everything below is feel, not function.
 | # | Item | Owner | State |
 |---|---|---|---|
 | P1 | Dialogs have poor padding | dialogs | **DONE** — fixed once in `Dialog`, not per call site |
-| P2 | The level pane needs a real reward indicator, not a bare emoji | | |
+| P2 | The level pane needs a real reward indicator, not a bare emoji | economy | **DONE** — `LevelRewardChip` in `:libraries:ui`, glossy and in the Treat's own orange, on **every** row that pays rather than only the frontier, and muted once collected. The bare 🦴 was advertising a reward nothing granted, so the reward was built first; see below |
 | P3 | Dog idle loops read oddly. Keep `idle` and `look`; drop the shake; the rest occasional at most | | |
 | P4 | Some X marks cannot be undone. The red X (paid for) and a placed dog must stay; every other mark must clear | | |
 | P5 | Tapping Level and Score opens an explainer; both labels a size bigger | dialogs | **Dialogs done**, seen on device. The two lines in `GameScreen.kt` that make the stats tappable and bump the label are handed back as a diff — that file was owned by another chunk |
@@ -1136,3 +1184,53 @@ dispatch timing. Three more came from tests that could not fail: assertions of t
 bad is in the output", which an empty output satisfies perfectly. Both are now written up in
 `decisions.md`, and every new assertion of that shape gets a companion that proves the output is
 non-empty.
+
+---
+
+## The consumable economy, 2026-09-07 late
+
+**Delivered.** Four config keys that were declared, typed, rendered in the admin console and read
+by nothing now decide something.
+
+**`UNWIRED` removed** (`ConfigValuesAreReadTest`), five names:
+
+- `BoostersTreatEveryNLevels` — a first clear on the cadence grants a Treat, and the level pane
+  marks every row that pays.
+- `BoostersProSniffsPerAttempt`, `BoostersProTreatsPerAttempt` — Pro's per-attempt floor.
+- `ProgressionSkipsPerDay`, `ProgressionSkipAfterFailedAttempts` — the skip, its ad and its daily
+  allowance.
+
+**`UNWIRED` left alone**, on purpose. `ProgressionLookaheadCount` describes a level map with
+silhouettes past the frontier, and the drawer deliberately shows all 500 rows with locks instead —
+there is no disclosure window for the key to widen, and inventing one to consume a config value is
+how the debt got created. `BoostersAdGrantsPerDay` counts rewarded booster grants per day: that is
+ad bookkeeping, it belongs with the other five numbers in `AdStateCache`, and `:libraries:ads` was
+out of this chunk's scope.
+
+**Three calls that could have gone the other way**, all written up in `decisions.md`: Pro's
+boosters as a floor rather than an assignment (the assignment reading takes consumables away from
+a paying customer), the reward paying on a first clear only (otherwise the shortest 4x4 in the pack
+is an ad-free treat printer), and the skip's per-day counter keeping a monotonic high-water mark
+that the daily challenge deliberately refuses — same mechanism, different blast radius when it
+misfires.
+
+**Seen on device** (emulator, fresh install): the reward chips down the pane at 5, 10, 15…; the
+Treat actually granted on clearing level 5, with the same chip on the win sheet and the booster
+badge going 3 → 4; the muted "Earned" chip on level 5 afterwards; the Skip appearing on a second
+failed attempt and not on a first; a real AdMob test rewarded ad playing, the level advancing 6 →
+7, and the caption dropping from "3 skips left today" to "2".
+
+**Found on device and left as-is:** `onAttemptStarted` fires again on every *resume*, so a board
+re-entered after a process death counts as another attempt and can offer the skip one loss early.
+The alternative is a failure column on `level_progress`, which means a schema bump on a database
+that still rebuilds itself destructively. Being early with a rescue that already costs an ad and
+comes out of a daily allowance is the cheap mistake; the KDoc and SPEC §1.6 both say so.
+
+**Fixed on device:** the claimed chip's first label ("Treat earned") was wide enough to squeeze the
+third paw off a completed row. It is "Earned" now, deliberately shorter than the unclaimed label so
+the layout only ever gets roomier.
+
+**Not verified:** Pro's per-attempt floor on a device — it needs a purchase, so it is covered by
+unit tests only. iOS runtime, as ever (compiles, has never run). And the emulator is shared with a
+concurrent chunk, so the run above was interrupted twice by that chunk's maintenance and
+force-update gates firing mid-level.

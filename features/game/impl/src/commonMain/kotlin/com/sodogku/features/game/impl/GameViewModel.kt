@@ -9,11 +9,15 @@ import com.sodogku.libraries.ads.AdGate
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
+import com.sodogku.libraries.config.values.BoostersProSniffsPerAttempt
+import com.sodogku.libraries.config.values.BoostersProTreatsPerAttempt
 import com.sodogku.libraries.config.values.BoostersRefillTo
 import com.sodogku.libraries.config.values.BoostersStartingSniffs
 import com.sodogku.libraries.config.values.BoostersStartingTreats
+import com.sodogku.libraries.config.values.BoostersTreatEveryNLevels
 import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.FeatureBoosters
+import com.sodogku.libraries.config.values.ProgressionSkipAfterFailedAttempts
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.logging.KLog
@@ -36,6 +40,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
 import com.sodogku.libraries.progress.ProgressRepository
+import com.sodogku.libraries.progress.SkipRepository
+import com.sodogku.libraries.progress.SkipResult
 import com.sodogku.libraries.puzzle.HintFinder
 import com.sodogku.libraries.puzzle.Solution
 import com.sodogku.libraries.puzzle.autoMarkedCells
@@ -52,6 +58,17 @@ import me.tatarka.inject.annotations.Inject
 
 /** Where the attempt is. Everything the screen renders keys off this. */
 enum class GamePhase { Loading, Playing, Won, Lost }
+
+/**
+ * What one qualifying first clear pays.
+ *
+ * One, because `boosters.treatEveryNLevels` already tunes how generous the
+ * ladder is, and two dials for one number is how the two end up disagreeing.
+ * File-level rather than in the ViewModel's companion because the level pane
+ * prints it, and a pane advertising a different number from the one the game
+ * pays is precisely the bug this reward exists to fix.
+ */
+internal const val LevelRewardTreats: Int = 1
 
 /**
  * Drives one attempt at one puzzle.
@@ -81,6 +98,8 @@ class GameViewModel(
     private val clock: TimeSource.WithComparableMarks,
     private val appCache: AppCache,
     private val progress: ProgressRepository,
+    /** The daily skip allowance, the ad behind it, and the write. */
+    private val skips: SkipRepository,
     private val daily: DailyRepository,
     private val achievements: AchievementsRepository,
     /**
@@ -99,6 +118,11 @@ class GameViewModel(
     private val startingSniffs: BoostersStartingSniffs,
     private val startingTreats: BoostersStartingTreats,
     private val refillTo: BoostersRefillTo,
+    /** How often a first clear pays a Treat. Zero or less pays none. */
+    private val treatEveryNLevels: BoostersTreatEveryNLevels,
+    private val proSniffsPerAttempt: BoostersProSniffsPerAttempt,
+    private val proTreatsPerAttempt: BoostersProTreatsPerAttempt,
+    private val skipAfterFailedAttempts: ProgressionSkipAfterFailedAttempts,
     private val achievementsEnabled: FeatureAchievements,
     private val boostersEnabled: FeatureBoosters,
 ) : SEAViewModel<GameState, GameEvent, GameAction>(initialStateArg = GameState()) {
@@ -209,6 +233,7 @@ class GameViewModel(
                 it.copy(warning = null, hintCells = emptySet())
             }
             GameAction.RefillBones -> action.refillBones()
+            GameAction.SkipLevel -> action.skipLevel()
             GameAction.ToggleColorblind -> action.toggleColorblind()
             GameAction.ToggleHaptics -> action.toggleHaptics()
             GameAction.ToggleReduceAnimations -> action.toggleReduceAnimations()
@@ -250,6 +275,7 @@ class GameViewModel(
                 isPro = entitlements.isPro.value,
                 boostersEnabled = boostersEnabled(),
                 refillTo = refillTo(),
+                treatEveryNLevels = treatEveryNLevels(),
                 // Null is "never granted any", which is what a fresh install
                 // looks like — so the opening grant comes from config rather
                 // than from a default baked into the record that stores it.
@@ -379,6 +405,7 @@ class GameViewModel(
         tutorialIndex = 0
         freeMistakeAvailable = tutorialScript.isNotEmpty() && level.id == Tutorial.FREE_MISTAKE_LEVEL
         val lesson = openFrame(level, opening, openingMarks)
+        grantProBoosters()
 
         updateBoard {
             GameState(
@@ -412,6 +439,7 @@ class GameViewModel(
                 showAchievements = it.showAchievements,
                 boostersEnabled = it.boostersEnabled,
                 refillTo = it.refillTo,
+                treatEveryNLevels = it.treatEveryNLevels,
                 isPro = it.isPro,
                 records = it.records,
                 unlockedThrough = campaignFrontier(unlocked, level.id),
@@ -421,6 +449,43 @@ class GameViewModel(
                 tutorialCells = lesson.cells,
             )
         }
+    }
+
+    /**
+     * Pro's opening boosters, which **lift a holding to a floor and never
+     * replace it** (SPEC 5.1).
+     *
+     * The other reading — set the count to `boosters.proSniffsPerAttempt` at the
+     * start of every attempt — is the one that has to be argued against, because
+     * "starts every attempt with 3" sounds like an assignment. It would take
+     * boosters *away*: a Pro player holding nine Treats from level rewards would
+     * open their next board with three and never understand where six went. A
+     * paying customer losing something they earned is the worst failure
+     * available here, and it is the failure an assignment ships.
+     *
+     * A floor also cannot be farmed. It never adds to a holding that already
+     * clears it, so restarting a level twenty times leaves a Pro player with
+     * exactly what one attempt gives them — which is the difference between "you
+     * never run out" and "you can print these". Level rewards remain the only
+     * way to hold more, for Pro and free players alike.
+     *
+     * Same shape as [refill] and [refillBones], which is the point: `refillTo`,
+     * the ad refill and this are three floors and no caps.
+     */
+    private suspend fun GameAction.grantProBoosters() {
+        if (!entitlements.isPro.value) return
+        var granted: Pair<Int, Int>? = null
+        updateState {
+            val next = it.copy(
+                sniffs = maxOf(it.sniffs, proSniffsPerAttempt()),
+                treats = maxOf(it.treats, proTreatsPerAttempt()),
+            )
+            granted = next.sniffs to next.treats
+            next
+        }
+        val (sniffs, treats) = granted ?: return
+        persistCounts(Consumable.Sniff, sniffs)
+        persistCounts(Consumable.Treat, treats)
     }
 
     /**
@@ -777,6 +842,11 @@ class GameViewModel(
             livesRemaining = state.livesRemaining,
             dailyStreakDays = streak,
         )
+        // Before the sheet is built, so the sheet can say so and the count it
+        // shows already includes the Treat. `progress.onCompleted` above has
+        // already overwritten the record, which is why the first-clear question
+        // is answered from the snapshot taken when the level opened.
+        val reward = grantLevelReward(level, firstClear = levelNeverCleared)
 
         sendEvent(GameEvent.Won)
         updateBoard {
@@ -788,9 +858,61 @@ class GameViewModel(
                 unlockedThrough = maxOf(it.unlockedThrough, unlocked),
                 newBadges = earnedBadges,
                 dailyStreak = streak,
+                treatAwarded = reward,
             )
         }
     }
+
+    /**
+     * The Treat every `boosters.treatEveryNLevels` levels pays out.
+     *
+     * **First clear only.** A replay pays nothing, because a level that paid
+     * every time it was finished would be a treat printer with no ad in front of
+     * it — pick the shortest 4x4 in the pack and farm it. The record is read as
+     * it stood when the level *opened* ([recordBeforeAttempt]); the clear above
+     * has already moved it to `Completed`, so asking now would answer "no" for
+     * every level in the game.
+     *
+     * The holding goes **above** the refill floor and stays there. That is the
+     * whole point of the reward: `boosters.refillTo` caps what an ad tops you up
+     * to, not what you are allowed to own (SPEC 1.5), so a player who clears
+     * levels accumulates a stash and a player who watches ads does not.
+     *
+     * Campaign only. The daily has no level ladder to count against, and its
+     * ids are positions in a different pack — daily 200 is not campaign 200.
+     */
+    private suspend fun GameAction.grantLevelReward(
+        level: LevelDefinition,
+        firstClear: Boolean,
+    ): Boolean {
+        if (isDaily || !firstClear) return false
+        val every = treatEveryNLevels()
+        if (every <= 0 || level.id % every != 0) return false
+
+        var held = 0
+        updateState {
+            held = it.treats + LevelRewardTreats
+            it.copy(treats = held)
+        }
+        persistCounts(Consumable.Treat, held)
+        logger.logEvent(
+            "game.level_reward_granted",
+            "level_id" to level.id,
+            "booster" to "treat",
+            "held" to held,
+        )
+        return true
+    }
+
+    /**
+     * Whether the level had never been cleared before this attempt opened.
+     *
+     * Read off the snapshot rather than the live record, because `onCompleted`
+     * overwrites it during the win. Both the achievement fold and the level
+     * reward hang off this, and they must agree.
+     */
+    private val levelNeverCleared: Boolean
+        get() = recordBeforeAttempt.state != LevelState.Completed
 
     /**
      * Locks in today's result and reports the streak it leaves behind.
@@ -848,7 +970,7 @@ class GameViewModel(
             bestCombo = card.bestCombo,
             sniffsUsed = sniffsUsed,
             treatsUsed = treatsUsed,
-            isFirstClear = completed && recordBeforeAttempt.state != LevelState.Completed,
+            isFirstClear = completed && levelNeverCleared,
             previousBestPaws = recordBeforeAttempt.bestPaws,
             dailyStreakDays = dailyStreakDays,
             localHour = now.toLocalDateTime(deviceTimeZone.current()).hour,
@@ -899,13 +1021,82 @@ class GameViewModel(
             livesRemaining = livesRemaining,
             dailyStreakDays = streak,
         )
+        val skip = skipOffer(level)
         updateBoard {
             it.copy(
                 phase = GamePhase.Lost,
                 elapsedMs = duration,
                 newBadges = earnedBadges,
                 dailyStreak = streak,
+                skip = skip,
             )
+        }
+    }
+
+    /**
+     * Whether this loss earns the Skip option, and what it costs.
+     *
+     * **Attempts, not failures.** `level_progress` counts starts, and adding a
+     * failure column would mean a schema bump on a database that still rebuilds
+     * itself destructively — it would cost every player their campaign to make
+     * this number one better. Attempts over-count, and by more than it looks:
+     * `onAttemptStarted` fires again every time a level is *resumed*, so
+     * backgrounding a board twice counts as two attempts. Seen on device — a
+     * level re-entered after a process death offered the skip on its first real
+     * loss. That error direction is deliberate. The skip is a rescue behind an
+     * ad and a daily cap, and being early with a rescue is the cheap mistake.
+     *
+     * Offered at zero remaining as well, disabled and saying why. A player who
+     * has just failed twice and is about to fail again should find out the
+     * option exists and is spent for today, rather than meet a sheet that
+     * quietly looks the same as it did an hour ago.
+     */
+    private suspend fun skipOffer(level: LevelDefinition): SkipOffer? {
+        // No skip on the daily: there is no next board to advance to, and the
+        // day is one attempt by definition.
+        if (isDaily) return null
+        val after = skipAfterFailedAttempts()
+        if (after <= 0 || recordBeforeAttempt.attempts + 1 < after) return null
+        // Clearing level 500 has nowhere to skip to.
+        if (level.id >= LevelPacks.lastCampaignLevelId) return null
+
+        val remaining = Catching { skips.remainingToday() }
+            .logOnFailure { "Failed to read the skip allowance" }
+            .getOrNull()
+            ?: return null
+        return SkipOffer(remainingToday = remaining, free = entitlements.isPro.value)
+    }
+
+    /**
+     * Trades an ad for the level, and opens the next one.
+     *
+     * The repository owns the order — allowance, then ad, then write — so this
+     * only routes the answer. [SkipResult.Declined] is the player closing the ad
+     * a second ago and the lose sheet is still in front of them unchanged, so it
+     * says nothing; [SkipResult.NoneLeft] re-renders the offer as spent, because
+     * it means the allowance ran out somewhere other than on this screen.
+     */
+    private suspend fun GameAction.skipLevel() {
+        val level = state.level ?: return
+        if (isDaily) return
+
+        val result = Catching { skips.skip(level.id) }
+            .logOnFailure { "Failed to skip level ${level.id}" }
+            .getOrNull()
+        when (result) {
+            is SkipResult.Skipped -> {
+                logger.logEvent(
+                    "game.level_skipped",
+                    "level_id" to level.id,
+                    "attempt_number" to attemptNumber,
+                    "skips_left_today" to result.remainingToday,
+                )
+                nextLevel()
+            }
+            SkipResult.NoneLeft -> updateState {
+                it.copy(skip = it.skip?.copy(remainingToday = 0))
+            }
+            SkipResult.Declined, null -> Unit
         }
     }
 
@@ -1374,6 +1565,17 @@ data class GameState(
     val refillTo: Int = 3,
 
     /**
+     * `boosters.treatEveryNLevels`, so the level pane marks the rows that pay.
+     *
+     * Zero by default rather than the config default. The pane promising a
+     * reward the game has not confirmed is the bug this whole reward path
+     * exists to close, and a value baked in here would be a second answer to a
+     * question config already answers — the failure that made
+     * `boosters.startingSniffs` unwirable.
+     */
+    val treatEveryNLevels: Int = 0,
+
+    /**
      * True once the last campaign level is cleared, so the win sheet can say so
      * instead of offering a next level that does not exist.
      */
@@ -1516,12 +1718,41 @@ data class GameState(
 
     /** The answer to a freeze the player just asked for. */
     val freezeMessage: FreezeMessage? = null,
+
+    /**
+     * The Skip option, or null when this attempt has not earned one. Set on the
+     * loss that qualifies, and gone again the moment a fresh attempt opens.
+     */
+    val skip: SkipOffer? = null,
+
+    /**
+     * True when the clear just paid a Treat, so the win sheet can say so. The
+     * count in [treats] already includes it.
+     */
+    val treatAwarded: Boolean = false,
 ) {
     val placedCells: Set<Int> get() = placed.cells().toSet()
 
     val dogsPlaced: Int get() = placed.placedCount
 
     val dogsRequired: Int get() = level?.size ?: 0
+}
+
+/**
+ * The Skip on the lose sheet.
+ *
+ * Carries the allowance rather than just a boolean so the button can say how
+ * many are left — the cap is the surprising part of this feature, and a player
+ * who finds out about it by tapping a button that does nothing has been told
+ * badly.
+ */
+data class SkipOffer(
+    val remainingToday: Int,
+
+    /** Pro skips without watching anything, so the button drops its Ad badge. */
+    val free: Boolean = false,
+) {
+    val available: Boolean get() = remainingToday > 0
 }
 
 /**
@@ -1601,6 +1832,9 @@ sealed interface GameAction {
     data object Leave : GameAction
     data object DismissWarning : GameAction
     data object RefillBones : GameAction
+
+    /** Trade an ad for the level, after enough attempts have failed. */
+    data object SkipLevel : GameAction
     data object ToggleColorblind : GameAction
     data object ToggleHaptics : GameAction
     data object ToggleReduceAnimations : GameAction

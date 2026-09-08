@@ -160,6 +160,13 @@ things to learn before the puzzle.
 - All three may be **held above 3**. Clearing levels grants extra, so a stash is a reward for
   playing rather than a meter that only ever empties. The cap is on the *refill*, not the holding,
   and a refill never reduces a holding.
+
+**The level reward, concretely.** Clearing a level whose id is a multiple of
+`boosters.treatEveryNLevels` (default 5) grants **one Treat**, on the **first clear only**. A
+replay pays nothing: a level that paid every time it was finished would be an ad-free treat
+printer, and the shortest 4x4 in the pack would be the whole economy. The level pane marks every
+row that pays, and marks the ones already collected as spent, so the ladder is visible before it
+is walked. Campaign only — the daily's ids are positions in another pack and it has no ladder.
 - Each shows its count as a badge on its button, including at zero. A count that vanishes when it
   runs out makes the button look broken rather than empty, and empty is the state that should
   invite a tap.
@@ -190,6 +197,26 @@ skips to level 500 in an afternoon and has nothing left.
 
 A skipped level records `state = SKIPPED`: no score, no paws, no time. It stays available on the
 map and can be cleared properly later. Skipping unlocks the next level normally.
+
+**Where it lives, and what counts as a failed attempt.** The option is the last control on the
+lose sheet, under both revives and Start over — a rescue, not an invitation to stop thinking. It
+counts `level_progress.attempts` (starts of a level that has never been cleared) rather than
+failures, because `level_progress` has no failure column and adding one means a schema bump on a
+database that still rebuilds itself destructively. Attempts over-count: an abandoned attempt, and
+a board resumed after a process death, both add one. The skip therefore arrives slightly early for
+some players, which is the correct direction for a rescue that already costs an ad and comes out
+of a daily allowance.
+
+With the allowance spent the control stays on screen, disabled, saying so. Removing it is how a
+player learns that a feature they used yesterday has silently gone away.
+
+**The per-day counter and a moved clock.** The allowance lives in its own persisted `skip_state`
+cache, so a force-quit is not a way around the cap. The recorded day **only ever moves forward**:
+a clock wound back does not roll the counter over, so a spent skip cannot be recovered. A clock
+wound forward does grant a fresh allowance — refusing a future date means trusting a clock we
+already do not trust — but it drags the recorded day with it, so the player then gets nothing
+until the real calendar catches up. See `decisions.md` for why this keeps a high-water mark where
+the daily challenge deliberately does not.
 
 ### 1.7 Grid sizes and the 500-level curve
 
@@ -480,7 +507,12 @@ it non-consumable. It grants:
 - No ads, ever.
 - Unlimited offline play.
 - Free continues, free skips (still under the daily skip cap), free streak freezes.
-- 3 Sniffs and 1 Treat at the start of every attempt.
+- 3 Sniffs and 3 Treats at the start of every attempt (`boosters.proSniffsPerAttempt` /
+  `boosters.proTreatsPerAttempt`). The table in §4.3 and the paywall copy have said 3 and 3 since
+  the config landed; this line said 1 Treat and was the stale copy, the same way §4.3 was the
+  stale copy about starting treats. **It is a floor, never an assignment**: a Pro player holding
+  nine Treats from level rewards opens their next board with nine, not three. Setting the holding
+  would take consumables away from a paying customer, and a floor cannot be farmed by restarting.
 - Jump to the first level of any band reached.
 
 Apple requires a visible **Restore Purchases** control; it lives in Settings. Because the

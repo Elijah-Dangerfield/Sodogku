@@ -8,11 +8,15 @@ import com.sodogku.libraries.billing.Entitlements
 import com.sodogku.libraries.billing.PurchaseOutcome
 import com.sodogku.libraries.billing.RestoreOutcome
 import com.sodogku.libraries.config.AppConfigMap
+import com.sodogku.libraries.config.values.BoostersProSniffsPerAttempt
+import com.sodogku.libraries.config.values.BoostersProTreatsPerAttempt
 import com.sodogku.libraries.config.values.BoostersRefillTo
 import com.sodogku.libraries.config.values.BoostersStartingSniffs
 import com.sodogku.libraries.config.values.BoostersStartingTreats
+import com.sodogku.libraries.config.values.BoostersTreatEveryNLevels
 import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.FeatureBoosters
+import com.sodogku.libraries.config.values.ProgressionSkipAfterFailedAttempts
 import com.sodogku.libraries.config.values.ScoringBasePerPlacement
 import com.sodogku.libraries.config.values.ScoringComboMax
 import com.sodogku.libraries.config.values.ScoringComboStep
@@ -33,6 +37,8 @@ import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
 import com.sodogku.libraries.progress.ProgressRepository
+import com.sodogku.libraries.progress.SkipRepository
+import com.sodogku.libraries.progress.SkipResult
 import com.sodogku.libraries.progress.daily.DailyOutcome
 import com.sodogku.libraries.progress.daily.DailyRepository
 import com.sodogku.libraries.progress.daily.DailyResult
@@ -1562,6 +1568,254 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(listOf(AnyAchievement), vm.state.newBadges)
     }
 
+    @Test
+    fun clearingALevelOnTheRewardCadencePaysATreat() = runUnitTest {
+        val cache = InMemoryAppCache()
+        val vm = viewModel(levelId = RewardLevel, cache = cache)
+        val before = vm.state.treats
+
+        solveCurrent(vm)
+
+        assertEquals(before + 1, vm.state.treats)
+        assertTrue(vm.state.treatAwarded, "the win sheet has to be able to say so")
+        assertEquals(before + 1, cache.get().treats, "a reward that is not persisted is not a reward")
+    }
+
+    @Test
+    fun aLevelOffTheCadencePaysNothing() = runUnitTest {
+        val vm = viewModel(levelId = PlainRewardlessLevel)
+        val before = vm.state.treats
+
+        solveCurrent(vm)
+
+        assertEquals(before, vm.state.treats)
+        assertFalse(vm.state.treatAwarded)
+    }
+
+    @Test
+    fun theCadenceIsTheConfiguredOneAndNotAHardcodedFive() = runUnitTest {
+        // The half that stops a `% 5` passing. Level 201 pays on a cadence of 3
+        // and not on the default of 5; level 200 is the other way round.
+        val config = configOf("boosters.treatEveryNLevels" to 3)
+        val onThree = viewModel(levelId = PlainRewardlessLevel, config = config)
+        val offThree = viewModel(levelId = RewardLevel, config = config)
+        val beforeOn = onThree.state.treats
+        val beforeOff = offThree.state.treats
+
+        solveCurrent(onThree)
+        solveCurrent(offThree)
+
+        assertEquals(beforeOn + 1, onThree.state.treats, "201 is a multiple of 3")
+        assertEquals(beforeOff, offThree.state.treats, "200 is not")
+    }
+
+    @Test
+    fun aCadenceOfZeroPaysNothingRatherThanDividingByIt() = runUnitTest {
+        val vm = viewModel(levelId = RewardLevel, config = configOf("boosters.treatEveryNLevels" to 0))
+        val before = vm.state.treats
+
+        solveCurrent(vm)
+
+        assertEquals(before, vm.state.treats)
+    }
+
+    @Test
+    fun aReplayOfAClearedLevelPaysNothing() = runUnitTest {
+        // Otherwise the shortest 4x4 in the pack is an ad-free treat printer.
+        val progress = InMemoryProgress()
+        progress.onCompleted(RewardLevel, score = 100, paws = 3, timeMs = 1_000)
+        val vm = viewModel(levelId = RewardLevel, progress = progress)
+        val before = vm.state.treats
+
+        solveCurrent(vm)
+
+        assertEquals(before, vm.state.treats)
+        assertFalse(vm.state.treatAwarded)
+    }
+
+    @Test
+    fun theRewardPushesAHoldingAboveTheRefillFloor() = runUnitTest {
+        // SPEC 1.5: `boosters.refillTo` caps the refill, never the holding.
+        val cache = InMemoryAppCache()
+        cache.set(AppData(treats = ConsumableRefillTo))
+        val vm = viewModel(levelId = RewardLevel, cache = cache)
+
+        solveCurrent(vm)
+
+        assertTrue(
+            vm.state.treats > vm.state.refillTo,
+            "a level reward has to be able to take a holding past the ad's ceiling",
+        )
+    }
+
+    @Test
+    fun theDailyPaysNoLevelReward() = runUnitTest {
+        // Daily ids are positions in another pack; daily 200 is not campaign 200.
+        val vm = viewModel(levelId = DailyLevel, isDaily = true)
+        val before = vm.state.treats
+
+        solveCurrent(vm)
+
+        assertEquals(before, vm.state.treats)
+    }
+
+    @Test
+    fun theLevelPaneIsToldTheCadenceItShouldAdvertise() = runUnitTest {
+        val vm = viewModel(config = configOf("boosters.treatEveryNLevels" to 7))
+
+        assertEquals(7, vm.state.treatEveryNLevels)
+    }
+
+    @Test
+    fun proOpensAnAttemptWithAFloorOfBoosters() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(sniffs = 0, treats = 0))
+        val vm = viewModel(entitlements = ProEntitlements(), cache = cache)
+
+        assertEquals(DefaultProBoosters, vm.state.sniffs)
+        assertEquals(DefaultProBoosters, vm.state.treats)
+        assertEquals(DefaultProBoosters, cache.get().sniffs)
+        assertEquals(DefaultProBoosters, cache.get().treats)
+    }
+
+    @Test
+    fun theProFloorIsTheConfiguredOne() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(sniffs = 0, treats = 0))
+        val vm = viewModel(
+            entitlements = ProEntitlements(),
+            cache = cache,
+            config = configOf(
+                "boosters.proSniffsPerAttempt" to 1,
+                "boosters.proTreatsPerAttempt" to 2,
+            ),
+        )
+
+        assertEquals(1, vm.state.sniffs)
+        assertEquals(2, vm.state.treats)
+    }
+
+    @Test
+    fun theProFloorNeverTakesAStashAway() = runUnitTest {
+        // The failure the "replace the holding" reading would ship: a paying
+        // player opens their next board with three and six treats are gone.
+        val cache = InMemoryAppCache()
+        cache.set(AppData(sniffs = 9, treats = 9))
+        val vm = viewModel(entitlements = ProEntitlements(), cache = cache)
+        assertEquals(9, vm.state.treats)
+
+        vm.takeAction(GameAction.Retry)
+
+        assertEquals(9, vm.state.sniffs, "a restart is not a reset")
+        assertEquals(9, vm.state.treats)
+    }
+
+    @Test
+    fun aFreePlayerGetsNoPerAttemptTopUp() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(sniffs = 0, treats = 0))
+        val vm = viewModel(cache = cache)
+
+        assertEquals(0, vm.state.sniffs)
+        assertEquals(0, vm.state.treats)
+    }
+
+    @Test
+    fun theSkipIsWithheldUntilEnoughAttemptsHaveFailed() = runUnitTest {
+        val vm = viewModel()
+
+        loseCurrent(vm)
+        assertNull(vm.state.skip, "one loss is not stuck, it is one loss")
+
+        vm.takeAction(GameAction.Retry)
+        loseCurrent(vm)
+
+        assertNotNull(vm.state.skip)
+        assertEquals(DefaultSkipsPerDay, vm.state.skip?.remainingToday)
+    }
+
+    @Test
+    fun theAttemptThresholdIsTheConfiguredOne() = runUnitTest {
+        // Against the default of 2 this first loss offers nothing, so the
+        // config value is what the assertion is actually about.
+        val vm = viewModel(config = configOf("progression.skipAfterFailedAttempts" to 1))
+
+        loseCurrent(vm)
+
+        assertNotNull(vm.state.skip)
+    }
+
+    @Test
+    fun theSkipIsNeverOfferedOnTheDaily() = runUnitTest {
+        val vm = viewModel(
+            levelId = DailyLevel,
+            isDaily = true,
+            config = configOf("progression.skipAfterFailedAttempts" to 1),
+        )
+
+        loseCurrent(vm)
+
+        assertNull(vm.state.skip, "there is no next daily to skip to")
+    }
+
+    @Test
+    fun takingTheSkipRecordsItAndOpensTheNextLevel() = runUnitTest {
+        val skips = FakeSkips()
+        val progress = InMemoryProgress()
+        val vm = viewModel(
+            skips = skips,
+            progress = progress,
+            config = configOf("progression.skipAfterFailedAttempts" to 1),
+        )
+        loseCurrent(vm)
+
+        vm.takeAction(GameAction.SkipLevel)
+
+        assertEquals(listOf(PlainLevel), skips.skipped)
+        assertEquals(PlainLevel + 1, vm.state.level?.id)
+        assertEquals(GamePhase.Playing, vm.state.phase)
+        assertNull(vm.state.skip, "a fresh attempt has not earned an offer")
+    }
+
+    @Test
+    fun aSpentAllowanceStillShowsTheOfferAndSaysItIsSpent() = runUnitTest {
+        val vm = viewModel(
+            skips = FakeSkips(remaining = 0),
+            config = configOf("progression.skipAfterFailedAttempts" to 1),
+        )
+
+        loseCurrent(vm)
+
+        val skip = assertNotNull(vm.state.skip)
+        assertFalse(skip.available, "a player who has failed twice should be told the cap exists")
+    }
+
+    @Test
+    fun closingTheSkipAdEarlyLeavesTheBoardWhereItWas() = runUnitTest {
+        val vm = viewModel(
+            skips = FakeSkips(declines = true),
+            config = configOf("progression.skipAfterFailedAttempts" to 1),
+        )
+        loseCurrent(vm)
+
+        vm.takeAction(GameAction.SkipLevel)
+
+        assertEquals(PlainLevel, vm.state.level?.id)
+        assertEquals(GamePhase.Lost, vm.state.phase)
+    }
+
+    @Test
+    fun proSeesTheSkipAsFreeSoItIsNotBadgedWithAnAd() = runUnitTest {
+        val vm = viewModel(
+            entitlements = ProEntitlements(),
+            config = configOf("progression.skipAfterFailedAttempts" to 1),
+        )
+
+        loseCurrent(vm)
+
+        assertTrue(vm.state.skip?.free == true)
+    }
+
     private fun viewModel(
         levelId: Int = PlainLevel,
         isDaily: Boolean = false,
@@ -1569,6 +1823,7 @@ class GameViewModelTest : CoroutineTest() {
         entitlements: Entitlements = FreeEntitlementsFake(),
         cache: AppCache = InMemoryAppCache(),
         progress: ProgressRepository = InMemoryProgress(),
+        skips: SkipRepository = FakeSkips(),
         daily: DailyRepository = FakeDaily(),
         achievements: AchievementsRepository = RecordingAchievements(),
         config: AppConfigMap = configOf(),
@@ -1580,6 +1835,7 @@ class GameViewModelTest : CoroutineTest() {
         clock,
         cache,
         progress,
+        skips,
         daily,
         achievements,
         // Fixed rather than the system clock: `localHour` is an input to the
@@ -1591,6 +1847,10 @@ class GameViewModelTest : CoroutineTest() {
         startingSniffs = BoostersStartingSniffs(config),
         startingTreats = BoostersStartingTreats(config),
         refillTo = BoostersRefillTo(config),
+        treatEveryNLevels = BoostersTreatEveryNLevels(config),
+        proSniffsPerAttempt = BoostersProSniffsPerAttempt(config),
+        proTreatsPerAttempt = BoostersProTreatsPerAttempt(config),
+        skipAfterFailedAttempts = ProgressionSkipAfterFailedAttempts(config),
         achievementsEnabled = FeatureAchievements(config),
         boostersEnabled = FeatureBoosters(config),
     )
@@ -1736,6 +1996,22 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Any badge will do; these tests care about whether one is shown. */
         val AnyAchievement = Achievement(AchievementId.FirstSteps, Stat.LevelsCleared, target = 1)
+
+        /** Mirrors `ProgressionSkipsPerDay.default`. */
+        const val DefaultSkipsPerDay = 3
+
+        /** Mirrors `BoostersProSniffsPerAttempt` / `BoostersProTreatsPerAttempt`. */
+        const val DefaultProBoosters = 3
+
+        /**
+         * A campaign level whose id is a multiple of `boosters.treatEveryNLevels`
+         * at its default of 5, and past the starter-dog band so the board opens
+         * empty. Level 200 is both.
+         */
+        const val RewardLevel = 200
+
+        /** A level id that is *not* a multiple of 5, so a reward there is a bug. */
+        const val PlainRewardlessLevel = 201
     }
 
     /**
@@ -1920,6 +2196,28 @@ class GameViewModelTest : CoroutineTest() {
 
         private fun LevelState.orUnlocked(): LevelState =
             if (this == LevelState.Locked) LevelState.Unlocked else this
+    }
+
+    /**
+     * In-memory [SkipRepository] that keeps the one rule the game leans on: the
+     * allowance goes *down* when a skip is taken. A fake whose count never moved
+     * would let a ViewModel that offered an infinite skip look correct.
+     */
+    private class FakeSkips(
+        private var remaining: Int = DefaultSkipsPerDay,
+        private val declines: Boolean = false,
+    ) : SkipRepository {
+        val skipped = mutableListOf<Int>()
+
+        override suspend fun remainingToday(): Int = remaining
+
+        override suspend fun skip(levelId: Int): SkipResult {
+            if (remaining <= 0) return SkipResult.NoneLeft
+            if (declines) return SkipResult.Declined
+            remaining--
+            skipped += levelId
+            return SkipResult.Skipped(remaining)
+        }
     }
 
     private class FixedAdGate(private val outcome: RewardOutcome) : AdGate {

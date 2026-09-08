@@ -38,6 +38,7 @@ import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.game.DailyCard
 import com.sodogku.libraries.ui.components.game.DailyCardState
+import com.sodogku.libraries.ui.components.game.LevelRewardChip
 import com.sodogku.libraries.ui.components.game.PawRating
 import com.sodogku.libraries.ui.components.icon.Icon
 import com.sodogku.libraries.ui.components.icon.Icons
@@ -51,7 +52,8 @@ import kotlinx.datetime.number
 import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.daily_date
-import sodogku.libraries.resources.generated.resources.levels_reward
+import sodogku.libraries.resources.generated.resources.levels_reward_claimed
+import sodogku.libraries.resources.generated.resources.levels_reward_treat
 import sodogku.libraries.resources.generated.resources.levels_size
 import sodogku.libraries.resources.generated.resources.levels_title
 import sodogku.libraries.resources.generated.resources.month_short_1
@@ -93,6 +95,13 @@ fun BoxScope.LevelDrawer(
     unlockedThrough: Int,
     canJumpAnywhere: Boolean,
     records: Map<Int, LevelRecord>,
+    /**
+     * `boosters.treatEveryNLevels`, so the pane advertises the reward the game
+     * will actually pay. Zero shows none — which is what an operator setting the
+     * key to zero means, and what the pane should say before the value has been
+     * read rather than promising a prize on spec.
+     */
+    treatEveryNLevels: Int,
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
     daily: DailyStatus? = null,
@@ -163,9 +172,10 @@ fun BoxScope.LevelDrawer(
                     record = records[level.id] ?: LevelRecord.unplayed(level.id),
                     isCurrent = level.id == currentLevelId,
                     unlocked = canJumpAnywhere || level.id <= unlockedThrough,
-                    // The frontier: the furthest level that has opened. Showing
-                    // what it pays out is the pull down the list.
-                    showsReward = level.id == unlockedThrough,
+                    // Every level that pays, not just the frontier. The rewards
+                    // are the reason to scroll 500 rows, and one chip on one row
+                    // is a coincidence rather than a ladder.
+                    paysReward = treatEveryNLevels > 0 && level.id % treatEveryNLevels == 0,
                     onPick = onPick,
                 )
             }
@@ -219,7 +229,7 @@ private fun LevelRow(
     record: LevelRecord,
     isCurrent: Boolean,
     unlocked: Boolean,
-    showsReward: Boolean,
+    paysReward: Boolean,
     onPick: (Int) -> Unit,
 ) {
     val background = when {
@@ -266,12 +276,18 @@ private fun LevelRow(
                 )
             }
         }
-        // A placeholder glyph until the reward art exists. It lives in
-        // strings.xml so swapping it for a real asset is one call site.
-        if (showsReward) {
-            Text(
-                text = stringResource(Res.string.levels_reward),
-                typography = AppTheme.typography.Heading.H600,
+        // Cleared levels keep the chip rather than dropping it, so the column
+        // stays a straight line down 500 rows — but as the spent version, since
+        // the Treat is paid on the first clear and this one has already been
+        // collected.
+        if (paysReward) {
+            LevelRewardChip(
+                label = if (record.state == LevelState.Completed) {
+                    stringResource(Res.string.levels_reward_claimed)
+                } else {
+                    stringResource(Res.string.levels_reward_treat, LevelRewardTreats)
+                },
+                claimed = record.state == LevelState.Completed,
             )
         }
     }

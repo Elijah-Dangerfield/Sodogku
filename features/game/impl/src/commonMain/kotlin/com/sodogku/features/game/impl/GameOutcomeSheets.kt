@@ -20,6 +20,7 @@ import com.sodogku.libraries.ui.components.game.PawRating
 import com.sodogku.libraries.sharing.ShareLabels
 import com.sodogku.libraries.sharing.ShareResult
 import com.sodogku.libraries.ui.components.feedback.ShareButton
+import com.sodogku.libraries.ui.components.game.LevelRewardChip
 import com.sodogku.libraries.ui.components.game.RewardBadge
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.system.AppTheme
@@ -38,6 +39,10 @@ import sodogku.libraries.resources.generated.resources.game_next_level
 import sodogku.libraries.resources.generated.resources.game_watch_ad_badge
 import sodogku.libraries.resources.generated.resources.game_refill_bones
 import sodogku.libraries.resources.generated.resources.game_retry
+import sodogku.libraries.resources.generated.resources.game_reward_earned
+import sodogku.libraries.resources.generated.resources.game_skip_level
+import sodogku.libraries.resources.generated.resources.game_skip_none_left
+import sodogku.libraries.resources.generated.resources.game_skip_remaining
 import sodogku.libraries.resources.generated.resources.game_won_title
 import sodogku.libraries.resources.generated.resources.share_footer
 import sodogku.libraries.resources.generated.resources.share_streak
@@ -80,6 +85,14 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
             typography = AppTheme.typography.Heading.H600,
             color = AppTheme.colors.accentPrimary,
         )
+        // The same chip the level pane promised, so the payout is recognisably
+        // the thing that was advertised rather than a number quietly going up
+        // in the booster row behind the sheet.
+        if (state.treatAwarded) {
+            LevelRewardChip(
+                label = stringResource(Res.string.game_reward_earned),
+            )
+        }
         // The streak is the reward for a daily, so it is shown next to the score
         // rather than left for the player to find back in the drawer.
         if (state.isDaily && state.dailyStreak > 0) {
@@ -192,12 +205,55 @@ private fun LostSheet(state: GameState, onAction: (GameAction) -> Unit, modifier
                 Text(stringResource(Res.string.game_retry))
             }
         }
+        // Under both revives and Start over, deliberately. This board is still
+        // winnable and the offer to move past it should be the last thing read,
+        // not the first — SPEC 1.6 wants a rescue, not an invitation to stop
+        // thinking.
+        state.skip?.let { skip -> SkipButton(skip, onAction) }
         ButtonGhost(
             onClick = { onAction(GameAction.Leave) },
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.game_back_to_levels))
         }
+    }
+}
+
+/**
+ * "Move past this one", as the quietest control on the sheet.
+ *
+ * A ghost button rather than a filled one: this is the option that ends the
+ * puzzle, and the two revives above it are the ones worth reaching for first.
+ *
+ * With the allowance spent it stays on screen, disabled, and swaps its label
+ * for the reason. The alternative — removing it — is how a player learns that a
+ * feature they used yesterday has silently gone away.
+ */
+@Composable
+private fun SkipButton(skip: SkipOffer, onAction: (GameAction) -> Unit) {
+    ButtonGhost(
+        onClick = { onAction(GameAction.SkipLevel) },
+        enabled = skip.available,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (skip.available) {
+            Text(stringResource(Res.string.game_skip_level))
+            // Pro skips for free, so badging it would promise an ad that never
+            // plays. The cap still applies to Pro (SPEC 1.6).
+            if (!skip.free) {
+                RewardBadge(modifier = Modifier.padding(start = Dimension.D300))
+            }
+        } else {
+            Text(stringResource(Res.string.game_skip_none_left))
+        }
+    }
+    if (skip.available) {
+        Text(
+            text = stringResource(Res.string.game_skip_remaining, skip.remainingToday),
+            typography = AppTheme.typography.Caption.C300,
+            color = AppTheme.colors.textSecondary,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -244,5 +300,16 @@ private fun WonSheetPreview() {
 private fun LostSheetPreview() {
     PreviewContent {
         GameOutcomeSheet(state = GameState(phase = GamePhase.Lost), onAction = {})
+    }
+}
+
+@Preview
+@Composable
+private fun LostSheetWithSkipPreview() {
+    PreviewContent {
+        GameOutcomeSheet(
+            state = GameState(phase = GamePhase.Lost, skip = SkipOffer(remainingToday = 2)),
+            onAction = {},
+        )
     }
 }

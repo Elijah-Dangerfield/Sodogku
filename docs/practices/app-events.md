@@ -118,6 +118,8 @@ a session join.
 | `game.booster_used` | `booster` (`sniff`/`treat`), `level_id` | A charge is actually spent |
 | `game.booster_no_op` | `booster`, `level_id` | A booster was asked for and **declined to spend**, because it had nothing to show. Should be rare; a rise means the hint engine is running out of things to say earlier than it should, which is a difficulty-calibration signal and not a UI one |
 | `game.booster_refilled` | `booster`, `to` | An ad topped a consumable up. `to` is the resulting holding, not the amount granted — refills never reduce, so the two differ for anyone above the floor |
+| `game.level_reward_granted` | `level_id`, `booster` (always `treat`), `held` | A **first** clear on the `boosters.treatEveryNLevels` cadence paid out. A replay pays nothing and emits nothing, so counting these counts rewards and not clears. `held` is the resulting holding, which is what tells you whether the reward is accumulating into a stash or being spent as fast as it arrives |
+| `game.level_skipped` | `level_id`, `attempt_number`, `skips_left_today` | A rewarded ad bought a way past a level. `attempt_number` is how many goes it took before giving up, which is the number that says whether the level is hard or broken. `skips_left_today` at 0 marks the players the daily cap is actually binding on |
 
 `mode` is `campaign` or `daily`, and it is on every game event rather than only the daily ones
 because level ids are ambiguous without it — the two packs share a number line, so `level_id: 7`

@@ -125,7 +125,7 @@ class ConfigValuesAreReadTest {
         const val MIN_SOURCE_FILES = 200
 
         /**
-         * The debt. It is now 19 names.
+         * The debt. It is now 6 names.
          *
          * It was 39 when this test was written, not the 37 the decisions entry
          * and the KDoc above both claim — the prose miscounted and the set is
@@ -160,34 +160,15 @@ class ConfigValuesAreReadTest {
             // it would mean inventing the harsher half of an A/B test.
             "AdsFailureMode",
 
-            // Progression and the economy that has no feature behind it yet.
-            // Skips are not built (no button, no per-day counter). The level
-            // map with silhouettes does not exist — the level drawer shows
-            // every level, locked ones included, deliberately. Nothing grants a
-            // treat on a level clear, nothing counts ad grants per day, and Pro
-            // does not top boosters up per attempt (SPEC 5.1 promises it; the
-            // code does not do it).
-            "ProgressionSkipsPerDay",
-            "ProgressionSkipAfterFailedAttempts",
+            // What is left of the economy. The level map with silhouettes does
+            // not exist — the level drawer shows every level, locked ones
+            // included, deliberately — so there is no disclosure window for
+            // `lookaheadCount` to widen. And nothing counts rewarded booster
+            // grants per day: that is ad bookkeeping, it belongs next to the
+            // other five numbers in `AdStateCache`, and `RealAdGate` has no
+            // per-day counter to hang it on yet.
             "ProgressionLookaheadCount",
-            "BoostersTreatEveryNLevels",
             "BoostersAdGrantsPerDay",
-            "BoostersProSniffsPerAttempt",
-            "BoostersProTreatsPerAttempt",
-
-            // The legal version gate, which is C11's remaining half.
-            "LegalTermsVersion",
-            "LegalPrivacyVersion",
-            "LegalForceReacceptBelow",
-
-            // The upgrade gate and the maintenance screen, neither of which has
-            // a screen yet. These are the ones that would bite hardest in an
-            // incident, since they are the controls you reach for first.
-            "AppMinSupportedVersion",
-            "AppSoftUpdateVersion",
-            "AppMaintenanceMessage",
-            "AppMaintenanceMode",
-            "AppReviewPromptAfterLevel",
         )
     }
 }

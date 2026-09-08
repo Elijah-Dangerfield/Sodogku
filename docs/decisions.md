@@ -6,6 +6,97 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — Pro's per-attempt boosters are a floor, not an assignment
+
+SPEC 5.1 says Pro "starts every attempt with 3 Sniffs and 3 Treats", and the obvious reading of
+that sentence is `sniffs = proSniffsPerAttempt` at the top of every attempt. That reading is
+wrong, and it is wrong in the most expensive direction available: **it takes consumables away
+from a paying customer.** A Pro player who has banked nine Treats from level rewards would open
+their next board with three and six would be gone, with no event, no message and no way to tell
+it from a bug.
+
+The implementation is `maxOf(held, proTreatsPerAttempt())`. Two properties fall out of it:
+
+- **It cannot take.** A holding above the floor is untouched, so the level-reward stash survives
+  and Pro accumulates like everyone else, only from a higher starting point.
+- **It cannot be farmed.** It never *adds* to a holding that already clears the floor, so
+  restarting a level twenty times leaves a Pro player with exactly what one attempt gives them.
+  The alternative worry — "Pro gets unlimited boosters" — is true in the sense that they never run
+  out, which is what $4.99 buys, and false in the sense that matters: the number cannot be driven
+  up by repetition.
+
+This is the same shape as `boosters.refillTo` and `refillBones`, both of which are already floors
+with no cap. Three places now say "never downward", which is the point: the economy has one rule
+about holdings and it holds everywhere.
+
+The top-up runs as its own `updateState` *before* the board's, rather than inside it. `state` lags
+`updateState` by a dispatch, so computing the floor from `state.sniffs` at the top of
+`startAttempt` would read the count from before `load()` landed. The transform's own argument is
+fresh, so the board update that follows sees the granted values without asking.
+
+## 2026-09-07 — the level reward pays on a first clear, and the pane stops lying about it
+
+The level pane already drew a bare 🦴 on the frontier row. Nothing granted anything, so the pane
+was advertising a prize that did not exist — which is a worse bug than a missing feature, because
+it is the kind a player notices and we do not.
+
+`boosters.treatEveryNLevels` (default 5) is now read in two places, and both matter:
+
+- `GameViewModel.win` grants one Treat when the id is a multiple of it.
+- The pane marks **every** row that pays, not just the frontier. One chip on one row is a
+  coincidence; a chip every fifth row down 500 rows is a ladder, and the ladder is the reason to
+  scroll the pane at all.
+
+**First clear only.** The record is read from `recordBeforeAttempt` — the snapshot taken when the
+level opened — because `progress.onCompleted` has already moved the live record to `Completed` by
+the time the reward is decided. Asking the live record would answer "not a first clear" for every
+level in the game. The same expression already decided `LevelResult.isFirstClear` for the
+achievement fold, so it is now one property (`levelNeverCleared`) and the two cannot disagree.
+
+Cleared rows keep the chip in a spent state rather than dropping it. Dropping it would break the
+column down the list and would quietly remove the only evidence that the level ever paid.
+
+**A cadence of zero pays nothing** rather than dividing by it. Zero is a real thing for an
+operator to type and it means "no ladder"; there is no failing-open case here, because a player
+who gets no free treats can still buy them with an ad and still play every level.
+
+## 2026-09-07 — the skip's daily counter keeps a high-water mark, and the daily deliberately does not
+
+`progression.skipsPerDay` needs a per-day counter that survives a force-quit and is not reset by
+moving the device clock. The daily challenge faced the same question and answered "defend against
+corruption, not against cheating" — no monotonic counter, because a device whose clock shipped
+wrong and later corrected itself would be **bricked out of the daily entirely**.
+
+The skip keeps the counter the daily refused, and the reason is the asymmetry in what a false
+positive costs. If the high-water mark is wrong here, the player gets no free skips for a while
+and can still play every level in the game. If it were wrong in the daily, the whole feature is
+gone. Same mechanism, different blast radius, different call.
+
+The rule is one line: **the recorded day only ever moves forward.**
+
+- Clock back → the date is not later than the record, so nothing rolls over. A spent skip stays
+  spent. This is the manipulation worth defending against, because it is the free one.
+- Clock forward → a fresh allowance, *and* the recorded day jumps with it. Putting the clock back
+  then returns next week's spent allowance, not today's fresh one, and the player gets nothing
+  until the real calendar catches up. One day's skips bought with every day until then.
+- Flying west repeats a date and correctly grants nothing new; flying east skips one and correctly
+  rolls over. Both are one test each with a fake zone, following the daily's pattern.
+
+It lives in its own persisted `skip_state` cache rather than in `AppData`, next to `ad_state` and
+for the same reason: two numbers that mean nothing without the config key they are compared
+against are machinery, not settings.
+
+`SkipRepository` is a third interface rather than two more methods on `ProgressRepository`,
+because the skip is a *transaction* — allowance, then ad, then write — and putting an ad network
+behind the interface that answers "what has this player done" would make every caller of it depend
+on advertising. It is shaped like `DailyRepository.useFreeze`, which is the same three steps in
+the same order.
+
+**The cap is checked before the ad**, so nobody watches thirty seconds of advertising for a skip
+that was never available. And a **negative cap grants zero, not everything** — the one place in
+this feature where failing open would be wrong, since a typo in the admin console would otherwise
+become an unlimited skip printer.
+
 ## 2026-09-07 — an invalid remote `ScoringConfig` is discarded whole, not repaired
 
 `ScoringConfig` validates in its `init` and **throws** — deliberately, since a

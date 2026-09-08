@@ -31,6 +31,9 @@
     <string name="settings_haptics_body">A small buzz when you mark a square, place a dog, or get one wrong.</string>
     <string name="settings_done">Done</string>
     <string name="game_watch_ad_badge">Ad</string>
+    <string name="game_skip_level">Skip this level</string>
+    <string name="game_skip_remaining">%1$d skips left today</string>
+    <string name="game_skip_none_left">No skips left today</string>
     <string name="game_free_bones">Free bones</string>
     <string name="game_dogs_found">%1$d/%2$d</string>
 
@@ -136,8 +139,13 @@
     <string name="settings_rerun_tutorial">Replay the tutorial</string>
     <string name="settings_rerun_tutorial_body">Runs the guided first three levels again, from the start.</string>
 
-    <!-- Stands in for the reward art on the next level to play. Replace the glyph, not the key. -->
-    <string name="levels_reward">🦴</string>
+    <!-- The chip on every level that pays a Treat on its first clear. -->
+    <string name="levels_reward_treat">+%1$d Treat</string>
+    <!-- The same chip once the level has been cleared and the reward collected.
+         Kept shorter than levels_reward_treat: the chip shares its row with the
+         paw rating, and the longer label squeezed the third paw out of view. -->
+    <string name="levels_reward_claimed">Earned</string>
+    <string name="game_reward_earned">You earned a Treat</string>
 
     <string name="daily_title">Daily challenge</string>
     <string name="daily_date">%1$s %2$d</string>
@@ -270,4 +278,27 @@
     <string name="offline_block_still_offline">Still nothing. Check wifi or mobile data.</string>
     <string name="offline_block_retry">Try again</string>
     <string name="offline_block_go_pro">Get Pro</string>
+
+    <!--
+      Launch gates (SPEC 4.3 `upgrade.*` / `legal.*`, SPEC 7.3).
+
+      There is deliberately no string for the maintenance body: `upgrade.maintenanceMessage`
+      is raw operator-written text, because it is written during an incident and a
+      resource key could only ever resolve to copy written before the incident existed.
+      See the KDoc on AppMaintenanceMessage.
+    -->
+    <string name="gate_update_title">Time for a new Sodogku</string>
+    <string name="gate_update_body">This version is too old to keep playing. The update is quick and your levels are waiting.</string>
+    <string name="gate_update_action">Get the update</string>
+    <string name="gate_maintenance_title">Back shortly</string>
+    <string name="gate_legal_title">A quick read</string>
+    <string name="gate_legal_body">We have updated our terms and privacy policy. Have a look, then tap below to carry on playing.</string>
+    <string name="gate_legal_terms">Terms of service</string>
+    <string name="gate_legal_privacy">Privacy policy</string>
+    <string name="gate_legal_accept">I accept</string>
+    <string name="notice_legal">Our terms and privacy policy have changed. Carrying on means you accept them.</string>
+    <string name="notice_legal_action">Read</string>
+    <string name="notice_soft_update">There is a newer Sodogku waiting for you.</string>
+    <string name="notice_soft_update_action">Update</string>
+    <string name="notice_dismiss">Dismiss</string>
 </resources>

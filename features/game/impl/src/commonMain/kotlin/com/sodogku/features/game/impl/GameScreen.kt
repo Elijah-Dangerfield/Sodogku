@@ -36,6 +36,9 @@ import com.sodogku.libraries.ui.components.game.BoosterButton
 import com.sodogku.libraries.ui.components.game.FloatingPoints
 import com.sodogku.libraries.ui.bounceClick
 import com.sodogku.libraries.ui.components.game.DogCounter
+// The Treat's identity now has two call sites — this button and the level
+// pane's reward chip — so it lives in the design system rather than here.
+import com.sodogku.libraries.ui.components.game.TreatColor
 import com.sodogku.libraries.ui.components.game.HudPill
 import com.sodogku.libraries.ui.components.game.LifeRow
 import com.sodogku.libraries.ui.components.game.RuleChip
@@ -180,6 +183,7 @@ fun GameScreen(
                 unlockedThrough = state.unlockedThrough,
                 canJumpAnywhere = state.isPro,
                 records = state.records,
+                treatEveryNLevels = state.treatEveryNLevels,
                 onPick = { onAction(GameAction.GoToLevel(it)) },
                 onDismiss = { onAction(GameAction.LevelsClosed) },
                 daily = state.daily,
@@ -539,7 +543,6 @@ private const val WEIGHT_FILL = 1f
  * anyone who cannot separate red from green.
  */
 private val SniffColor = ColorResource.Blue500.color
-private val TreatColor = ColorResource.Orange600.color
 
 /** The standing ad offer. Purple, so an offer never wears a booster's clothes. */
 private val AdOfferColor = ColorResource.Purple600.color
