@@ -90,20 +90,34 @@ private fun DrawScope.drawSheetFrame(
 }
 
 /**
- * The idle loops a placed dog can be given. All four are head-only and legible
- * at cell size; body animations would be unreadable at 34dp.
+ * The idle loops a placed dog can be given, weighted.
  *
- * They are separate sheets rather than one big one because a board only ever
- * shows a handful of dogs, and Compose caches each `imageResource` — so the
- * loops that are actually in play are the only ones decoded.
+ * `idle` and `look` are the two the game is built around: a dog that settles and
+ * a dog that glances about. Both read as an animal sitting there, which is what
+ * a *placed* dog is — the placement already had its moment, and the loop that
+ * follows should not keep asking for attention.
+ *
+ * `pant` appears roughly one cell in six, so a full board has a couple of dogs
+ * doing something slightly different and no board is a row of clones.
+ *
+ * `tilt` and `flop` are deliberately absent. They are the two that read as a
+ * shake, and a head snapping about in the corner of the eye pulls focus off the
+ * puzzle. The sheets stay on disk because they are the right loops for a
+ * celebration or an empty state, where motion is the point.
+ *
+ * All of them are head-only and legible at cell size; a body animation would be
+ * mush at 34dp. They are separate sheets rather than one atlas because a board
+ * shows a handful of dogs and Compose caches each `imageResource`, so only the
+ * loops actually in play are ever decoded.
  */
 private val DogLoops
     @Composable get() = listOf(
-        Res.drawable.dog_look_sheet,
-        Res.drawable.dog_tilt_sheet,
-        Res.drawable.dog_pant_sheet,
-        Res.drawable.dog_flop_sheet,
         Res.drawable.dog_idle_sheet,
+        Res.drawable.dog_look_sheet,
+        Res.drawable.dog_idle_sheet,
+        Res.drawable.dog_look_sheet,
+        Res.drawable.dog_idle_sheet,
+        Res.drawable.dog_pant_sheet,
     )
 
 /** Must match `scripts/build_dog_sprites.py --frames`. */

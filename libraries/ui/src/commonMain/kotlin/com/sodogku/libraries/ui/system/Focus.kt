@@ -25,7 +25,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -54,6 +56,21 @@ data class Spotlight(
     val targets: Set<FocusTargetKey>,
     val message: String? = null,
     val dismissOnOutsideTap: Boolean = true,
+
+    /**
+     * Whether a tap on a lit target is reported back through `onTargetTap`
+     * instead of dismissing the spotlight.
+     *
+     * Off by default, and the default is the one to keep for a *warning*: the
+     * last-bone spotlight lights the bones, and a tap on them should close the
+     * warning rather than do anything to the bones.
+     *
+     * On, the lit things are the only interactive part of the screen — which is
+     * the whole of "only the correct cell is tappable" in a guided lesson. Pair
+     * it with `dismissOnOutsideTap = false` so a stray tap elsewhere does
+     * nothing rather than clearing a step the player has not completed.
+     */
+    val targetsAreLive: Boolean = false,
 )
 
 /**
@@ -111,6 +128,11 @@ fun Modifier.focusTarget(key: FocusTargetKey): Modifier = composed {
  *
  * Place it as the last child of a full-screen `Box` so it covers the content it
  * is dimming.
+ *
+ * [content] is handed the **union** of the lit rectangles, not one of them. A
+ * caller hanging a card off the spotlight wants the box around everything that
+ * is lit; anchoring on an arbitrary member of the set puts the card on top of
+ * the others.
  */
 @Composable
 fun BoxScope.FocusScrim(
@@ -120,6 +142,7 @@ fun BoxScope.FocusScrim(
     scrimColor: Color = DefaultScrim,
     cornerRadius: Dp = DefaultCornerRadius,
     padding: Dp = DefaultPadding,
+    onTargetTap: (FocusTargetKey) -> Unit = {},
     content: @Composable (Rect) -> Unit = {},
 ) {
     val registry = LocalFocusRegistry.current
@@ -131,8 +154,8 @@ fun BoxScope.FocusScrim(
 
     if (progress.value <= 0f) return
 
-    val rects = spotlight?.targets
-        ?.mapNotNull { registry.bounds[it] }
+    val lit = spotlight?.targets
+        ?.mapNotNull { key -> registry.bounds[key]?.let { key to it } }
         .orEmpty()
 
     Box(
@@ -145,7 +168,7 @@ fun BoxScope.FocusScrim(
             .drawWithContent {
                 drawRect(scrimColor)
                 val grow = progress.value
-                rects.forEach { rect ->
+                lit.forEach { (_, rect) ->
                     val pad = padding.toPx()
                     val hole = RoundRect(
                         rect = Rect(
@@ -164,16 +187,47 @@ fun BoxScope.FocusScrim(
                 }
                 drawContent()
             }
-            .pointerInput(spotlight) {
-                detectTapGestures {
-                    if (spotlight?.dismissOnOutsideTap == true) onDismiss()
+            // The scrim swallows the whole screen and *reports* the taps that
+            // land in a hole, rather than letting them fall through to what is
+            // underneath. Falling through is not on offer: a Compose overlay
+            // does not share pointer input with the siblings it covers, so a
+            // lit composable never sees the touch however carefully the scrim
+            // declines to consume it. Reporting the key back is the honest
+            // version, and it keeps double-tap timing in the caller's hands.
+            .pointerInput(spotlight, lit) {
+                val holes = lit.map { (key, rect) -> key to rect.inflate(padding.toPx()) }
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    val hit = holes.firstOrNull { (_, hole) -> hole.contains(down.position) }
+                    waitForUpOrCancellation()?.let { up ->
+                        up.consume()
+                        when {
+                            hit != null && spotlight?.targetsAreLive == true ->
+                                onTargetTap(hit.first)
+                            spotlight?.dismissOnOutsideTap == true -> onDismiss()
+                        }
+                    }
                 }
             },
     ) {
-        val anchor = rects.firstOrNull() ?: Rect.Zero
-        content(anchor)
+        content(lit.map { it.second }.union())
     }
 }
+
+/** The single box around every lit rectangle, or [Rect.Zero] when nothing is lit. */
+private fun List<Rect>.union(): Rect = fold(null as Rect?) { box, rect ->
+    if (box == null) {
+        rect
+    } else {
+        Rect(
+            left = minOf(box.left, rect.left),
+            top = minOf(box.top, rect.top),
+            right = maxOf(box.right, rect.right),
+            bottom = maxOf(box.bottom, rect.bottom),
+        )
+    }
+} ?: Rect.Zero
 
 private val DefaultScrim = Color(0xC4101018)
 private val DefaultCornerRadius = 14.dp

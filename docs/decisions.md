@@ -1193,3 +1193,18 @@ not run, and the build would have agreed with them by staying green.
 
 Sodogku is Android and iOS. If a desktop target ever lands, this code is one
 `git log` away and will need rewriting against whatever the desktop story is then.
+
+## 2026-09-07 — placed dogs sit still, mostly
+
+The user, on the idle loops: *"I prefer the idle and the look around. For sure
+not the shake. Maybe occasionally or something."*
+
+The rotation is now weighted rather than uniform — `idle` and `look` take five of
+six slots and `pant` takes the sixth, so a full board has a couple of dogs doing
+something slightly different and no board is a row of clones. `tilt` and `flop`
+are out of the rotation entirely: they are the two that read as a shake, and a
+head snapping about in peripheral vision pulls focus off the puzzle, which is the
+opposite of what idle motion is for.
+
+Both sheets stay on disk. They are the right loops for a celebration or an empty
+state, where the motion *is* the point.
