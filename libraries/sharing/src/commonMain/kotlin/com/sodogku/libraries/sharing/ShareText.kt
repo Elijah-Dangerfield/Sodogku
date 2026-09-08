@@ -58,8 +58,14 @@ object ShareText {
         BONE.repeat(result.bonesRemaining.coerceIn(0, MAX_BONE_GLYPHS)),
     ).filter { it.isNotEmpty() }.joinToString(GROUP_GAP)
 
-    /** `m:ss`, or `h:mm:ss` for the rare run that crosses an hour. */
-    private fun duration(millis: Long): String {
+    /**
+     * `m:ss`, or `h:mm:ss` for the rare run that crosses an hour.
+     *
+     * Public because the win sheet and the level pane show the same time this
+     * line does, and a second copy of the arithmetic is how a shared run comes
+     * to disagree with the sheet it was shared from.
+     */
+    fun duration(millis: Long): String {
         val total = (millis.coerceAtLeast(0)) / MILLIS_PER_SECOND
         val seconds = total % SECONDS_PER_MINUTE
         val minutes = (total / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR

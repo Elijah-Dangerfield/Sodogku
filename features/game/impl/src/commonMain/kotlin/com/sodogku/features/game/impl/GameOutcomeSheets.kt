@@ -2,6 +2,7 @@ package com.sodogku.features.game.impl
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,6 +21,8 @@ import com.sodogku.libraries.ui.components.dialog.ModalDialogDefaults
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.game.PawRating
+import com.sodogku.libraries.ui.components.game.ScoreCounter
+import com.sodogku.libraries.ui.components.game.ScorePawBurst
 import com.sodogku.libraries.sharing.ShareLabels
 import com.sodogku.libraries.sharing.ShareResult
 import com.sodogku.libraries.ui.components.feedback.ShareButton
@@ -55,6 +58,7 @@ import sodogku.libraries.resources.generated.resources.game_reward_earned
 import sodogku.libraries.resources.generated.resources.game_skip_level
 import sodogku.libraries.resources.generated.resources.game_skip_none_left
 import sodogku.libraries.resources.generated.resources.game_skip_remaining
+import sodogku.libraries.resources.generated.resources.game_time_taken
 import sodogku.libraries.resources.generated.resources.game_won_title
 import sodogku.libraries.resources.generated.resources.share_footer
 import sodogku.libraries.resources.generated.resources.share_streak
@@ -93,11 +97,33 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
             textAlign = TextAlign.Center,
         )
         PawRating(paws = state.paws)
-        Text(
-            text = state.attemptScore.toString(),
-            typography = AppTheme.typography.Heading.H600,
-            color = AppTheme.colors.accentPrimary,
-        )
+        // The score is *earned* here rather than found: it rolls up from zero
+        // while a handful of paws fly down into it from where the rating sits.
+        //
+        // On the sheet and not up in the header, which is the one decision worth
+        // stating. The header's counter holds the lifetime total and it does
+        // roll when this clear lands, but it does it behind a 70%-black scrim at
+        // the top of a screen whose middle the player is reading. Paws flown
+        // there would land a long way from the thing being read. This number is
+        // the one the sheet is about.
+        Box(contentAlignment = Alignment.Center) {
+            ScoreCounter(
+                score = state.attemptScore,
+                countFrom = 0,
+                typography = AppTheme.typography.Heading.H600,
+                color = AppTheme.colors.accentPrimary,
+            )
+            ScorePawBurst()
+        }
+        // Under the score, quietly. The time is the thing a player compares
+        // against themselves later; it is not what the sheet is for.
+        elapsedLabel(state.elapsedMs)?.let { time ->
+            Text(
+                text = stringResource(Res.string.game_time_taken, time),
+                typography = AppTheme.typography.Body.B600,
+                color = AppTheme.colors.textSecondary,
+            )
+        }
         // The same chip the level pane promised, so the payout is recognisably
         // the thing that was advertised rather than a number quietly going up
         // in the booster row behind the sheet.
@@ -291,6 +317,17 @@ private fun DailyRecapSheet(state: GameState, onAction: (GameAction) -> Unit, mo
                     text = recap.score.toString(),
                     typography = AppTheme.typography.Heading.H600,
                     color = AppTheme.colors.accentPrimary,
+                )
+            }
+            // Recalled like everything else on this sheet, so no roll and no
+            // paws. Gated on the clear as well as on the number: a failed day
+            // carries the time it ran for, and "Solved in 2:10" over a board
+            // nobody solved is the sheet lying about the day it exists to show.
+            elapsedLabel(recap.timeMs).takeIf { cleared }?.let { time ->
+                Text(
+                    text = stringResource(Res.string.game_time_taken, time),
+                    typography = AppTheme.typography.Body.B600,
+                    color = AppTheme.colors.textSecondary,
                 )
             }
         }

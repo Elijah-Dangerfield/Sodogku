@@ -1,8 +1,10 @@
 package com.sodogku.libraries.ui.components.game
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -11,13 +13,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.Dp
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.text.Text
+import com.sodogku.libraries.ui.system.LocalReduceAnimations
+import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
+import com.sodogku.system.typography.TypographyResource
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -40,14 +49,33 @@ import kotlin.math.roundToInt
 fun ScoreCounter(
     score: Int,
     modifier: Modifier = Modifier,
+    /**
+     * What the counter reads before its first roll.
+     *
+     * Defaults to [score], because the header's counter is on screen for the
+     * whole board and has nothing to earn: it starts holding the player's real
+     * total and only rolls when that total moves. The win sheet's counter
+     * *appears* already holding its number, so it passes zero and the number is
+     * seen to be earned rather than found.
+     */
+    countFrom: Int = score,
+    typography: TypographyResource = AppTheme.typography.Display.D900,
+    color: ColorResource = AppTheme.colors.text,
 ) {
-    var displayed by remember { mutableIntStateOf(score) }
-    val from = remember { mutableIntStateOf(score) }
+    // Read here rather than taken as a parameter, so a new screen honours the
+    // setting without its author knowing the setting exists. A number that rolls
+    // is an animation like any other, and a preview that captured one mid-roll
+    // would screenshot a number the player never sees.
+    val still = LocalReduceAnimations.current || LocalInspectionMode.current
+    var displayed by remember { mutableIntStateOf(if (still) score else countFrom) }
 
-    LaunchedEffect(score) {
+    LaunchedEffect(score, still) {
         val start = displayed
+        if (still) {
+            displayed = score
+            return@LaunchedEffect
+        }
         if (start == score) return@LaunchedEffect
-        from.intValue = start
         val progress = Animatable(0f)
         progress.animateTo(1f, tween(durationMillis = countUpMillis(score - start))) {
             displayed = (start + (score - start) * value).roundToInt()
@@ -57,10 +85,71 @@ fun ScoreCounter(
 
     Text(
         text = displayed.toString(),
-        typography = AppTheme.typography.Display.D900,
-        color = AppTheme.colors.text,
+        typography = typography,
+        color = color,
         modifier = modifier,
     )
+}
+
+/**
+ * A handful of golden paws converging on the score that just went up.
+ *
+ * Drawn as an overlay on the number itself rather than measured between two
+ * anchors: the paws launch from a spread of points above it, which is where the
+ * rating they come from sits, and converge on its centre. The measured version
+ * buys a few pixels of accuracy and costs an anchor registry threaded through
+ * every layer between the two, which is machinery this does not need.
+ *
+ * Longer than the ~300ms [Motion] holds most things to, and for the same reason
+ * `Motion.PlacementPulseMillis` is: this is a reward rather than feedback. It
+ * fires once at the end of a board, it takes no input away while it runs, and
+ * the button under it is live the whole time.
+ */
+@Composable
+fun ScorePawBurst(modifier: Modifier = Modifier) {
+    if (LocalReduceAnimations.current || LocalInspectionMode.current) return
+
+    Box(contentAlignment = Alignment.Center, modifier = modifier) {
+        repeat(PawsInBurst) { index ->
+            val progress = remember(index) { Animatable(0f) }
+            LaunchedEffect(index) {
+                delay(index * PawStaggerMillis.toLong())
+                progress.animateTo(
+                    1f,
+                    tween(durationMillis = PawFlightMillis, easing = FastOutSlowInEasing),
+                )
+            }
+            // The spread runs left to right across the burst, so five paws leave
+            // as a group rather than stacking on one point.
+            val lane = index - (PawsInBurst - 1) / 2f
+            Box(
+                modifier = Modifier
+                    .size(PawSize)
+                    // Read here and never in composition. The sheet holds a
+                    // share card and a paw rating, and subscribing that subtree
+                    // to sixty frames a second is the one way this flourish
+                    // could cost the player something.
+                    .graphicsLayer {
+                        val travelled = progress.value
+                        val remaining = 1f - travelled
+                        translationX = lane * PawSpread.toPx() * remaining
+                        // Negative is up the screen, so they start above the
+                        // number and fall into it. The rating they come from is
+                        // the row directly above.
+                        translationY = -PawDrop.toPx() * remaining
+                        val scale = PawLandScale + (1f - PawLandScale) * remaining
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = when {
+                            travelled < PawFadeIn -> travelled / PawFadeIn
+                            travelled > PawFadeOut -> (1f - travelled) / (1f - PawFadeOut)
+                            else -> 1f
+                        }.coerceIn(0f, 1f)
+                    }
+                    .drawBehind { drawPaw(PawGold, filled = true) },
+            )
+        }
+    }
 }
 
 /**
@@ -131,6 +220,36 @@ private const val MillisPerPoint = 0.35f
 private const val FloatMillis = 900
 private const val FloatStartScale = 0.7f
 private const val FloatScaleRamp = 4f
+
+/**
+ * Enough to read as a handful, few enough to arrive as one gesture. Each one is
+ * a `graphicsLayer` and a `drawBehind`, so this is also the whole cost.
+ */
+private const val PawsInBurst = 5
+
+private const val PawFlightMillis = 360
+private const val PawStaggerMillis = 50
+
+/** How far apart the paws start, per lane either side of the number. */
+private val PawSpread = Dimension.D800
+
+/** How far above the number they start, which is about where the rating sits. */
+private val PawDrop = Dimension.D1400
+
+private val PawSize = Dimension.D800
+
+/** They shrink as they land, so the number reads as absorbing them. */
+private const val PawLandScale = 0.45f
+
+private const val PawFadeIn = 0.15f
+private const val PawFadeOut = 0.85f
+
+/**
+ * The gold of an earned paw. A second copy of `GameHud`'s `EarnedPaw`, which is
+ * file-private there. The two are the same colour on purpose, and want to be one
+ * token the next time that file is open.
+ */
+private val PawGold = Color(0xFFF5B93D)
 
 @Preview
 @Composable

@@ -65,6 +65,9 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
+import com.sodogku.libraries.sodogku.AppEvent
+import com.sodogku.libraries.sodogku.AppEventBus
+import com.sodogku.libraries.sodogku.AppEvents
 import com.sodogku.libraries.sodogku.ConsumableRefillTo
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -77,6 +80,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -1189,6 +1193,63 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(vm.state.paws, record.bestPaws)
         assertEquals(vm.state.elapsedMs, record.bestTimeMs)
         assertTrue(record.bestTimeMs > 0, "a clear has to carry a duration to beat later")
+    }
+
+    // ---- S3: the clock is the player's, and only runs while they can see it. --
+
+    @Test
+    fun anHourInTheBackgroundCostsThePlayerNothing() = runUnitTest {
+        // The control run is the load-bearing half. Asserting only that the
+        // interrupted run came in under an hour would pass with the clock
+        // stopped for good on the first background, and asserting only that it
+        // came in over zero would pass with the fix reverted entirely.
+        val straight = viewModel()
+        clock += Thinking
+        solve(straight)
+
+        val lifecycle = HandDrivenAppEvents()
+        val interrupted = viewModel(lifecycle = lifecycle)
+        clock += Thinking
+        lifecycle.background()
+        settle()
+        clock += AnHourAway
+        lifecycle.foreground()
+        settle()
+        solve(interrupted)
+
+        assertTrue(
+            straight.state.elapsedMs > Thinking.inWholeMilliseconds,
+            "the fixture has to spend real time on the board, before and after the pause",
+        )
+        assertEquals(
+            straight.state.elapsedMs,
+            interrupted.state.elapsedMs,
+            "the same play, with an hour of not playing in the middle of it",
+        )
+    }
+
+    @Test
+    fun aSecondBackgroundWithoutAForegroundIsNotChargedTwice() = runUnitTest {
+        // Android dispatches a foreground on the way *into* the first one, so
+        // the edges are not guaranteed to alternate. Folding the same span in
+        // twice would run the clock backwards from the player's point of view.
+        val lifecycle = HandDrivenAppEvents()
+        val vm = viewModel(lifecycle = lifecycle)
+        clock += Thinking
+        lifecycle.background()
+        settle()
+        clock += AnHourAway
+        lifecycle.background()
+        settle()
+        lifecycle.foreground()
+        settle()
+        solve(vm)
+
+        val straight = viewModel()
+        clock += Thinking
+        solve(straight)
+
+        assertEquals(straight.state.elapsedMs, vm.state.elapsedMs)
     }
 
     @Test
@@ -3217,6 +3278,7 @@ class GameViewModelTest : CoroutineTest() {
         achievements: AchievementsRepository = RecordingAchievements(),
         streak: StreakRepository = SilentStreak(),
         config: AppConfigMap = configOf(),
+        lifecycle: HandDrivenAppEvents = HandDrivenAppEvents(),
     ) = GameViewModel(
         levelId,
         isDaily,
@@ -3244,7 +3306,34 @@ class GameViewModelTest : CoroutineTest() {
         skipAfterFailedAttempts = ProgressionSkipAfterFailedAttempts(config),
         achievementsEnabled = FeatureAchievements(config),
         boostersEnabled = FeatureBoosters(config),
+        appEvents = AppEvents(lifecycle),
     )
+
+    /**
+     * The app going away and coming back, on demand.
+     *
+     * Replay-free, like the real `liveEventStream` the ViewModel subscribes to,
+     * so a board that opens after a foreground does not inherit it.
+     */
+    private class HandDrivenAppEvents : AppEventBus {
+        private val events = MutableSharedFlow<AppEvent>(extraBufferCapacity = EventBuffer)
+
+        override fun dispatch(event: AppEvent) {
+            events.tryEmit(event)
+        }
+
+        override fun eventStream(): Flow<AppEvent> = events
+
+        override fun liveEventStream(): Flow<AppEvent> = events
+
+        fun background() = dispatch(AppEvent.OnBackground)
+
+        fun foreground() = dispatch(AppEvent.OnForeground(isColdBoot = false))
+
+        private companion object {
+            const val EventBuffer = 8
+        }
+    }
 
     /**
      * Every [GameEvent] the ViewModel emits from here on, in order.
@@ -3387,6 +3476,12 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Long enough that the next tap starts a fresh gesture. */
         val SettleGap = 500.milliseconds
+
+        /** A player looking at the board. Real time, and it has to be counted. */
+        val Thinking = 30.seconds
+
+        /** A phone call, a school run, a night. None of it is play. */
+        val AnHourAway = 1.hours
 
         /** Just past the commit window, so a second tap is a second note. */
         val LateGap = 400.milliseconds

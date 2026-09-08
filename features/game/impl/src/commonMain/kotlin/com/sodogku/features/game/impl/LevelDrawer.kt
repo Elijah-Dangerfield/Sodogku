@@ -54,6 +54,7 @@ import kotlinx.datetime.number
 import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.daily_date
+import sodogku.libraries.resources.generated.resources.levels_best_time
 import sodogku.libraries.resources.generated.resources.levels_locked
 import sodogku.libraries.resources.generated.resources.levels_reward_claimed
 import sodogku.libraries.resources.generated.resources.levels_reward_treat
@@ -311,6 +312,17 @@ private fun LevelRow(
                 typography = AppTheme.typography.Caption.C300,
                 color = AppTheme.colors.textSecondary,
             )
+            // The best of the runs, which is what `LevelRecord` keeps and what
+            // makes the row worth coming back to. Absent rather than zeroed on a
+            // level that has been attempted and not finished: there is no time
+            // to beat until somebody finishes one.
+            elapsedLabel(record.bestTimeMs)?.let { time ->
+                Text(
+                    text = stringResource(Res.string.levels_best_time, time),
+                    typography = AppTheme.typography.Caption.C300,
+                    color = AppTheme.colors.textSecondary,
+                )
+            }
             // Only a cleared level has a rating to show. An unlocked one that
             // has been attempted and lost would otherwise render three empty
             // paws, which reads as a nought-out-of-three score rather than as

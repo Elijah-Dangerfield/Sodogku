@@ -56,6 +56,8 @@ import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.sodogku.AppCache
+import com.sodogku.libraries.sodogku.AppEvent
+import com.sodogku.libraries.sodogku.AppEvents
 import com.sodogku.libraries.sodogku.BoardSnapshot
 import com.sodogku.libraries.sodogku.ConsumableRefillTo
 import kotlin.time.ComparableTimeMark
@@ -152,6 +154,11 @@ class GameViewModel(
     private val skipAfterFailedAttempts: ProgressionSkipAfterFailedAttempts,
     private val achievementsEnabled: FeatureAchievements,
     private val boostersEnabled: FeatureBoosters,
+    /**
+     * Foreground and background edges, which is the only thing on this screen
+     * that cares the app can go away. See [GameAction.VisibilityChanged].
+     */
+    private val appEvents: AppEvents,
 ) : SEAViewModel<GameState, GameEvent, GameAction>(initialStateArg = GameState()) {
 
     private val logger = KLog.withTag("Game")
@@ -166,8 +173,24 @@ class GameViewModel(
      * The monotonic clock restarts with the process, so a resumed board has to
      * carry its own history. Adding it here rather than storing a wall-clock
      * start is what keeps the hours the app spent closed out of the timer.
+     *
+     * It carries the *foreground* pauses too. Backgrounding folds the run so far
+     * into this and stops the clock; coming back re-marks [attemptStartedAt]. A
+     * process death was never the only way the app goes away, and the monotonic
+     * source keeps running through the other one.
      */
     private var elapsedBeforeResume = 0L
+
+    /**
+     * True while the app is in the background, so [elapsedMs] reads the
+     * accumulator alone.
+     *
+     * A flag rather than a nullable [attemptStartedAt]: the mark is also the
+     * baseline for the speed bonus, and making it null for a background would
+     * push that decision through every call site to answer a question it does
+     * not have.
+     */
+    private var clockPaused = false
     private var lastTappedCell: Int? = null
     private var warnedAboutLastBone = false
     private var lastTapAt: ComparableTimeMark? = null
@@ -300,6 +323,17 @@ class GameViewModel(
         // repository re-emits at local midnight — so a drawer left open past
         // midnight picks up the new board without this screen watching a clock.
         daily.observe().collectIn(viewModelScope) { takeAction(GameAction.DailyChanged(it)) }
+        // `live()`, not the replaying stream. These are edges: a board opened
+        // seconds after a foreground would otherwise be handed that foreground
+        // as its first event, and the daily opens on its own route over a
+        // campaign board, so two ViewModels would each replay it.
+        appEvents.live().collectIn(viewModelScope) { event ->
+            when (event) {
+                is AppEvent.OnForeground -> takeAction(GameAction.VisibilityChanged(true))
+                is AppEvent.OnBackground -> takeAction(GameAction.VisibilityChanged(false))
+                else -> Unit
+            }
+        }
     }
 
     override suspend fun handleAction(action: GameAction) {
@@ -345,7 +379,7 @@ class GameViewModel(
             GameAction.OpenSettings -> sendEvent(GameEvent.OpenSettings)
             GameAction.TutorialAdvance -> action.tutorialTapped()
             GameAction.SkipTutorial -> action.skipTutorial()
-            is GameAction.TimerTick -> action.updateState { it.copy(elapsedMs = elapsedMs()) }
+            is GameAction.VisibilityChanged -> holdClock(paused = !action.foreground)
             is GameAction.DisplaySettingsChanged -> {
                 // The field and the state are written together, and the field
                 // first: it is what the tutorial reads before an update lands.
@@ -2115,8 +2149,32 @@ class GameViewModel(
         next?.let { saveBoard(it) }
     }
 
-    private fun elapsedMs(): Long =
-        elapsedBeforeResume + attemptStartedAt.elapsedNow().inWholeMilliseconds
+    private fun elapsedMs(): Long = elapsedBeforeResume +
+        if (clockPaused) 0L else attemptStartedAt.elapsedNow().inWholeMilliseconds
+
+    /**
+     * Stops the puzzle clock while the app is away, and starts it again on the
+     * way back.
+     *
+     * Nothing is written to disk here. The snapshot is saved after every move
+     * and carries [elapsedMs] as it stood then, so a process death in the
+     * background costs the player the seconds since their last placement. That
+     * is an under-count, which is the direction a timing error should fail in.
+     *
+     * Idempotent in both directions. Android dispatches `onStart` on the way
+     * into the first foreground as well as on every return, so the resume half
+     * runs once before the player has done anything, and a second background
+     * must not fold the same span in twice.
+     */
+    private fun holdClock(paused: Boolean) {
+        if (paused == clockPaused) return
+        if (paused) {
+            elapsedBeforeResume += attemptStartedAt.elapsedNow().inWholeMilliseconds
+        } else {
+            attemptStartedAt = clock.markNow()
+        }
+        clockPaused = paused
+    }
 
     /**
      * Writes the attempt to disk, or clears the slot when there is nothing worth

@@ -15,6 +15,7 @@ import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.ScoringConfig
+import com.sodogku.libraries.sharing.ShareText
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 
@@ -625,5 +626,29 @@ sealed interface GameAction {
     /** Out of the guided run for good, from whichever step is showing. */
     data object SkipTutorial : GameAction
 
-    data class TimerTick(val at: Long) : GameAction
+    /**
+     * The app went away or came back.
+     *
+     * The puzzle clock runs on a monotonic source, which does not stop when the
+     * app does, so a player who takes a phone call mid-board would be charged
+     * the call. This is the edge that stops and restarts it. It replaced
+     * `TimerTick`, which was dispatched by nobody: the elapsed field was never
+     * rendered mid-attempt, so a per-second tick bought a recomposition a second
+     * and no pixels.
+     */
+    data class VisibilityChanged(val foreground: Boolean) : GameAction
 }
+
+/**
+ * A finished run as `m:ss`, or null when there is no run to show.
+ *
+ * One formatter for the win sheet and the level pane, and the same one the share
+ * card prints, so the time a player reads on the sheet is the time they post.
+ *
+ * Null rather than "0:00" for a board with no time on it. An unplayed level, a
+ * day that was given up on and a record written before times were kept all hold
+ * zero, and a clock reading nought reads as a run that took no time rather than
+ * as one that never happened.
+ */
+internal fun elapsedLabel(millis: Long): String? =
+    if (millis <= 0L) null else ShareText.duration(millis)
