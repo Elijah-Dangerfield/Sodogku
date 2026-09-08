@@ -1156,6 +1156,55 @@ handling, and 44pt touch targets verified on the smallest supported device at 10
 
 **Done when** a colorblind simulator pass is clean and every animation respects reduce-motion.
 
+### Accessibility half — **DONE on Android** (2026-09-08)
+
+**What a screen-reader player can do now.** Open the app, reach both header buttons by name, walk
+the board square by square hearing "Row 3, column 4, pink" and its state, cross a square off with
+the ordinary activation and hear "crossed off" back, and place a dog with double-tap-and-hold or
+the actions menu. The board disappears from the tree while anything covers it. SPEC 16 has the
+wording, the split between content and state description, and what is deliberately left unlabelled.
+
+**What they still cannot do.** Complete the tutorial's "tap the lit square" steps: `FocusScrim`
+owns the touch and knows its targets only as rectangles, so lighting one as an accessible control
+needs a label on `Spotlight`. "Skip tutorial" is labelled and reachable, so the guided run can be
+left — a worse first five minutes than a sighted player gets, and the first thing to pick up next.
+The sniff hint and the last-bone warning also announce nothing when they appear.
+
+**Measured.**
+
+- **Touch targets.** 44pt at 10x10 is geometrically impossible (ten columns of 44 is 440dp). The
+  number that matters is not the drawn cell: Compose expands a pointer node's bounds toward 48dp
+  and clips at the neighbour, so the 6dp gutter is live and a square's target is **37.3dp at 411dp
+  width, 32.2dp at the 360dp floor** against a 26.2–31.2dp drawn cell. Everything that is not a
+  board square clears 44dp — header buttons 48, rule chips 48, boosters 48. SPEC 16 states the
+  exception rather than a promise the geometry cannot keep.
+- **Colourblind glyph contrast** is 1.74:1–2.02:1 composited against its own fill, not the
+  1.82–2.02 that was written down. Over the 1.70 floor `RegionPaletteTest` enforces, and confirmed
+  legible on a device with the mode on.
+- **Frame time**, 40 rapid taps on a 10x10, alternating builds in one sitting: **8.4ms median /
+  10.7ms p90 before, 9.2ms / 13.6ms after**, worst frame unchanged at ~20ms, budget 16.7ms. The
+  first honest attempt was 11.2ms / 20.4ms and the fix was memoising the `semantics` block; see
+  `decisions.md` for why an inline one invalidates a hundred nodes per recomposition.
+
+**Two things this found that were not accessibility bugs.**
+
+- **`Dialog` had no height bound at all.** At the largest system font the score explainer put its
+  title under the clock and its only button under the gesture bar. It also means the inner scroll
+  `GameDialogs` already had has never done anything.
+- **The first fix for that crashed every dialog in the app** — an outer `verticalScroll` hands the
+  inner one an unbounded height — through a clean build, clean detekt and a green test run. Only
+  opening a dialog on a device caught it.
+
+**Not verified.** iOS, entirely: the semantics are `commonMain` and platform-independent, but
+`xcode-select` still does not point at Xcode, so no VoiceOver pass has been run and the app has
+never launched on iOS. On Android, TalkBack's *focus* announcement was read out of the semantics
+tree rather than heard — `adb shell input` bypasses the accessibility input filter on a Play
+system image and `sendevent` needs root, so TalkBack's own gestures cannot be driven from here.
+What was heard: TalkBack's speech-output overlay showed **"crossed off"** after a square was
+marked, which is the state description doing its job. What was read out of the tree: all hundred
+cells' descriptions, `long-clickable="true"` on each, and both header buttons as single 48dp
+`android.widget.Button` nodes carrying their labels.
+
 ---
 
 ## C13 · Store prep — **PARTLY DONE** (2026-09-08)

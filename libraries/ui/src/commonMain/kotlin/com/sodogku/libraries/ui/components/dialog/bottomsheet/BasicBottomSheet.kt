@@ -18,7 +18,10 @@ import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.VerticalSpacerD800
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.settings_done
 
 @Composable
 fun BasicBottomSheet(
@@ -61,7 +64,7 @@ fun BasicBottomSheet(
                     horizontalArrangement = Arrangement.End
                 ) {
                     IconButton(
-                        icon = Icons.Check("CLose"),
+                        icon = Icons.Check(stringResource(Res.string.settings_done)),
                         onClick = state::dismiss
                     )
                 }

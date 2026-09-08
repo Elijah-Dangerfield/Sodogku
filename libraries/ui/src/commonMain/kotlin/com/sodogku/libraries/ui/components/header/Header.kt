@@ -28,7 +28,10 @@ import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.icon.IconButton
 import com.sodogku.libraries.ui.components.icon.Icons
 import com.sodogku.libraries.ui.components.text.Text
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.common_back
 
 @Composable
 fun TopBar(
@@ -62,7 +65,7 @@ fun TopBar(
             if (onNavigateBack != null) {
                 IconButton(
                     size = IconButton.Size.Large,
-                    icon = Icons.ChevronLeft("Navigate back"),
+                    icon = Icons.ChevronLeft(stringResource(Res.string.common_back)),
                     onClick = onNavigateBack
                 )
             }

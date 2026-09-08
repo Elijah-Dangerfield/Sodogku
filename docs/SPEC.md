@@ -1062,20 +1062,87 @@ The core mechanic is color, so this is a design constraint, not a checkbox.
 Roughly 8% of men have red-green color vision deficiency, and no 10-color palette survives
 deuteranopia.
 
-- **Colorblind mode** overlays each region with a distinct light glyph (paw, bone, star, heart)
-  so the glyph, not the hue, is the region identity.
+- **Colorblind mode** overlays each region with a distinct glyph (ten of them: circle, ring,
+  square, diamond, two triangles, plus, bar, double bar, chevron) so the glyph, not the hue, is
+  the region identity.
 - Pick the base palette for lightness separation as well as hue separation.
 - Never encode anything only in color: rule chips, strike feedback, and region highlight all need
   a shape or motion component.
 
-Also: 44pt minimum touch targets means a 10x10 board fills the width on a small phone; dynamic
-type in header and settings; and "reduce motion" degrades bounces to fades rather than removing
-feedback.
+**Measured, against the ten shipped fills:** the composited glyph watermark runs **1.74:1 to
+2.02:1** against its own fill (`RegionPaletteTest` holds a 1.70 floor), the closest pair of fills
+is 23.6 apart in CIELAB (floor 20), and the luminance span is 0.371 (floor 0.30). Confirmed
+legible on a device with the mode on.
 
 "Reduce animations" reaches the design system as `LocalReduceAnimations`, provided once at the
 app root. Any component that moves on its own reads it there rather than being handed it, so a
 new screen honours the setting without its author having to know the setting exists. Dialogs are
 the worked example: on they spring in and overshoot, off they fade.
+
+### Touch targets
+
+44pt at 10x10 is geometrically impossible — ten columns of 44 is 440dp, wider than any phone. The
+numbers, measured on device:
+
+| Width | Drawn cell | Touch bounds |
+|---|---|---|
+| 411dp | 31.2dp | **37.3dp** |
+| 393dp (Pixel 4a) | 29.5dp | 35.5dp |
+| 375dp (iPhone SE, the iOS floor at deployment target 18.2) | 27.7dp | 33.7dp |
+| 360dp (assumed Android floor) | 26.2dp | 32.2dp |
+
+The second column is what a finger gets: Compose expands a pointer node's touch bounds toward
+48dp and clips at the neighbour, so the 6dp gutter between squares belongs to the nearest square
+rather than to nobody.
+
+**So the rule is:** 32.2dp minimum on a board square at the narrowest supported width, which
+clears WCAG 2.2 AA 2.5.8 (24×24, and its exception for a presentation that is essential — a grid
+of ten is the puzzle) and does not clear AAA 2.5.5 or Apple's 44pt. **Everything that is not a
+board square must clear 44dp**, and does: header icon buttons 48dp, rule chips 48dp tall,
+boosters 48dp.
+
+### Dynamic type
+
+Verified at `font_scale 2.0` on the board, Settings and every dialog. Settings and the board
+header hold. Two things needed fixing and both were fixed in the design system rather than at a
+call site: the booster row wraps (`FlowRow`) so a long ad-offer label is never broken mid-word,
+and `Dialog` insets itself with `safeDrawingPadding` and caps at the window height, so a long
+explainer scrolls inside the card instead of pushing its title under the clock and its button
+under the gesture bar.
+
+### Screen readers
+
+The board is playable with one. Every square is a labelled, activatable node.
+
+- **A square says** "Row 3, column 4, pink" as its content description and its state — empty,
+  crossed off, dog, or "wrong guess, cost a bone" — as its state description, which is the half a
+  reader re-announces on its own when it changes. In colorblind mode the region is named by its
+  glyph rather than its hue, because that is what is on the square.
+- **Crossing off** is the node's ordinary activation.
+- **Placing a dog** is `onLongClick` (double-tap and hold on Android) and a custom action of the
+  same name (the rotor on iOS). It is not the sighted gesture: a second tap inside 320ms is
+  consumed by the reader and never reaches the app, so a board with descriptions and nothing else
+  can be marked and unmarked and never played.
+- **A square the board has already ruled out offers no placement.** Announcing an action that
+  does nothing is worse than announcing none.
+- **The board vanishes from the tree while anything covers it** — a spotlight, the outcome sheet,
+  the level pane — because the scrim that swallows a sighted player's taps is a drawing and stops
+  nothing else.
+
+**What is deliberately not labelled:** the dog inside a square (the square says "dog"), the region
+glyph (the region name is the same information), the flying points and the placement starburst
+(celebration; the score is a labelled control of its own).
+
+**Not yet true, and needed before this is finished:**
+
+- The tutorial's "tap the lit square" steps cannot be completed with a screen reader. `FocusScrim`
+  owns the touch and knows its targets only as rectangles; lighting one as an accessible control
+  needs a label on `Spotlight`. "Skip tutorial" is labelled and reachable, so the guided run can
+  be left, which is a worse first five minutes than a sighted player gets.
+- **iOS is unverified.** The semantics are `commonMain` and platform-independent, but no VoiceOver
+  pass has been run — `xcode-select` does not point at Xcode on the build machine, so the app has
+  never been launched on iOS at all.
+- The sniff hint and the last-bone warning announce nothing when they appear.
 
 ---
 

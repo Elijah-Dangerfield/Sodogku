@@ -6,6 +6,189 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-08 — the board says where it is and what is on it, and offers placement as an action
+
+`BoardCell` draws its fill, its region glyph and its cross rather than composing them, which is
+what makes a hundred of them affordable and is also why a screen reader met a hundred anonymous
+boxes: there is nothing in the tree to infer meaning from. So the cell states its meaning. Every
+part of it was already a parameter.
+
+**Split across `contentDescription` and `stateDescription`, not one string.** The description is
+the square's identity — "Row 3, column 4, pink" — and never changes. The state is what is on it,
+and it is the half TalkBack and VoiceOver re-announce on their own when it changes under the
+reading cursor. Folded into one string, a player who crosses a square off hears nothing back.
+Verified on a device: with TalkBack running, marking a square put **"crossed off"** on TalkBack's
+own speech-output overlay.
+
+**In colourblind mode the label names the glyph, not the hue.** "Row 3, column 4, square". SPEC 16
+says the glyph *is* the region's identity in that mode, and the one player who has turned it on is
+the one for whom "periwinkle" is the least useful word available. The `colorblind` flag was
+already a parameter on the cell; this costs a list index.
+
+**Placement is an action, not a gesture.** Committing a guess is a second tap inside 320ms,
+recognised in `GameViewModel` because the cell deliberately refuses `onDoubleTap`. Under
+explore-by-touch the screen reader consumes the double tap and delivers one activation, so a board
+with content descriptions and nothing else is a board that can be marked and unmarked and never
+played — worse than an unlabelled one, because it looks finished. The cell declares `onLongClick`
+(Android's double-tap-and-hold, verified as `long-clickable="true"` in a `uiautomator` dump) *and*
+a custom action of the same name (what VoiceOver puts on its rotor). Neither is a fallback.
+
+**The action sends two `CellTapped`s rather than a new `GameAction`.** The double tap is not
+something the ViewModel is told about; it is two ordinary taps measured against a clock in
+`GameViewModel.tap`. Sending both halves is the same input a thumb produces, so the events, the
+scoring, the tutorial triggers and the bone all behave identically by construction and there is
+nothing new to test in the ViewModel. It is in `GameScreen.placeAt` with the reasoning attached,
+and it becomes a first-class action the day the 320ms window moves somewhere a synthetic pair
+cannot reach.
+
+**The strings are resolved once per board, not once per cell.** `BoardSurface` provides
+`LocalBoardCellLabels`; `BoardCell` reads it. `stringResource` is a composable with per-call-site
+state, and a hundred cells asking for fourteen each is fourteen hundred of them per board
+recomposition. The description itself is built *inside* the `semantics` block, which the platform
+only invokes when a service is reading, so a board nobody is listening to builds no strings at all.
+
+**What is deliberately not labelled:** the dog image inside a cell (the cell already says "dog"),
+the region glyph (same information as the region name), `FloatingPoints` and the placement
+starburst (a celebration, and the score is already a labelled control), and the `LifeRow` bones
+(the HUD pill they sit in is the thing to label, and it is a separate item on the punch list).
+
+## 2026-09-08 — an icon with nothing to say has to spell that out
+
+`Icons.Menu(null)` compiled, and three call sites passed `null` — including both buttons on the
+game screen. Nothing failed, because `null` is *also* how a genuinely decorative icon is spelled,
+so "no label" and "no label needed" were the same expression at the call site and in review.
+
+`Icons.X(contentDescription: String)` is non-null now and `Icons.X.decorative` is the other case:
+a decision somebody made and a word somebody can grep for. `IconButton` refuses a decorative icon
+outright in debug builds, matching what `Icons.Filled` already does for a missing variant — an
+icon button has no text to fall back on, so there is no correct use of one.
+
+**The label moved onto the button.** Left on the `Icon` it landed on a node of its own: measured in
+a `uiautomator` dump as a 28dp unfocusable child of a 48dp focusable button carrying nothing.
+Whether a reader finds it was up to the reader. `IconButton` merges its descendants and sets the
+description itself, and the dump now shows one `android.widget.Button` at 48dp with the label on it.
+
+**`NoticeBannerDefaults.DismissDescription` is gone.** Its comment said `:libraries:ui` holds no
+copy; the module has had `api(projects.libraries.resources)` all along. It uses `common_close`.
+
+## 2026-09-08 — a scrim is a drawing, so what is under it stays reachable
+
+`FocusScrim` swallows every touch and *reports* the ones that land in a hole; nothing under it is
+interactive. None of that is in the semantics tree. The moment the board's squares became
+activatable, a screen-reader player could place a dog through a coach mark that a sighted player
+cannot even tap.
+
+`Modifier.coveredByOverlay(covered)` (`hideFromAccessibility`) goes on the thing being covered, not
+on the cover — Compose gives a sibling no way to reach back over what it was drawn on top of — and
+`GameState.isCovered` lists the eight overlays exhaustively rather than summarising, because the
+failure of a missing entry is silent.
+
+**The cost, stated plainly:** the tutorial's "tap the lit square" steps cannot be completed with a
+screen reader. The scrim owns the touch and only knows its targets as rectangles, so lighting one
+as an accessible control needs a label on `Spotlight`, which is a wider change than this chunk.
+"Skip tutorial" is labelled and reachable, so a screen-reader player can leave the guided run and
+play; that is a worse first five minutes than a sighted player gets, and it is written down in
+BUILD-PLAN C12 rather than closed.
+
+## 2026-09-08 — a 10x10 cell cannot reach 44pt, and the number that matters is not the one drawn
+
+SPEC 16 asked for 44pt minimum touch targets verified on the smallest supported device at 10x10.
+Ten cells across cannot: `10 × 44 = 440dp` is wider than any phone. Measured, at 10x10:
+
+| Width | Drawn cell | Reported touch bounds |
+|---|---|---|
+| 411dp (test emulator) | 31.2dp | **37.3dp** |
+| 393dp (Pixel 4a) | 29.5dp | 35.5dp |
+| 375dp (iPhone SE, the iOS floor at deployment target 18.2) | 27.7dp | 33.7dp |
+| 360dp (the Android floor this assumes) | 26.2dp | 32.2dp |
+
+The second column is the one that matters and it was a surprise. Compose expands a pointer-input
+node's touch bounds toward the 48dp minimum and clips at the neighbour, so **the 6dp gutter is
+live** — every square's target is the cell plus the gutter, measured as 98px against an 82px cell
+in a `uiautomator` dump, and there is no dead space between two squares. No code was needed for
+this; it was worth measuring rather than assuming, because the obvious reading of the layout says
+the gutter is dead.
+
+**Where that leaves the requirement.** 32.2dp at the assumed floor clears WCAG 2.2 AA
+(2.5.8 Target Size (Minimum), 24×24), which also exempts a target whose presentation is essential —
+a grid of ten is the puzzle. It does not clear WCAG AAA 2.5.5 or Apple's 44pt, and nothing that
+keeps ten columns can. Everything that is *not* the grid does clear it: both header icon buttons
+measure 48dp, the rule chips 48dp tall, the boosters 48dp. SPEC 16 now states the exception and
+the floor instead of a promise the geometry cannot keep.
+
+**What was rejected:** shrinking the board to 8x8 on narrow phones (changes the puzzle), and a
+scrollable grid (a board you cannot see at once is not a board you can reason about).
+
+## 2026-09-08 — two things broke at the largest system font, and one of them was a crash waiting
+
+Checked at `font_scale 2.0` on the board, Settings and the dialogs. Settings was already fine.
+
+- **"Free bones" broke mid-word as "Free bone / s".** Three controls no longer fit across 411dp.
+  The booster row is a `FlowRow` now; the ad offer drops to a second line. Shrinking the label or
+  clipping the offer were the other options and both hide a control the player is being sold.
+- **The score explainer grew past the screen.** Its title ran under the clock and its only button
+  was cut in half by the gesture bar, with no way to reach either. `Dialog` insets itself with
+  `safeDrawingPadding` and caps at the window height from `LocalWindowInfo`.
+
+**The near-miss worth writing down.** The first fix added `verticalScroll` to the dialog card.
+`GameDialogs` already scrolls its own body, and an outer scroll hands the inner one an unbounded
+height — *every dialog in the app* crashed on open, at every font size, with "Vertically scrollable
+component was measured with an infinity maximum height". It shipped through a clean
+`assembleDebug`, a clean `detekt` and a green test run, and the only thing that caught it was
+opening a dialog on a device. The cap alone is the fix: what the inner scroll never had was a
+bound, so it was a scroll container the length of its own content, which is a scroll container that
+never scrolls.
+
+## 2026-09-08 — a hundred semantics blocks cost frames, and most of it was the lambda
+
+Adding a `semantics { }` to `BoardCell` regressed the board, measurably. Forty rapid taps across a
+10x10, `gfxinfo framestats`, UI-plus-render-thread work (`HandleInputStart` → `SwapBuffers`), three
+alternating runs per build so both halves see the same machine:
+
+| | median | p90 | worst | over 16.7ms |
+|---|---|---|---|---|
+| Before any semantics | **8.4ms** | 10.7ms | 20.0ms | 3 / 203 |
+| Naive inline `semantics { }` | **11.2ms** | 20.4ms | 29.7ms | 40 / 217 |
+| Block memoised | 9.4ms | 14.3ms | 27.2ms | 14 / 211 |
+| …plus the set hoist | **9.2ms** | 13.6ms | 20.5ms | 10 / 210 |
+
+**What cost the 3ms.** `Modifier.semantics { }` takes a plain lambda, and a plain lambda that
+closes over anything is a new object every composition. Compose compares those objects to decide
+whether the node changed, so a block written inline invalidates all hundred cells' semantics every
+time the board recomposes — whether or not anything is listening. `rememberBoardCellSemantics`
+keys the block on what it actually says, so a square whose state did not change hands back the
+same object and invalidates nothing. This is the same shape as the `Radii.Cell` getter recorded
+below: a value that is constant in fact but new in identity, multiplied by a hundred.
+
+**The two callbacks are behind a plain holder, not `rememberUpdatedState`.** Both are fresh lambdas
+every composition, so a snapshot state each would be two hundred snapshot *writes* per board
+recomposition for values nothing needs to recompose on.
+
+**`GameState.placedCells` is a `get()` that rebuilds a set**, and the grid was asking for it twice
+per square. Read once for the whole grid. Worth 0.2ms, and it was already wrong before this chunk.
+
+**What is left, and why it stays.** 9.2ms against 8.4 — about 0.8ms of median and 2.9ms of p90 for
+a hundred nodes that exist in the tree, with the worst frame unchanged at ~20ms. Ruled out as the
+cause: content capture, which is on by default on the Play emulator image and walks semantics
+independently of any screen reader — turning it off measured 9.1ms, inside the noise. It is the
+nodes themselves. Both figures sit inside a 16.7ms budget and this is the price of the board being
+playable at all without sight.
+
+**On the measurement.** The first attempt at this reported 55–130ms medians for *both* builds and
+looked like a catastrophic regression; it was the machine, running an IDE at 240% CPU and six
+Gradle daemons. The before-and-after builds have to be measured alternately in one sitting, and a
+number that moves by 15x between runs is a number about the host.
+
+## 2026-09-08 — the region glyph contrast, measured rather than claimed
+
+The entry below records the colourblind watermark landing at "1.48–1.67:1 to 1.82–2.02:1" after the
+pastel retune. Recomputed against the ten shipped fills, at `GlyphAlpha = 0.60` and `DARK_INK`
+alpha `0x8C`, the composited range is **1.74:1 to 2.02:1** — orchid at 1.74 and periwinkle at 1.76
+are the two below the figure that was written down. Still over the 1.70 floor
+`RegionPaletteTest` enforces, and confirmed legible on a device with the mode on, but the range in
+that entry was optimistic by 0.08. Closest pair in CIELAB is pink/orchid at 23.6 and the luminance
+span is 0.371, both as recorded.
+
 ## 2026-09-07 — a blocking launch gate is rendered instead of the nav host, not navigated to
 
 `AccessDeniedRoute` and `OfflineBlockRoute` are both nav destinations that swallow back. That

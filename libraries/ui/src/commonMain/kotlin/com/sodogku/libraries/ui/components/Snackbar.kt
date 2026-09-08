@@ -30,7 +30,10 @@ import com.sodogku.system.Radii
 import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.system.VerticalSpacerD800
 import com.sodogku.system.color.ProvideContentColor
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.common_close
 import kotlin.random.Random
 import androidx.compose.material3.SnackbarData as MaterialSnackbarData
 import androidx.compose.material3.SnackbarDuration as MaterialSnackbarDuration
@@ -121,7 +124,7 @@ fun Snackbar(
             if (podawanSnackbarData.visuals.withDismissAction) {
                 IconButton(
                     size = IconButton.Size.Small,
-                    icon = Icons.X("Close"),
+                    icon = Icons.X(stringResource(Res.string.common_close)),
                     onClick = podawanSnackbarData::dismiss,
                 )
             }

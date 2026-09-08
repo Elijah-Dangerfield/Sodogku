@@ -22,14 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sodogku.libraries.ui.PreviewContent
@@ -145,6 +138,17 @@ fun BoardCell(
     // cost `LocalBoardCellLabels` exists to keep off a hundred-cell board, and
     // `BoardSurface` provides it for every real one.
     val spoken = labels ?: rememberBoardCellLabels()
+    val spokenProperties = rememberBoardCellSemantics(
+        labels = spoken,
+        row = row,
+        column = column,
+        region = region,
+        state = state,
+        colorblind = colorblind,
+        enabled = enabled,
+        onTap = onTap,
+        onPlace = onPlace,
+    )
 
     val entrance = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
@@ -260,51 +264,7 @@ fun BoardCell(
                 // cross appears instantly and converts if another tap follows.
                 detectTapGestures(onTap = { onTap() })
             }
-            // Last in the chain, and the whole block runs lazily: the platform
-            // only asks for these properties when an accessibility service is
-            // reading the tree, so a board nobody is listening to builds no
-            // strings and allocates no action list.
-            .semantics {
-                contentDescription = spoken.describe(row, column, region, colorblind)
-                stateDescription = spoken.stateOf(state)
-                if (!enabled) {
-                    disabled()
-                    return@semantics
-                }
-                onClick(
-                    label = when (state) {
-                        BoardCellState.Empty -> spoken.markAction
-                        else -> spoken.clearAction
-                    },
-                ) {
-                    onTap()
-                    true
-                }
-                if (onPlace != null) {
-                    // Offered twice, because the two platforms put the same
-                    // capability in different places. `onLongClick` is a
-                    // *primary* gesture on Android — double-tap and hold, which
-                    // TalkBack announces with the label as a hint — and the
-                    // custom action is the one VoiceOver puts on its rotor and
-                    // TalkBack in its actions menu. Neither is a fallback; a
-                    // player who knows one never needs the other.
-                    //
-                    // This declares two accessibility actions and adds no
-                    // gesture detector: the sighted double tap is still the
-                    // pointer path in `pointerInput` above, untouched and
-                    // unlagged.
-                    onLongClick(label = spoken.placeAction) {
-                        onPlace()
-                        true
-                    }
-                    customActions = listOf(
-                        CustomAccessibilityAction(spoken.placeAction) {
-                            onPlace()
-                            true
-                        },
-                    )
-                }
-            },
+            .semantics(properties = spokenProperties)
     ) {
         if (pop.value > 0f) {
             // A placed dog is alive: it looks around and blinks. Driven from a

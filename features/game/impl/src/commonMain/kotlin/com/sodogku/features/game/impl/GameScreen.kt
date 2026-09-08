@@ -433,7 +433,13 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
 @Composable
 private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Unit) {
     val level = state.level ?: return
-    val placement = rememberPlacementPulse(state.placedCells, size)
+    // `GameState.placedCells` is a `get()` that rebuilds a set. Read once for
+    // the whole grid rather than twice per square — a 10x10 asked for it two
+    // hundred times per recomposition, which is a hundred throwaway sets the
+    // board never needed and the sort of thing that only shows up when
+    // something else makes you measure.
+    val placed = state.placedCells
+    val placement = rememberPlacementPulse(placed, size)
 
     BoxWithConstraints {
         val cell = (maxWidth - BoardCellGap * (size - 1)) / size
@@ -454,7 +460,7 @@ private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Uni
                                 Modifier
                             },
                             region = level.board.regionAt(index),
-                            state = cellState(state, index),
+                            state = cellState(state, index, placed),
                             row = row,
                             column = col,
                             size = cell,
@@ -471,7 +477,7 @@ private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Uni
                             animated = !state.reduceAnimations,
                             enabled = state.phase == GamePhase.Playing,
                             onTap = { onAction(GameAction.CellTapped(index)) },
-                            onPlace = placeAt(state, index, onAction),
+                            onPlace = placeAt(state, index, placed, onAction),
                         )
                     }
                 }
@@ -502,18 +508,19 @@ private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Uni
 internal fun placeAt(
     state: GameState,
     cell: Int,
+    placed: Set<Int> = state.placedCells,
     onAction: (GameAction) -> Unit,
 ): (() -> Unit)? {
     if (state.phase != GamePhase.Playing) return null
-    if (cell in state.autoMarks || cell in state.placedCells || cell in state.wrongGuesses) return null
+    if (cell in state.autoMarks || cell in placed || cell in state.wrongGuesses) return null
     return {
         onAction(GameAction.CellTapped(cell))
         onAction(GameAction.CellTapped(cell))
     }
 }
 
-private fun cellState(state: GameState, cell: Int): BoardCellState = when {
-    cell in state.placedCells -> BoardCellState.Occupied
+private fun cellState(state: GameState, cell: Int, placed: Set<Int>): BoardCellState = when {
+    cell in placed -> BoardCellState.Occupied
     cell in state.wrongGuesses -> BoardCellState.Wrong
     cell in state.manualMarks -> BoardCellState.Marked
     // An auto-mark the player has tapped away reads as empty again. It is still
