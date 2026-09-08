@@ -16,6 +16,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.sodogku.libraries.scoring.ScoringConfig
+import com.sodogku.libraries.ui.components.game.RewardButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +51,7 @@ import sodogku.libraries.resources.generated.resources.game_score_label
 import sodogku.libraries.resources.generated.resources.game_rule_no_touching
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_line
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_region
+import sodogku.libraries.resources.generated.resources.game_free_bones
 import sodogku.libraries.resources.generated.resources.game_sniff
 import sodogku.libraries.resources.generated.resources.game_treat
 
@@ -63,7 +66,6 @@ fun GameScreen(
     modifier: Modifier = Modifier,
 ) {
     var dialog by remember { mutableStateOf<GameDialog?>(null) }
-    var drawerOpen by remember { mutableStateOf(false) }
 
     Screen(modifier = modifier) { padding ->
         val level = state.level
@@ -83,10 +85,7 @@ fun GameScreen(
             GameHeader(
                 state = state,
                 levelId = level.id,
-                onOpenLevels = {
-                    drawerOpen = true
-                    onAction(GameAction.LevelsOpened)
-                },
+                onOpenLevels = { onAction(GameAction.LevelsOpened) },
                 onSettings = { dialog = GameDialog.Settings },
                 onExplainBones = { onAction(GameAction.BoosterTapped(Consumable.Bone)) },
             )
@@ -133,16 +132,13 @@ fun GameScreen(
             SniffHint(state = state, onAction = onAction)
 
             LevelDrawer(
-                open = drawerOpen,
+                open = state.drawerOpen,
                 currentLevelId = level.id,
                 unlockedThrough = state.unlockedThrough,
                 canJumpAnywhere = state.isPro,
                 records = state.records,
-                onPick = {
-                    drawerOpen = false
-                    onAction(GameAction.GoToLevel(it))
-                },
-                onDismiss = { drawerOpen = false },
+                onPick = { onAction(GameAction.GoToLevel(it)) },
+                onDismiss = { onAction(GameAction.LevelsClosed) },
             )
         }
 
@@ -320,9 +316,21 @@ private fun cellState(state: GameState, cell: Int): BoardCellState = when (cell)
     else -> BoardCellState.Empty
 }
 
+/**
+ * The two boosters and the standing ad offer.
+ *
+ * The ad button lives here rather than in the header because this row is where a
+ * stuck player is already looking. It stays on screen at all times so nobody has
+ * to run out of something to discover the offer exists — but it greys out once
+ * bones are full, because selling an ad for nothing is worse than not offering
+ * one.
+ */
 @Composable
 private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D600)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimension.D600),
+    ) {
         BoosterButton(
             label = stringResource(Res.string.game_sniff),
             count = state.sniffs,
@@ -334,6 +342,11 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
             count = state.treats,
             enabled = state.phase == GamePhase.Playing,
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Treat)) },
+        )
+        RewardButton(
+            label = stringResource(Res.string.game_free_bones),
+            enabled = state.livesRemaining < ScoringConfig.MAX_LIVES,
+            onClick = { onAction(GameAction.RefillBones) },
         )
     }
 }

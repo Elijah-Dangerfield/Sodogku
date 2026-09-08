@@ -177,6 +177,8 @@ private fun LevelRow(
                 PawRating(
                     paws = record.bestPaws,
                     size = Dimension.D700,
+                    // A recalled rating, not a fresh one. See PawRating.
+                    animated = false,
                     modifier = Modifier.padding(top = Dimension.D200),
                 )
             }

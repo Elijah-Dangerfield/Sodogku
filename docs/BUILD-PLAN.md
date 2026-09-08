@@ -403,7 +403,7 @@ question (bones-only versus an interstitial every N levels). Tracked in C4b.
 
 ---
 
-## C4b · The consumable economy
+## C4b · The consumable economy — **DONE** (2026-09-07)
 
 **Unblocked by** C4a. Haptics, the level drawer and the in-game dialogs already landed.
 
@@ -441,7 +441,7 @@ time someone taps an unfamiliar button they should find out what it costs before
 
 ---
 
-## C5 · Progress and per-level records
+## C5 · Progress and per-level records — **DONE** (2026-09-07)
 
 **Unblocked by** C4b.
 
@@ -450,6 +450,21 @@ attempts, state) and the in-progress board snapshot so backgrounding mid-level r
 Level rewards are granted here, which is what feeds the drawer's prize preview.
 
 The one number that exists today, `AppData.currentLevel`, moves into this module.
+
+**Outcome.** `:libraries:progress` (api + impl, 15 tests) backs the level drawer. `LevelState` is
+*ranked* — `Locked < Unlocked < Skipped < Completed` — and only ever moves up, persisted by name
+rather than ordinal so reordering the enum cannot silently re-rate everyone's history.
+
+**What it discovered.** Deleting `AppData.currentLevel` left a cold-start regression: `AppViewModel`
+still read it for the start destination, so every launch went to level 1 no matter what the
+player had cleared. Nothing failed — the field still existed and still had a default. The fix
+injects `ProgressRepository`; the clamp for a finished campaign lives in `LevelPacks.clampToCampaign`
+rather than at the call site, because forgetting it is a crash-free *wrong answer* that only shows
+up for the players who finish.
+
+The drawer's `open` flag also lived in the screen's `remember` while everything it draws is loaded
+in the ViewModel, so the pane could open onto a list of locked rows while the records were still
+in flight. Both now move in one `updateState`.
 
 ---
 

@@ -443,3 +443,37 @@ Added `boosters.refillTo` while here. What an ad tops you up to was the one core
 economy number that was a compile-time constant while everything around it was
 tunable. It is a floor, never a cap: level rewards push a holding above it and a
 refill leaves those alone.
+
+## 2026-09-07 — the standing ad offer greys out rather than always firing
+
+The ask was "an ad button that is always clickable, it just refills your bones".
+It is always *there* — that is the part that matters, because otherwise nobody
+discovers the offer until they have already run out and the app looks like it is
+punishing them. But it greys out when bones are full.
+
+Selling an ad for nothing is worse than not offering one. A player who taps it at
+three bones, sits through thirty seconds and gets three bones back learns that the
+button lies, and that is a more expensive lesson than the impression is worth. It
+sits in the booster row rather than the header because that row is where a stuck
+player is already looking.
+
+`refillBones` also stopped assigning `MAX_LIVES` and now takes `maxOf`, matching
+the rule the booster refill already followed: a holding earned above the floor is
+never reduced by topping up.
+
+## 2026-09-07 — placed dogs get one idle loop each and keep it
+
+Four sprite sheets exist (`look`, `tilt`, `pant`, `flop`) and only `look` was
+wired. Each placed dog now picks a loop from its cell index, so a board reads as
+a row of animals rather than one animal drawn eight times.
+
+It picks once and keeps it. Switching mid-attempt was the tempting version and is
+the wrong one: motion in the periphery pulls the eye, and pulling it away from
+the puzzle is the opposite of what idle animation is for. Four separate sheets
+rather than one big one, because Compose caches each `imageResource` and a board
+only ever shows a handful of dogs — only the loops in play get decoded.
+
+Same reasoning retires the pop on `PawRating` in the level list. The pop means
+"you just earned these", which is a lie when the rating is being recalled, and
+in a 500-row list rows recycle, so every completed level twitched each time it
+scrolled back on screen.

@@ -565,6 +565,55 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(null, vm.state.records[300], "an untouched level has no record at all")
     }
 
+    @Test
+    fun theDrawerOpensWithItsRecordsAndNotBefore() = runUnitTest {
+        // The flag and the rows it draws move in one update. Held apart — the
+        // flag in the screen's `remember`, the records here — the pane could show
+        // a full list of locked levels for however long the query took.
+        val progress = InMemoryProgress()
+        progress.onCompleted(StarterDogLevel, score = 900, paws = 3, timeMs = 4_000)
+        val vm = viewModel(progress = progress)
+        assertFalse(vm.state.drawerOpen)
+
+        vm.takeAction(GameAction.LevelsOpened)
+
+        assertTrue(vm.state.drawerOpen)
+        assertTrue(vm.state.records.isNotEmpty(), "open with nothing to show is the bug")
+
+        vm.takeAction(GameAction.LevelsClosed)
+        assertFalse(vm.state.drawerOpen)
+    }
+
+    @Test
+    fun pickingALevelClosesTheDrawer() = runUnitTest {
+        val progress = InMemoryProgress()
+        progress.onCompleted(StarterDogLevel, score = 1, paws = 1, timeMs = 1)
+        val vm = viewModel(levelId = StarterDogLevel, progress = progress)
+        vm.takeAction(GameAction.LevelsOpened)
+
+        vm.takeAction(GameAction.GoToLevel(StarterDogLevel + 1))
+
+        assertEquals(StarterDogLevel + 1, vm.state.level?.id)
+        assertFalse(vm.state.drawerOpen, "the pane must not survive the level it launched")
+    }
+
+    @Test
+    fun theStandingAdOfferRefillsBonesWithoutEverReducingThem() = runUnitTest {
+        val vm = viewModel()
+        repeat(2) { vm.commit(wrongCellIn(row = it)) }
+        assertTrue(
+            vm.state.livesRemaining < ScoringConfig.MAX_LIVES,
+            "the fixture has to actually cost lives",
+        )
+
+        vm.takeAction(GameAction.RefillBones)
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+
+        // Already full: the ad may still play, but it must not take anything away.
+        vm.takeAction(GameAction.RefillBones)
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+    }
+
     private val clock = TestTimeSource()
 
     private fun viewModel(

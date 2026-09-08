@@ -82,6 +82,16 @@ fun PawRating(
     paws: Int,
     modifier: Modifier = Modifier,
     size: Dp = Dimension.D1100,
+    /**
+     * False draws the paws already earned, with no pop.
+     *
+     * The animation says "you just won these", which is a lie anywhere the
+     * rating is being *recalled* rather than awarded. In the 500-row level list
+     * it is also a nuisance: rows recycle as they scroll, so every completed
+     * level pops each time it comes back on screen and the list appears to
+     * twitch.
+     */
+    animated: Boolean = true,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
@@ -89,9 +99,9 @@ fun PawRating(
     ) {
         repeat(MaxPaws) { index ->
             val earned = index < paws
-            val pop = remember { Animatable(0f) }
-            LaunchedEffect(earned) {
-                if (earned) {
+            val pop = remember { Animatable(if (animated) 0f else 1f) }
+            LaunchedEffect(earned, animated) {
+                if (earned && animated) {
                     pop.snapTo(0f)
                     pop.animateTo(Motion.PopOvershoot, Motion.Pop)
                     pop.animateTo(1f, Motion.Tap)

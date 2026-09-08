@@ -87,6 +87,7 @@ class GameViewModel(
             GameAction.ToggleReduceAnimations -> action.toggleReduceAnimations()
             GameAction.NextLevel -> action.nextLevel()
             GameAction.LevelsOpened -> action.loadRecords()
+            GameAction.LevelsClosed -> action.updateState { it.copy(drawerOpen = false) }
             is GameAction.GoToLevel -> action.goToLevel(action.levelId)
             GameAction.OpenPrivacy -> sendEvent(GameEvent.OpenPrivacy)
             GameAction.OpenTerms -> sendEvent(GameEvent.OpenTerms)
@@ -393,7 +394,12 @@ class GameViewModel(
         warnedAboutLastBone = false
         logger.logEvent("game.bones_refilled", "level_id" to (state.level?.id ?: 0))
         updateState {
-            it.copy(phase = GamePhase.Playing, livesRemaining = ScoringConfig.MAX_LIVES)
+            it.copy(
+                phase = GamePhase.Playing,
+                // Never downward, matching `refill`: a player holding more than
+                // the floor should not be punished for watching an ad.
+                livesRemaining = maxOf(it.livesRemaining, ScoringConfig.MAX_LIVES),
+            )
         }
     }
 
@@ -453,6 +459,10 @@ class GameViewModel(
             it.copy(
                 records = records,
                 unlockedThrough = maxOf(unlocked, it.level?.id ?: LevelRecord.FIRST_LEVEL_ID),
+                // Opened together with the data, in one update. Flipping the flag
+                // first would show a pane of locked rows for a frame while the
+                // records were still loading.
+                drawerOpen = true,
             )
         }
     }
@@ -460,6 +470,7 @@ class GameViewModel(
     private suspend fun GameAction.goToLevel(levelId: Int) {
         val target = LevelPacks.campaign.byId(levelId) ?: return
         if (!entitlements.isPro.value && levelId > state.unlockedThrough) return
+        updateState { it.copy(drawerOpen = false) }
         attemptNumber = 1
         startAttempt(target)
     }
@@ -701,6 +712,14 @@ data class GameState(
 
     /** Squares a sniff has ruled out, spotlit until the player taps away. */
     val hintCells: Set<Int> = emptySet(),
+
+    /**
+     * Whether the level pane is showing. In state rather than in the screen's
+     * `remember` because everything the pane draws — [records], [unlockedThrough],
+     * [isPro] — is loaded here, and a flag that lives apart from the data it
+     * gates can be true while the data behind it is still empty.
+     */
+    val drawerOpen: Boolean = false,
 ) {
     val placedCells: Set<Int> get() = placed.cells().toSet()
 
@@ -753,6 +772,8 @@ sealed interface GameAction {
 
     /** The drawer was opened, so its per-level records need reading. */
     data object LevelsOpened : GameAction
+
+    data object LevelsClosed : GameAction
     data class GoToLevel(val levelId: Int) : GameAction
     data object OpenPrivacy : GameAction
     data object OpenTerms : GameAction
