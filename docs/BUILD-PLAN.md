@@ -973,6 +973,29 @@ chunk up to C7 can be built with nothing from outside.
 
 ---
 
+## Polish punch list (from the user, 2026-09-07 late)
+
+The brief: **"the perfect bubbly big game app"** — Candy Crush vibe, and it should
+look a lot like Meowdoku. Everything below is feel, not function.
+
+| # | Item | Owner | State |
+|---|---|---|---|
+| P1 | Dialogs have poor padding | | |
+| P2 | The level pane needs a real reward indicator, not a bare emoji | | |
+| P3 | Dog idle loops read oddly. Keep `idle` and `look`; drop the shake; the rest occasional at most | | |
+| P4 | Some X marks cannot be undone. The red X (paid for) and a placed dog must stay; every other mark must clear | | |
+| P5 | Tapping Level and Score opens an explainer; both labels a size bigger | | |
+| P6 | A rounder, more playful display face. Poppins is already everywhere; `FontFamily.kt` names Baloo 2 and Fredoka as drop-in OFL replacements | | |
+| P7 | A better dialog entrance animation | | |
+| P8 | Keep checking the app against Meowdoku screenshots | | |
+| P9 | Propose features, argued both ways, leaning conservative, each with a backend-driven-or-not call | | |
+
+**Standing instructions attached to this list:** keep reviewing the code for what
+keeps it good, keep writing tests, commit to `main` often but not every edit, and
+use sub-agents — including to argue a decision from both sides before taking it.
+
+---
+
 ## Where this actually stands, 2026-09-07 evening
 
 Everything through C7 is code-complete. What is left is either waiting on the user or is the
