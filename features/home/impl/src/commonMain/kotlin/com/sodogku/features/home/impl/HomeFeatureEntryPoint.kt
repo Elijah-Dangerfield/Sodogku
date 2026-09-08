@@ -9,8 +9,6 @@ import com.sodogku.features.game.GameRoute
 import com.sodogku.features.home.HomeRoute
 import com.sodogku.features.home.impl.bugreport.BugReportScreen
 import com.sodogku.features.home.impl.bugreport.BugReportViewModel
-import com.sodogku.features.home.impl.feedback.FeedbackScreen
-import com.sodogku.features.home.impl.feedback.FeedbackViewModel
 import com.sodogku.features.profile.BugReportRoute
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.Router
@@ -25,7 +23,6 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @Inject
 class HomeFeatureEntryPoint(
     private val homeViewModelFactory: () -> HomeViewModel,
-    private val feedbackViewModelFactory: () -> FeedbackViewModel,
     private val bugReportViewModelFactory: (logId: String?, errorCode: Int?, contextMessage: String?) -> BugReportViewModel,
 ) : FeatureEntryPoint {
 
@@ -39,16 +36,7 @@ class HomeFeatureEntryPoint(
                 onPlay = { levelId -> router.navigate(GameRoute(levelId)) },
             )
         }
-        
-        screen<FeedbackRoute> {
-            val viewModel: FeedbackViewModel = viewModel { feedbackViewModelFactory() }
-            val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
-            FeedbackScreen(
-                state = state,
-                onAction = viewModel::takeAction,
-            )
-        }
-        
+
         screen<BugReportRoute> { backStackEntry ->
             val route = backStackEntry.toRoute<BugReportRoute>()
             val viewModel: BugReportViewModel = viewModel {

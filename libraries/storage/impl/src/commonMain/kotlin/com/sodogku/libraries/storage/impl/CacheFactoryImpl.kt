@@ -114,5 +114,20 @@ private class DataStoreCache<T : Any>(
         dataStore.updateData { value }
     }
 
+    /**
+     * Overridden because the interface default is `set(transform(get()))`, and a
+     * read-then-write is not atomic. Two writers that overlap — and on a cold
+     * start several do, since the install-id minter, the review coordinator and
+     * the navigation tracker all write `AppData` while the first screen is
+     * live — each hold a snapshot taken before the other's write, so whichever
+     * lands second silently reverts the first. Observed on a fresh install: a
+     * settings toggle and a feedback counter both written, both gone by the next
+     * launch.
+     *
+     * `DataStore.updateData` serialises the read and the write, so the transform
+     * always sees the latest value.
+     */
+    override suspend fun update(transform: (T) -> T): T = dataStore.updateData(transform)
+
     override suspend fun clear() { deleteFile() }
 }

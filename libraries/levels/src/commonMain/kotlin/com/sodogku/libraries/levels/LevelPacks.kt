@@ -48,9 +48,18 @@ object LevelPacks {
      * Local date on purpose. It needs no server, and a player who changes their
      * device clock to skip ahead has only cheated themselves.
      */
-    fun dailyFor(epochDay: Long): LevelDefinition {
-        val pool = daily.levels
-        val index = ((epochDay % pool.size) + pool.size) % pool.size
-        return pool[index.toInt()]
+    fun dailyFor(epochDay: Long): LevelDefinition = daily.levels[dailyIndexFor(epochDay)]
+
+    /**
+     * Where [epochDay] lands in the daily pool.
+     *
+     * Exposed as well as [dailyFor] because the day's result records *which board
+     * it was*, and that has to be the same wrap the board came from — recomputing
+     * the modulo at the call site is how the two quietly disagree once
+     * `daily.poolOffset` moves.
+     */
+    fun dailyIndexFor(epochDay: Long): Int {
+        val pool = daily.levels.size
+        return (((epochDay % pool) + pool) % pool).toInt()
     }
 }

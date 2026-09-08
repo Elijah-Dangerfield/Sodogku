@@ -1,9 +1,9 @@
 package com.sodogku.features.home.impl.bugreport
 
-import com.sodogku.features.home.impl.feedback.FeedbackRepository
 import com.sodogku.libraries.core.eitherWay
 import com.sodogku.libraries.flowroutines.SEAViewModel
 import com.sodogku.libraries.sodogku.AppCache
+import com.sodogku.libraries.sodogku.FeedbackRepository
 import com.sodogku.libraries.navigation.Router
 import com.sodogku.libraries.ui.snackbar.showSnackBar
 import me.tatarka.inject.annotations.Assisted

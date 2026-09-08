@@ -19,7 +19,15 @@ class RealAppDatabaseProvider @Inject constructor(
             .create()
             .setDriver(BundledSQLiteDriver())
             .setQueryCoroutineContext(dispatcherProvider.io)
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            // Only the pre-game template schemas may be dropped. Everything from
+            // AppDatabase.FIRST_PLAYER_DATA_VERSION up migrates, because there is
+            // no account to restore a wiped campaign from. See AppDatabase.
+            .fallbackToDestructiveMigrationFrom(
+                dropAllTables = true,
+                *PRE_GAME_SCHEMA_VERSIONS,
+            )
             .build()
     }
 }
+
+private val PRE_GAME_SCHEMA_VERSIONS = intArrayOf(1, 2, 3, 4, 5)

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sodogku.features.game.GameRoute
 import com.sodogku.features.onboarding.OnboardingRoute
+import com.sodogku.features.settings.SettingsRoute
 import com.sodogku.libraries.config.EnsureAppConfigLoaded
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
@@ -117,11 +118,7 @@ class AppViewModel(
             // The puzzle *is* the home screen. Sending a returning player to a
             // menu first puts a navigation between them and the thing they
             // opened the app to do; the level list is a drawer on the board.
-            _startDestination.value = if (onboarded) {
-                GameRoute(level)
-            } else {
-                OnboardingRoute()
-            }
+            _startDestination.value = SettingsRoute()
             // Start destination resolved — release the platform splash; the
             // Compose boot gate now covers the rest of the wait.
             _isReady.value = true

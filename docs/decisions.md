@@ -6,6 +6,179 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-07 — The streak is folded from `daily_result`, never counted
+
+**Decision:** there is no stored streak. `DailyRepository` walks the stored results backwards from
+the player's current local date every time it is asked, and `AppData` gained none of the three
+fields section 13.4 had penciled in for this (`dailyStreak`, `lastDailyDate`,
+`freezesUsedThisMonth`). All three are derivable, and a derived number cannot drift.
+
+**Why it matters more here than it looks:** a counter has no witness. If a bug, a crash between
+two writes, or a clock jump leaves it one too low, nothing on the device can tell — the player
+reports a number we can neither verify nor rebuild, and progress is device-local so there is no
+server copy to fall back on. Folding makes every past bug retroactively fixable: ship the fix and
+the number is right on the next read.
+
+**The cost is one full table read per status.** A few hundred rows after several years, on a query
+with no joins. A partial "recent tail" query would be a cache, and the cache is the thing this
+avoids.
+
+**Rules the fold encodes**, each pinned by a test that names an exact number rather than "not
+broken" (a fold that always returned zero satisfies "a missed day breaks the streak"):
+
+- Today does not have to be done yet. A run through yesterday counts all day today, including
+  after today has been played and lost — the day is spent, but the run breaks at midnight, not on
+  the loss.
+- A frozen day **bridges without counting**. The streak is days you played; an ad is not one.
+- A failed day is not a missed day, so no freeze may cover it. Losing has to mean something or
+  the bones on the daily are decoration.
+- Results dated after today are invisible to the walk. That is what a clock set forward and back
+  leaves behind, and they simply wait for the date to reach them.
+
+## 2026-09-07 — What the daily defends against a moved clock: corruption, not cheating
+
+**Decision:** nothing in the daily tries to detect or punish clock manipulation. Selection is the
+local date, results are keyed on the local date, the streak is folded from them, and a player who
+moves their clock gets a self-consistent answer for whatever date they claim it is.
+
+**Why not defend:** the daily is device-local with no leaderboard, so a time traveller only cheats
+themselves — the spec said as much in section 2 before any of this was built. Every defence that
+was considered costs a legitimate player something real:
+
+- *Refuse to write a date older than the newest row* — breaks flying west, which genuinely returns
+  the player to yesterday's date, and breaks an attempt that starts at 23:58 and finishes at 00:01.
+- *Refuse a date in the future* — the future is only knowable relative to a clock we already do not
+  trust, and the check fires on exactly the reading it cannot verify.
+- *Keep a monotonic "highest date seen"* — a stored counter again, and this one bricks the daily
+  for anyone whose device shipped with a bad clock that later corrected itself.
+
+**What is defended, and is tested:** that nothing a clock does can leave a *permanently* wrong
+state. Rows are only ever inserted, never updated or deleted, so a clock moved forwards and back
+hides rows and then reveals them again. The streak follows the date and comes back whole. A day
+that already has a result stays locked whichever direction the clock moved, so no clock setting
+buys a second attempt at a board.
+
+`DailyRepository.onCompleted` takes the **date** rather than reading "now", for the 23:58 case: the
+result belongs to the board that was played, and the new day is left genuinely unplayed. Being
+generous there is cheaper than explaining why a puzzle finished at one minute past midnight
+counted for neither day.
+
+## 2026-09-07 — Timezone changes are a date question, not a special case
+
+**Decision:** `dayOf(now, zone)` and `untilNextDay(now, zone)` are free functions taking both
+arguments, and `DeviceTimeZone` is a seam re-read on every call rather than a `TimeZone` resolved
+once in the DI graph.
+
+**Why the seam:** the zone changes while the app is running. A value captured at graph construction
+serves a player who has just landed their old midnight — right through their first day in the new
+place, which is exactly the day they are most likely to be off routine and lose a streak.
+
+**What falls out of it**, and is what makes the behaviour testable at all: flying east can skip a
+calendar date, so the streak breaks — and the freeze offer covers precisely that day, which is what
+a freeze is for. Flying west repeats a date; the earlier day's board is already solved so it does
+not reopen, and the streak reads one lower until the date catches up. Both are one test each with a
+fake zone, no device and no clock skew.
+
+`untilNextDay` goes through `atStartOfDayIn` rather than adding 24 hours, because a DST
+spring-forward day is 23 hours long and in a few zones midnight does not exist at all on the
+transition day. It is floored at a second so a strange clock cannot turn the rollover flow into a
+busy loop.
+
+## 2026-09-07 — `daily_result` is insert-only, and the primary key is the lock
+
+**Decision:** the one-attempt-per-day rule is `@Insert(onConflict = IGNORE)` against a table whose
+primary key is the local date. There is no update path on the table at all.
+
+**Why the database and not a check:** "read the row, write if absent" is two statements with a race
+between them, and the caller who forgets the read gets a silent overwrite of a better score. The
+conflict strategy makes the first result the only one the database will accept, so the rule holds
+even for a caller that does not know about it.
+
+`outcome` is a stored enum name (`Completed` / `Failed` / `Frozen`) rather than the `completed` and
+`froze` booleans section 13.2 sketched. Two booleans describe four states and one of them —
+completed *and* frozen — is meaningless. Stored by name, not ordinal, for the reason
+`level_progress.state` is.
+
+**Related, and unresolved:** `AppDatabase` still builds with `fallbackToDestructiveMigration`. It
+was harmless when the only table was an example; it now means a schema bump silently deletes every
+campaign record and every streak, on a device that has no server copy of either. Fixing it needs
+real migrations and belongs to the chunk before the first store release, not to C6.
+
+## 2026-09-07 — Both daily flags are read, so neither becomes a switch nothing listens to
+
+**Decision:** `DailyStatus.enabled` is `daily.enabled && features.dailyChallenge`.
+
+The config has carried both since C7's key set was written — a kill switch for a broken or
+offensive board, and a feature flag for rollout. Reading only one would have left the other in the
+admin console looking operable, which is the failure that had already happened once with
+`app.minSupportedVersion` (see the entry below). Two flags that both mean "off" cost nothing to AND
+together, and a flag nobody reads costs an emergency.
+
+## 2026-09-07 — Achievements store the facts, not the counters
+
+**Decision:** `achievement_fact` holds one append-only row per finished attempt, and every counter
+an achievement is judged on is folded back out of that log on demand. Nothing materializes a
+counter. `achievement_unlock` stores only what has already been *announced*.
+
+**Why:** two properties fall out that a counters table cannot have. An achievement added in a later
+release back-fills from a player's history — the next attempt they finish grants it, dated to the
+attempt that really earned it, instead of starting them at zero. And there is exactly one
+representation of progress, so no cached number can disagree with the history it came from. Cards
+went the same way for a different reason (its server had to re-derive counters a reinstalled client
+could not be trusted to report); here there is no server, and the argument that survives is
+back-fill plus no drift.
+
+**Cost accepted:** every read re-folds the whole log, O(n) in attempts. A completionist's log is
+500 campaign rows plus one a day, and the fold is arithmetic over a list — if it ever matters,
+materializing counters behind `AchievementsRepository` is invisible to callers.
+
+**The idempotency comes from the store, not the fold.** The engine cannot double-*grant* (an id
+already unlocked is filtered before anything is announced) but it would happily double-*count* the
+same result twice. That is why a fact carries a key and the table has a unique index on it: record
+the same attempt ten times and the counters move once. Recording is written insert-first,
+fold-after, so the fold only ever sees what the index let through.
+
+## 2026-09-07 — A share cannot leak the answer because it is never handed one
+
+**Decision:** `:libraries:sharing` takes a size, a region layout and four numbers. There is no
+parameter for the solution and no dependency on `:libraries:puzzle`, so the formatter cannot print
+the placements the way a screenshot would.
+
+**Why the signature rather than a rule:** "don't include the dogs" is the sort of thing that holds
+until someone adds one field to a win-sheet payload. Making it unrepresentable costs nothing — the
+grid is the region partition every player sees before their first move, which is exactly what makes
+a daily share worth posting.
+
+**The test that can actually fail** is not "two solutions share identically" (that one is true by
+construction and stands as a regression guard). It is `everyCellOfARegionRendersTheSameSquare`,
+which fails the moment any cell is rendered differently from its neighbours in the same region —
+the shape a "show where the dogs went" implementation would take.
+
+**Discovered constraint:** Unicode has exactly nine coloured-or-neutral square emoji
+(🟥🟧🟨🟩🟦🟪🟫⬜⬛) and the 10x10 band needs ten regions. Region 10 is `🔲`, the closest pair in the
+set. Repeating a square instead would merge two regions into one shape on the biggest boards, which
+is worse than a slightly awkward tenth glyph.
+
+**The words are the caller's.** Title, streak line and footer are passed in already localised. The
+module holds no English, does no date formatting, and cannot be the reason a share is in the wrong
+language. Score grouping is a plain comma — common Kotlin has no locale-aware number formatter, and
+threading a separator through the API for a string nobody parses buys less than it costs.
+
+## 2026-09-07 — The achievement catalog carries ids, not copy
+
+**Decision:** `Achievement` is an id, a stat, a target and a hidden flag. No name, no description,
+not even a string resource key.
+
+**Alternative considered:** `nameKey: String = "achievement_top_dog_name"`, which is what the Cards
+registry does in spirit. Rejected because a typo or a forgotten string resolves to null at runtime,
+in the release build, as a badge captioned with its own key. With ids only, the UI maps them in an
+exhaustive `when`, so adding an achievement fails to compile until someone writes the words.
+
+**Related:** every criterion is `counter >= target`, replacing the sealed `Criterion` hierarchy the
+Cards catalog uses. Anything that cannot be phrased that way becomes a new `Stat` in the fold. One
+place reasons about what counts, and progress-toward-unlock is a division instead of a per-criterion
+special case.
+
 ## 2026-09-07 — Three consumables, one shape
 
 **Decision:** Bones, Sniffs and Treats all start at 3, all refill to 3 for a rewarded ad, and all
@@ -518,3 +691,22 @@ It needs redrawing before store prep.
 What *was* there and unused: `dog_idle.webp` and `dog_bark.webp`. `idle` is now a
 fifth placed-dog loop. `bark` is a reaction rather than an idle, so it is being
 kept for the win moment rather than added to the loop rotation.
+
+## 2026-09-07 — the database stopped dropping itself
+
+`RealAppDatabaseProvider` built with `fallbackToDestructiveMigration(dropAllTables = true)`.
+Two agents flagged it independently on the same afternoon, from opposite ends of
+the schema, and they were right: it was harmless while the only table was the
+template's example, and it became a silent unrecoverable wipe the moment
+`level_progress` landed.
+
+There is no account. A player's campaign records, daily streak and achievements
+exist in exactly one place — that file on their phone. The next release that adds
+a column would have deleted all of it, on launch, with no error and nothing to
+restore from.
+
+Now: `autoMigrations` for 6→7 and 7→8, and destructive fallback narrowed to
+versions 1–5, which are template history no install has ever run. Every addition
+so far is a new table, so Room writes the migrations itself. The value of the
+list is what happens when it *can't* — a renamed or retyped column now fails the
+build rather than the player's save.

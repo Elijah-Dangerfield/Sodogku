@@ -4,6 +4,7 @@ import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.flowroutines.SEAViewModel
 import com.sodogku.libraries.sodogku.AppCache
+import com.sodogku.libraries.sodogku.FeedbackRepository
 import me.tatarka.inject.annotations.Inject
 
 /** How long a note may be. Long enough to describe a bug, short enough to read. */

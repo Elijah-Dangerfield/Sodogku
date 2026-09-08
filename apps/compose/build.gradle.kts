@@ -91,6 +91,9 @@ kotlin {
             implementation(projects.libraries.billing)
             implementation(projects.libraries.progress)
             implementation(projects.libraries.progress.impl)
+            implementation(projects.libraries.achievements)
+            implementation(projects.libraries.achievements.impl)
+            implementation(projects.libraries.sharing)
 
             implementation(projects.libraries.storage)
             implementation(projects.libraries.storage.impl)
@@ -107,6 +110,8 @@ kotlin {
             implementation(projects.features.onboarding.impl)
             implementation(projects.features.game)
             implementation(projects.features.game.impl)
+            implementation(projects.features.settings)
+            implementation(projects.features.settings.impl)
 
             implementation(libs.atomicfu)
             

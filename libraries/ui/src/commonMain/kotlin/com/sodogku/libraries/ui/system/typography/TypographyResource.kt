@@ -265,11 +265,23 @@ fun rememberTypography(): Typography {
 }
 
 class DefaultTypography(
-    serifFontFamily: FontFamily,
+    @Suppress("UnusedPrivateProperty") serifFontFamily: FontFamily,
     sansSerifFontFamily: FontFamily,
     brandFontFamily: FontFamily
 ) : Typography {
-    override val Display: DisplayTypography = DisplayTypographyImpl(serifFontFamily)
+    /**
+     * Poppins, not the serif the template shipped.
+     *
+     * Display is not a decorative scale here — it is the app's own voice, and it
+     * carries every dialog title, screen header and error message as well as the
+     * level and score. DM Serif was a leftover, and it was quietly making a dog
+     * puzzle look like a magazine on every one of those screens.
+     *
+     * [serifFontFamily] stays in the constructor rather than being deleted: the
+     * template's theme wires all three families, and dropping the parameter is a
+     * change to every caller for no gain. Nothing reads it, which is the point.
+     */
+    override val Display: DisplayTypography = DisplayTypographyImpl(sansSerifFontFamily)
 
     override val Brand: BrandTypography = BrandTypographyImpl(brandFontFamily)
 
@@ -286,10 +298,12 @@ class DisplayTypographyImpl(
     private val fontFamily: FontFamily
 ) : DisplayTypography {
 
-    // Display uses tight line-height (1.1x) for visual impact
+    // Display uses tight line-height (1.1x) for visual impact, and Bold rather
+    // than SemiBold: Poppins is near-circular, and the extra weight is what
+    // turns a large number from "set in a heavy font" into something rounded.
     override val D1500 = TypographyResource(
         fontFamily = fontFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = Dimension.D1500.sp(),
         lineHeight = Dimension.D1500.lineHeight(com.sodogku.system.LineHeightRatio.TIGHT),
         lineBreak = LineBreak.Heading,
@@ -298,7 +312,7 @@ class DisplayTypographyImpl(
 
     override val D1400 = TypographyResource(
         fontFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = Dimension.D1400.sp(),
         lineHeight = Dimension.D1400.lineHeight(com.sodogku.system.LineHeightRatio.TIGHT),
         lineBreak = LineBreak.Heading,
@@ -307,7 +321,7 @@ class DisplayTypographyImpl(
 
     override val D1300 = TypographyResource(
         fontFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = Dimension.D1300.sp(),
         lineHeight = Dimension.D1300.lineHeight(com.sodogku.system.LineHeightRatio.TIGHT),
         lineBreak = LineBreak.Heading,
@@ -316,7 +330,7 @@ class DisplayTypographyImpl(
 
     override val D1200 = TypographyResource(
         fontFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = Dimension.D1200.sp(),
         lineHeight = Dimension.D1200.lineHeight(com.sodogku.system.LineHeightRatio.TIGHT),
         lineBreak = LineBreak.Heading,
@@ -325,7 +339,7 @@ class DisplayTypographyImpl(
 
     override val D1100 = TypographyResource(
         fontFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = Dimension.D1100.sp(),
         lineHeight = Dimension.D1100.lineHeight(com.sodogku.system.LineHeightRatio.TIGHT),
         lineBreak = LineBreak.Heading,
@@ -334,7 +348,7 @@ class DisplayTypographyImpl(
 
     override val D1000 = TypographyResource(
         fontFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = Dimension.D1000.sp(),
         lineHeight = Dimension.D1000.lineHeight(com.sodogku.system.LineHeightRatio.TIGHT),
         lineBreak = LineBreak.Heading,
@@ -343,7 +357,7 @@ class DisplayTypographyImpl(
 
     override val D900 = TypographyResource(
         fontFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = Dimension.D900.sp(),
         lineHeight = Dimension.D900.lineHeight(com.sodogku.system.LineHeightRatio.TIGHT),
         lineBreak = LineBreak.Heading,
@@ -352,7 +366,7 @@ class DisplayTypographyImpl(
 
     override val D800 = TypographyResource(
         fontFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = Dimension.D800.sp(),
         lineHeight = Dimension.D800.lineHeight(com.sodogku.system.LineHeightRatio.TIGHT),
         lineBreak = LineBreak.Heading,

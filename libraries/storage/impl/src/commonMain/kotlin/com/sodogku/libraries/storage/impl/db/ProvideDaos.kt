@@ -1,5 +1,7 @@
 package com.sodogku.libraries.storage.impl.db
 
+import com.sodogku.libraries.achievements.db.AchievementDao
+import com.sodogku.libraries.progress.db.DailyResultDao
 import com.sodogku.libraries.progress.db.LevelProgressDao
 import com.sodogku.libraries.sodogku.storage.db.ClearableDao
 import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataDao
@@ -32,3 +34,25 @@ class ProvideExampleUserDataDao @Inject constructor(
 class ProvideLevelProgressDao @Inject constructor(
     provider: AppDatabaseProvider
 ) : LevelProgressDao by provider.database.levelProgressDao()
+
+/**
+ * Not clearable either, and for a stronger reason than the campaign: this table
+ * *is* the streak. Wiping it does not reset a number, it deletes the evidence the
+ * number is derived from, and nothing can reconstruct it afterwards.
+ */
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = DailyResultDao::class)
+class ProvideDailyResultDao @Inject constructor(
+    provider: AppDatabaseProvider
+) : DailyResultDao by provider.database.dailyResultDao()
+
+/**
+ * Same reasoning again: the fact log *is* the achievement progress, since every
+ * counter is folded from it rather than stored. Clearing it would silently take
+ * badges off a player who had earned them.
+ */
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = AchievementDao::class)
+class ProvideAchievementDao @Inject constructor(
+    provider: AppDatabaseProvider
+) : AchievementDao by provider.database.achievementDao()

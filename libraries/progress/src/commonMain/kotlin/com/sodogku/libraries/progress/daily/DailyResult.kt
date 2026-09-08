@@ -34,6 +34,4 @@ data class DailyResult(
     val score: Int,
     val paws: Int,
     val timeMs: Long,
-) {
-    val isCompleted: Boolean get() = outcome == DailyOutcome.Completed
-}
+)

@@ -468,7 +468,7 @@ in flight. Both now move in one `updateState`.
 
 ---
 
-## C6 · Daily challenge
+## C6 · Daily challenge — **logic DONE** (2026-09-07), card UI outstanding
 
 **Unblocked by** C5.
 
@@ -477,6 +477,63 @@ streak freeze (fake ad for now), one-attempt-per-day locking, `daily_result` per
 
 **Done when** the date rolls correctly across midnight, a missed day breaks the streak, a freeze
 covers exactly one day, and a completed daily cannot be replayed for a better score.
+
+**Outcome.** Everything except the card. 43 tests in `:libraries:progress:impl`, detekt clean,
+Android and iOS both compile. All four done-when conditions are pinned by tests that fail when the
+implementation is broken (checked by mutation: forcing the streak fold to return zero fails 23 of
+them, and relaxing the insert conflict strategy fails the two replay tests).
+
+The surface the card is built against, all in `:libraries:progress`:
+
+```kotlin
+interface DailyRepository {
+    fun observe(): Flow<DailyStatus>        // re-emits on a result AND at local midnight
+    suspend fun status(): DailyStatus
+    suspend fun history(): List<DailyResult>
+    suspend fun onCompleted(date: LocalDate, score: Int, paws: Int, timeMs: Long)
+    suspend fun onFailed(date: LocalDate, timeMs: Long)
+    suspend fun useFreeze(): FreezeResult   // shows the rewarded ad itself
+    suspend fun reset()
+}
+```
+
+`DailyStatus` carries `date`, `packIndex`, `levelId`, `result`, `streak`, `freezeOffer`,
+`resetsIn` and `enabled`, plus a computed `playable`. The card should do no date arithmetic of its
+own — everything in one status comes from one snapshot of the clock.
+
+### What is left
+
+- **The card itself**, and the route that opens the board from `packIndex`. Note that daily and
+  campaign level ids share a number line (daily level 7 is not campaign level 7), so whatever
+  launches the game needs the *pack* as well as the id — `GameViewModel` currently resolves its
+  level against `LevelPacks.campaign` only.
+- **Telemetry.** `daily.started` / `daily.completed` / `daily.streak_broken` / `daily.freeze_used`
+  are specced in section 14 and not emitted; the streak is available at every one of those call
+  sites.
+- **Sharing** (C10) reads `history()`.
+
+### What it discovered
+
+- **`AppData` does not gain a streak.** `dailyStreak`, `lastDailyDate` and `freezesUsedThisMonth`
+  were in spec 13.4 and are not stored; all three fold out of `daily_result`. SPEC updated.
+- **`daily_result` uses an `outcome` enum**, not the `completed` + `froze` booleans 13.2 sketched.
+  Four states, one of them meaningless.
+- **Both daily flags are read.** `daily.enabled && features.dailyChallenge`. Reading one would
+  have left the other looking operable in the admin console, which is the failure already recorded
+  against `app.minSupportedVersion`.
+- **`fallbackToDestructiveMigration` is now a data-loss bug waiting to happen.** A schema version
+  bump drops every table, which used to cost an example row and now costs the player's whole
+  campaign and their streak, with no server copy of either. Real migrations are needed before the
+  first store release — not urgent this week, unshippable after it.
+- `LevelPacks.dailyIndexFor(epochDay)` was added next to `dailyFor` so the stored `levelIndex` and
+  the board come from the same wrap.
+
+**Not verified:** nothing was run on a device — there is no UI to run. The Room queries themselves
+are unexercised for the same reason `level_progress`'s are (a KMP Room database needs a native
+driver the host JVM test source set does not have); the tests drive an in-memory DAO that
+reproduces the `IGNORE` conflict behaviour the schema depends on. The first thing the card should
+prove on device is that a completed daily survives a process death, because that is the one path
+these tests cannot see.
 
 ---
 
@@ -543,6 +600,57 @@ campaign levels and the daily.
 
 **Done when** every badge in the catalog can be earned in a test, the toggle suppresses display
 without stopping recording, and share text renders correctly on both platforms.
+
+### The pure-logic half — **DONE** (2026-09-07)
+
+`:libraries:achievements` (+ impl) and `:libraries:sharing`. 46 tests, detekt clean, green on JVM,
+Android and iOS. No UI and no routes: the badge grid, the unlock toast, the settings toggle and the
+platform share intent are still to come.
+
+- **21 achievements**, each one `counter >= target` and nothing else. Every one is earned in a test
+  from a synthetic history, and — the half that can actually fail — every one is checked *not* to
+  be earned one short of its target.
+- **A pure fold.** `AchievementEngine.apply(state, result)` takes no clock and no storage, so
+  replaying a history reproduces the same badges with the same dates. An unlock is stamped with the
+  attempt that earned it, not with the time of the fold.
+- **The fact log is the storage.** `achievement_fact` (append-only, unique per attempt) plus
+  `achievement_unlock` (what has been announced). Counters are not persisted at all — see
+  `decisions.md` for the back-fill and no-drift argument, and for why the idempotency lives in the
+  unique index rather than in the fold.
+- **The share text cannot leak the solution**, because `ShareResult` has nowhere to put one.
+
+### What the game layer still has to supply
+
+Three fields on `LevelResult` are things the win path knows but does not currently compute. None is
+more than a line, and until they are wired the achievements that read them cannot fire:
+
+- `bestCombo` — `GameViewModel` tracks the current combo in `ScoreCard` but never its running max.
+  (On a strike-free clear the final combo equals the grid size, so it is only really needed for
+  clears that took a strike.)
+- `sniffsUsed` / `treatsUsed` — the inventory is decremented, but nothing counts spends *per
+  attempt*.
+- `isFirstClear` and `previousBestPaws` — read `ProgressRepository.record(levelId)` **before**
+  `onCompleted` writes over it. These are what make "levels cleared" count levels rather than
+  clears.
+
+`dailyStreakDays` and `localHour` both landed elsewhere while this was in flight:
+`DailyRepository.status().streak` and the `DeviceTimeZone` seam C6 added.
+
+### Two things the first draft wanted and the game does not record
+
+- **Marathon** (a 30-minute session) needs session length. Nothing tracks it, and it is not a
+  property of an attempt, so it is not in the catalog.
+- **Completionist** (three paws on a whole band) needs the band's level count, which lives in the
+  pack — the achievements module would have to depend on the content it is meant to be independent
+  of. Show Dog (10) and Pedigree (50) replace it.
+
+### Discovered: a schema bump wipes the campaign
+
+`RealAppDatabaseProvider` builds with `fallbackToDestructiveMigration(dropAllTables = true)`, so
+adding these two tables took the database from 7 to 8 and drops every existing row with it. Free
+today and unrecoverable after release: `level_progress` and `daily_result` are a player's entire
+history and there is no account to restore them from. Whatever ships first needs either real
+migrations or a deliberate decision that the fallback stays.
 
 ---
 

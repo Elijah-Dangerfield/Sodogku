@@ -237,19 +237,29 @@ in the genre and it costs almost nothing given a bundled pack.
 - **Pool.** A separate `daily` pack of 730 levels (two years), generated alongside the campaign
   pack. Kept separate so the daily never spoils a campaign level. When the pool runs out the app
   wraps with an offset, and we ship a new pool in a content update well before then.
-- **Selection.** `dailyIndex = daysSinceEpoch(localDate) % poolSize`. Local device date, no
-  server. Someone can time-travel by changing their clock; that costs us nothing.
+- **Selection.** `dailyIndex = (daysSinceEpoch(localDate) + daily.poolOffset) % poolSize`. Local
+  device date, no server. Someone can time-travel by changing their clock; that costs us nothing,
+  and nothing tries to stop them — see `decisions.md` for what *is* defended.
 - **One attempt shape.** Same three lives, same boosters, same scoring. Once completed or failed,
   the day's result is locked in. A failed daily can be continued with a rewarded ad exactly like
-  a campaign level, but only once.
-- **Streak.** Consecutive days with a completed daily. Local. A missed day resets it. A
-  **Streak Freeze** costs a rewarded ad and covers one missed day, capped at
-  `daily.freezesPerMonth` (default 2). This is the single most reliable ad impression in the app.
+  a campaign level, but only once. The lock is the `daily_result` primary key, so it holds
+  whatever the clock is set to. The result is recorded against the date whose board was played,
+  so an attempt that runs through midnight counts for the day it started and leaves the new day
+  unplayed.
+- **Streak.** Consecutive days with a completed daily, **recomputed from the stored results on
+  every read** rather than counted. Local. A missed day resets it. Today does not have to be done
+  yet — a run through yesterday stands all day, including after today has been played and lost.
+  A **Streak Freeze** costs a rewarded ad and covers one missed day, capped at
+  `daily.freezesPerMonth` (default 2, counted against the month of the day being covered). A
+  frozen day bridges the gap without counting toward the total, and is only offered when covering
+  it would actually reconnect a run. A day the player attempted and lost is not missed and cannot
+  be frozen. This is the single most reliable ad impression in the app.
 - **Entry point.** A prominent card at the top of the level map with the day's date, the streak
   count, and a done/not-done state.
 - **Sharing.** The daily is what people share, because everyone had the same board.
 
-`daily.enabled` is a remote config kill switch.
+`daily.enabled` is a remote config kill switch, and `features.dailyChallenge` is the rollout flag.
+The card reads both — either one off closes it — so neither is a control that nothing listens to.
 
 ---
 
@@ -568,21 +578,54 @@ The template already generates `pages/privacy.html` and `pages/terms.html` throu
 ## 8. Achievements
 
 Cards-style but simpler: no accounts means no server fold. `:libraries:achievements` holds a pure
-`fold(counters, facts)` and a client-side registry. Facts are per-completion records, counters
-are derived, everything is local.
+`fold(counters, facts)` and a client-side catalog. Facts are per-attempt records, counters are
+derived, everything is local.
+
+**What is stored is the facts, not the counters.** One `achievement_fact` row per finished
+attempt, append-only, deduped on a per-attempt key. Every counter is folded back out of that log
+on demand, so there is no second copy of a player's progress to drift, and an achievement added in
+a later release back-fills from history instead of starting everyone at zero. `achievement_unlock`
+records what has already been *announced*, so a catalog change cannot re-toast a two-month-old
+badge.
 
 Progress cannot survive a reinstall. That is the honest cost of no accounts and it should be
 stated plainly in Settings.
 
-Starter catalog: First Steps (clear level 1), Good Dog (10), Best in Show (100), Top Dog (500),
-Perfect Form (a zero-strike clear), Flawless Ten (10 consecutive), Speed Demon (any level under
-30s), Blitz (7x7+ under 60s), High Roller (a single level over 20,000 points), Marathon (30 minute
-session), Night Owl (1am to 5am), Early Bird (5am to 8am), Comeback (clear after two strikes), No
-Help Needed (25 levels, no boosters), Daily Devotion (7 day streak), Faithful (30 day streak),
-Completionist (3 paws on a whole band).
+Every criterion is one shape: a counter reached a number. Anything that cannot be phrased that way
+becomes a new counter in the fold rather than a new kind of criterion, which is what keeps
+progress-toward-unlock a division rather than a special case.
+
+| Achievement | Earned by |
+|---|---|
+| First Steps / Good Dog / Best in Show / Top Dog | 1, 10, 100, 500 campaign levels cleared (levels, not clears — a replay does not count) |
+| Perfect Form | a clear that cost no bones |
+| Flawless Ten | 10 consecutive flawless clears; a strike *or* a failed attempt breaks it |
+| Comeback | cleared after losing two bones |
+| No Help Needed | 25 clears with no sniff and no treat |
+| Speed Demon | any level inside 30s |
+| Blitz | a 7x7 or bigger inside 60s |
+| High Roller | 20,000 points on one level (par on a 10x10 is ~30,500, on a 4x4 ~6,400) |
+| Chain of Eight | a run of 8 consecutive correct placements |
+| Show Dog / Pedigree | 10 and 50 levels taken to three paws, counted the first time each gets there |
+| Grid Seven / Grid Ten | clear a 7x7, clear a 10x10 |
+| Fetch Daily | one daily cleared |
+| Daily Devotion / Faithful | a 7 and a 30 day daily streak |
+| Night Owl (hidden) | a clear between 1am and 5am |
+| Early Bird (hidden) | a clear between 5am and 8am |
+
+Two from the first draft did not survive contact with what the game records. **Marathon** (a
+30-minute session) needs session length, which nothing tracks and which is not a property of an
+attempt. **Completionist** (three paws on a whole band) needs the band's level count, which lives
+in the pack — so the achievements module would have to depend on the content it is supposed to be
+independent of; Show Dog and Pedigree replace it with count milestones.
+
+The catalog carries **no display copy**, only stable ids. Names and descriptions are string
+resources the UI maps with an exhaustive `when`, so adding an achievement fails the build until
+somebody writes the words for it rather than shipping a badge captioned
+`achievement_top_dog_name`.
 
 Toggleable in Settings, which suppresses toasts and hides the tab but keeps recording, so
-re-enabling shows accurate history.
+re-enabling shows accurate history. The toggle deliberately does not reach the repository.
 
 ---
 
@@ -593,14 +636,30 @@ same board.
 
 ```
 Sodogku Daily · Sep 8
-⏱ 1:42   🏆 14,820   🐾🐾🐾
-🔥 12 day streak
+⏱ 1:42   🏆 14,820   🐾🐾🐾   🦴🦴
 
-🟪🟩🟩🟨🟨🟦🟦
-🟪🟪🟩🟨🟦🟦🟥
+🟥🟥🟧🟧🟨🟨🟩
+🟥🟦🟦🟧🟨🟩🟩
 ...
+
 sodogku.app
 ```
+
+The bones the player finished with are on the stats line next to the paws — surviving a 10x10 with
+all three is the brag the number exists for. The streak line only appears for the daily.
+
+**The grid is the region layout, and the text generator is never given the solution.** No-spoilers
+is a property of `ShareResult`'s signature rather than of anyone's care at the call site: two
+players who solved the same board produce byte-identical text, and so does a player who has not
+solved it. Every cell of a region renders as the same square, including the one the dog was on.
+
+Unicode has exactly nine coloured-or-neutral square emoji and the top band needs ten regions, so
+region 10 is `🔲`. It is the closest pair in the set; on a 10x10 a share reads slightly worse than
+a screenshot, which is the price of the format working at all.
+
+Every word in a share — the title, the streak line, the footer — is passed in by the UI from
+`:libraries:resources`, already formatted for the locale. `:libraries:sharing` owns the layout,
+the emoji and the numbers, and holds no English and no date formatting of its own.
 
 Share from the win sheet, the daily card, and a level-map long-press. `share.tapped` is worth
 watching closely, it is the cheapest organic growth channel the app has.
@@ -653,7 +712,9 @@ libraries/
   scoring/                 Pure Kotlin. Score, combo, paw thresholds.
   ads/           + impl    AdGate; AdMob Android, AdMob iOS via Swift
   billing/       + impl    Entitlements; Play Billing / StoreKit 2
-  achievements/            Pure fold logic
+  achievements/  + impl    Pure fold + catalog; Room-backed fact log
+  sharing/                 Pure Kotlin. The share text. Zero deps, and no way
+                           to be handed a solution.
   legal/         + impl    Document versions + acceptance gate
 tools/
   level-generator          JVM CLI, depends on :libraries:puzzle
@@ -693,7 +754,28 @@ ruin a best time.
 
 ### 13.2 Room: `daily_result`
 
-`date` (PK, local ISO date), `level_index`, `completed`, `score`, `time_ms`, `paws`, `froze`.
+`date` (PK, local ISO date), `levelIndex`, `outcome` (`Completed` / `Failed` / `Frozen`), `score`,
+`paws`, `timeMs`.
+
+`outcome` replaces the `completed` + `froze` pair: two booleans describe four states and one of
+them is meaningless. A day with **no row** is a missed day, which is the only thing a `Frozen` row
+may stand in for.
+
+Insert-only, with the primary key as the one-attempt-per-day lock. The streak is **not** stored —
+it is folded out of this table on every read. See section 8's counters for the same rule and
+`decisions.md` for why.
+
+### 13.2a Room: `achievement_fact` and `achievement_unlock`
+
+`achievement_fact`: `id` (PK, autoincrement — the fold is order-dependent), `key` (unique: mode,
+level and finish time, so an at-least-once caller cannot double-count), `level_id`, `mode`, `size`,
+`completed`, `score`, `paws`, `time_ms`, `strikes`, `best_combo`, `sniffs_used`, `treats_used`,
+`first_clear`, `previous_best_paws`, `daily_streak_days`, `local_hour`, `finished_at`.
+
+`achievement_unlock`: `achievement_id` (PK), `unlocked_at` — the timestamp of the attempt that
+crossed the threshold, not of the write.
+
+Counters are **not** stored. See section 8.
 
 ### 13.3 In-progress board
 
@@ -706,10 +788,14 @@ absence reads as a bug.
 `currentLevel`, `hasCompletedTutorial`, `soundEnabled`, `hapticsEnabled`, `autoMarkEnabled`,
 `achievementsEnabled`, `colorblindMode`, `showTimer`, `acceptedTermsVersion`,
 `acceptedPrivacyVersion`, `cachedAdFreeEntitlement`, `sniffCount`, `treatCount`,
-`dailyStreak`, `lastDailyDate`, `freezesUsedThisMonth`, `skipsUsedToday`, `skipsDate`,
+`skipsUsedToday`, `skipsDate`,
 `adGrantsToday`, `adGrantsDate`, `levelsSinceLastInterstitial`, `lastInterstitialAt`,
 `interstitialsThisSession`, `offlineGraceLevelsUsed`, `offlineGraceStartedAt`,
 `firstLaunchAt`, `totalPlayTimeMs`, `sessionsPlayed`, `longestSessionMs`.
+
+`dailyStreak`, `lastDailyDate` and `freezesUsedThisMonth` were listed here and are **not** stored.
+All three are derivable from `daily_result`, and a derived number cannot drift out of step with the
+history it claims to summarise.
 
 ---
 

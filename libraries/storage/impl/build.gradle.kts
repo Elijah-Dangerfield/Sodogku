@@ -14,6 +14,7 @@ kotlin {
             implementation(projects.libraries.storage)
 
             implementation(projects.libraries.progress)
+            implementation(projects.libraries.achievements)
             implementation(projects.libraries.core)
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.sodogku)

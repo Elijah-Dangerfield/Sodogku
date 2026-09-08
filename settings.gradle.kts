@@ -73,6 +73,8 @@ if (!serverOnly) {
     include(":features:onboarding:impl")
 include(":features:game")
 include(":features:game:impl")
+include(":features:settings")
+include(":features:settings:impl")
 
     // Libraries
     include(":libraries:config")
@@ -89,6 +91,8 @@ include(":features:game:impl")
     include(":libraries:review:impl")
     include(":libraries:storage")
     include(":libraries:storage:impl")
+include(":libraries:achievements")
+include(":libraries:achievements:impl")
 include(":libraries:ads")
 include(":libraries:billing")
 include(":libraries:levels")
@@ -96,6 +100,7 @@ include(":libraries:progress")
 include(":libraries:progress:impl")
 include(":libraries:puzzle")
 include(":libraries:scoring")
+include(":libraries:sharing")
     // No api sibling on purpose: the public surface is the `logEvent`
     // extension in :libraries:core; this impl only hosts the experimental
     // opentelemetry-kotlin dependency + the GrafanaLogTree wiring.

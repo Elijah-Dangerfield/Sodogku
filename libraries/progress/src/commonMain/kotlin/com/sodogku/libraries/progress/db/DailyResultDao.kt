@@ -58,9 +58,6 @@ interface DailyResultDao {
     @Query("SELECT * FROM daily_result ORDER BY date")
     suspend fun all(): List<DailyResultEntity>
 
-    @Query("SELECT * FROM daily_result WHERE date = :date")
-    suspend fun find(date: String): DailyResultEntity?
-
     @Query("DELETE FROM daily_result")
     suspend fun deleteAll()
 }
