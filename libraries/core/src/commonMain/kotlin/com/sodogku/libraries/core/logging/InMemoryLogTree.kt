@@ -17,7 +17,7 @@ import kotlin.time.Clock
  *
  * It is a tree in its own right rather than a field on the Sentry tree
  * (where this buffer used to live) because the Sentry tree refuses every entry
- * when the DSN is unset. That is exactly a local debug build — the build where
+ * when the DSN is unset. That is exactly a local debug build, the build where
  * someone is most likely to file a report, and where the buffer was therefore
  * always empty.
  *
@@ -56,7 +56,7 @@ class InMemoryLogTree(
     }
 
     /**
-     * Newline-joined tail, oldest first. Non-clearing on purpose — a reporter
+     * Newline-joined tail, oldest first. Non-clearing on purpose: a reporter
      * who files twice in a row should get context both times, and the ring
      * overwrites itself anyway.
      */

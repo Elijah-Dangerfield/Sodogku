@@ -6,6 +6,7 @@ import com.sodogku.features.settings.impl.feedback.FeedbackViewModel
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
+import com.sodogku.libraries.sodogku.FeedbackKind
 import com.sodogku.libraries.sodogku.FeedbackRepository
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,6 +28,7 @@ class FeedbackViewModelTest : CoroutineTest() {
         vm.takeAction(FeedbackAction.Submit)
 
         assertEquals("the 9x9 levels are the best ones", repository.sent.single())
+        assertEquals(FeedbackKind.Feedback, repository.kinds.single())
         assertEquals(1, cache.get().feedbacksGiven)
         assertTrue(vm.state.sent)
         assertFalse(vm.state.isSubmitting)
@@ -73,13 +75,17 @@ class FeedbackViewModelTest : CoroutineTest() {
 
     private class RecordingRepository : FeedbackRepository {
         val sent = mutableListOf<String>()
+        val kinds = mutableListOf<FeedbackKind>()
         override suspend fun submitFeedback(
             message: String,
-            isBugReport: Boolean,
+            kind: FeedbackKind,
             logId: String?,
             errorCode: Int?,
+            screenshots: List<ByteArray>,
+            includeLogs: Boolean,
         ): Catching<Unit> {
             sent += message
+            kinds += kind
             return Catching.success(Unit)
         }
     }
@@ -87,9 +93,11 @@ class FeedbackViewModelTest : CoroutineTest() {
     private class FailingRepository : FeedbackRepository {
         override suspend fun submitFeedback(
             message: String,
-            isBugReport: Boolean,
+            kind: FeedbackKind,
             logId: String?,
             errorCode: Int?,
+            screenshots: List<ByteArray>,
+            includeLogs: Boolean,
         ): Catching<Unit> = Catching.failure(IllegalStateException("no network"))
     }
 

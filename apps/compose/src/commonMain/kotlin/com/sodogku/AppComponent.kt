@@ -5,6 +5,8 @@ import com.sodogku.features.gate.impl.LaunchGateViewModel
 import com.sodogku.libraries.config.values.FeatureSharing
 import com.sodogku.libraries.core.AppState
 import com.sodogku.libraries.core.AutoInit
+import com.sodogku.devfeedback.DevFeedbackHost
+import com.sodogku.devfeedback.DevFeedbackViewModel
 import com.sodogku.libraries.navigation.DeepLinkBridge
 import com.sodogku.libraries.navigation.impl.DelegatingRouter
 import com.sodogku.libraries.sharing.ShareLauncher
@@ -51,6 +53,15 @@ interface AppComponent {
     val startupReporter: StartupReporter
     val shakeHandler: ShakeHandler
     val deepLinkBridge: DeepLinkBridge
+
+    /**
+     * Backs the right-edge feedback panel. Pulled out here rather than reached
+     * through a nav destination because the panel is an overlay over whatever
+     * screen the report is about — see [DevFeedbackHost]. Singleton so a
+     * half-typed directive survives dismissing the panel to go look at the
+     * thing being complained about.
+     */
+    val devFeedbackViewModel: DevFeedbackViewModel
 
     /**
      * The platform share sheet, provided into the composition as

@@ -60,17 +60,22 @@ interface Telemetry {
     fun setContext(key: String, value: String?)
 
     /**
-     * [screenshots] are JPEG-compressed image bytes the user chose to attach
-     * (already downscaled by the picker). Each rides along on the carrier event
+     * [screenshots] are JPEG-compressed image bytes the reporter chose to attach
+     * (already downscaled at capture). Each rides along on the carrier event
      * as its own image attachment, so a triager sees exactly what the reporter
      * saw. Empty by default.
+     *
+     * [includeLogs] attaches the in-memory session log tail. Default on: a
+     * report without the logs around it usually costs a round trip to
+     * reproduce, and the tail is redacted before it is ever buffered.
      */
     fun captureUserFeedback(
         message: String,
-        isBugReport: Boolean,
+        kind: FeedbackKind,
         eventId: String?,
         errorCode: Int?,
         email: String? = null,
         screenshots: List<ByteArray> = emptyList(),
+        includeLogs: Boolean = true,
     )
 }

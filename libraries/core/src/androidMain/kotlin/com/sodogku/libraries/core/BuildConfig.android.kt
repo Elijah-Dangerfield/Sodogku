@@ -30,4 +30,9 @@ actual object BuildInfo {
 
     actual val commitBranch: String
         get() = SodogkuBuildConfig.COMMIT_BRANCH
+
+    // Play has no TestFlight equivalent that a running app can detect: an
+    // internal-testing install is indistinguishable from a production one.
+    // Testers on Android get a debug build or nothing.
+    actual val isTestFlight: Boolean = false
 }

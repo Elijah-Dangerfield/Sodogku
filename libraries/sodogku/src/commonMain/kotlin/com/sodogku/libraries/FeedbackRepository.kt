@@ -23,9 +23,11 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 interface FeedbackRepository {
     suspend fun submitFeedback(
         message: String,
-        isBugReport: Boolean,
+        kind: FeedbackKind,
         logId: String? = null,
         errorCode: Int? = null,
+        screenshots: List<ByteArray> = emptyList(),
+        includeLogs: Boolean = true,
     ): Catching<Unit>
 }
 
@@ -37,15 +39,19 @@ class FeedbackRepositoryImpl(
 ) : FeedbackRepository {
     override suspend fun submitFeedback(
         message: String,
-        isBugReport: Boolean,
+        kind: FeedbackKind,
         logId: String?,
         errorCode: Int?,
+        screenshots: List<ByteArray>,
+        includeLogs: Boolean,
     ): Catching<Unit> = Catching {
         telemetry.captureUserFeedback(
             message = message,
-            isBugReport = isBugReport,
+            kind = kind,
             eventId = logId,
             errorCode = errorCode,
+            screenshots = screenshots,
+            includeLogs = includeLogs,
         )
     }
 }

@@ -6,7 +6,7 @@ package com.sodogku.libraries.core.logging
  * The in-memory tail is attached to feedback reports, which land in a bug
  * tracker a human browses. Sodogku has no accounts and no user data, so the
  * realistic leak is not "the player's identity" but "a credential that happened
- * to be interpolated into a message" — a DSN, a bearer header echoed while
+ * to be interpolated into a message": a DSN, a bearer header echoed while
  * debugging a request, a signed URL. Those are what this removes.
  *
  * Deliberately narrow. Redacting aggressively (every query string, every long

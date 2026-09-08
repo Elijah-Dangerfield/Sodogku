@@ -1,6 +1,7 @@
 package com.sodogku.libraries.core
 
 import com.sodogku.buildinfo.SodogkuBuildConfig
+import platform.Foundation.NSBundle
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.Platform as NativePlatform
 
@@ -31,4 +32,12 @@ actual object BuildInfo {
 
     actual val commitBranch: String
         get() = SodogkuBuildConfig.COMMIT_BRANCH
+
+    // A TestFlight install carries a sandbox receipt; an App Store install
+    // carries a production one. Both are the same release binary, so this is
+    // the only thing that distinguishes them. Lazy because it touches the
+    // bundle, and the answer cannot change within a process.
+    actual val isTestFlight: Boolean by lazy {
+        !isDebug && NSBundle.mainBundle.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+    }
 }

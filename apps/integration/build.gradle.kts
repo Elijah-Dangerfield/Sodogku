@@ -117,4 +117,13 @@ tasks.withType<Test>().configureEach {
             exclude("**/build/**")
         },
     ).withPropertyName("sharedStringsScan")
+
+    // Same again for the agent skills. `FeedbackTriageQueryContractTest` holds
+    // the triage skill's Sentry queries against the enum that produces the tag
+    // values — and the enum half is covered by the `*.kt` tree above while the
+    // markdown half was not, so editing only the skill left the task
+    // UP-TO-DATE and the mismatch green.
+    inputs.files(
+        rootProject.fileTree(repo.dir(".claude/skills")) { include("**/*.md") },
+    ).withPropertyName("agentSkillScan")
 }

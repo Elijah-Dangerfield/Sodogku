@@ -6,9 +6,11 @@ import com.sodogku.libraries.core.Platform
 import com.sodogku.libraries.core.TelemetryInfo
 import com.sodogku.libraries.core.buildType
 import com.sodogku.libraries.core.versionString
+import com.sodogku.libraries.core.logging.InMemoryLogTree
 import com.sodogku.libraries.core.logging.KLog
 import com.sodogku.libraries.core.logging.LogLevel
 import com.sodogku.libraries.core.logging.Logger
+import com.sodogku.libraries.sodogku.FeedbackKind
 import com.sodogku.libraries.sodogku.Telemetry
 import com.sodogku.libraries.sodogku.impl.logging.DevConsoleWriter
 import com.sodogku.libraries.sodogku.impl.logging.KermitLogTree
@@ -45,9 +47,10 @@ private class ConfiguredTelemetry(
     private val logger: Logger = KLog.withTag("Telemetry")
     private var initialized = false
 
-    // The planted Sentry tree, held so captureUserFeedback can dump its
-    // in-memory log buffer as an attachment. Null until Sentry initializes.
-    private var sentryLogTree: SentryLogTree? = null
+    // The planted session buffer, held so captureUserFeedback can dump it as
+    // an attachment. Planted whether or not Sentry is enabled — a local debug
+    // build has no DSN, and that is exactly where feedback gets written.
+    private var sessionLogTree: InMemoryLogTree? = null
 
     override fun initialize() {
         if (initialized) return
@@ -69,6 +72,15 @@ private class ConfiguredTelemetry(
 
         val config = configProvider()
 
+        // Before the enabled check on purpose: the buffer is local-only, so it
+        // costs nothing to keep and is worthless if it only exists in builds
+        // that can already report.
+        config.logPolicy.minBufferLevel?.let { level ->
+            val tree = InMemoryLogTree(minLevel = level)
+            sessionLogTree = tree
+            KLog.plant(tree)
+        }
+
         if (!config.isEnabled) {
             logger.i { scope ->
                 scope.tag("environment", config.environment)
@@ -87,13 +99,12 @@ private class ConfiguredTelemetry(
                 scope.tag("build_type", config.buildTypeTag)
             }
         }.onSuccess {
-            val tree = SentryLogTree(
-                minBreadcrumbLevel = config.logPolicy.minBreadcrumbLevel,
-                minEventLevel = config.logPolicy.minEventLevel,
-                minBufferLevel = config.logPolicy.minBufferLevel,
+            KLog.plant(
+                SentryLogTree(
+                    minBreadcrumbLevel = config.logPolicy.minBreadcrumbLevel,
+                    minEventLevel = config.logPolicy.minEventLevel,
+                )
             )
-            sentryLogTree = tree
-            KLog.plant(tree)
             Sentry.configureScope {
                 it.setExtra("platform", config.platformTag)
                 it.setExtra("build_type", config.buildTypeTag)
@@ -162,16 +173,17 @@ private class ConfiguredTelemetry(
     @OptIn(ExperimentalUuidApi::class)
     override fun captureUserFeedback(
         message: String,
-        isBugReport: Boolean,
+        kind: FeedbackKind,
         eventId: String?,
         errorCode: Int?,
         email: String?,
         screenshots: List<ByteArray>,
+        includeLogs: Boolean,
     ) {
         val payload = message.trim()
         if (payload.isBlank()) {
             logger.w {
-                it.tag("feedback_type", if (isBugReport) "bug_report" else "feedback")
+                it.tag(FEEDBACK_KIND_TAG, kind.tag)
                 "Ignoring empty feedback payload"
             }
             return
@@ -179,13 +191,13 @@ private class ConfiguredTelemetry(
 
         if (!Sentry.isEnabled()) {
             logger.w {
-                it.tag("feedback_type", if (isBugReport) "bug_report" else "feedback")
+                it.tag(FEEDBACK_KIND_TAG, kind.tag)
                 "Sentry disabled, feedback dropped"
             }
             return
         }
 
-        val typeTag = if (isBugReport) "bug_report" else "feedback"
+        val isBugReport = kind == FeedbackKind.BugReport
         val sanitizedEmail = email?.trim()?.takeIf { it.isNotBlank() }
 
         // The legacy User Feedback API only persists feedback attached to an
@@ -202,10 +214,13 @@ private class ConfiguredTelemetry(
         // along as an attachment — the fine-grained Debug/Verbose we never ship
         // as breadcrumbs, captured only when the user actually files feedback.
         // Local scope means none of this leaks onto later events.
-        val logDump = sentryLogTree?.snapshot()?.takeIf { it.isNotBlank() }
+        val logDump = if (includeLogs) sessionLogTree?.snapshot()?.takeIf { it.isNotBlank() } else null
         val feedbackId = Uuid.random().toString()
-        val sentryId = Sentry.captureMessage(if (isBugReport) "Bug report" else "User feedback") { scope ->
+        val sentryId = Sentry.captureMessage(kind.carrierMessage) { scope ->
             scope.setTag(FEEDBACK_EVENT_TAG, feedbackId)
+            // The one thing triage filters on. See [FeedbackKind] for why it is
+            // a tag and not part of the message.
+            scope.setTag(FEEDBACK_KIND_TAG, kind.tag)
             if (logDump != null) {
                 scope.addAttachment(Attachment(logDump.encodeToByteArray(), "session-log.txt", "text/plain"))
             }
@@ -239,14 +254,16 @@ private class ConfiguredTelemetry(
         Sentry.captureUserFeedback(feedback)
 
         logger.i { scope ->
-            scope.tag("feedback_type", typeTag)
+            scope.tag(FEEDBACK_KIND_TAG, kind.tag)
             scope.extra("event_id", sentryId.toString())
             if (isBugReport) {
                 errorCode?.let { scope.extra("error_code", it) }
             }
             scope.extra("payload_length", payload.length)
             scope.extra("has_email", sanitizedEmail != null)
-            "Feedback forwarded to Sentry ($typeTag)"
+            scope.extra("attached_logs", logDump != null)
+            scope.extra("attached_screenshots", screenshots.count { it.isNotEmpty() })
+            "Feedback forwarded to Sentry (${kind.tag})"
         }
     }
 }
@@ -271,6 +288,10 @@ private const val COMMIT_BRANCH_KEY = "commit_branch"
 // shared "User feedback" / "Bug report" message.
 private const val FEEDBACK_EVENT_TAG = "feedback_event"
 private const val FEEDBACK_FINGERPRINT = "feedback"
+
+// What the triage routine queries: `feedback_kind:owner_directive` finds every
+// report the owner filed and nothing else. Values are [FeedbackKind.tag].
+internal const val FEEDBACK_KIND_TAG = "feedback_kind"
 
 // Hard cap on attached screenshots, mirrored on the UI side. Defensive: the
 // picker already limits selection, this just guarantees a malformed caller
@@ -323,10 +344,15 @@ data class SentryRuntimeConfig(
         val minBreadcrumbLevel: LogLevel,
         val minEventLevel: LogLevel,
         /**
-         * Lowest level retained in the in-memory ring buffer dumped onto user
-         * feedback (null = no buffer). Set below [minBreadcrumbLevel] to keep
-         * the fine-grained detail we don't ship — debug builds buffer Verbose+,
-         * release buffers Debug+ (skips per-frame Verbose churn).
+         * Lowest level retained by the planted
+         * [com.sodogku.libraries.core.logging.InMemoryLogTree], whose tail is
+         * attached to feedback reports (null = no buffer). Set *below*
+         * [minBreadcrumbLevel] so it keeps the fine-grained detail we never
+         * ship: debug buffers Verbose+, release buffers Debug+, which skips
+         * per-frame Verbose churn.
+         *
+         * Read outside the `isEnabled` check in `initialize`, so the buffer
+         * exists in builds with no DSN too.
          */
         val minBufferLevel: LogLevel? = null,
     )

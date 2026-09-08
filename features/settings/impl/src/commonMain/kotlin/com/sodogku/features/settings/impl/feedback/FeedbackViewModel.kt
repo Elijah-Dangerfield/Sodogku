@@ -4,6 +4,7 @@ import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.flowroutines.SEAViewModel
 import com.sodogku.libraries.sodogku.AppCache
+import com.sodogku.libraries.sodogku.FeedbackKind
 import com.sodogku.libraries.sodogku.FeedbackRepository
 import me.tatarka.inject.annotations.Inject
 
@@ -46,7 +47,7 @@ class FeedbackViewModel(
 
         updateState { it.copy(isSubmitting = true, showEmptyError = false) }
 
-        repository.submitFeedback(message = message, isBugReport = false)
+        repository.submitFeedback(message = message, kind = FeedbackKind.Feedback)
             .logOnFailure { "Feedback submission failed" }
 
         Catching { appCache.update { it.copy(feedbacksGiven = it.feedbacksGiven + 1) } }
