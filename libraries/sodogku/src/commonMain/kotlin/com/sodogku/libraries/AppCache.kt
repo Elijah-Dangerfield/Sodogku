@@ -62,12 +62,22 @@ data class AppData(
      * so this decides what the player is *shown*, not what is true. Turning it
      * off hands the bookkeeping back rather than making the board harder.
      *
-     * On by default, and it has to be. It is what every existing player already
-     * has, and the tutorial teaches auto-mark as a step: a default of off would
-     * make that lesson a lie on first launch. A player who turns it off later
-     * has chosen the bookkeeping knowingly.
+     * **Off** by default, which is the harder call of the two.
+     *
+     * Crossing a square off *is* the deduction. A board that does it for you
+     * has taken the step the player is supposed to make and left them matching
+     * a pattern, and a first-timer handed that never learns to read a board at
+     * all — so the difficulty ramp later has nothing to bite on. Every game in
+     * this shape ships it off, and this one used to default it on for a reason
+     * that has since gone: the tutorial taught auto-mark as a step, so off
+     * would have made that lesson a lie. `Tutorial.scriptFor` now picks the
+     * curriculum from this flag and drops those two lessons when it is off, so
+     * the tutorial teaches whichever board the player is actually going to get.
+     *
+     * A player who turns it on has asked for the bookkeeping knowingly, which
+     * is the direction that wants a deliberate tap.
      */
-    val autoMarkEnabled: Boolean = true,
+    val autoMarkEnabled: Boolean = false,
 
     /**
      * Swaps the animated dogs for stills and shortens the board's entrance.

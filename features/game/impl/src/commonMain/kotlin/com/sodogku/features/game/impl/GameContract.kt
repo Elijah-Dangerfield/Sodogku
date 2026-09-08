@@ -60,11 +60,11 @@ data class GameState(
     /**
      * `AppData.autoMarkEnabled` — whether [autoMarks] are drawn.
      *
-     * True by default, so a board built before the cache has been read shows
-     * the game as it is played. Nothing about the puzzle changes when this is
-     * false; see [visibleAutoMarks].
+     * False by default, matching `AppData.autoMarkEnabled`, so a board built
+     * before the cache has been read shows the game as it is played. Nothing
+     * about the puzzle changes when this is false; see [visibleAutoMarks].
      */
-    val autoMarkVisible: Boolean = true,
+    val autoMarkVisible: Boolean = false,
 
     /** What an ad tops a booster up to, so the prompt's copy matches the tap. */
     val refillTo: Int = 3,

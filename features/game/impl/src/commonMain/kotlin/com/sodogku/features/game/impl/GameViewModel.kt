@@ -261,7 +261,7 @@ class GameViewModel(
      * computed from the placements either way; this only decides whether the
      * board draws them.
      */
-    private var autoMark = true
+    private var autoMark = false
 
     /**
      * The level's history as it stood *before* this attempt touched it.
@@ -402,7 +402,10 @@ class GameViewModel(
             .getOrNull()
         // Into the field before the update, because `startAttempt` below reads
         // it and `state` does not carry this write until the next dispatch.
-        autoMark = settings?.autoMarkEnabled != false
+        // `== true`, so a cache that failed to read falls back to off along
+        // with everybody else. The alternative gives a player a board that
+        // marks itself only when something has gone wrong.
+        autoMark = settings?.autoMarkEnabled == true
         updateState {
             it.copy(
                 colorblind = settings?.colorblindMode == true,

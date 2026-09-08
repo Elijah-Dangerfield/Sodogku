@@ -195,10 +195,10 @@ data class SettingsState(
     /**
      * Whether a placed dog crosses off the squares it rules out.
      *
-     * True by default because that is what the game does and what the tutorial
-     * teaches. Off is the purist option and changes only what is drawn.
+     * False by default, matching `AppData.autoMarkEnabled`, where the reasoning
+     * lives. On is the assist, and it changes only what is drawn.
      */
-    val autoMarkEnabled: Boolean = true,
+    val autoMarkEnabled: Boolean = false,
     val hapticsEnabled: Boolean = true,
     val reduceAnimations: Boolean = false,
     val colorblindMode: Boolean = false,

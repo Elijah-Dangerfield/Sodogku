@@ -117,6 +117,9 @@ class PlaceAtTest {
         ),
         phase = GamePhase.Playing,
         placed = placed,
+        // Explicit, and not the default: every case below is about a mark the
+        // player can see, and the state's own default is off.
+        autoMarkVisible = true,
         autoMarks = autoMarks,
         manualMarks = manualMarks,
         wrongGuesses = wrongGuesses,

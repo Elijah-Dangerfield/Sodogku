@@ -83,6 +83,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -164,12 +165,30 @@ class GameViewModelTest : CoroutineTest() {
         // The companion to the test above, and the reason it is not vacuous:
         // both sets are non-empty here, so `visibleAutoMarks` emptying there is
         // the setting and not an empty board.
-        val vm = viewModel()
+        val vm = viewModel(cache = assistedCache())
 
         vm.commit(cellFor(row = 0))
 
         assertTrue(vm.state.autoMarks.isNotEmpty())
         assertEquals(vm.state.autoMarks, vm.state.visibleAutoMarks)
+    }
+
+    @Test
+    fun aCacheThatCannotBeReadStillOpensTheBoardWithTheCrossesOff() = runUnitTest {
+        // The fallback, which is the one line here that no other test reaches:
+        // `settings` is null and the read has to land on the same answer a
+        // fresh install gets. Written `== true` rather than `!= false` for
+        // exactly this, and the two are indistinguishable everywhere else.
+        //
+        // Getting it backwards would hand a player the assisted board only when
+        // something had gone wrong, which is the sort of bug that gets reported
+        // as "it sometimes plays itself".
+        val vm = viewModel(cache = UnreadableAppCache())
+
+        vm.commit(cellFor(row = 0))
+
+        assertTrue(vm.state.autoMarks.isNotEmpty(), "a placement that rules nothing out is not a fixture")
+        assertTrue(vm.state.visibleAutoMarks.isEmpty(), "a broken cache turned the crosses on")
     }
 
     @Test
@@ -249,23 +268,27 @@ class GameViewModelTest : CoroutineTest() {
     fun flippingTheSettingMidBoardChangesWhatIsDrawnAndNothingElse() = runUnitTest {
         // Observed rather than read once when the board opens: the gear opens a
         // real screen, so a player flips this and comes straight back.
+        //
+        // Starts off, which is where a fresh install starts, and runs the round
+        // trip from there. Both edges are asserted, so neither direction can be
+        // the one that silently does nothing.
         val cache = InMemoryAppCache()
         val vm = viewModel(cache = cache)
         vm.commit(cellFor(row = 0))
         val deduced = vm.state.autoMarks
-        assertTrue(deduced.isNotEmpty())
-        assertEquals(deduced, vm.state.visibleAutoMarks, "nothing was crossed off to begin with")
+        assertTrue(deduced.isNotEmpty(), "a placement that rules nothing out is not a fixture")
+        assertTrue(vm.state.visibleAutoMarks.isEmpty(), "the board crossed squares off unasked")
+
+        cache.set(cache.get().copy(autoMarkEnabled = true))
+        settle()
+
+        assertEquals(deduced, vm.state.visibleAutoMarks, "turning it on drew nothing")
 
         cache.set(cache.get().copy(autoMarkEnabled = false))
         settle()
 
         assertTrue(vm.state.visibleAutoMarks.isEmpty(), "the crosses stayed on screen")
         assertEquals(deduced, vm.state.autoMarks, "the deduction moved with the setting")
-
-        cache.set(cache.get().copy(autoMarkEnabled = true))
-        settle()
-
-        assertEquals(deduced, vm.state.visibleAutoMarks, "the crosses did not come back")
     }
 
     @Test
@@ -673,8 +696,10 @@ class GameViewModelTest : CoroutineTest() {
         runUnitTest {
             // The companion, and the one that makes the assertion above mean
             // something: a test that only ever saw `false` would pass against a
-            // hardcoded `false`.
-            val vm = viewModel()
+            // hardcoded `false`. Needs the crosses on, since the board does not
+            // draw any by default and `on_marked` is about a square the player
+            // could see was ruled out.
+            val vm = viewModel(cache = assistedCache())
             vm.commit(cellFor(row = 0))
             val autoMarked = vm.state.visibleAutoMarks.first { it !in vm.state.placedCells }
 
@@ -2190,7 +2215,9 @@ class GameViewModelTest : CoroutineTest() {
         // drop it back the moment level 1 opened.
         val progress = InMemoryProgress()
         progress.onCompleted(PlainLevel, score = 4_000, paws = 3, timeMs = 9_000)
-        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache(), progress = progress)
+        // Assisted, only because `AutoMark` is the step being driven to and the
+        // short curriculum does not have one. Nothing here is about the setting.
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtAssistedCache(), progress = progress)
         val before = vm.state.lifetimeScore
 
         vm.driveTo(TutorialStep.AutoMark)
@@ -2397,30 +2424,44 @@ class GameViewModelTest : CoroutineTest() {
         // that lights a square the asked-for gesture cannot satisfy — a
         // placement on a wrong square, a strike on the right one — would loop
         // here forever, which is precisely the dead end being ruled out.
-        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
-        assertNotNull(vm.state.tutorial, "the tutorial opened with nothing to teach")
-        var seen = 0
-        while (vm.state.tutorial != null && vm.state.isRehearsal) {
-            val step = assertNotNull(vm.state.tutorial)
-            if (Tutorial.triggerFor(step) != TutorialTrigger.Tap) {
-                val lit = vm.state.tutorialCells
-                assertTrue(lit.isNotEmpty(), "$step asks for a gesture on nothing")
-                lit.forEach { cell ->
-                    assertTrue(cell !in vm.state.autoMarks, "$step lit a crossed-off square")
-                    assertTrue(cell !in vm.state.placedCells, "$step lit an occupied square")
+        //
+        // Both curricula, because there are two. `scriptFor` drops the two
+        // auto-mark lessons for a player who has the crosses off, and since
+        // that became the default it is the *shorter* script most first
+        // launches walk. Running one of them would leave the common path
+        // unchecked for exactly the dead end this test exists to find.
+        listOf(false to untaughtCache(), true to untaughtAssistedCache()).forEach { (autoMark, cache) ->
+            val vm = viewModel(levelId = FirstGuidedLevel, cache = cache)
+            assertNotNull(vm.state.tutorial, "the tutorial opened with nothing to teach")
+            var seen = 0
+            while (vm.state.tutorial != null && vm.state.isRehearsal) {
+                val step = assertNotNull(vm.state.tutorial)
+                if (Tutorial.triggerFor(step) != TutorialTrigger.Tap) {
+                    val lit = vm.state.tutorialCells
+                    assertTrue(lit.isNotEmpty(), "$step asks for a gesture on nothing")
+                    lit.forEach { cell ->
+                        // Only when the crosses are drawn. The game ignores a
+                        // tap on a square the player can see is ruled out; with
+                        // auto-mark off nothing is swallowed, so a lit square
+                        // inside the cascade is still perfectly tappable.
+                        if (autoMark) {
+                            assertTrue(cell !in vm.state.autoMarks, "$step lit a crossed-off square")
+                        }
+                        assertTrue(cell !in vm.state.placedCells, "$step lit an occupied square")
+                    }
                 }
+                assertEquals(GamePhase.Playing, vm.state.phase, "$step left the board out of play")
+                vm.perform(step)
+                assertTrue(vm.state.tutorial != step, "$step did not move on the gesture it asked for")
+                seen++
+                assertTrue(seen <= StepBudget, "the script never finished")
             }
-            assertEquals(GamePhase.Playing, vm.state.phase, "$step left the board out of play")
-            vm.perform(step)
-            assertTrue(vm.state.tutorial != step, "$step did not move on the gesture it asked for")
-            seen++
-            assertTrue(seen <= StepBudget, "the script never finished")
+            assertEquals(Tutorial.scriptFor(autoMark).size, seen, "a lesson was skipped, auto-mark $autoMark")
+            // And it let go of the board on the way out, rather than leaving the
+            // player on a demo puzzle they can never finish.
+            assertFalse(vm.state.isRehearsal)
+            assertEquals(FirstGuidedLevel, vm.state.level?.id)
         }
-        assertEquals(Tutorial.Script.size, seen, "a lesson was skipped")
-        // And it let go of the board on the way out, rather than leaving the
-        // player on a demo puzzle they can never finish.
-        assertFalse(vm.state.isRehearsal)
-        assertEquals(FirstGuidedLevel, vm.state.level?.id)
     }
 
     @Test
@@ -2429,8 +2470,12 @@ class GameViewModelTest : CoroutineTest() {
         // the board, which is the same dead end by another route. Since R3 it
         // also has to leave the *rehearsal*: dropping the player onto the demo
         // board would hand them a puzzle worth nothing that is not in any pack.
+        //
+        // Driven off the longer of the two curricula, so every index is a step
+        // that exists. The short script is a prefix-and-gap of this one, and
+        // `noStepCanLeaveTheBoardUntappable` walks it end to end.
         Tutorial.Script.indices.forEach { stopAt ->
-            val cache = untaughtCache()
+            val cache = untaughtAssistedCache()
             val vm = viewModel(levelId = FirstGuidedLevel, cache = cache)
             repeat(stopAt) { vm.perform(assertNotNull(vm.state.tutorial)) }
             assertNotNull(vm.state.tutorial, "nothing was showing to skip out of")
@@ -2482,7 +2527,7 @@ class GameViewModelTest : CoroutineTest() {
     fun theAutoMarkLessonPointsAtTheSquaresThePlacementJustCrossedOff() = runUnitTest {
         // The whole content of the step. Pointing at every marked square would
         // include the starter dog's, which the player was shown five steps ago.
-        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtAssistedCache())
         vm.driveTo(TutorialStep.PlaceAndWatch)
         val before = vm.state.autoMarks
 
@@ -2549,9 +2594,12 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun theTutorialStillTeachesAutoMarkToEveryoneElse() = runUnitTest {
+    fun theTutorialStillTeachesAutoMarkToAPlayerWhoTurnedItOn() = runUnitTest {
         // The other half, so the filter above is a filter and not a deletion.
-        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+        // "Turned it on" and no longer "everyone else": off is the default now,
+        // so the short script is the one most players get and these two lessons
+        // are the exception rather than the rule.
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtAssistedCache())
         val seen = mutableListOf<TutorialStep>()
 
         var guard = 0
@@ -2567,12 +2615,29 @@ class GameViewModelTest : CoroutineTest() {
 
     private val clock = TestTimeSource()
 
-    /** A player who chose "Teach me how", which is the tutorial's entry condition. */
+    /**
+     * A player who chose "Teach me how", which is the tutorial's entry
+     * condition. A fresh install, so the crosses are off and the guided run is
+     * the short curriculum.
+     */
     private suspend fun untaughtCache(): InMemoryAppCache =
         InMemoryAppCache().apply { set(AppData(hasCompletedTutorial = false)) }
 
     /**
-     * A player who has turned the crosses off, and been taught already.
+     * Untaught, with the crosses turned on, which is the only way to reach the
+     * two auto-mark lessons: `Tutorial.scriptFor` drops them otherwise.
+     */
+    private suspend fun untaughtAssistedCache(): InMemoryAppCache = InMemoryAppCache()
+        .apply { set(AppData(autoMarkEnabled = true, hasCompletedTutorial = false)) }
+
+    /**
+     * A player who has the crosses off, and been taught already.
+     *
+     * `autoMarkEnabled = false` is now the default rather than a choice, and it
+     * is spelled out here anyway: the tests that take this cache are *about*
+     * the crosses being off, and they should say so where they can be read
+     * rather than inherit it from a field three modules away that could flip
+     * back.
      *
      * `hasCompletedTutorial` is not incidental at any call site that opens a
      * real board: a default cache is a fresh install, and a fresh install on
@@ -2580,6 +2645,16 @@ class GameViewModelTest : CoroutineTest() {
      */
     private suspend fun puristCache(): InMemoryAppCache = InMemoryAppCache()
         .apply { set(AppData(autoMarkEnabled = false, hasCompletedTutorial = true)) }
+
+    /**
+     * The other side of [puristCache]: a taught player who has turned the
+     * crosses **on**.
+     *
+     * Needed by every test about what a crossed-off square does, because the
+     * board does not cross anything off unasked any more.
+     */
+    private suspend fun assistedCache(): InMemoryAppCache = InMemoryAppCache()
+        .apply { set(AppData(autoMarkEnabled = true, hasCompletedTutorial = true)) }
 
     /** Untaught *and* a purist, which is what "replay the tutorial" produces. */
     private suspend fun untaughtPuristCache(): InMemoryAppCache = InMemoryAppCache()
@@ -3669,6 +3744,21 @@ class GameViewModelTest : CoroutineTest() {
         override suspend fun get(): AppData = state.value
         override suspend fun set(value: AppData): Unit = error("disk is full")
         override suspend fun clear(): Unit = error("disk is full")
+    }
+
+    /**
+     * The other half: a cache whose *reads* fail, so the board opens knowing
+     * none of the player's display settings.
+     *
+     * `updates` never emits, deliberately. A read that throws and a stream that
+     * then delivers the record anyway is not a failure the app can have, and
+     * seeding it would let the settings flow paper over the fallback under test.
+     */
+    private class UnreadableAppCache : AppCache {
+        override val updates: Flow<AppData> = emptyFlow()
+        override suspend fun get(): AppData = error("cache is corrupt")
+        override suspend fun set(value: AppData) = Unit
+        override suspend fun clear() = Unit
     }
 
     /**

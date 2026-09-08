@@ -36,28 +36,30 @@ class SettingsViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun autoMarkIsOnByDefaultAndTogglesAndPersists() = runUnitTest {
-        // On by default is the load-bearing half. It is what every existing
-        // player already has, and the tutorial teaches auto-mark as a step — a
-        // default of off would make that lesson a lie on first launch.
+    fun autoMarkIsOffByDefaultAndTogglesAndPersists() = runUnitTest {
+        // Off by default is the load-bearing half. Crossing a square off is the
+        // deduction, so a board that does it unasked has taken the step the
+        // player is meant to make.
         val cache = InMemoryAppCache()
         val vm = viewModel(cache)
-        assertTrue(vm.state.autoMarkEnabled, "the board crosses squares off by default")
-        assertTrue(cache.get().autoMarkEnabled, "and a fresh install is stored that way")
+        assertFalse(vm.state.autoMarkEnabled, "the board crossed squares off nobody asked it to")
+        assertFalse(cache.get().autoMarkEnabled, "and a fresh install is stored that way")
 
         vm.takeAction(SettingsAction.ToggleAutoMark)
 
-        assertFalse(vm.state.autoMarkEnabled)
-        assertFalse(cache.get().autoMarkEnabled)
+        assertTrue(vm.state.autoMarkEnabled)
+        assertTrue(cache.get().autoMarkEnabled)
     }
 
     @Test
     fun autoMarkOpensShowingWhatIsAlreadySaved() = runUnitTest {
-        val cache = InMemoryAppCache(AppData(autoMarkEnabled = false))
+        // Seeded to the *non*-default, which is the whole test: against `false`
+        // this would pass just as well if the screen never read the cache.
+        val cache = InMemoryAppCache(AppData(autoMarkEnabled = true))
 
         val vm = viewModel(cache)
 
-        assertFalse(vm.state.autoMarkEnabled, "the screen forgot a choice the player made")
+        assertTrue(vm.state.autoMarkEnabled, "the screen forgot a choice the player made")
     }
 
     @Test

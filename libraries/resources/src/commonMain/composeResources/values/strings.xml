@@ -25,7 +25,7 @@
     <string name="game_settings">Settings</string>
     <string name="game_levels_menu">Levels</string>
     <string name="settings_auto_mark">Cross off squares for me</string>
-    <string name="settings_auto_mark_body">When a dog lands, the squares its row, column, block and neighbours rule out are crossed off automatically. Turn this off to keep that work yourself.</string>
+    <string name="settings_auto_mark_body">Turn this on and a placed dog crosses off every square its row, column, block and neighbours rule out, so you do not have to mark them yourself.</string>
     <string name="settings_colorblind">Shapes on colors</string>
     <string name="settings_colorblind_body">Adds a distinct shape to each color, so regions stay apart without relying on hue.</string>
     <string name="settings_haptics">Vibration</string>
