@@ -665,6 +665,46 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun leavingALevelAndComingBackKeepsIt() = runUnitTest {
+        // The half a process-death test misses: switching boards inside one
+        // ViewModel never went through `load`, so the snapshot was written and
+        // then never read. The player's board came back after a force-quit and
+        // not after a trip through the level pane, which is the more common one.
+        // PlainLevel, because `cellFor` is computed against the shared test
+        // level — on any other board its cells are wrong and the commit becomes
+        // a strike, which is how the first version of this test passed against
+        // the bug it was written for.
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 1, paws = 1, timeMs = 1)
+        val vm = viewModel(levelId = PlainLevel, progress = progress)
+        vm.commit(cellFor(row = 1))
+        val placed = vm.state.placedCells
+        assertEquals(1, placed.size, "one placement, and it has to be a placement not a strike")
+
+        vm.takeAction(GameAction.GoToLevel(PlainLevel + 1))
+        assertEquals(PlainLevel + 1, vm.state.level?.id, "the fixture has to actually move")
+        assertTrue(vm.state.placedCells.isEmpty(), "and the new board starts empty")
+
+        vm.takeAction(GameAction.GoToLevel(PlainLevel))
+
+        assertEquals(placed, vm.state.placedCells, "the board has to be waiting where it was left")
+    }
+
+    @Test
+    fun retryStillThrowsTheBoardAway() = runUnitTest {
+        // The exception. Retry is the one path that means it, and handing the
+        // board back would make the button appear to do nothing.
+        val vm = viewModel()
+        repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
+        assertEquals(GamePhase.Lost, vm.state.phase)
+
+        vm.takeAction(GameAction.Retry)
+
+        assertTrue(vm.state.wrongGuesses.isEmpty(), "a retry starts clean")
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+    }
+
+    @Test
     fun anAttemptSurvivesTheProcessBeingKilled() = runUnitTest {
         // The bug this exists for: booster spends were written to disk the moment
         // they happened and the board they paid for was not, so a force-quit

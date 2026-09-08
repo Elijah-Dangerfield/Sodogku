@@ -1929,3 +1929,22 @@ under a link.
 Same shape as the dialog padding, found the same day. A design system that makes
 the right thing *available* rather than *default* gets the wrong thing on every
 screen, and each call site looks correct in isolation.
+
+## 2026-09-08 — and the board comes back when you walk away from it too
+
+The first fix restored a saved board on `load`, which covers a process death and
+nothing else. Switching levels happens *inside* one ViewModel, so the snapshot
+was written on the way out and never read on the way back — the board survived a
+force-quit and not a trip through the level pane, which is much the more common
+one. Every path that opens a board now looks the snapshot up.
+
+Retry is the exception, and deliberately so: it is the one action that means
+"throw this away", and handing the board back would make the button appear to do
+nothing.
+
+The first test for this **passed against the bug**, which is worth writing down
+because it is the third time this shape has appeared today. `cellFor(row)` in the
+test file resolves against a fixed shared level, so used on any other board its
+cells are wrong and a "commit" lands as a strike. The board therefore held only
+its starter dog before and after, and the assertion compared nothing to nothing.
+Mutation-checking is what caught it: reverting the fix left the test green.

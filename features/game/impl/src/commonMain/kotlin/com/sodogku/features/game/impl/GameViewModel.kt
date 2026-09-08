@@ -294,13 +294,7 @@ class GameViewModel(
             sendEvent(GameEvent.NavigateBack)
             return
         }
-        // Only the attempt for *this* board comes back. A snapshot of some other
-        // level is left alone rather than discarded: the player may well return
-        // to it, and this screen has no business deciding that for them.
-        val saved = settings?.boardInProgress
-            ?.takeIf { it.levelId == level.id && it.isDaily == isDaily }
-            ?.takeIf { it.placements.size == level.size }
-        startAttempt(level, resume = saved)
+        startAttempt(level, resume = savedBoardFor(level))
     }
 
     /**
@@ -328,6 +322,24 @@ class GameViewModel(
         dailyDate = status.date
         return LevelPacks.daily.byId(status.levelId)
     }
+
+    /**
+     * The stored attempt at [level], if it is this one's.
+     *
+     * A snapshot of some *other* level is left alone rather than discarded — the
+     * player may well go back to it, and opening a different board is not a
+     * decision about that one.
+     *
+     * The size check is not paranoia about the pack: it is what stops a snapshot
+     * written before a level was regenerated from being loaded onto a board with
+     * a different number of rows.
+     */
+    private suspend fun savedBoardFor(level: LevelDefinition): BoardSnapshot? =
+        Catching { appCache.get().boardInProgress }
+            .logOnFailure { "Failed to read the saved board" }
+            .getOrNull()
+            ?.takeIf { it.levelId == level.id && it.isDaily == isDaily }
+            ?.takeIf { it.placements.size == level.size }
 
     private suspend fun GameAction.startAttempt(
         level: LevelDefinition,
@@ -1151,7 +1163,7 @@ class GameViewModel(
             return
         }
         attemptNumber = 1
-        startAttempt(next)
+        startAttempt(next, resume = savedBoardFor(next))
     }
 
     /**
@@ -1199,7 +1211,7 @@ class GameViewModel(
         // after opening the pane mid-puzzle and tapping the row they were on.
         if (levelId == state.level?.id && state.phase == GamePhase.Playing) return
         attemptNumber = 1
-        startAttempt(target)
+        startAttempt(target, resume = savedBoardFor(target))
     }
 
     /** Opens today's board on its own route, from the card in the drawer. */
@@ -1243,7 +1255,9 @@ class GameViewModel(
         // whose score is already committed to a date.
         if (isDaily) return
         attemptNumber++
-        startAttempt(level)
+        // No resume. Retry is the one path that deliberately throws the board
+        // away, and handing it back would make the button do nothing.
+        startAttempt(level, resume = null)
     }
 
     /**
