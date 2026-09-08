@@ -206,6 +206,16 @@ class GameViewModel(
     private var markedBeforeFirstTap = false
 
     /**
+     * The drag in progress, or null when the player is not dragging.
+     *
+     * A field rather than a piece of [GameState], for the reason [lastTappedCell]
+     * is one: it belongs to a gesture rather than to the board, nothing on screen
+     * renders from it, and it has to be readable *now* rather than a dispatch
+     * from now.
+     */
+    private var stroke: MarkStroke? = null
+
+    /**
      * Consumables spent *this attempt*. The holdings in state only ever say what
      * is left, and "cleared it without help" is a question about what was spent.
      * Reset by [startAttempt] rather than accumulated across retries.
@@ -340,6 +350,9 @@ class GameViewModel(
         when (action) {
             GameAction.Load -> action.load()
             is GameAction.CellTapped -> action.tap(action.cell)
+            is GameAction.DragStarted -> action.startStroke(action.cell)
+            is GameAction.DragCrossed -> action.paint(action.cell)
+            GameAction.DragEnded -> action.endStroke()
             is GameAction.BoosterTapped -> action.boosterTapped(action.consumable)
             is GameAction.BoosterConfirmed -> action.spend(action.consumable)
             is GameAction.BoosterRefillRequested -> action.refill(action.consumable)
@@ -598,6 +611,7 @@ class GameViewModel(
         lastPlacementAt = attemptStartedAt
         lastTappedCell = null
         lastTapAt = null
+        stroke = null
         warnedAboutLastBone = false
         sniffsUsed = resume?.sniffsUsed ?: 0
         treatsUsed = resume?.treatsUsed ?: 0
@@ -1067,6 +1081,104 @@ class GameViewModel(
             )
         }
         if (level != null) advanceTutorial(TutorialTrigger.Marked, level, placed, marks)
+    }
+
+    /**
+     * The first square of a drag, and the one that decides what the rest of it
+     * does.
+     *
+     * A stroke paints **one way**. Starting on an empty square marks everything
+     * it crosses; starting on a cross the player made clears everything it
+     * crosses. The alternative — toggling each square as it is reached — makes
+     * dragging back over your own path erase it, which is a gesture nobody can
+     * aim.
+     *
+     * A drag can only ever write or erase a note. It never places a dog and it
+     * never spends a bone, which is what lets it be as loose as it is: there is
+     * no version of this gesture that costs the player anything.
+     */
+    private suspend fun GameAction.startStroke(cell: Int) {
+        stroke = null
+        if (state.phase != GamePhase.Playing) return
+        // A drag is not the first half of a double tap. Without this, a stroke
+        // that began on a square the player had just tapped would leave that tap
+        // armed, and the next tap on it would commit a dog they were only
+        // dragging across.
+        lastTappedCell = null
+        lastTapAt = null
+        stroke = MarkStroke()
+        paint(cell)
+    }
+
+    /**
+     * One square of a stroke.
+     *
+     * Three kinds of square are crossed rather than painted, and they are the
+     * three a tap cannot change either:
+     *
+     * - **A placed dog.** Nothing about a drag places or removes one.
+     * - **A square that cost a bone.** It is already ruled out, so marking it
+     *   says nothing, and [toggleMark] refuses to clear it — while a stroke that
+     *   *nudged* instead, which is what a tap does, would fire a shake and a
+     *   haptic for every red square it crossed on a gesture meant to be free.
+     *   It is skipped here rather than left to [toggleMark]'s own guard so that
+     *   it cannot decide the stroke's direction: a red square reads as crossed
+     *   off, so a stroke starting on one would clear all the way across.
+     * - **A cross the board drew for itself**, when auto-mark is on. Those are
+     *   not the player's notes to erase, and a stroke that could wipe them would
+     *   be a fast way to lose a board's worth of deduction. It is the *drawn*
+     *   set, so with auto-mark off nothing here is skipped at all, and an
+     *   auto-mark the player has already tapped away reads as empty and can be
+     *   painted back like any other square.
+     *
+     * Every square is offered once per stroke. That is not tidiness, it is what
+     * makes the reads here safe: `state` lags `updateState` by a dispatch, so a
+     * square asked about twice in one stroke could answer with the board as it
+     * stood *before* the first answer — and the second answer would undo the
+     * first, which is the toggling this gesture exists to avoid arriving by the
+     * back door.
+     */
+    private suspend fun GameAction.paint(cell: Int) {
+        // Null unless a stroke is live, which is the only phase check this needs:
+        // [startStroke] refuses to open one on a board that is not being played,
+        // and nothing a stroke does can end an attempt, so a gesture that got a
+        // stroke keeps it for as long as the finger is down.
+        val current = stroke ?: return
+        if (!current.painted.add(cell)) return
+        if (cell in state.placedCells) return
+        if (cell in state.wrongGuesses) return
+        if (cell in state.visibleAutoMarks) return
+
+        val crossed = cell in state.manualMarks
+        // Decided by the first square the stroke can act on, rather than by the
+        // first one it touches. A stroke that starts on a dog has been told
+        // nothing about what the player wants.
+        val marking = current.marking ?: (!crossed).also { current.marking = it }
+        if (crossed == marking) return
+        current.changed++
+        toggleMark(cell)
+    }
+
+    /**
+     * The finger came up. Nothing on the board moves.
+     *
+     * The stroke is reported as one gesture rather than as a run of marks,
+     * because the question this was built to answer is whether anybody drags at
+     * all — and a per-square event cannot tell four squares in one stroke from
+     * four separate taps.
+     */
+    private suspend fun GameAction.endStroke() {
+        val finished = stroke ?: return
+        stroke = null
+        if (rehearsing || finished.changed == 0) return
+        logger.logEvent(
+            "game.drag",
+            "squares" to finished.changed,
+            "marking" to (finished.marking == true),
+            "level_id" to (state.level?.id ?: -1),
+            "mode" to modeName,
+            "auto_mark" to autoMark,
+        )
     }
 
     /** The committed guess. This is the only path that can cost a life. */
@@ -2281,4 +2393,19 @@ class GameViewModel(
          */
         const val DoubleTapWindowMs = 320L
     }
+}
+
+/**
+ * A drag across the board, while it is happening.
+ *
+ * [marking] is decided once — by the first square the stroke reaches that it can
+ * act on — and then holds for the whole gesture. [painted] is every square the
+ * stroke has already been offered, the skipped ones included, so a stroke that
+ * doubles back cannot undo itself. [changed] is how much of it reached the
+ * board, which is what the stroke is worth reporting as.
+ */
+private class MarkStroke {
+    var marking: Boolean? = null
+    var changed: Int = 0
+    val painted = mutableSetOf<Int>()
 }

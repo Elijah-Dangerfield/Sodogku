@@ -34,6 +34,7 @@ import com.sodogku.libraries.ui.components.board.BoardCell
 import com.sodogku.libraries.ui.components.board.BoardCellState
 import com.sodogku.libraries.ui.components.board.BoardCellGap
 import com.sodogku.libraries.ui.components.board.BoardSurface
+import com.sodogku.libraries.ui.components.board.dragAcrossCells
 import com.sodogku.libraries.ui.components.board.rememberPlacementPulse
 import com.sodogku.libraries.ui.components.game.BoosterButton
 import com.sodogku.libraries.ui.components.game.FloatingPoints
@@ -552,7 +553,23 @@ private fun BoardRows(state: GameState, size: Int, onAction: (GameAction) -> Uni
     BoxWithConstraints {
         val cell = (maxWidth - BoardCellGap * (size - 1)) / size
 
-        Column(verticalArrangement = Arrangement.spacedBy(BoardCellGap)) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(BoardCellGap),
+            // On the grid rather than on each square: a stroke that has left a
+            // square is no longer that square's business, and the run of squares
+            // it crosses is only knowable from here. Gated exactly as the cells
+            // themselves are, so the two paths cannot disagree about whether the
+            // board is live.
+            modifier = Modifier.dragAcrossCells(
+                size = size,
+                cellSize = cell,
+                gap = BoardCellGap,
+                enabled = state.phase == GamePhase.Playing,
+                onDragStart = { onAction(GameAction.DragStarted(it)) },
+                onDragEnter = { onAction(GameAction.DragCrossed(it)) },
+                onDragEnd = { onAction(GameAction.DragEnded) },
+            ),
+        ) {
             repeat(size) { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(BoardCellGap)) {
                     repeat(size) { col ->

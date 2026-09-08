@@ -291,6 +291,187 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(deduced, vm.state.autoMarks, "the deduction moved with the setting")
     }
 
+    // ---- S26: one gesture, a run of crosses. --------------------------------
+    //
+    // A drag is the marking gesture in bulk and nothing else. Every test that
+    // asserts what a stroke *did* is paired with one asserting what it could not
+    // do, because the whole reason this gesture is allowed to be loose — no
+    // confirmation, no window, no aim — is that there is no version of it that
+    // costs the player anything.
+
+    @Test
+    fun aDragCrossesOffEverySquareItTouches() = runUnitTest {
+        val vm = viewModel(cache = puristCache())
+        val squares = emptyCells(vm, 3)
+
+        vm.drag(squares)
+
+        assertEquals(squares.toSet(), vm.state.manualMarks)
+    }
+
+    @Test
+    fun aDragThatStartsOnACrossClearsInsteadOfMarking() = runUnitTest {
+        val vm = viewModel(cache = puristCache())
+        val squares = emptyCells(vm, 3)
+        vm.note(squares.first())
+
+        vm.drag(squares)
+
+        assertTrue(vm.state.manualMarks.isEmpty(), "a stroke off a cross has to rub out, not fill in")
+    }
+
+    /**
+     * The one that makes the gesture aimable.
+     *
+     * A stroke that toggled each square as it reached it would erase its own
+     * path the moment a thumb wandered back along it — and a thumb travelling
+     * across a board wanders. The mode is decided once and then held, so going
+     * back over a square that is already how the stroke wants it does nothing.
+     */
+    @Test
+    fun aDragOverItsOwnPathDoesNotRubItOut() = runUnitTest {
+        val vm = viewModel(cache = puristCache())
+        val (first, second) = emptyCells(vm, 2)
+
+        vm.drag(listOf(first, second, first))
+
+        assertEquals(setOf(first, second), vm.state.manualMarks, "the stroke undid itself")
+    }
+
+    @Test
+    fun aDragNeverPlacesADogAndNeverSpendsABone() = runUnitTest {
+        // Straight over the square the dog actually goes on, which is the one
+        // that would place if a stroke could commit, and over a square that
+        // would cost a bone if it could.
+        val vm = viewModel(cache = puristCache())
+        val answer = cellFor(row = 0)
+        val wrong = tappableWrongCell(vm)
+
+        vm.drag(listOf(answer, wrong))
+
+        assertEquals(0, vm.state.dogsPlaced, "a drag placed a dog")
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining, "a drag spent a bone")
+        assertTrue(vm.state.wrongGuesses.isEmpty(), "a drag left a square red")
+        assertEquals(setOf(answer, wrong), vm.state.manualMarks, "and it did not mark either")
+    }
+
+    @Test
+    fun aDragLeavesPlacedDogsAndTheBoardsOwnCrossesAlone() = runUnitTest {
+        // The crosses on, because with them off there is nothing here to skip:
+        // this is the case where a stroke could wipe out a board's worth of
+        // deduction in one swipe.
+        val vm = viewModel(cache = assistedCache())
+        val dog = cellFor(row = 0)
+        vm.commit(dog)
+        val drawn = vm.state.visibleAutoMarks.first { it !in vm.state.placedCells }
+        val (mine, alsoMine) = emptyCells(vm, 2)
+
+        vm.drag(listOf(mine, dog, drawn, alsoMine))
+
+        assertEquals(1, vm.state.dogsPlaced, "the stroke moved a dog")
+        assertTrue(dog !in vm.state.manualMarks, "it crossed off a square with a dog on it")
+        assertTrue(drawn in vm.state.visibleAutoMarks, "it rubbed out the board's own cross")
+        assertEquals(setOf(mine, alsoMine), vm.state.manualMarks, "and it skipped the squares it should have marked")
+    }
+
+    @Test
+    fun aDragOverASquareThatCostABoneLeavesItExactlyAsItIs() = runUnitTest {
+        // A red square is inert to a tap, so it is inert to a stroke: marking it
+        // says nothing it does not already say, clearing it is refused
+        // everywhere else in the game, and nudging it — which is what a tap does
+        // — would fire a shake and a haptic for every red square a stroke
+        // crossed, on a gesture that is meant to be free.
+        val vm = viewModel(cache = puristCache())
+        val red = tappableWrongCell(vm)
+        vm.commit(red)
+        val bones = vm.state.livesRemaining
+        val shakes = vm.state.shakeNonce
+        val ahead = emptyCells(vm, 1).first()
+
+        // Straight off the red square, which is the start that decides both
+        // halves of this: a red square is crossed off, so one allowed to set the
+        // mode would turn the whole stroke into a clearing one and everything
+        // after it would go untouched.
+        vm.drag(listOf(red, ahead))
+
+        assertTrue(red in vm.state.wrongGuesses, "the square stopped being red")
+        assertTrue(red in vm.state.manualMarks, "the cross a bone paid for was rubbed out")
+        assertTrue(ahead in vm.state.manualMarks, "the stroke never got going")
+        assertEquals(bones, vm.state.livesRemaining, "crossing a red square cost another bone")
+        assertEquals(shakes, vm.state.shakeNonce, "the stroke shook the board on its way past")
+    }
+
+    /**
+     * A stroke that begins on a square it cannot touch has been told nothing
+     * about what the player wants, so it waits.
+     *
+     * The crosses are on and the stroke starts on one of them: read as "the
+     * first square is already crossed off", the whole gesture would be a
+     * clearing stroke and every empty square after it would go untouched.
+     */
+    @Test
+    fun theModeComesFromTheFirstSquareTheStrokeCanActOn() = runUnitTest {
+        val vm = viewModel(cache = assistedCache())
+        vm.commit(cellFor(row = 0))
+        val drawn = vm.state.visibleAutoMarks.first { it !in vm.state.placedCells }
+        val squares = emptyCells(vm, 2)
+
+        vm.drag(listOf(drawn) + squares)
+
+        assertEquals(squares.toSet(), vm.state.manualMarks, "the stroke started clearing and marked nothing")
+    }
+
+    @Test
+    fun aTapRightAfterADragIsAFirstTapAndNotACommit() = runUnitTest {
+        // The failure this exists to catch costs a bone. A tap arms the commit;
+        // if a drag from that same square leaves it armed, the next tap inside
+        // the double-tap window converts a gesture the player made with their
+        // whole hand into a deliberate placement they never asked for.
+        val vm = viewModel(cache = puristCache())
+        val wrong = tappableWrongCell(vm)
+        val neighbour = emptyCells(vm, 3).first { it != wrong }
+        vm.takeAction(GameAction.CellTapped(wrong))
+        settle()
+
+        vm.drag(listOf(wrong, neighbour))
+        vm.takeAction(GameAction.CellTapped(wrong))
+        settle()
+
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining, "the tap after the drag committed")
+        assertTrue(wrong !in vm.state.wrongGuesses)
+        assertTrue(wrong in vm.state.manualMarks, "and it should have written an ordinary cross")
+    }
+
+    @Test
+    fun aDragOnAFinishedBoardChangesNothing() = runUnitTest {
+        val vm = viewModel(cache = puristCache())
+        solve(vm)
+        assertEquals(GamePhase.Won, vm.state.phase)
+
+        vm.drag(listOf(0, 1, 2))
+
+        assertTrue(vm.state.manualMarks.isEmpty(), "a finished board took notes")
+    }
+
+    @Test
+    fun aStrokeIsReportedOnceWithTheSquaresItActuallyChanged() = recordingEvents { events ->
+        runUnitTest {
+            // One event per gesture, not per square: the question this feature
+            // was built to answer is whether anybody drags at all, and a
+            // per-square event cannot tell four squares in one stroke from four
+            // separate taps. The count is what reached the board, so the dog the
+            // stroke crossed on its way past is not in it.
+            val vm = viewModel(cache = puristCache())
+            vm.commit(cellFor(row = 0))
+            val squares = emptyCells(vm, 3)
+
+            vm.drag(listOf(vm.state.placedCells.first()) + squares)
+
+            assertEquals(3, events.single("game.drag")["squares"])
+            assertEquals(true, events.single("game.drag")["marking"])
+        }
+    }
+
     @Test
     fun aDeliberatePlacementOnACrossedOffSquareStillCosts() = runUnitTest {
         // Reported from a device: "I tried to place a dog illegally and it
@@ -3457,6 +3638,34 @@ class GameViewModelTest : CoroutineTest() {
         takeAction(GameAction.CellTapped(cell))
         clock += SettleGap
         settle()
+    }
+
+    /**
+     * One stroke across [cells], in the order a thumb would reach them. The
+     * first is the square the finger went down on.
+     *
+     * The clock deliberately does not move. A drag has no window to be inside or
+     * outside of, and `aTapRightAfterADragIsAFirstTapAndNotACommit` needs the tap
+     * that follows to land while the double-tap window is still open.
+     */
+    private fun GameViewModel.drag(cells: List<Int>) {
+        takeAction(GameAction.DragStarted(cells.first()))
+        cells.drop(1).forEach { takeAction(GameAction.DragCrossed(it)) }
+        takeAction(GameAction.DragEnded)
+        settle()
+    }
+
+    /** [count] squares on the open board that a stroke could write on. */
+    private fun emptyCells(vm: GameViewModel, count: Int): List<Int> {
+        val open = assertNotNull(vm.state.level)
+        val free = (0 until open.board.cellCount).filter { cell ->
+            cell !in vm.state.visibleAutoMarks &&
+                cell !in vm.state.placedCells &&
+                cell !in vm.state.manualMarks &&
+                cell !in vm.state.wrongGuesses
+        }
+        assertTrue(free.size >= count, "the board has no room for a stroke of $count")
+        return free.take(count)
     }
 
     private fun solve(vm: GameViewModel) {

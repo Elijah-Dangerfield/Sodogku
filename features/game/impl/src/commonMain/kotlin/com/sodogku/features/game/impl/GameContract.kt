@@ -550,6 +550,25 @@ data class TutorialFrame(val step: TutorialStep?, val cells: Set<Int>) {
 sealed interface GameAction {
     data object Load : GameAction
     data class CellTapped(val cell: Int) : GameAction
+
+    /**
+     * The first square of a drag across the board.
+     *
+     * Three actions rather than one carrying a list, because the gesture is not
+     * over when it starts: the squares arrive as the thumb reaches them, and the
+     * board has to draw each cross as it is made or the whole stroke lands at
+     * once at the end and reads as a glitch.
+     *
+     * This one decides what the stroke does. See `GameViewModel.startStroke`.
+     */
+    data class DragStarted(val cell: Int) : GameAction
+
+    /** A further square the drag has reached. Never the one it started on. */
+    data class DragCrossed(val cell: Int) : GameAction
+
+    /** The finger came up. Nothing on the board moves; the stroke is logged. */
+    data object DragEnded : GameAction
+
     /** Tapping a booster button. May explain, use, or offer a refill. */
     data class BoosterTapped(val consumable: Consumable) : GameAction
 
