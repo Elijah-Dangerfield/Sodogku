@@ -477,3 +477,44 @@ Same reasoning retires the pop on `PawRating` in the level list. The pop means
 "you just earned these", which is a lie when the rating is being recalled, and
 in a 500-row list rows recycle, so every completed level twitched each time it
 scrolled back on screen.
+
+## 2026-09-07 — the game's numbers move to the Display scale
+
+"Big and bubbly, the level especially." The level and the score were on
+`Heading.H700`, which is the same weight as every section title in the app, so
+they read as chrome — one more label on a screen already full of them.
+
+They are now `Display.D900`, and the labels above them drop to `Caption.C300`.
+The scale already existed and nothing in the game used it. Poppins was picked in
+C3a precisely because it is geometric and near-circular; at display size the same
+digits stop looking like a status bar. The label is there to say which number
+this is, once. It does not need to compete.
+
+No new font, and no new type scale. Adding either would have been the obvious
+move and the wrong one — the "bubbly" was already available in the scale that
+shipped, unused.
+
+## 2026-09-07 — the win sheet's ad badge was a copy of the design-system one
+
+`GameOutcomeSheets` had a private `AdBadge` that reimplemented `RewardBadge`
+down to the same accent and radius. Two things meaning "an ad is involved" is one
+too many: the whole point of a single accent for ad affordances is that a player
+learns the colour once, and that only holds if there is one component to change
+when it moves.
+
+The lose sheet's refill button is now badged too, unconditionally — refilling
+*always* costs an ad, unlike Next level, where one is only sometimes due.
+
+## 2026-09-07 — blocked on art that never reached disk
+
+Two assets the user described in chat are not in `sodogku-assets/`: the **sad dog**
+for the out-of-bones sheet, and the **better bone art**. The lose sheet still uses
+`DogPose.HardMode` and the bones are still drawn in `GameShapes.drawBone`. Both
+call sites are one-liners once the files exist.
+
+`dog-appmark.png` also still carries sudoku numerals, which Sodogku does not have.
+It needs redrawing before store prep.
+
+What *was* there and unused: `dog_idle.webp` and `dog_bark.webp`. `idle` is now a
+fifth placed-dog loop. `bark` is a reaction rather than an idle, so it is being
+kept for the win moment rather than added to the loop rotation.

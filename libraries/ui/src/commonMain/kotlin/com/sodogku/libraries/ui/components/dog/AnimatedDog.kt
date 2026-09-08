@@ -18,6 +18,7 @@ import org.jetbrains.compose.resources.imageResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.dog_flop_sheet
+import sodogku.libraries.resources.generated.resources.dog_idle_sheet
 import sodogku.libraries.resources.generated.resources.dog_look_sheet
 import sodogku.libraries.resources.generated.resources.dog_pant_sheet
 import sodogku.libraries.resources.generated.resources.dog_tilt_sheet
@@ -102,6 +103,7 @@ private val DogLoops
         Res.drawable.dog_tilt_sheet,
         Res.drawable.dog_pant_sheet,
         Res.drawable.dog_flop_sheet,
+        Res.drawable.dog_idle_sheet,
     )
 
 /** Must match `scripts/build_dog_sprites.py --frames`. */

@@ -44,7 +44,7 @@ fun DogCounter(
         Dog(pose = DogPose.Still, size = Dimension.D1100)
         Text(
             text = stringResource(Res.string.game_dogs_found, found, total),
-            typography = AppTheme.typography.Heading.H600,
+            typography = AppTheme.typography.Display.D800,
             color = if (found == total && total > 0) {
                 AppTheme.colors.accentPrimary
             } else {

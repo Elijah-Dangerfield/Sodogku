@@ -215,9 +215,16 @@ private fun GameHeader(
 }
 
 /**
- * A stat with its label above it. The number is the display face at heading
- * weight, because the level and the score are the two things a player glances
- * at mid-puzzle and neither should need looking for.
+ * A stat with its label above it.
+ *
+ * The number is on the **Display** scale, not the heading scale. The level and
+ * the score are the two things a player glances at mid-puzzle, and at heading
+ * size they read as chrome — one more label in a screen already full of them.
+ * Poppins is near-circular by design, so the same digits at display size stop
+ * looking like a status bar and start looking like part of the game.
+ *
+ * The label above stays small and quiet: it is there to say which number this
+ * is, once, and never to be read again.
  */
 @Composable
 private fun HeaderStat(
@@ -228,11 +235,11 @@ private fun HeaderStat(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = label,
-            typography = AppTheme.typography.Body.B400,
+            typography = AppTheme.typography.Caption.C300,
             color = AppTheme.colors.textSecondary,
         )
         if (value != null) {
-            Text(text = value, typography = AppTheme.typography.Heading.H700)
+            Text(text = value, typography = AppTheme.typography.Display.D900)
         } else {
             content()
         }

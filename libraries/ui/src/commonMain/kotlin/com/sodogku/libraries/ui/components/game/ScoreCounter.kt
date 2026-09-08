@@ -49,7 +49,7 @@ fun ScoreCounter(
 
     Text(
         text = displayed.toString(),
-        typography = AppTheme.typography.Heading.H600,
+        typography = AppTheme.typography.Display.D900,
         color = AppTheme.colors.text,
         modifier = modifier,
     )
