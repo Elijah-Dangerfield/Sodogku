@@ -87,6 +87,11 @@ import sodogku.libraries.resources.generated.resources.hint_apply
 import sodogku.libraries.resources.generated.resources.hint_discard
 import sodogku.libraries.resources.generated.resources.hint_found_many
 import sodogku.libraries.resources.generated.resources.hint_found_one
+import com.sodogku.libraries.ui.components.game.BoardControl
+import com.sodogku.libraries.ui.components.game.BoardControlBone
+import com.sodogku.libraries.ui.components.dog.Dog
+import com.sodogku.libraries.ui.components.dog.DogPose
+import androidx.compose.ui.graphics.Color
 
 /**
  * The board and everything around it. A pure render of [GameState]; every
@@ -658,38 +663,75 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
     // broke "Free bones" across two lines as "Free bone / s". Nothing here is
     // ordered or paired, so the honest answer to not fitting is to wrap onto a
     // second line rather than to shrink the labels or clip the offer.
+    val playing = state.phase == GamePhase.Playing
     FlowRow(
         verticalArrangement = Arrangement.spacedBy(Dimension.D400),
-        horizontalArrangement = Arrangement.spacedBy(Dimension.D600, Alignment.CenterHorizontally),
-        itemVerticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimension.D800, Alignment.CenterHorizontally),
+        itemVerticalAlignment = Alignment.Top,
     ) {
-        BoosterButton(
+        BoardControl(
             label = stringResource(Res.string.game_sniff),
             count = state.sniffs,
-            color = SniffColor,
             modifier = Modifier.focusTarget(SniffFocusKey),
-            enabled = state.phase == GamePhase.Playing,
+            enabled = playing,
+            // Only after a wrong guess, and only while there is one to spend
+            // and no proposal already on screen. A booster that waves at
+            // somebody mid-deduction is telling them they are too slow; one
+            // that waves after they have just paid a bone is offering to help.
+            attention = playing && state.sniffs > 0 &&
+                state.hintCells.isEmpty() && state.strikesThisAttempt > 0,
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Sniff)) },
-        )
-        BoosterButton(
+        ) {
+            Dog(pose = DogPose.Focused, size = BoardControlDog)
+        }
+        BoardControl(
             label = stringResource(Res.string.game_treat),
             count = state.treats,
-            color = TreatColor,
             modifier = Modifier.focusTarget(TreatFocusKey),
-            enabled = state.phase == GamePhase.Playing,
+            enabled = playing,
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Treat)) },
-        )
-        RewardButton(
+        ) {
+            BoardControlBone(fill = TreatColor, edge = TreatEdge)
+        }
+        BoardControl(
             label = stringResource(Res.string.game_free_bones),
-            color = AdOfferColor,
             // Against `boosters.refillTo`, not the compile-time three: the
             // refill tops up to the config number, so comparing with a constant
             // would grey the offer out while an ad still had something to give.
             enabled = state.phase != GamePhase.Recap && state.livesRemaining < state.refillTo,
             onClick = { onAction(GameAction.RefillBones) },
-        )
+        ) {
+            BoardControlBone(fill = BoneGold, edge = BoneGoldEdge)
+        }
     }
 }
+
+/**
+ * The dog inside a board control.
+ *
+ * Larger than the bone beside it, because the dog art carries its own margin
+ * inside the image while `drawBone` fills its box. Matching the numbers would
+ * make the dog visibly the smaller of the two.
+ */
+private val BoardControlDog = Dimension.D1500
+
+/**
+ * The bones on the refill offer, matching the ones in the life counter.
+ *
+ * The same currency should be the same object. A differently coloured bone on
+ * the button that refills them would read as a different thing being offered.
+ */
+private val BoneGold = Color(0xFFF5C043)
+private val BoneGoldEdge = Color(0xFFC8871B)
+
+/**
+ * The treat, in the orange it wears everywhere else.
+ *
+ * Not the pale biscuit `LevelRewardChip` uses. That one is drawn *on* orange and
+ * is pale so it reads against it; on a white circle it all but disappeared. Same
+ * object, opposite background, opposite treatment.
+ */
+private val TreatEdge = Color(0xFFB35C0F)
 
 private const val WEIGHT_FILL = 1f
 

@@ -11,7 +11,7 @@
     <string name="game_rule_one_per_region">1 dog per color</string>
     <string name="game_rule_one_per_line">1 dog per row &amp; column</string>
     <string name="game_rule_no_touching">Dogs cannot touch</string>
-    <string name="game_sniff">Sniff</string>
+    <string name="game_sniff">Locate</string>
     <string name="game_treat">Treat</string>
     <string name="game_won_title">Good dog!</string>
     <string name="game_lost_title">Out of bones</string>
@@ -43,7 +43,7 @@
     <string name="game_skip_level">Skip this level</string>
     <string name="game_skip_remaining">%1$d skips left today</string>
     <string name="game_skip_none_left">No skips left today</string>
-    <string name="game_free_bones">Free bones</string>
+    <string name="game_free_bones">Bones</string>
     <string name="game_dogs_found">%1$d/%2$d</string>
 
     <string name="rules_title">How to play</string>
@@ -149,7 +149,7 @@
     <string name="board_glyph_7">bar</string>
     <string name="board_glyph_8">double bar</string>
     <string name="board_glyph_9">chevron</string>
-    <string name="booster_sniff_title">Sniff it out</string>
+    <string name="booster_sniff_title">Locate</string>
     <string name="booster_sniff_body">Your dog sniffs around and rules out a few squares for you. It never tells you where a dog goes. That part is still yours.</string>
     <string name="booster_treat_title">Give a treat</string>
     <string name="booster_treat_body">Places one dog correctly, free. No bone at risk.</string>
@@ -523,4 +523,11 @@
     <string name="dogs_title">Dogs found</string>
     <string name="dogs_body">You have placed %1$d of the %2$d dogs this board needs. One per color, one per row, one per column, so a %3$d-dog board is a %3$d by %3$d grid.</string>
     <string name="dogs_a11y">%1$d of %2$d dogs found</string>
+
+    <!-- The clock on a board that was finished, and the best of the finished
+         runs on a level pane row. Both take a time already formatted as m:ss,
+         so the sheet, the pane and the share card all read the same. Only ever
+         shown against a clear: a board nobody solved has no "solved in". -->
+    <string name="game_time_taken">Solved in %1$s</string>
+    <string name="levels_best_time">Best %1$s</string>
 </resources>
