@@ -674,12 +674,8 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
             count = state.sniffs,
             modifier = Modifier.focusTarget(SniffFocusKey),
             enabled = playing,
-            // Only after a wrong guess, and only while there is one to spend
-            // and no proposal already on screen. A booster that waves at
-            // somebody mid-deduction is telling them they are too slow; one
-            // that waves after they have just paid a bone is offering to help.
             attention = playing && state.sniffs > 0 &&
-                state.hintCells.isEmpty() && state.strikesThisAttempt > 0,
+                state.hintCells.isEmpty() && state.isStruggling,
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Sniff)) },
         ) {
             Dog(pose = DogPose.Focused, size = BoardControlDog)
@@ -705,6 +701,33 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
         }
     }
 }
+
+/**
+ * Whether the board has enough evidence to offer help unasked.
+ *
+ * One wrong guess is not struggling. Everybody gets one, often deliberately —
+ * the tutorial *instructs* a wrong guess — and a booster that starts waving
+ * after it is reading a single mistake as a cry for help.
+ *
+ * Two is different: two wrong guesses on one board means the deduction has gone
+ * wrong somewhere rather than a finger having slipped, and it leaves one bone,
+ * so the next mistake ends the attempt. That is the moment where a hint is
+ * genuinely worth more than the charge it costs.
+ *
+ * Down to the last bone counts on its own, because bones are global now. A
+ * player can arrive at a fresh board already on one, having spent the others
+ * elsewhere, and they are in the same spot without having made a mistake here.
+ *
+ * A time-based signal would be better than either — somebody staring at an
+ * unchanged board for two minutes is struggling and may not have guessed at all
+ * — and it needs an elapsed clock the board does not yet drive. Worth revisiting
+ * once it does.
+ */
+private val GameState.isStruggling: Boolean
+    get() = strikesThisAttempt >= StruggleStrikes || livesRemaining <= 1
+
+/** Two wrong guesses on one board. One is normal; two is a pattern. */
+private const val StruggleStrikes = 2
 
 /**
  * The dog inside a board control.

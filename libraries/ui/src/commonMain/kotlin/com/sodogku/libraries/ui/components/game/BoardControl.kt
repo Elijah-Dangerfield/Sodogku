@@ -184,10 +184,19 @@ fun BoardControlBone(fill: Color, edge: Color, size: Dp = ArtSize) {
     )
 }
 
-/** Big enough for a picture to read, and a comfortable thumb target. */
-private val FaceSize = Dimension.D1900
+/**
+ * The circle.
+ *
+ * Smaller than it started, and the picture inside it larger, so the ratio moved
+ * twice. A 100dp circle around a 28dp bone is mostly white: the thing that
+ * identifies the control was the smallest part of it, and the row took more
+ * vertical space than a row of three buttons needs. This is still comfortably
+ * above the 48dp minimum touch target.
+ */
+private val FaceSize = Dimension.D1600
 
-private val ArtSize = Dimension.D1000
+/** Roughly half the circle across, so the bone reads rather than sits in it. */
+private val ArtSize = Dimension.D1200
 
 /** Matches the aspect `drawBone` is drawn against; a bone in a square is a blob. */
 private const val BoneAspect = 1.45f
