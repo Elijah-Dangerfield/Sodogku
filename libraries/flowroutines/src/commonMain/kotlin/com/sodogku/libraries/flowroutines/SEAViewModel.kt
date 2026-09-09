@@ -267,10 +267,29 @@ abstract class SEAViewModel<S : Any, E : Any, A : Any>(
      */
     protected abstract suspend fun handleAction(action: A)
 
+    /**
+     * Best effort. Most states are not savable and that is fine.
+     *
+     * `SavedStateHandle` takes primitives and Parcelables
+     * ([SavedStateHandle.ACCEPTABLE_CLASSES]); a plain Kotlin data class is
+     * neither, so this throws on nearly every screen in the app, on every
+     * teardown, by design.
+     *
+     * It used to go through `logOnFailure`, which logs at Error, and `SentryLogTree`
+     * turns Error into an event. So the single most routine thing this class
+     * does was filing Sentry issues -- "Can't put value with type
+     * OnboardingState into saved state" -- for behaviour the class documents as
+     * expected. Debug keeps it in the local log where it belongs.
+     *
+     * If a screen genuinely needs its state to survive process death, the fix is
+     * to make that state savable, not to raise this back to a warning.
+     */
     override fun onCleared() {
         Catching {
             savedStateHandle[STATE_KEY] = state
-        }.logOnFailure("Could not save state on clear for state: ${state::class.simpleName}")
+        }.onFailure {
+            KLog.d { "${state::class.simpleName} is not savable, so it will not survive process death" }
+        }
     }
 
     companion object {

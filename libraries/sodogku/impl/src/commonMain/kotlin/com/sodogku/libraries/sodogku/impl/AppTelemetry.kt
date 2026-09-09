@@ -21,6 +21,7 @@ import io.sentry.kotlin.multiplatform.Attachment
 import io.sentry.kotlin.multiplatform.Sentry
 import io.sentry.kotlin.multiplatform.SentryOptions
 import io.sentry.kotlin.multiplatform.protocol.User
+import io.sentry.kotlin.multiplatform.SentryLevel
 import io.sentry.kotlin.multiplatform.protocol.UserFeedback
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -221,6 +222,28 @@ private class ConfiguredTelemetry(
             // The one thing triage filters on. See [FeedbackKind] for why it is
             // a tag and not part of the message.
             scope.setTag(FEEDBACK_KIND_TAG, kind.tag)
+
+            // Info, not the default. A feedback report is not an error and a
+            // Sentry issue at error level pulls triage toward it as if it were
+            // one -- it sorts with crashes, and it reads as one in the list.
+            scope.level = SentryLevel.INFO
+
+            // The message goes on the carrier event as well as into
+            // captureUserFeedback, and this duplication is the fix rather than
+            // an oversight.
+            //
+            // The legacy User Feedback API is the only one this SDK has -- 0.26
+            // has no `captureFeedback`/`SentryFeedback` either, so upgrading
+            // does not help -- and where its comments render depends on the
+            // Sentry org's feedback settings. Reported from the field: the log
+            // attachment and the screenshot were both visible on the issue and
+            // the typed message was nowhere. Attachments and extras are shown on
+            // the issue page unconditionally, so putting the payload there makes
+            // it visible on the same page as the evidence it explains.
+            scope.setExtra(FEEDBACK_MESSAGE_KEY, payload)
+            scope.addAttachment(
+                Attachment(payload.encodeToByteArray(), "feedback.txt", "text/plain"),
+            )
             if (logDump != null) {
                 scope.addAttachment(Attachment(logDump.encodeToByteArray(), "session-log.txt", "text/plain"))
             }
@@ -267,6 +290,13 @@ private class ConfiguredTelemetry(
         }
     }
 }
+
+/**
+ * Where the typed report lands on the carrier event, so it is readable next to
+ * the attachments rather than only wherever Sentry decides to render legacy
+ * user feedback.
+ */
+private const val FEEDBACK_MESSAGE_KEY = "feedback_message"
 
 // Scope key for the current navigation route (set via [Telemetry.setCurrentRoute]).
 // Shared by the tag and the extra so they read identically in Sentry.
