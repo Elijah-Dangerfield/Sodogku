@@ -198,3 +198,41 @@ verified directly:
 The new `pages/privacy.html` was written against the code rather than against
 this file, so it is the more trustworthy of the two. Reconcile toward it, and
 where they disagree, check the code rather than picking one.
+
+## SD-8 [P1] — A streak day should be earned by finishing any board, not only the daily
+
+**Ask:** The owner, on 2026-09-09: "Is it normal for the streak to be only the
+daily challenge thing? I kinda thought a streak would've been 'did you play at
+all' specifically did you finish any single board."
+
+Decided: **any finished board keeps the streak alive**, campaign or daily.
+
+The flaw in the current design is concrete rather than theoretical. A player who
+clears ten campaign levels today and does not open the daily still loses their
+streak, which reads as the app being broken rather than as a rule. It also makes
+the campaign, which is the bulk of the game, contribute nothing to the one
+retention mechanic. Duolingo, which the owner named as the model, counts any
+lesson.
+
+**Done when:** Finishing any board records today as a streak day, the streak
+page and the flame badge reflect it, and the daily still pays its own separate
+reward so it keeps a reason to exist.
+
+**Hints:** The streak is currently derived entirely from the `daily_result`
+table. `libraries/progress/impl/.../streak/StreakRepositoryImpl.kt:63` builds
+`summary()` from `dao.all()` on that table alone, and
+`libraries/progress/src/.../streak/StreakSummary.kt` documents the rebuild.
+
+So this is a data-model change, not a copy change: a streak day needs a source
+that campaign clears also write to. Options are a new table of active days, or
+folding campaign completions into the same rows the streak folds over. Decide
+deliberately and say which, because `DailyRepository` reads the same table for a
+different question and must not start seeing campaign rows as daily results.
+
+Two things that were priced against daily-only difficulty and should be
+re-examined once this lands, though neither has to change in the same commit:
+the streak freeze and the streak restore. A streak that is much easier to keep
+makes both cheaper in real terms.
+
+**Blocked** until the agents working `features/streak/impl` and
+`features/game/impl` have landed; both are in the way.
