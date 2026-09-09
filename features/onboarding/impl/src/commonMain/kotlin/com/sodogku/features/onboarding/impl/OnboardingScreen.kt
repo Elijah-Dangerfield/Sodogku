@@ -34,24 +34,22 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.hideFromAccessibility
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.Screen
+import com.sodogku.libraries.ui.components.button.ButtonAccent
 import com.sodogku.libraries.ui.components.button.ButtonGhost
+import com.sodogku.libraries.ui.components.button.ButtonPrimary
+import com.sodogku.libraries.ui.components.button.ButtonSize
 import com.sodogku.libraries.ui.components.dog.LoopingDog
 import com.sodogku.libraries.ui.components.game.drawPaw
 import com.sodogku.libraries.ui.components.text.Text
-import com.sodogku.libraries.ui.system.DeepSurface
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
-import com.sodogku.system.Radii
 import com.sodogku.system.VerticalSpacerD300
 import com.sodogku.system.VerticalSpacerD400
 import com.sodogku.system.VerticalSpacerD500
@@ -207,7 +205,7 @@ private fun DogField(
     playing: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val field = AppTheme.colors.status.warning.color
+    val field = AppTheme.colors.accentBrand.color
     val texture = ColorResource.White.withAlpha(FieldTextureAlpha).color
 
     val statusBar = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
@@ -282,7 +280,7 @@ private fun WelcomeCard(
     // behind a dialog, and a name that happens to resolve correctly is the kind
     // of thing that stops being true when someone retunes the palette.
     val lift = AppTheme.colors.shadow.withAlpha(CardShadowAlpha).color
-    Box(modifier = modifier.fillMaxWidth().background(AppTheme.colors.status.warning.color)) {
+    Box(modifier = modifier.fillMaxWidth().background(AppTheme.colors.accentBrand.color)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -302,8 +300,14 @@ private fun WelcomeCard(
                 }
                 .background(AppTheme.colors.background.color, CardShape)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
-                .padding(horizontal = Dimension.D800)
-                .padding(top = Dimension.D900, bottom = Dimension.D700),
+                // Roomier than the D800/D900/D700 this started at, and the top
+                // is the one that had to move most. The corners are D1400 (58dp)
+                // of radius, so at 24dp of top padding the title was set inside
+                // the arc and the card read as cramped precisely where it is
+                // meant to look like it has room. Half the radius is about
+                // right: clear of the curve without stranding the title.
+                .padding(horizontal = Dimension.D1000)
+                .padding(top = Dimension.D1100, bottom = Dimension.D900),
             ) {
             Text(
                 text = stringResource(Res.string.app_name),
@@ -377,34 +381,27 @@ private fun Rule(text: String) {
 /**
  * The primary, in the amber it is standing under.
  *
- * Built from [DeepSurface] rather than `ButtonPrimary` because the button
- * ladder's colours are role-named — Primary is `accentPrimary`, which is the
- * blue — and there is no accent slot that means "the amber". Recolouring the
- * ladder for one screen would repaint every primary button in the app, so this
- * borrows the same face-on-a-lip the ladder is drawn with and nothing else.
+ * An ordinary [ButtonPrimary] on the [ButtonAccent.Brand] accent. It used to be
+ * hand-built out of `DeepSurface`, the primitive the button ladder uses
+ * internally, because there was no accent that meant "the amber" and recolouring
+ * Primary would have repainted every button in the app.
  *
- * Brown-900 on this amber measures 6.5:1. White measures 1.8:1, which is why
- * the copy is dark on it.
+ * That was the wrong trade and it cost more than it looked like. The hand-built
+ * version had to restate the disabled colours, the shape, the semantics role and
+ * the text style, and it silently opted out of every later change to buttons --
+ * including the one that made the press lip thicker, which is how it came up
+ * again. A missing enum case is cheaper to add than a bespoke button is to keep.
  */
 @Composable
 private fun StartButton(enabled: Boolean, onClick: () -> Unit) {
-    val face = if (enabled) AppTheme.colors.status.warning else AppTheme.colors.surfaceDisabled
-    val ink = if (enabled) AppTheme.colors.text else AppTheme.colors.onSurfaceDisabled
-
-    DeepSurface(
-        color = face.color,
-        shape = Radii.Button,
-        enabled = enabled,
+    ButtonPrimary(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().semantics { role = Role.Button },
+        accent = ButtonAccent.Brand,
+        size = ButtonSize.Large,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(
-            text = stringResource(Res.string.onboarding_start_tutorial),
-            typography = AppTheme.typography.Label.L600,
-            color = ink,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(vertical = Dimension.D700),
-        )
+        Text(stringResource(Res.string.onboarding_start_tutorial))
     }
 }
 

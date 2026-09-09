@@ -55,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import com.sodogku.libraries.ui.system.color.ColorResource
+import com.sodogku.libraries.ui.system.DeepSurface
 import com.sodogku.libraries.ui.system.color.animateColorResourceAsState
 import com.sodogku.libraries.ui.components.icon.IconResource
 import com.sodogku.system.AppTheme
@@ -141,8 +142,27 @@ enum class ButtonType {
 /**
  * Which accent a *filled Primary* renders. Role-named, never a literal color, so repointing an
  * accent token never touches a button.
+ *
+ * [Brand] exists because its absence sent a call site out of the button system
+ * altogether. The welcome screen's CTA is the app's amber, there was no accent
+ * that meant the amber, so it was hand-built out of [DeepSurface] -- the
+ * primitive `BasicButton` uses internally. It looked right and was wrong: it
+ * missed the disabled ladder, the press spring's tuning, the size scale and the
+ * `Role.Button` semantics, and every later change to buttons skipped it. That is
+ * the tell for a missing enum case, not for a component that needs escaping.
+ *
+ * Reach for [DeepSurface] only when the thing genuinely is not a button.
  */
-enum class ButtonAccent { Primary, Secondary }
+enum class ButtonAccent {
+    /** The main CTA. Blue. */
+    Primary,
+
+    /** Blue's counterpart. Purple; also what "an ad is involved" wears. */
+    Secondary,
+
+    /** The app's own amber, with dark ink on it rather than white. */
+    Brand,
+}
 
 enum class ButtonSize {
     Large,
@@ -337,6 +357,7 @@ private val LocalButtonStyle =
 private fun accentSolid(a: ButtonAccent) = when (a) {
     ButtonAccent.Primary -> AppTheme.colors.accentPrimary
     ButtonAccent.Secondary -> AppTheme.colors.accentSecondary
+    ButtonAccent.Brand -> AppTheme.colors.accentBrand
 }
 
 @Composable
@@ -344,6 +365,7 @@ private fun accentSolid(a: ButtonAccent) = when (a) {
 private fun onAccent(a: ButtonAccent) = when (a) {
     ButtonAccent.Primary -> AppTheme.colors.onAccentPrimary
     ButtonAccent.Secondary -> AppTheme.colors.onAccentSecondary
+    ButtonAccent.Brand -> AppTheme.colors.onAccentBrand
 }
 
 /**

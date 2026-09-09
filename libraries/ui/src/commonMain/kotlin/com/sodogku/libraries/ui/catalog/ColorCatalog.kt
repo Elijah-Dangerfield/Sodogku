@@ -62,6 +62,8 @@ internal fun ColorAccents() {
         SwatchFlow {
             ColorRow("accentSecondary", c.accentSecondary, c.onAccentSecondary, "A second, distinct primary-level action (e.g. 'Upgrade' beside 'Continue').")
             ColorRow("onAccentSecondary", c.onAccentSecondary, c.accentSecondary, "Text and icons on an accentSecondary fill.")
+            ColorRow("accentBrand", c.accentBrand, c.onAccentBrand, "The app's own amber. Not status.warning, which happens to be the same value and means 'careful'.")
+            ColorRow("onAccentBrand", c.onAccentBrand, c.accentBrand, "Dark ink, not white — white on this amber is 1.8:1.")
         }
     }
 }

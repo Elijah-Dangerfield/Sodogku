@@ -39,6 +39,25 @@ interface Colors {
     val accentSecondary: ColorResource
     val onAccentSecondary: ColorResource
 
+    /**
+     * The amber. The app's own colour, as opposed to a role in a hierarchy.
+     *
+     * It had no slot, so everything that wanted it reached into
+     * `status.warning` -- the welcome field, the welcome CTA, the paywall. That
+     * token means "caution: expiring soon, degraded, risky action", and the one
+     * thing the brand colour must never say is *careful*. Nothing was visibly
+     * wrong, because Amber600 is Amber600 whichever name you ask for it by, and
+     * that is exactly the problem: the day someone retunes warning to a more
+     * alarming orange, the welcome screen goes with it.
+     *
+     * Note [onAccentBrand] is the dark ink, not white. White on this amber is
+     * 1.8:1; Brown900 is 6.5:1. It is the one accent in the set that reads dark,
+     * which is a property of the colour rather than a choice, and having it in
+     * the palette stops each call site rediscovering it.
+     */
+    val accentBrand: ColorResource
+    val onAccentBrand: ColorResource
+
     /* Backgrounds */
     val shadow: ColorResource
     val background: ColorResource
@@ -97,6 +116,10 @@ val defaultColors = object : Colors {
     // Purple as secondary - adds a touch of creativity and calm
     override val accentSecondary = ColorResource.Purple600
     override val onAccentSecondary = ColorResource.White
+    // The amber the app is actually made of. Same value as status.warning and
+    // not the same idea: see the doc on the interface.
+    override val accentBrand = ColorResource.Amber600
+    override val onAccentBrand = ColorResource.Brown900
 
     override val shadow = ColorResource.Black_A30
     override val textDisabled = ColorResource.Brown300

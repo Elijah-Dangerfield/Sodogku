@@ -461,7 +461,7 @@ private val SlabPaws = listOf(
 private val ProAmber: ColorResource
     @ReadOnlyComposable
     @Composable
-    get() = AppTheme.colors.status.warning
+    get() = AppTheme.colors.accentBrand
 
 /** Square across the top, where the sheet's own corners already round it. */
 private val SlabShape = RoundedCornerShape(
