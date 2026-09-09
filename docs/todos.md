@@ -597,3 +597,94 @@ already has rather than inventing a second way in. Android's equivalent is
 neither.
 
 **Not blocked on anything.** No store review implication, no new permission.
+
+## SD-26 [P0] — Navigation dies while the board keeps taking taps
+
+**Ask:** Owner, 2026-09-09, on iOS: *"idk whats happening but im clicking all
+over and nothing is happening Im marking things, trying to open the side pine,
+trying to go to achivements. Its not working."*
+
+**What the logs show.** Not a frozen UI. Marks still register and the view model
+still fires events; only navigation stops.
+
+```
+17:11:08.182  Sending event OpenAchievements
+17:11:08.186  (DelegatingRouter) Enqueuing navigation: navigate to AchievementsRoute
+17:11:09.440  Sending event OpenAchievements     <- and eleven more like it
+                                                    with no Enqueuing line at all
+```
+
+The first tap reached the router. The next eleven produced the event and no
+navigation, and the one that *was* enqueued never executed.
+
+**The mechanism, which is the useful part.** Two separate things gate on
+`Lifecycle.State.STARTED`, and they are the two things in this trace that
+stopped:
+
+- `GameFeatureEntryPoint` collects events through `ObserveEvents`, which is
+  `repeatOnLifecycle(STARTED)`. Below STARTED it stops collecting, so
+  `router.navigate` is never called and nothing is even enqueued.
+- `DelegatingRouter.setNavController` drains its channel through
+  `observeWithLifecycle(lifecycle)`, also STARTED. Below STARTED, `trySend`
+  still succeeds into an UNLIMITED channel and the command sits there. That is
+  why the queue can log an enqueue for work that never runs.
+
+`sendEvent` has no lifecycle gate, which is why the events keep logging and the
+app looks alive.
+
+So the question is not "why did navigation break" but **what is holding the
+lifecycle below STARTED while the Compose UI is still drawing and handling
+touches.**
+
+**Prime suspect: the shake dialog.** 30 seconds earlier:
+
+```
+17:10:15  Feedback forwarded to Sentry (owner_directive)
+17:10:18  Enqueuing navigation: navigate to ShakeDialogRoute
+17:10:34  Enqueuing navigation: go back
+```
+
+The shake at :18 was almost certainly spurious (the owner had just put the phone
+down after submitting feedback; the recognizer was retuned for that in a later
+commit, which reduces the trigger but does not fix this). Note the feedback
+panel had a keyboard up immediately before, and `ShakeDialogRoute` arrived while
+that was tearing down.
+
+**Done when:** Opening the feedback panel, submitting, then triggering the shake
+dialog and dismissing it leaves navigation working. And, separately, an
+enqueued-but-undrained command cannot sit silently: either the router surfaces a
+queue that has not drained within a few seconds, or it stops gating the drain on
+STARTED.
+
+**Hints:** `libraries/navigation/impl/.../DelegatingRouter.kt` (`setNavController`,
+`clearNavController`, `enqueueNavigation`),
+`libraries/flowroutines/.../Compose.kt` (`observeWithLifecycle`). Worth checking
+whether `clearNavController` ran without a matching `setNavController` -- it
+cancels `processingJob` and replaces `viewScope` with a fresh
+`CompletableDeferred`, and nothing ever completes that again until a new
+controller is bound. On iOS, check what the feedback panel and the shake dialog
+do to the hosting `UIViewController` and therefore to the lifecycle owner.
+
+Reproduce with the log lines above rather than by guessing: `Enqueuing
+navigation` with no visible result is the signature.
+
+## SD-27 [P2] — Replace the feedback drag handle with a movable FAB
+
+**Ask:** Owner, 2026-09-09: *"the drag handle to swipe in the feedback is kinda
+hard to grab. Mabye instead we have a floating, drag to move, small FAB that
+opens it as a full screen. And maybe in QA settings you can toggle to just not
+show it if you want."*
+
+**Done when:** A small FAB floats over the app, can be dragged anywhere and
+stays put, opens the feedback panel full screen, and can be switched off from QA
+settings. The edge-drag handle is gone.
+
+**Hints:** The panel is `apps/compose/.../devfeedback/DevFeedbackPanel.kt`. Three
+things worth getting right rather than discovering later: the FAB must not sit
+over the booster row or the board (which is the whole screen on a big grid), so
+"drag to move" is a requirement and not a nicety; it must not appear in release
+builds; and the toggle needs somewhere to persist, alongside whatever QA
+settings already use.
+
+Related: whether this FAB should also be the shake dialog's entry point, so
+there is one way into feedback rather than three.
