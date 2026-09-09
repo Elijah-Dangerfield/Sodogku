@@ -56,7 +56,7 @@ import sodogku.libraries.resources.generated.resources.game_next_level
 import sodogku.libraries.resources.generated.resources.game_watch_ad_badge
 import sodogku.libraries.resources.generated.resources.game_refill_bones
 import sodogku.libraries.resources.generated.resources.game_retry
-import sodogku.libraries.resources.generated.resources.game_reward_earned
+import sodogku.libraries.resources.generated.resources.game_reward_earned_treat
 import sodogku.libraries.resources.generated.resources.game_skip_level
 import sodogku.libraries.resources.generated.resources.game_skip_none_left
 import sodogku.libraries.resources.generated.resources.game_skip_remaining
@@ -143,7 +143,7 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
         // in the booster row behind the sheet.
         if (state.treatAwarded) {
             LevelRewardChip(
-                label = stringResource(Res.string.game_reward_earned),
+                label = stringResource(Res.string.game_reward_earned_treat),
             )
         }
         // The streak is the reward for a daily, so it is shown next to the score
