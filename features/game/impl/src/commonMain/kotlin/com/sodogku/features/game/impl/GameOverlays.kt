@@ -15,7 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.sodogku.libraries.ui.components.game.CoachMark
 import com.sodogku.libraries.ui.components.text.Text
+import androidx.compose.ui.geometry.Rect
+import com.sodogku.libraries.ui.system.AnchoredCard
 import com.sodogku.libraries.ui.system.FocusScrim
+import com.sodogku.libraries.ui.system.animatePlacement
 import com.sodogku.libraries.ui.system.FocusTargetKey
 import com.sodogku.libraries.ui.system.Spotlight
 import com.sodogku.system.AppTheme
@@ -96,7 +99,7 @@ fun BoxScope.LastBoneWarning(state: GameState, onAction: (GameAction) -> Unit) {
         },
         onDismiss = { onAction(GameAction.DismissWarning) },
     ) { anchor ->
-        SpeechBubble(anchorBottomPx = anchor.bottom) {
+        SpeechBubble(anchor = anchor) {
             Text(
                 text = stringResource(Res.string.game_last_bone_title),
                 typography = AppTheme.typography.Heading.H600,
@@ -138,8 +141,8 @@ fun BoxScope.SniffHint(state: GameState, onAction: (GameAction) -> Unit) {
             .takeIf { it.isNotEmpty() }
             ?.let { cells -> Spotlight(targets = cells.map(::cellFocusKey).toSet()) },
         onDismiss = { onAction(GameAction.DiscardHint) },
-    ) {
-        SpeechBubble(anchorBottomPx = 0f) {
+    ) { anchor ->
+        SpeechBubble(anchor = anchor) {
             Text(
                 text = stringResource(Res.string.hint_title),
                 typography = AppTheme.typography.Heading.H600,
@@ -367,32 +370,25 @@ private fun bodyOf(step: TutorialStep, autoMark: Boolean): StringResource = when
  * and the thing it is describing read as one object.
  */
 @Composable
-private fun BoxScope.SpeechBubble(
-    anchorBottomPx: Float,
+private fun SpeechBubble(
+    anchor: Rect,
     content: @Composable () -> Unit,
 ) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    // Never higher than MinTop: an anchor at the very top of the screen (a
-    // spotlight with no single thing to hang off) would otherwise put the card
-    // under the status bar.
-    val top = maxOf(with(density) { anchorBottomPx.toDp() } + Dimension.D600, MinTop)
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Dimension.D300),
-        modifier = Modifier
-            .align(Alignment.TopCenter)
-            .padding(top = top)
-            .padding(horizontal = Dimension.D800)
-            .widthIn(max = BubbleMaxWidth)
-            .clip(Radii.Card)
-            .background(AppTheme.colors.surfacePrimary.color)
-            .padding(Dimension.D700),
-    ) {
-        content()
+    AnchoredCard(anchor = anchor) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Dimension.D300),
+            modifier = Modifier
+                .animatePlacement()
+                .padding(horizontal = Dimension.D800)
+                .widthIn(max = BubbleMaxWidth)
+                .clip(Radii.Card)
+                .background(AppTheme.colors.surfacePrimary.color)
+                .padding(Dimension.D700),
+        ) {
+            content()
+        }
     }
 }
 
 private val BubbleMaxWidth = Dimension.D1900 * 3
-
-/** Clears the status bar and the header when there is no anchor to hang from. */
-private val MinTop = Dimension.D1900
