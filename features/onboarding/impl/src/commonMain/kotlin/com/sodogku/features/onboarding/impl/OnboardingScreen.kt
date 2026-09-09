@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.Dp
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.Screen
 import com.sodogku.libraries.ui.components.button.ButtonGhost
-import com.sodogku.libraries.ui.components.dog.AnimatedDog
+import com.sodogku.libraries.ui.components.dog.LoopingDog
 import com.sodogku.libraries.ui.components.game.drawPaw
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.system.DeepSurface
@@ -83,9 +83,9 @@ fun OnboardingScreen(
         dogAlpha = 1f,
         restAlpha = 1f,
         // The one place the loop is switched off for a player who asked for
-        // stills. `AnimatedDog` holds frame 0, which is the same frame the
-        // splash shows, so reduce-animations gets a composed screen rather than
-        // an empty hole where the dog was.
+        // stills. `LoopingDog` holds frame 0, which is the same frame the splash
+        // shows, so reduce-animations gets a composed screen rather than an
+        // empty hole where the dog was.
         dogPlaying = !LocalReduceAnimations.current,
     )
 }
@@ -111,7 +111,10 @@ fun OnboardingScreen(
  * everything else, cross-fading up behind a dog that is opaque in both layers
  * for the whole 450ms.
  *
- * The dog holds a still frame here. See [WelcomeDogLoop] for why.
+ * The dog holds a still frame here, and must keep doing so. The splash and the
+ * welcome screen are two separate dogs, each stepping its own coroutine: if both
+ * played, they would cross-fade between whatever frames they happened to be on,
+ * which is a double exposure rather than a handover.
  *
  * What is hidden is drawn but [inert] — a zero-alpha button is still a button
  * until it is told otherwise.
@@ -228,9 +231,13 @@ private fun DogField(
                 .windowInsetsPadding(statusBar),
             contentAlignment = Alignment.Center,
         ) {
-            AnimatedDog(
+            // Hero weight, so 320px frames rather than the board's 128px: this
+            // draws at 240dp, and the old sheet was a five-times upscale. Also
+            // the reason it is `LoopingDog` and not `AnimatedDog` — one clip on
+            // repeat stops being seen after about three passes, and this dog is
+            // the screen.
+            LoopingDog(
                 size = dogSize,
-                variant = WelcomeDogLoop,
                 playing = playing,
                 modifier = Modifier.alpha(dogAlpha),
             )
@@ -460,28 +467,6 @@ private const val FieldTextureAlpha = 0.16f
  */
 private val WelcomeDogSize: Dp = Dimension.D1900 * 2.4f
 
-/**
- * `look`, the loop where the dog glances about.
- *
- * An index rather than a name because `AnimatedDog` takes one: its loops are a
- * weighted list, private to the design system, and 1 is `dog_look_sheet`. Read
- * that list before changing this number.
- *
- * `look` over `pant` because a person is reading three rules while this plays.
- * A dog glancing around is company; a two-second grin on repeat is a thing
- * demanding to be watched, and it would be competing with the copy that has the
- * actual job on this screen.
- *
- * The splash holds frame 0 of the same loop instead of playing it. Two reasons.
- * The obvious one is that a launch screen that starts animating before the app
- * is up is the app pretending to be further along than it is. The one that
- * matters is the cross-fade: the splash's dog and the real one are two separate
- * `AnimatedDog`s, each stepping its own coroutine, and if both played they would
- * dissolve through each other from whatever frames they happened to be on. A
- * still frame 0 against a moving dog is one dog with a soft head for 450ms. Two
- * moving dogs a few frames apart is a double exposure.
- */
-private const val WelcomeDogLoop = 1
 
 /** Big enough to read as a paw, small enough to sit on a line of body copy. */
 private val PawBulletSize: Dp = Dimension.D600

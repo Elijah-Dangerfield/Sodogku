@@ -17,6 +17,17 @@ import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.imageResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalInspectionMode
+import com.sodogku.libraries.ui.system.LocalReduceAnimations
+import org.jetbrains.compose.resources.DrawableResource
+import sodogku.libraries.resources.generated.resources.dog_idle_hero_sheet
+import sodogku.libraries.resources.generated.resources.dog_look_hero_sheet
+import sodogku.libraries.resources.generated.resources.dog_tilt_hero_sheet
+import kotlin.math.sin
 import sodogku.libraries.resources.generated.resources.dog_flop_sheet
 import sodogku.libraries.resources.generated.resources.dog_idle_sheet
 import sodogku.libraries.resources.generated.resources.dog_look_sheet
@@ -136,3 +147,146 @@ private fun AnimatedDogPreview() {
         AnimatedDog(size = DogHeroSize)
     }
 }
+
+/**
+ * A dog that keeps itself company: plays a loop, holds still a moment, plays a
+ * different one.
+ *
+ * [AnimatedDog] is one clip forever. That is right on the board, where a placed
+ * dog should settle and stop asking for attention, and wrong anywhere the dog is
+ * the subject of the screen, because a single loop on repeat stops being seen.
+ *
+ * Hero weight: 320px frames against the board's 128px, because this draws at
+ * around 240dp and the board draws at 34dp. Same source clips, packed larger.
+ *
+ * The head also floats. It is a slow vertical drift of a couple of device
+ * pixels, well under the movement inside the frames, so it reads as buoyancy
+ * rather than as a second animation arguing with the first. Off with
+ * [LocalReduceAnimations], along with everything else.
+ *
+ * [seed] decides the order of clips and the length of the pauses. Two dogs with
+ * different seeds behave differently; the same seed behaves the same way twice,
+ * which is what makes any of this reproducible.
+ */
+@Composable
+fun LoopingDog(
+    size: Dp,
+    modifier: Modifier = Modifier,
+    seed: Int = 0,
+    playing: Boolean = true,
+) {
+    LoopingDogImpl(size, modifier, seed, playing, HeroLoops, float = true)
+}
+
+/**
+ * [LoopingDog] at board weight, for a dog that is small but still the thing
+ * being looked at — an empty state, a reward, a card.
+ *
+ * No float: at cell size a two-pixel drift is either invisible or a wobble, and
+ * neither is worth the frame.
+ */
+@Composable
+fun LoopingDogSmall(
+    size: Dp,
+    modifier: Modifier = Modifier,
+    seed: Int = 0,
+    playing: Boolean = true,
+) {
+    LoopingDogImpl(size, modifier, seed, playing, BoardLoops, float = false)
+}
+
+@Composable
+private fun LoopingDogImpl(
+    size: Dp,
+    modifier: Modifier,
+    seed: Int,
+    playing: Boolean,
+    loops: List<DrawableResource>,
+    float: Boolean,
+) {
+    val still = !playing || LocalReduceAnimations.current || LocalInspectionMode.current
+    val schedule = remember(seed, loops.size) { DogLoopSchedule(seed, loops.size) }
+
+    val turn = remember { mutableIntStateOf(0) }
+    val frame = remember { mutableIntStateOf(0) }
+    val sheet = imageResource(loops[schedule.clipAt(turn.intValue).mod(loops.size)])
+
+    LaunchedEffect(still, schedule) {
+        if (still) {
+            frame.intValue = 0
+            return@LaunchedEffect
+        }
+        while (true) {
+            // The hold sits on frame 0 of the clip about to play, so the pause
+            // is the dog waiting to do something rather than freezing halfway
+            // through having done it.
+            repeat(schedule.holdTurnsAt(turn.intValue)) { delay(HoldUnitMillis) }
+            for (next in 0 until FrameCount) {
+                frame.intValue = next
+                delay(FrameDurationMillis)
+            }
+            frame.intValue = 0
+            turn.intValue += 1
+        }
+    }
+
+    val bob = remember { Animatable(0f) }
+    LaunchedEffect(still, float) {
+        if (still || !float) {
+            bob.snapTo(0f)
+            return@LaunchedEffect
+        }
+        while (true) {
+            bob.animateTo(1f, tween(FloatMillis, easing = LinearEasing))
+            bob.snapTo(0f)
+        }
+    }
+
+    Canvas(
+        modifier = modifier
+            .size(size)
+            // Read in the draw phase. Reading `bob.value` in composition would
+            // recompose this subtree every frame for a two-pixel drift.
+            .graphicsLayer {
+                translationY = sin(bob.value * TwoPi) * FloatPixels
+            },
+    ) {
+        drawSheetFrame(sheet, frame.intValue)
+    }
+}
+
+/**
+ * The hero loops, and why these three.
+ *
+ * `idle` and `look` are the calm pair the game is built on. `tilt` is the one
+ * that reads as a shake, which is exactly wrong on a board full of dogs and
+ * exactly right on a screen with one: it is the gesture that makes a viewer feel
+ * looked at.
+ *
+ * Three and not seven. Every clip a dog switches to is a sheet decoded and held,
+ * about 12MB each at hero weight, and a fourth buys less variety than the holds
+ * already provide.
+ */
+private val HeroLoops
+    @Composable get() = listOf(
+        Res.drawable.dog_idle_hero_sheet,
+        Res.drawable.dog_look_hero_sheet,
+        Res.drawable.dog_tilt_hero_sheet,
+    )
+
+/** The same idea at board weight, reusing the sheets the board already decodes. */
+private val BoardLoops
+    @Composable get() = listOf(
+        Res.drawable.dog_idle_sheet,
+        Res.drawable.dog_look_sheet,
+        Res.drawable.dog_tilt_sheet,
+    )
+
+/** One unit of pause, a little longer than a frame so a hold reads as a hold. */
+private const val HoldUnitMillis = 220L
+
+/** A full drift up and back. Slow enough not to be a bounce. */
+private const val FloatMillis = 3_200
+
+private const val FloatPixels = 4f
+private const val TwoPi = 6.2831855f
