@@ -32,15 +32,31 @@ class BrokenRuleTest {
 
     private val dog = 15
 
-    private fun state(strike: Int?, placed: Set<Int>) = GameState(
+    /**
+     * A second 4x4, shaped so two dogs can conflict with the same square from
+     * the same distance by different rules — which is the only situation the
+     * rule ordering actually decides, and one the board above cannot produce.
+     *
+     *   B B B B      0  1  2  3
+     *   B B B B      4  5  6  7
+     *   B B A B      8  9 10 11
+     *   A B B B     12 13 14 15
+     *
+     * Against a strike on 12: the dog on 4 is two squares up its column, and the
+     * dog on 10 is two squares away sharing region A. Neither is touching and
+     * both are equally near.
+     */
+    private val tieBoard = Board.parse("BBBBBBBBBBABABBB")
+
+    private fun state(strike: Int?, placed: Set<Int>, on: Board = board) = GameState(
         level = LevelDefinition(
             id = 1,
-            board = board,
-            solution = Solution.empty(board.size),
+            board = on,
+            solution = Solution.empty(on.size),
             difficulty = 1,
         ),
-        placed = Solution(IntArray(board.size) { row ->
-            placed.firstOrNull { it / board.size == row }?.rem(board.size) ?: Solution.UNPLACED
+        placed = Solution(IntArray(on.size) { row ->
+            placed.firstOrNull { it / on.size == row }?.rem(on.size) ?: Solution.UNPLACED
         }),
         strikeCell = strike,
         strikeNonce = if (strike == null) 0 else 1,
@@ -73,6 +89,45 @@ class BrokenRuleTest {
     fun aDistantSquareInTheSameColumnNamesTheLineRule() {
         // Cell 7: the dog's column, two rows clear of it, region B.
         assertEquals(RuleDiagram.OnePerLine, brokenRule(state(strike = 7, placed = setOf(dog))))
+    }
+
+    @Test
+    fun theNearestDogDecidesEvenWhenAFurtherOneBreaksATighterRule() {
+        // Cell 12 is a corner, so region A. Two dogs object to it: cell 3, the
+        // opposite corner, on the colour rule from three squares away; and cell
+        // 4, two squares up its own column, on the line rule.
+        //
+        // Asking each rule in turn whether *any* dog broke it answered "colour",
+        // pointing at the far corner. The player is looking at the square they
+        // tapped, and the dog two above it is what explains it.
+        assertEquals(
+            RuleDiagram.OnePerLine,
+            brokenRule(state(strike = 12, placed = setOf(3, 4))),
+        )
+    }
+
+    @Test
+    fun twoDogsEquallyNearAreSplitByWhichRuleIsTighter() {
+        // Nothing about distance can choose between these two, so the ordering
+        // is the whole answer — and without one it would fall to whatever order
+        // the placements happen to iterate in, which is the arbitrariness this
+        // is here to rule out. The colour blob is a bounded area the player can
+        // take in; the column runs the height of the board.
+        assertEquals(
+            RuleDiagram.OnePerRegion,
+            brokenRule(state(strike = 12, placed = setOf(4, 10), on = tieBoard)),
+        )
+    }
+
+    @Test
+    fun oneDogBreakingTwoRulesNamesTheTighterOne() {
+        // Cell 9 shares both a column and a region with cell 1, two rows clear
+        // of it. The colour blob is a bounded area; the column runs the height
+        // of the board.
+        assertEquals(
+            RuleDiagram.OnePerRegion,
+            brokenRule(state(strike = 1, placed = setOf(9))),
+        )
     }
 
     @Test

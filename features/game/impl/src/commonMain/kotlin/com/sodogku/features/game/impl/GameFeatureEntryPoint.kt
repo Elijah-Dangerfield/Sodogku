@@ -65,7 +65,11 @@ class GameFeatureEntryPoint(
                 }
             }
 
-            GameScreen(state = state, onAction = viewModel::takeAction)
+            GameScreen(
+                state = state,
+                elapsed = viewModel.elapsed,
+                onAction = viewModel::takeAction,
+            )
         }
     }
 }

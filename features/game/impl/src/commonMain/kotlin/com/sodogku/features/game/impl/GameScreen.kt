@@ -14,12 +14,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.StateFlow
 import com.sodogku.libraries.ui.components.game.RewardButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +85,7 @@ import sodogku.libraries.resources.generated.resources.game_bones_remaining
 import sodogku.libraries.resources.generated.resources.game_free_bones
 import sodogku.libraries.resources.generated.resources.game_sniff
 import sodogku.libraries.resources.generated.resources.game_treat
+import kotlin.math.abs
 import kotlin.math.sin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.tween
@@ -98,6 +101,8 @@ import com.sodogku.libraries.ui.components.game.BoardControlBone
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalInspectionMode
+import kotlinx.coroutines.delay
 
 /**
  * The board and everything around it. A pure render of [GameState]; every
@@ -106,10 +111,35 @@ import androidx.compose.ui.graphics.Color
 @Composable
 fun GameScreen(
     state: GameState,
+    /**
+     * The puzzle clock, as a flow rather than a value.
+     *
+     * Threading a `StateFlow` into a composable is normally a smell, and this is
+     * the case it exists for: the clock moves once a second and [GameState] is
+     * unstable, so folding it in there would recompose this whole screen — the
+     * board included, a hundred cells of it — for a five-character label. It is
+     * collected by [BoardClock] alone, which is the only thing that draws it.
+     */
+    elapsed: StateFlow<Long>,
     onAction: (GameAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var dialog by remember { mutableStateOf<GameDialog?>(null) }
+
+    // The one thing on this screen that happens without the player: the clock
+    // under the board, and the attractor's chance to notice somebody who has
+    // stopped. See `GameAction.ClockTicked` for why it is driven from here.
+    //
+    // Silent under inspection. A loop that never ends is exactly what a preview
+    // or a screenshot test waits on forever.
+    val inspecting = LocalInspectionMode.current
+    LaunchedEffect(inspecting) {
+        if (inspecting) return@LaunchedEffect
+        while (true) {
+            delay(TickMillis)
+            onAction(GameAction.ClockTicked)
+        }
+    }
 
     Screen(modifier = modifier) { padding ->
         val level = state.level
@@ -156,6 +186,8 @@ fun GameScreen(
             }
 
             Spacer(modifier = Modifier.weight(SpaceBelowBoard))
+
+            BoardClock(elapsed)
 
             // `boosters.enabled` off already stops the economy — a tap spends
             // nothing and an ad refill refuses — but leaving the buttons on
@@ -335,7 +367,7 @@ private fun GameHeader(
                 label = stringResource(Res.string.game_score_label),
                 value = null,
                 onClick = onExplainScore,
-                content = { ScoreCounter(score = state.lifetimeScore) },
+                content = { ScoreCounter(score = state.lifetimeScore, abbreviated = true) },
             )
         }
 
@@ -526,27 +558,63 @@ private fun RuleChips(state: GameState, onExplain: () -> Unit) {
  * simply is not where the dog goes, and nothing on screen yet says why. Pointing
  * at a rule there would be inventing a reason.
  *
- * The order is deliberate and is not the order the chips are drawn in.
- * Adjacency is checked first because it is the rule players forget, and because
- * an orthogonally adjacent square also breaks the row-and-column rule — check
- * that one first and the subtler answer is never reached. A diagonal neighbour
- * breaks adjacency alone, which is exactly the case worth naming.
+ * **The offending dog is picked before the rule is.** This used to ask each rule
+ * in turn whether *any* placed dog broke it, which meant the answer could name a
+ * rule against a dog on the far side of the board while a nearer one explained
+ * the same square better: a guess two squares along a row from one dog, and in
+ * the same colour as another five squares away, was reported as the colour rule.
+ * The player looks at the square they tapped and then at what is near it, so the
+ * chip has to name the conflict they can see. The nearest conflicting dog wins,
+ * measured as king moves — the same distance the adjacency rule is defined in.
+ *
+ * Between rules that *one* dog breaks, the tighter one wins: touching, then
+ * colour, then row-and-column. That order is by how local the rule is, which is
+ * the same thing as how quickly the player can check it. An orthogonal
+ * neighbour breaks the line rule too, and naming that instead would have the
+ * chip point down a whole row to explain a square that is simply next door.
  */
 internal fun brokenRule(state: GameState): RuleDiagram? {
     val board = state.level?.board ?: return null
     val cell = state.strikeCell?.takeIf { state.strikeNonce > 0 } ?: return null
-    val placed = state.placedCells
-    if (placed.isEmpty()) return null
 
     val row = board.rowOf(cell)
     val col = board.colOf(cell)
-    return when {
-        placed.any { touches(board.rowOf(it), board.colOf(it), row, col) } -> RuleDiagram.NoTouching
-        placed.any { board.regionAt(it) == board.regionAt(cell) } -> RuleDiagram.OnePerRegion
-        placed.any { board.rowOf(it) == row || board.colOf(it) == col } -> RuleDiagram.OnePerLine
-        else -> null
-    }
+    val region = board.regionAt(cell)
+
+    return state.placedCells
+        .mapNotNull { dog ->
+            val dogRow = board.rowOf(dog)
+            val dogCol = board.colOf(dog)
+            val rule = when {
+                touches(dogRow, dogCol, row, col) -> RuleDiagram.NoTouching
+                board.regionAt(dog) == region -> RuleDiagram.OnePerRegion
+                dogRow == row || dogCol == col -> RuleDiagram.OnePerLine
+                else -> null
+            }
+            rule?.let { kingMoves(dogRow, dogCol, row, col) to it }
+        }
+        .minWithOrNull(compareBy({ (distance, _) -> distance }, { (_, rule) -> rule.tightness }))
+        ?.second
 }
+
+/**
+ * How local a rule is, lowest first, and the tiebreak when one dog breaks two.
+ *
+ * Not the enum's own order, which is the order the chips are *drawn* in and has
+ * no business deciding this — the two answer different questions and the day
+ * somebody reorders the row for layout reasons is the day this would silently
+ * start naming a different rule.
+ */
+private val RuleDiagram.tightness: Int
+    get() = when (this) {
+        RuleDiagram.NoTouching -> 0
+        RuleDiagram.OnePerRegion -> 1
+        RuleDiagram.OnePerLine -> 2
+    }
+
+/** King moves between two squares: the distance the adjacency rule is written in. */
+private fun kingMoves(row: Int, col: Int, otherRow: Int, otherCol: Int): Int =
+    maxOf(abs(row - otherRow), abs(col - otherCol))
 
 private fun touches(row: Int, col: Int, otherRow: Int, otherCol: Int): Boolean {
     val dr = row - otherRow
@@ -734,6 +802,34 @@ private fun cellState(state: GameState, cell: Int, placed: Set<Int>): BoardCellS
 }
 
 /**
+ * How long this attempt has taken, between the board and the boosters.
+ *
+ * Quiet on purpose. A timer is the one piece of chrome that can turn a puzzle
+ * into a test, and nothing here is timed against a limit — the clock is scored
+ * only as a bonus and shown mainly so a replay can be compared with the run
+ * before it. Caption scale in the secondary ink is the smallest thing on the
+ * screen that is still legible.
+ *
+ * **Its own composable, collecting its own flow**, so the once-a-second change
+ * invalidates one `Text` and not the screen above it.
+ *
+ * Empty rather than absent before the first second, because [elapsedLabel] has
+ * no answer for a run of no length and a `Text` that appears after one second
+ * would shove the booster row down as it arrived. An empty string still
+ * measures one line.
+ */
+@Composable
+private fun BoardClock(elapsed: StateFlow<Long>, modifier: Modifier = Modifier) {
+    val millis by elapsed.collectAsState()
+    Text(
+        text = elapsedLabel(millis).orEmpty(),
+        typography = AppTheme.typography.Caption.C300,
+        color = AppTheme.colors.textSecondary,
+        modifier = modifier.padding(bottom = Dimension.D400),
+    )
+}
+
+/**
  * The two boosters and the standing ad offer.
  *
  * The ad button lives here rather than in the header because this row is where a
@@ -760,8 +856,22 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
             count = state.sniffs,
             modifier = Modifier.focusTarget(SniffFocusKey),
             enabled = playing,
-            attention = playing && state.sniffs > 0 &&
-                state.hintCells.isEmpty() && state.isStruggling,
+            // **No `sniffs > 0`.** That gate was the bug: a player holding
+            // nothing is exactly the player worth showing this to, because
+            // tapping an empty booster opens the prompt whose primary button is
+            // an ad that refills it. Gating on the holding meant the offer was
+            // hidden from everyone who needed it and shown only to people who
+            // already had one.
+            //
+            // `!isCovered` because everything that covers the board — a hint
+            // awaiting an answer, the level pane, a prompt, a coach mark — takes
+            // the taps this is inviting. A button beating under a scrim is
+            // asking for something the player cannot give it.
+            //
+            // One button, not both. The Locate is the "I cannot see the next
+            // move" booster; two controls pulsing at once is a row demanding
+            // attention rather than a suggestion.
+            attention = playing && state.nudgeBoosters && !state.isCovered,
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Sniff)) },
         ) {
             Dog(pose = DogPose.Focused, size = BoardControlDog)
@@ -787,33 +897,6 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
         }
     }
 }
-
-/**
- * Whether the board has enough evidence to offer help unasked.
- *
- * One wrong guess is not struggling. Everybody gets one, often deliberately —
- * the tutorial *instructs* a wrong guess — and a booster that starts waving
- * after it is reading a single mistake as a cry for help.
- *
- * Two is different: two wrong guesses on one board means the deduction has gone
- * wrong somewhere rather than a finger having slipped, and it leaves one bone,
- * so the next mistake ends the attempt. That is the moment where a hint is
- * genuinely worth more than the charge it costs.
- *
- * Down to the last bone counts on its own, because bones are global now. A
- * player can arrive at a fresh board already on one, having spent the others
- * elsewhere, and they are in the same spot without having made a mistake here.
- *
- * A time-based signal would be better than either — somebody staring at an
- * unchanged board for two minutes is struggling and may not have guessed at all
- * — and it needs an elapsed clock the board does not yet drive. Worth revisiting
- * once it does.
- */
-private val GameState.isStruggling: Boolean
-    get() = strikesThisAttempt >= StruggleStrikes || livesRemaining <= 1
-
-/** Two wrong guesses on one board. One is normal; two is a pattern. */
-private const val StruggleStrikes = 2
 
 /**
  * The dog inside a board control.

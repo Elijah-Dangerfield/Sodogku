@@ -280,6 +280,22 @@ data class GameState(
     val hintCells: Set<Int> = emptySet(),
 
     /**
+     * Whether the boosters should be asking to be pressed, from
+     * [StruggleDetector].
+     *
+     * A boolean and not a duration or a count, because the whole of "how often,
+     * and for how long" is the detector's business and nothing on screen should
+     * be able to disagree with it.
+     *
+     * **Deliberately absent from `startAttempt`.** That builds a fresh
+     * [GameState] rather than copying one, so anything it does not name is
+     * reset — which for this field is exactly right: a new board has not been
+     * struggled with yet, and carrying the last board's nudge across would open
+     * level 12 with the button already wobbling.
+     */
+    val nudgeBoosters: Boolean = false,
+
+    /**
      * Badges this attempt just unlocked, in catalog order. Empty is the normal
      * answer; the outcome sheet shows them and nothing else needs to.
      */
@@ -709,7 +725,41 @@ sealed interface GameAction {
      * and no pixels.
      */
     data class VisibilityChanged(val foreground: Boolean) : GameAction
+
+    /**
+     * One second of the puzzle clock, sent by the screen.
+     *
+     * This is the `TimerTick` that was deleted, back for a reason it did not
+     * have then: the board now draws the elapsed time, and the attractor under
+     * it has to notice a player who has stopped doing anything — neither of
+     * which any player input can announce.
+     *
+     * **Driven from the screen, not from a timer in the ViewModel.** A clock
+     * nobody is looking at does not need to run, since the elapsed time is
+     * recomputed from a monotonic mark whenever it is asked for. And an
+     * unbounded `delay` loop inside `viewModelScope` is a trap for every test in
+     * this module: `advanceUntilIdle` runs the virtual clock until nothing is
+     * scheduled, and a timer that always schedules one more tick means that
+     * never happens. As an ordinary action a test sends seconds by hand.
+     *
+     * It deliberately does **not** carry the clock into [GameState]. The elapsed
+     * millis go out on `GameViewModel.elapsed` instead, so the one composable
+     * that draws them is the only thing that recomposes; a second on the state
+     * would recompose a hundred board cells for a label that changed. What this
+     * action writes is [GameState.nudgeBoosters], which moves a couple of times
+     * a board rather than sixty times a minute.
+     */
+    data object ClockTicked : GameAction
 }
+
+/**
+ * How often the clock under the board moves and the attractor is asked whether
+ * the player looks stuck.
+ *
+ * One second, because that is the resolution `elapsedLabel` renders at. Anything
+ * faster buys no pixels; anything slower makes the seconds visibly skip.
+ */
+internal const val TickMillis = 1_000L
 
 /**
  * A finished run as `m:ss`, or null when there is no run to show.

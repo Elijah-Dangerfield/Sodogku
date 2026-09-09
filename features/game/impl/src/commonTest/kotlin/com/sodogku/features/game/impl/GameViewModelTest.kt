@@ -822,6 +822,202 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun aCorrectPlacementStopsExplainingTheLastWrongGuess() = runUnitTest {
+        val vm = viewModel()
+        vm.commit(wrongCellIn(row = 0))
+        assertNotNull(vm.state.strikeCell, "the wrong guess was never diagnosed")
+
+        vm.commit(cellFor(row = 1))
+
+        assertNull(vm.state.strikeCell, "a dog landed and the board was still explaining a mistake")
+    }
+
+    @Test
+    fun aCorrectPlacementNextToAnOldWrongGuessLightsNoRuleChip() = runUnitTest {
+        // The device report, reproduced. `brokenRule` re-derives its answer from
+        // `strikeCell` against the placements *as they stand*, so a strike cell
+        // nobody cleared was re-diagnosed against every dog that landed after
+        // it. Put the dog next door to it and the adjacency chip lit on the move
+        // that was right — which is what "I placed a dog correctly and saw dogs
+        // cannot touch highlight red" is.
+        val vm = viewModel()
+        val nextDog = cellFor(row = 1)
+        vm.commit(wrongCellTouching(nextDog, row = 0))
+        vm.commit(nextDog)
+
+        assertNull(brokenRule(vm.state), "a correct placement lit a rule chip")
+    }
+
+    // ---- S18: knowing when the player is stuck, and saying so once. ---------
+
+    @Test
+    fun aWrongGuessAsksTheBoostersForAttention() = runUnitTest {
+        val vm = viewModel()
+        assertFalse(vm.state.nudgeBoosters, "a board opened already nagging")
+
+        vm.commit(wrongCellIn(row = 0))
+        vm.tick()
+
+        assertTrue(vm.state.nudgeBoosters, "a wrong guess went unnoticed")
+    }
+
+    @Test
+    fun aPlayerHoldingNothingIsExactlyWhoTheOfferIsFor() = runUnitTest {
+        // The old gate was `sniffs > 0`, which hid the attractor from everyone
+        // who had run out. Tapping an empty booster opens the prompt whose
+        // primary button is an ad that refills it, so the empty-handed player is
+        // the one with something to gain from being shown it.
+        val vm = viewModel(cache = emptyHandedCache())
+        assertEquals(0, vm.state.sniffs, "the fixture is meant to be out of everything")
+
+        vm.commit(wrongCellIn(row = 0))
+        vm.tick()
+
+        assertTrue(vm.state.nudgeBoosters, "the offer was hidden from the player who needed it")
+    }
+
+    @Test
+    fun sittingStillOnTheBoardAsksForAttention() = runUnitTest {
+        // No mistakes, nothing spent, plenty of bones — invisible to the strike
+        // counting this replaced, and the commonest way to be stuck.
+        val vm = viewModel()
+        vm.note(emptyCells(vm, count = 1).first())
+
+        clock += Staring
+        vm.tick()
+
+        assertTrue(vm.state.nudgeBoosters, "ten seconds of nothing went unnoticed")
+    }
+
+    @Test
+    fun aPlacementStopsTheBoostersAsking() = runUnitTest {
+        val vm = viewModel()
+        vm.commit(wrongCellIn(row = 0))
+        vm.tick()
+        assertTrue(vm.state.nudgeBoosters)
+
+        vm.commit(cellFor(row = 1))
+
+        assertFalse(
+            vm.state.nudgeBoosters,
+            "the button kept beating through the move that unstuck the player",
+        )
+    }
+
+    @Test
+    fun theAttractorGoesQuietWithoutWaitingToBeUnstuck() = runUnitTest {
+        // The nag guard. The player is still stuck — no dog since the wrong
+        // guess — and the button has to stop anyway.
+        val vm = viewModel()
+        vm.commit(wrongCellIn(row = 0))
+        vm.tick()
+        assertTrue(vm.state.nudgeBoosters)
+
+        clock += ABurst
+        vm.tick()
+
+        assertFalse(vm.state.nudgeBoosters, "the attractor ran for as long as the player was stuck")
+    }
+
+    @Test
+    fun aFreshAttemptOpensWithoutTheLastOnesStruggle() = runUnitTest {
+        // Three wrong guesses and a lost board, then Start over. The new attempt
+        // has been going for no time and has had nothing go wrong on it; opening
+        // it with the button already beating would be the old permanent-gate bug
+        // with extra steps.
+        val vm = viewModel()
+        repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
+        vm.tick()
+        vm.takeAction(GameAction.RefillBones)
+        settle()
+
+        vm.takeAction(GameAction.Retry)
+        settle()
+        vm.tick()
+
+        assertFalse(vm.state.nudgeBoosters, "the new board inherited the old board's struggle")
+    }
+
+    @Test
+    fun theRehearsalBoardNeverNags() = runUnitTest {
+        // The lesson *instructs* a wrong guess, and it is teaching a booster of
+        // its own two steps later. A button beating through a coach mark is the
+        // tutorial arguing with itself.
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+        assertTrue(vm.state.isRehearsal, "the fixture never entered the rehearsal")
+
+        // The wrong guess the lesson asks for. It costs no bone here, but it
+        // reaches the detector like any other, so the guard has to be what stops
+        // the button — a rehearsal that simply never got stuck would let a
+        // missing guard pass.
+        val open = assertNotNull(vm.state.level)
+        val row = 1
+        val col = (0 until open.size).first { it != open.solution[row] }
+        vm.commit(open.board.cellAt(row, col))
+        vm.tick()
+
+        assertFalse(vm.state.nudgeBoosters, "the tutorial argued with itself")
+    }
+
+    // ---- S19: the clock under the board. ------------------------------------
+
+    @Test
+    fun theClockRunsWhileThePlayerSitsStill() = runUnitTest {
+        // The whole point of the label: a player who is not touching anything
+        // still watches the seconds go by. Nothing else on this screen moves
+        // without an action.
+        val vm = viewModel()
+        assertEquals(0L, vm.elapsed.value)
+
+        clock += Thinking
+        vm.tick()
+
+        assertEquals(Thinking.inWholeMilliseconds, vm.elapsed.value)
+    }
+
+    @Test
+    fun theClockIsNotOnTheBoardState() = runUnitTest {
+        // `GameState` is unstable to Compose, so a clock on it would recompose
+        // the whole board — a hundred cells — once a second for a five-character
+        // label. Mid-attempt the field stays where `startAttempt` left it.
+        val vm = viewModel()
+
+        clock += Thinking
+        vm.tick()
+
+        assertEquals(0L, vm.state.elapsedMs, "the tick leaked into the board state")
+    }
+
+    @Test
+    fun theClockUnderTheBoardStopsWhileTheAppIsAway() = runUnitTest {
+        val lifecycle = HandDrivenAppEvents()
+        val vm = viewModel(lifecycle = lifecycle)
+        clock += Thinking
+        vm.tick()
+        val onScreen = vm.elapsed.value
+
+        lifecycle.background()
+        settle()
+        clock += AnHourAway
+        vm.tick()
+
+        assertEquals(onScreen, vm.elapsed.value, "an hour in a pocket was charged to the puzzle")
+    }
+
+    @Test
+    fun aFreshAttemptRestartsTheClock() = runUnitTest {
+        val vm = viewModel()
+        clock += Thinking
+        vm.tick()
+        assertTrue(vm.elapsed.value > 0)
+
+        vm.takeAction(GameAction.Retry)
+        settle()
+
+        assertEquals(0L, vm.elapsed.value, "the new attempt inherited the last one's clock")
+    }
+
+    @Test
     fun aSecondCommitOnASquareThatAlreadyCostABoneCostsNothing() = runUnitTest {
         // The mirror of the bug that started this review. That one was `commit`
         // refusing too much; this is `commit` refusing too little, in the one
@@ -3942,6 +4138,39 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     /**
+     * A wrong square in [row] that is next door to [cell], which is the geometry
+     * the rule-chip report needed: strike here, place there, and a stale
+     * `strikeCell` gets re-diagnosed against the new dog as an adjacency break.
+     *
+     * The three columns around [cell] cannot all be [row]'s answer, so one of
+     * them is always wrong and always adjacent.
+     */
+    private fun wrongCellTouching(cell: Int, row: Int): Int {
+        val column = level.board.colOf(cell)
+        val col = (column - 1..column + 1)
+            .filter { it in 0 until level.size }
+            .first { it != level.solution[row] }
+        return level.board.cellAt(row, col)
+    }
+
+    /** A player who has run out of both boosters, which is most players. */
+    private suspend fun emptyHandedCache(): InMemoryAppCache =
+        InMemoryAppCache().apply { set(AppData(sniffs = 0, treats = 0)) }
+
+    /**
+     * One second of the puzzle clock.
+     *
+     * The real one comes from a `LaunchedEffect` in `GameScreen` — see
+     * `GameAction.ClockTicked` for why it is not a timer in the ViewModel — so
+     * here a test spends seconds on [clock] and then says how many the screen
+     * would have reported.
+     */
+    private fun GameViewModel.tick() {
+        takeAction(GameAction.ClockTicked)
+        settle()
+    }
+
+    /**
      * A wrong cell the player could actually tap right now.
      *
      * Not the same as "any wrong cell": auto-mark rules cells out as dogs land,
@@ -3998,6 +4227,12 @@ class GameViewModelTest : CoroutineTest() {
 
         /** A player looking at the board. Real time, and it has to be counted. */
         val Thinking = 30.seconds
+
+        /** Past `StruggleDetector`'s idle window, with room to spare. */
+        val Staring = 12.seconds
+
+        /** Past the end of one attention burst. */
+        val ABurst = 8.seconds
 
         /** A phone call, a school run, a night. None of it is play. */
         val AnHourAway = 1.hours

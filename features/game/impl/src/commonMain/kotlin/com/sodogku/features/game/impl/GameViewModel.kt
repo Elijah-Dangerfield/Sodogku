@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import com.sodogku.libraries.ads.AdGate
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
@@ -189,6 +191,35 @@ class GameViewModel(
     private var attemptStartedAt = clock.markNow()
     private var lastPlacementAt = clock.markNow()
     private var attemptNumber = 1
+
+    private val mutableElapsed = MutableStateFlow(0L)
+
+    /**
+     * The puzzle clock, in whole seconds, for the label under the board.
+     *
+     * **Not a field of [GameState], and that is the point.** `GameState` holds
+     * sets, lists and maps, so Compose treats it as unstable and every screen
+     * that takes it recomposes whenever it changes — which for a value that
+     * moves once a second means the whole board, a hundred cells of it, once a
+     * second, for a five-character label. Out here the clock is collected by the
+     * one composable that draws it and nothing else in the tree hears it.
+     *
+     * Truncated to the second, because that is all `elapsedLabel` renders: at
+     * millisecond resolution every tick would be a distinct value and the
+     * conflation a [StateFlow] gives for free would never fire.
+     */
+    val elapsed: StateFlow<Long> = mutableElapsed
+
+    /**
+     * When to offer help unasked. See [StruggleDetector] for what counts as
+     * stuck and what stops it nagging.
+     *
+     * A field rather than anything derived from [state], for the reason
+     * everything else in this file is one: it is fed from inside `place`,
+     * `strike` and `toggleMark`, all of which run before their own `updateState`
+     * has landed.
+     */
+    private val struggle = StruggleDetector()
 
     /**
      * Play time this attempt had already accumulated before it was resumed.
@@ -432,6 +463,7 @@ class GameViewModel(
             GameAction.TutorialAdvance -> action.tutorialTapped()
             GameAction.SkipTutorial -> action.skipTutorial()
             is GameAction.VisibilityChanged -> holdClock(paused = !action.foreground)
+            GameAction.ClockTicked -> action.tick()
             is GameAction.DisplaySettingsChanged -> {
                 // The field and the state are written together, and the field
                 // first: it is what the tutorial reads before an update lands.
@@ -650,6 +682,11 @@ class GameViewModel(
         rehearsing = rehearsal
         attemptStartedAt = clock.markNow()
         lastPlacementAt = attemptStartedAt
+        // Both keyed on the attempt, and both would otherwise carry the last
+        // board across: the detector's pace history is about *this* puzzle, and
+        // a resumed board's clock starts from what it had already spent.
+        struggle.reset()
+        publishElapsed(resume?.elapsedMs ?: 0L)
         lastTappedCell = null
         lastTapAt = null
         stroke = null
@@ -1062,6 +1099,7 @@ class GameViewModel(
      * when the tap was being deliberately ignored.
      */
     private suspend fun GameAction.nudge(cell: Int) {
+        struggle.onTouched(elapsedMs())
         updateState {
             it.copy(
                 shakeCell = cell,
@@ -1102,6 +1140,10 @@ class GameViewModel(
     private suspend fun GameAction.toggleMark(cell: Int) {
         // Paid for with a bone. It stays.
         if (cell in state.wrongGuesses) return
+        // Both branches below are a cross going on or coming off, and both are
+        // the player working. Counted here rather than in `tap` and `paint`
+        // separately, which is the only place the two gestures meet.
+        struggle.onMarked(elapsedMs())
         if (state.autoMarkVisible && cell in state.autoMarks) {
             updateBoard {
                 it.copy(
@@ -1293,6 +1335,8 @@ class GameViewModel(
         val marksBefore = state.autoMarks
         val marks = level.board.autoMarkedCells(placed)
 
+        struggle.onPlaced(elapsedMs())
+
         updateBoard {
             it.copy(
                 placed = placed,
@@ -1302,6 +1346,23 @@ class GameViewModel(
                 lastPoints = scored.points,
                 lastPraise = scored.praise,
                 pointsNonce = it.pointsNonce + 1,
+                // The dog landed, so the attractor stops immediately rather than
+                // on the next tick. A button still wobbling a second after the
+                // move that unstuck the player is the nag this whole detector is
+                // trying not to be.
+                nudgeBoosters = false,
+                // Nothing on the board is broken, so no rule chip should still
+                // be pointing at anything.
+                //
+                // This is the whole of the "a correct placement lit *dogs cannot
+                // touch*" report. `brokenRule` re-derives its answer from
+                // `strikeCell` against the *current* placements on every frame,
+                // so a strike cell left behind was re-diagnosed against each new
+                // dog — and a dog placed next to a square that had cost a bone
+                // earlier lit the adjacency chip on the move that got it right.
+                // Only `nudge` cleared this, so the stale value survived every
+                // placement until the next refused tap.
+                strikeCell = null,
             )
         }
         sendEvent(GameEvent.PlacedDog(cell))
@@ -1369,6 +1430,7 @@ class GameViewModel(
         }
         if (!forgiven) strikesThisAttempt++
         val strikes = strikesThisAttempt
+        struggle.onStruck(elapsedMs())
         updateBoard {
             it.copy(
                 score = Scoring.strike(it.score),
@@ -2364,6 +2426,40 @@ class GameViewModel(
         next?.let { saveBoard(it) }
     }
 
+    /**
+     * A second of a live attempt: move the clock on, and ask whether the player
+     * looks stuck.
+     *
+     * Both halves are no-ops on a board that is not being played, which is what
+     * lets the ticker run unconditionally. The clock reads
+     * [GameState.elapsedMs]'s own source, so a backgrounded app publishes the
+     * same value it published a second ago and the [StateFlow] conflates it away
+     * — no recomposition, no advancing clock, nothing to switch off.
+     *
+     * [StruggleDetector.nudging] is called exactly once per tick and only from
+     * here. It is not a pure query — asking is what starts and ends a burst —
+     * so a second caller would silently halve the burst length.
+     */
+    private suspend fun GameAction.tick() {
+        if (state.phase != GamePhase.Playing) return
+        val now = elapsedMs()
+        publishElapsed(now)
+        if (rehearsing) return
+        val nudge = struggle.nudging(now)
+        updateState { it.copy(nudgeBoosters = nudge) }
+    }
+
+    /**
+     * Puts the clock on the wire, truncated to the second the label will draw.
+     *
+     * The truncation is what makes the [StateFlow] quiet. At millisecond
+     * resolution every tick is a distinct value, so every tick would recompose
+     * the label to render the identical five characters.
+     */
+    private fun publishElapsed(millis: Long) {
+        mutableElapsed.value = millis / MillisPerSecond * MillisPerSecond
+    }
+
     private fun elapsedMs(): Long = elapsedBeforeResume +
         if (clockPaused) 0L else attemptStartedAt.elapsedNow().inWholeMilliseconds
 
@@ -2492,6 +2588,8 @@ class GameViewModel(
          * without inheriting its latency.
          */
         const val DoubleTapWindowMs = 320L
+
+        const val MillisPerSecond = 1_000L
     }
 }
 

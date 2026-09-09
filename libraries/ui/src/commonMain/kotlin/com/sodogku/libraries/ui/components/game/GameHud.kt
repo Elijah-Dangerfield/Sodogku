@@ -17,6 +17,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
@@ -28,6 +31,7 @@ import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
 import com.sodogku.system.Radii
+import com.sodogku.system.cornerRadius
 import com.sodogku.libraries.ui.system.DeepSurface
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -250,11 +254,34 @@ fun RuleChip(
             // recompose all three chips on every frame of the settle.
             .drawBehind {
                 val lit = flash.value
-                drawRect(color = lerp(resting, alert.copy(alpha = RuleChipTint), lit))
+                val corner = CornerRadius(Radii.Card.cornerRadius(this, size))
+                drawRoundRect(
+                    color = lerp(resting, alert.copy(alpha = RuleChipTint), lit),
+                    cornerRadius = corner,
+                )
                 if (lit > 0f) {
-                    drawRect(
+                    // Rounded, and inset by half the stroke. Two separate
+                    // reasons the outline came out clipped, and fixing either
+                    // alone leaves it looking broken.
+                    //
+                    // It was a `drawRect`, so its corners were square inside a
+                    // `clip(Radii.Card)` — the clip ate them and the outline
+                    // appeared as four detached edges. And a `Stroke` is centred
+                    // on the path it is given, so even once the path follows the
+                    // corners, half the line's width sits outside the clip and
+                    // is thrown away: the chip reads as having a hairline on
+                    // three sides and nothing at the corners.
+                    val edge = RuleChipOutline.toPx()
+                    val inset = edge / 2f
+                    drawRoundRect(
                         color = alert.copy(alpha = lit),
-                        style = Stroke(width = RuleChipOutline.toPx()),
+                        topLeft = Offset(inset, inset),
+                        size = Size(size.width - edge, size.height - edge),
+                        cornerRadius = CornerRadius(
+                            (corner.x - inset).coerceAtLeast(0f),
+                            (corner.y - inset).coerceAtLeast(0f),
+                        ),
+                        style = Stroke(width = edge),
                     )
                 }
             }

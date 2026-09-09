@@ -61,6 +61,17 @@ fun ScoreCounter(
     countFrom: Int = score,
     typography: TypographyResource = AppTheme.typography.Display.D900,
     color: ColorResource = AppTheme.colors.text,
+    /**
+     * Draw `130.5K` rather than `130450`.
+     *
+     * Opt-in, and only the board's header takes it. That counter holds the
+     * lifetime total, which is already six figures by level 29 and will reach
+     * seven — at display size beside a level number it stops being a number and
+     * becomes a wall of digits, and it is glanced at rather than read. The
+     * outcome sheet's counter shows one attempt's score, which is three or four
+     * digits and is the number the sheet is *about*, so it stays exact.
+     */
+    abbreviated: Boolean = false,
 ) {
     // Read here rather than taken as a parameter, so a new screen honours the
     // setting without its author knowing the setting exists. A number that rolls
@@ -84,11 +95,44 @@ fun ScoreCounter(
     }
 
     Text(
-        text = displayed.toString(),
+        text = if (abbreviated) abbreviateScore(displayed) else displayed.toString(),
         typography = typography,
         color = color,
         modifier = modifier,
     )
+}
+
+/**
+ * A score short enough to sit in a header: `845`, `1.2K`, `130.5K`, `1.2M`.
+ *
+ * One decimal, always, and dropped when it is zero — `12K` rather than `12.0K`.
+ * The decimal is what stops the abbreviation eating the feedback: without it a
+ * clear worth 400 points would leave a six-figure total reading `130K` before
+ * and after, and the count-up roll above would animate between two identical
+ * strings.
+ *
+ * Under a thousand the number is drawn exactly, because there is nothing to
+ * save: `845` is shorter than `0.8K` and it is also true.
+ *
+ * The promotion at the top is the case worth stating. 999,999 rounds to
+ * `1000.0K`, which is longer than the number it abbreviates and reads as a
+ * mistake; it becomes `1M`. That is detected by counting digits rather than by
+ * comparing against a hand-written 999,950, so the edge cannot drift away from
+ * the rounding that produces it.
+ */
+internal fun abbreviateScore(score: Int): String {
+    if (score < Thousand) return score.toString()
+    val thousands = oneDecimal(score.toDouble() / Thousand)
+    if (thousands.substringBefore('.').length <= AbbreviatedDigits) return thousands + "K"
+    return oneDecimal(score.toDouble() / Million) + "M"
+}
+
+/** [value] to one decimal place, with a trailing `.0` dropped. */
+private fun oneDecimal(value: Double): String {
+    val tenths = (value * TENTHS).roundToInt()
+    val whole = tenths / TENTHS
+    val fraction = tenths % TENTHS
+    return if (fraction == 0) whole.toString() else "$whole.$fraction"
 }
 
 /**
@@ -217,6 +261,13 @@ private const val MinCountUpMillis = 320
 private const val MaxCountUpMillis = 1400
 
 private const val MillisPerPoint = 0.35f
+
+private const val Thousand = 1_000
+private const val Million = 1_000_000
+private const val TENTHS = 10
+
+/** Above three digits before the point, the next suffix up is the shorter answer. */
+private const val AbbreviatedDigits = 3
 private const val FloatMillis = 900
 private const val FloatStartScale = 0.7f
 private const val FloatScaleRamp = 4f

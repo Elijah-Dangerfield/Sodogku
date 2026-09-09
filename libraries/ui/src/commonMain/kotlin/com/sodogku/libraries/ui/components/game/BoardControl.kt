@@ -36,6 +36,7 @@ import com.sodogku.system.Radii
 import com.sodogku.system.clip
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.math.cos
 import kotlin.math.sin
 
 /**
@@ -67,10 +68,13 @@ fun BoardControl(
     /**
      * Whether to draw attention to this control.
      *
-     * A slow ring around the circle and a small wobble on whatever is inside it.
-     * Deliberately not a scale on the whole button: a control that grows and
-     * shrinks under a thumb that is reaching for it is a control that gets
-     * mis-tapped, and the row sits exactly where the hand already is.
+     * The whole button beats, twice, and the picture inside it shakes itself out
+     * as it settles. The button scaling was previously refused on the grounds
+     * that a control growing under a reaching thumb gets mis-tapped, and the
+     * risk is real — so the beat is [AttentionScale], a few percent, which is
+     * enough to see out of the corner of an eye and far too little to move a
+     * touch target out from under a finger. The expanding ring it replaces read
+     * as a notification badge rather than as a button asking to be pressed.
      */
     attention: Boolean = false,
     onClick: () -> Unit = {},
@@ -90,7 +94,6 @@ fun BoardControl(
         }
     }
 
-    val ring = AppTheme.colors.accentPrimary.color
     val face = if (enabled) AppTheme.colors.surfacePrimary.color else AppTheme.colors.surfaceDisabled.color
 
     Column(
@@ -105,22 +108,17 @@ fun BoardControl(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(FaceSize)
-                    // Read in the draw phase, never in composition: a ring that
+                    // Read in the layer, never in composition: a beat that
                     // recomposed this subtree sixty times a second would be a
                     // steady cost for a decoration.
-                    .drawBehind {
-                        val progress = pulse.value
-                        if (progress <= 0f) return@drawBehind
-                        // One out-and-fade, not a throb. A ring that pulsed
-                        // continuously would compete with the board for the eye
-                        // for as long as the booster went unused.
-                        val grow = 1f + progress * RingGrowth
-                        val alpha = (1f - progress) * RingAlpha
-                        drawCircle(
-                            color = ring.copy(alpha = alpha),
-                            radius = size.minDimension / 2f * grow,
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = RingWidth.toPx()),
-                        )
+                    .graphicsLayer {
+                        // Cosine rather than sine, so the beat starts and ends
+                        // at rest instead of jumping to full size on the first
+                        // frame and snapping back on the last.
+                        val swell = (1f - cos(pulse.value * Tau * AttentionBeats)) / 2f
+                        val scale = 1f + swell * AttentionScale
+                        scaleX = scale
+                        scaleY = scale
                     }
                     .elevation(Elevation.Button, Radii.Round.shape)
                     .clip(Radii.Round)
@@ -129,9 +127,10 @@ fun BoardControl(
             ) {
                 Box(
                     modifier = Modifier.graphicsLayer {
-                        // The picture wobbles rather than the button, so the
-                        // touch target never moves.
-                        rotationZ = sin(pulse.value * WobbleCycles) * WobbleDegrees * (1f - pulse.value)
+                        // Damped by the remaining progress, so the picture
+                        // shakes hardest as the beat lands and has settled by
+                        // the time the button is at rest again.
+                        rotationZ = sin(pulse.value * ShakeCycles) * ShakeDegrees * (1f - pulse.value)
                     },
                 ) {
                     art()
@@ -162,9 +161,13 @@ fun BoardControl(
             }
         }
 
+        // Label rather than Caption. These three words name the only controls
+        // under the board, so they are UI labels and not footnotes — the caption
+        // scale is 8sp Normal, which on a cream page under a white disc read as
+        // something the design had finished with.
         Text(
             text = label,
-            typography = AppTheme.typography.Caption.C300,
+            typography = AppTheme.typography.Label.L400,
             color = if (enabled) AppTheme.colors.textSecondary else AppTheme.colors.onSurfaceDisabled,
         )
     }
@@ -187,15 +190,19 @@ fun BoardControlBone(fill: Color, edge: Color, size: Dp = ArtSize) {
 /**
  * The circle.
  *
- * Smaller than it started, and the picture inside it larger, so the ratio moved
- * twice. A 100dp circle around a 28dp bone is mostly white: the thing that
- * identifies the control was the smallest part of it, and the row took more
- * vertical space than a row of three buttons needs. This is still comfortably
- * above the 48dp minimum touch target.
+ * Smaller than it started, twice over: 100dp, then 84dp, now 70dp, while the
+ * picture inside it went the other way. A 100dp circle around a 28dp bone is
+ * mostly white — the thing that identifies the control was the smallest part of
+ * it, and the row took more vertical space than a row of three buttons needs.
+ *
+ * 70dp is the floor rather than a waypoint. It is still comfortably past the
+ * 48dp minimum touch target, but the art inside is [ArtSize] and the next step
+ * down the scale would put the two within a few dp of each other, which is a
+ * picture in a ring rather than a picture on a button.
  */
-private val FaceSize = Dimension.D1600
+private val FaceSize = Dimension.D1500
 
-/** Roughly half the circle across, so the bone reads rather than sits in it. */
+/** Well over half the circle across, so the bone reads rather than sits in it. */
 private val ArtSize = Dimension.D1200
 
 /** Matches the aspect `drawBone` is drawn against; a bone in a square is a blob. */
@@ -206,13 +213,24 @@ private const val BoneTilt = -20f
 private const val AttentionMillis = 1_100
 private const val AttentionRestMillis = 2_400L
 
-/** How far past the circle the ring travels before it fades out. */
-private const val RingGrowth = 0.35f
-private const val RingAlpha = 0.55f
-private val RingWidth = Dimension.D50
+private const val Tau = 6.2831855f
 
-private const val WobbleCycles = 9f
-private const val WobbleDegrees = 7f
+/**
+ * How far the button swells at the top of a beat — six percent.
+ *
+ * Small on purpose. This row sits under the board exactly where the hand
+ * already is, and a control that grows under a thumb already on its way to it
+ * is a control that gets mis-tapped. Six percent of a 70dp circle is about two
+ * dp of travel on each edge: legible as movement in peripheral vision, and
+ * nowhere near enough to walk out from under a finger.
+ */
+private const val AttentionScale = 0.06f
+
+/** Two beats per burst, so it reads as a pulse rather than as a single twitch. */
+private const val AttentionBeats = 2f
+
+private const val ShakeCycles = 9f
+private const val ShakeDegrees = 7f
 
 @Preview
 @Composable

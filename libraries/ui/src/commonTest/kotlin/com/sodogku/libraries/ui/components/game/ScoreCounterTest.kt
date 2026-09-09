@@ -2,10 +2,12 @@ package com.sodogku.libraries.ui.components.game
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
- * The score roll takes longer for a bigger jump.
+ * The score roll takes longer for a bigger jump, and the header's copy of the
+ * number is short enough to sit in a header.
  *
  * It was a flat 420ms whatever the delta. A placement pays a few hundred points
  * and a level clear pays a few thousand, so the same duration covered a tenfold
@@ -72,6 +74,53 @@ class ScoreCounterTest {
         // treats as "snap", and a refactor that removed that early return would
         // otherwise silently kill the animation.
         assertTrue(countUpMillis(0) > 0)
+    }
+
+    @Test
+    fun aSmallScoreIsDrawnExactly() {
+        // `0.8K` is longer than `845` and less true. There is nothing to save
+        // below a thousand.
+        assertEquals("845", abbreviateScore(845))
+        assertEquals("0", abbreviateScore(0))
+        assertEquals("999", abbreviateScore(999))
+    }
+
+    @Test
+    fun thousandsCarryOneDecimal() {
+        // The reported case: level 29's lifetime total, six digits wide in a
+        // header beside a level number.
+        assertEquals("130.5K", abbreviateScore(130_450))
+        assertEquals("1.2K", abbreviateScore(1_234))
+        assertEquals("1K", abbreviateScore(1_000))
+    }
+
+    @Test
+    fun aWholeNumberDropsItsDecimal() {
+        // `12.0K` is a decimal place spent saying nothing.
+        assertEquals("12K", abbreviateScore(12_000))
+        assertEquals("12K", abbreviateScore(12_004), "the rounding stopped short of a whole number")
+    }
+
+    @Test
+    fun theDecimalIsWhatKeepsTheRollWorthWatching() {
+        // The counter rolls between these two, and without a decimal place both
+        // would read `130K` — a level clear worth 400 points would animate
+        // between two identical strings.
+        assertNotEquals(abbreviateScore(130_050), abbreviateScore(130_450))
+    }
+
+    @Test
+    fun millionsGetTheirOwnSuffix() {
+        assertEquals("1.2M", abbreviateScore(1_234_567))
+        assertEquals("1M", abbreviateScore(1_000_000))
+    }
+
+    @Test
+    fun theTopOfTheThousandsPromotesRatherThanRoundingToFourDigits() {
+        // 999,999 rounds to `1000.0K`, which is longer than the number it is
+        // abbreviating and reads as a bug.
+        assertEquals("1M", abbreviateScore(999_999))
+        assertEquals("999.9K", abbreviateScore(999_949), "the promotion reached too far down")
     }
 
     private companion object {
