@@ -287,11 +287,12 @@ exist; nothing here needs code:
 ./scripts/setup_sentry.sh
 ```
 
-It prompts for an auth token, checks it against the project, then writes
-`sentry.dsn` into `local.properties` and sets the two repo secrets and two repo
-variables. Mint the token at
-`https://elijah-dangerfield.sentry.io/settings/auth-tokens/` with scopes
-`org:read project:read project:write project:releases`.
+It prompts for an auth token, checks it, then writes `sentry.dsn` into
+`local.properties` and sets the two repo secrets and two repo variables. Mint
+the token at `https://elijah-dangerfield.sentry.io/settings/auth-tokens/` as an
+**Organization Token**. Its scopes are fixed (`org:ci`: source map upload,
+release creation, code mappings) and that is exactly the set CI needs, so there
+is nothing to choose.
 
 Why each piece matters, if you want to do it by hand instead. The DSN resolves
 at `build-logic/.../Versioning.kt:190` as env `SENTRY_DSN`, then

@@ -50,8 +50,11 @@ say "Sentry org:     $ORG"
 say "Sentry project: $PROJECT"
 say "DSN:            ${DSN%%@*}@..."
 say ""
-say "The auth token needs scopes: org:read project:read project:write project:releases"
-say "Mint one at: https://$ORG.sentry.io/settings/auth-tokens/"
+say "Mint an *organization* token at:"
+say "  https://$ORG.sentry.io/settings/auth-tokens/"
+say "Its scopes are fixed (org:ci -- source map upload, release creation, code"
+say "mappings) and that is exactly what CI does. A legacy user auth token with"
+say "project:releases and org:read also works."
 say ""
 
 # Refuse rather than fall back to a visible prompt. Somewhere that cannot hide
@@ -76,14 +79,42 @@ printf '\n'
 # mapping upload in a release run -- which is the failure mode this whole
 # pipeline is prone to, since every Sentry step in CI is guarded by
 # `if: env.SENTRY_AUTH_TOKEN != ''` and passes loudly when it does nothing.
+#
+# Probe the capability CI actually uses, not a convenient endpoint. The first
+# version of this asked for the *project* and rejected a perfectly good token:
+# organization tokens carry a fixed org:ci scope set that covers uploads and
+# releases and deliberately excludes project:read, so the probe failed on the
+# one kind of token Sentry's own UI steers you toward. chunk-upload is what
+# `sentry-cli upload-proguard` and `debug-files upload` go through, so a token
+# that can reach it can do the job by definition.
+#
+# The project endpoint stays as a fallback for a legacy user auth token, which
+# can read projects but may not advertise chunk-upload.
+status_of() {
+    curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$1"
+}
+
 say ""
-printf 'Checking the token against %s/%s ... ' "$ORG" "$PROJECT"
-if ! curl -sf -H "Authorization: Bearer $TOKEN" \
-    "https://sentry.io/api/0/projects/$ORG/$PROJECT/" -o /dev/null; then
-    printf 'FAILED\n'
-    die "the token could not read $ORG/$PROJECT -- check the slugs and the token's scopes"
+printf 'Checking the token ... '
+CHUNK_STATUS=$(status_of "https://sentry.io/api/0/organizations/$ORG/chunk-upload/")
+if [ "$CHUNK_STATUS" = "200" ]; then
+    printf 'ok (organization token)\n'
+else
+    PROJECT_STATUS=$(status_of "https://sentry.io/api/0/projects/$ORG/$PROJECT/")
+    if [ "$PROJECT_STATUS" = "200" ]; then
+        printf 'ok (user auth token)\n'
+    else
+        printf 'FAILED\n'
+        say "  chunk-upload  -> HTTP $CHUNK_STATUS"
+        say "  project       -> HTTP $PROJECT_STATUS"
+        case "$CHUNK_STATUS" in
+            401) die "the token was rejected -- it is mistyped, revoked or from another org" ;;
+            403) die "the token is valid but under-scoped for uploads" ;;
+            404) die "no org '$ORG' -- check the slug at https://sentry.io/settings/" ;;
+            *)   die "could not verify the token (see the two statuses above)" ;;
+        esac
+    fi
 fi
-printf 'ok\n'
 
 # local.properties: rewrite in place, keeping every other key.
 say ""

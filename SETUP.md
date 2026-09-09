@@ -62,7 +62,7 @@ Set under **Settings → Secrets and variables → Actions**. All are required f
 
 | Secret | Notes |
 | --- | --- |
-| `SENTRY_AUTH_TOKEN` | Sentry → User Auth Tokens → scope: `project:releases`, `org:read`. Used by `beta.yml`/`release.yml` to create releases + upload mappings/dSYMs. |
+| `SENTRY_AUTH_TOKEN` | Sentry → Settings → Auth Tokens → **Create Organization Token**. Its scopes are fixed (`org:ci`: source map upload, release creation, code mappings) and cover everything `beta.yml`/`release.yml` do. A legacy user auth token with `project:releases` + `org:read` also works. |
 | `SENTRY_DSN` | Sentry → Project Settings → Client Keys (DSN). Baked into store builds so crash reporting is live; blank leaves crash reporting dormant. |
 
 And under **Settings → Secrets and variables → Actions → Variables** (not secrets):
@@ -73,11 +73,11 @@ And under **Settings → Secrets and variables → Actions → Variables** (not 
 | `SENTRY_PROJECT` | Your Sentry project slug |
 
 `./scripts/setup_sentry.sh` sets all four of the above plus `sentry.dsn` in
-`local.properties`, and verifies the token against the project before writing
-anything. Worth using rather than clicking through the settings pages: getting
-the org and project in as *secrets* instead of variables is an easy mistake and
-fails silently, because `release.yml` reads them via `vars.` and an unset `vars.`
-is the empty string.
+`local.properties`, and checks the token can reach the chunk-upload endpoint
+before writing anything. Worth using rather than clicking through the settings
+pages: getting the org and project in as *secrets* instead of variables is an
+easy mistake and fails silently, because `release.yml` reads them via `vars.`
+and an unset `vars.` is the empty string.
 
 ### Grafana Cloud telemetry (optional)
 
