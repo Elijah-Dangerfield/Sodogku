@@ -80,10 +80,10 @@ class ShakeRecognizerTest {
 
         repeat(20) { index ->
             val step = index + 1
-            val z = if (step % 2 == 0) 0.0 else 7.0
+            val z = if (step % 2 == 0) 0.0 else 11.9
             assertFalse(
                 recognizer.onSample(0.0, 0.0, z, atMs = step * 100L),
-                "7.0 m/s² per 100ms is under the 8.0 bar, however long it goes on",
+                "11.9 m/s² per 100ms is under the 12.0 bar, however long it goes on",
             )
         }
     }
@@ -95,19 +95,35 @@ class ShakeRecognizerTest {
         recognizer.onSample(0.0, 0.0, 0.0, atMs = 0)
 
         // Lifting the phone off a table: one large change, then stillness.
-        assertFalse(recognizer.onSample(0.0, 0.0, 12.0, atMs = 100))
-        assertFalse(recognizer.onSample(0.0, 0.0, 12.0, atMs = 200))
-        assertFalse(recognizer.onSample(0.0, 0.0, 12.0, atMs = 300))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 100))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 200))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 300))
     }
 
     @Test
-    fun twoQualifyingSamplesInsideTheBurstWindowAreAShake() {
+    fun fourQualifyingSamplesInsideTheBurstWindowAreAShake() {
         val recognizer = ShakeRecognizer()
 
         recognizer.onSample(0.0, 0.0, 0.0, atMs = 0)
 
-        assertFalse(recognizer.onSample(0.0, 0.0, 12.0, atMs = 100))
-        assertTrue(recognizer.onSample(0.0, 0.0, 0.0, atMs = 200))
+        // Reversing direction every 100ms: a hand shaking a phone.
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 100))
+        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 200))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 300))
+        assertTrue(recognizer.onSample(0.0, 0.0, 0.0, atMs = 400))
+    }
+
+    @Test
+    fun threeQualifyingSamplesAreNotEnough() {
+        // The boundary, and the reason the count went from two to four. At two,
+        // this sequence fired -- and this sequence is a phone being set down.
+        val recognizer = ShakeRecognizer()
+
+        recognizer.onSample(0.0, 0.0, 0.0, atMs = 0)
+
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 100))
+        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 200))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 300))
     }
 
     @Test
@@ -116,14 +132,46 @@ class ShakeRecognizerTest {
 
         recognizer.onSample(0.0, 0.0, 0.0, atMs = 0)
 
-        assertFalse(recognizer.onSample(0.0, 0.0, 12.0, atMs = 100))
+        // Three reversals, then held still well past the window, then three
+        // more. Six qualifying samples in total and not a shake, because a
+        // shake is defined by how tightly they cluster.
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 100))
+        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 200))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 300))
 
-        // Held still for over a second, then knocked once more. Two isolated
-        // knocks a second and a half apart are two knocks, not a shake.
-        (2..14).forEach { step ->
-            assertFalse(recognizer.onSample(0.0, 0.0, 12.0, atMs = step * 100L))
+        (4..11).forEach { step ->
+            assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = step * 100L))
         }
-        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 1_500))
+
+        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 1_200))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 1_300))
+        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 1_400))
+    }
+
+    @Test
+    fun aStragglerOutsideTheWindowDoesNotCompleteABurst() {
+        // Three tight reversals, then stillness, then a fourth 600ms after the
+        // third. Four qualifying samples in total, and not a shake: that is
+        // three knocks and a straggler, not an oscillation.
+        //
+        // This is the case that pins the window. The other burst test uses a
+        // gap long enough to reset under any plausible value, so it passed
+        // happily with the window widened back to the old 1000ms; at 1000 this
+        // sequence fires.
+        val recognizer = ShakeRecognizer()
+
+        recognizer.onSample(0.0, 0.0, 0.0, atMs = 0)
+
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 100))
+        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 200))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 300))
+
+        // Held there: no change, so nothing qualifies.
+        (4..8).forEach { step ->
+            assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = step * 100L))
+        }
+
+        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 900))
     }
 
     @Test
@@ -131,11 +179,16 @@ class ShakeRecognizerTest {
         val recognizer = ShakeRecognizer()
 
         recognizer.onSample(0.0, 0.0, 0.0, atMs = 0)
-        assertFalse(recognizer.onSample(0.0, 0.0, 12.0, atMs = 100))
-        assertTrue(recognizer.onSample(0.0, 0.0, 0.0, atMs = 200))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 100))
+        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 200))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 300))
+        assertTrue(recognizer.onSample(0.0, 0.0, 0.0, atMs = 400))
 
-        assertFalse(recognizer.onSample(0.0, 0.0, 12.0, atMs = 300))
-        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 400))
+        // Still shaking, and still only one dialog.
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 500))
+        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 600))
+        assertFalse(recognizer.onSample(0.0, 0.0, 20.0, atMs = 700))
+        assertFalse(recognizer.onSample(0.0, 0.0, 0.0, atMs = 800))
     }
 
     @Test
@@ -146,10 +199,12 @@ class ShakeRecognizerTest {
 
         val firedAt = (1..40).mapNotNull { step ->
             val atMs = step * 100L
-            val z = if (step % 2 == 0) 0.0 else 12.0
+            val z = if (step % 2 == 0) 0.0 else 20.0
             atMs.takeIf { recognizer.onSample(0.0, 0.0, z, atMs = atMs) }
         }
 
-        assertEquals(listOf(200L, 1_700L, 3_200L), firedAt)
+        // 400ms to confirm the first one, then one per cooldown for as long as
+        // the shaking goes on.
+        assertEquals(listOf(400L, 1_900L, 3_400L), firedAt)
     }
 }

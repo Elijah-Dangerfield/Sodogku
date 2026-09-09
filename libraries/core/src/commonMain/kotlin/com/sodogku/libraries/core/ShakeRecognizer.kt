@@ -23,11 +23,18 @@ import kotlin.math.sqrt
  *   reverses several times a second — so a real one produces qualifying samples
  *   repeatedly and a bump produces exactly one.
  *
- * The magnitude bar is deliberately unchanged from what shipped: the old Android
- * detector compared `magnitude / timeDiffMs * 10000` against 800, which is the
- * same bar as 8.0 m/s² per 100ms. What changed is that it is now reached the
- * same way regardless of how far apart two samples happened to land, and that
- * clearing it once is no longer enough.
+ * The numbers were retuned after a report that the dialog appeared "way too"
+ * often, having originally been carried over unchanged from the old Android
+ * detector's `magnitude / timeDiffMs * 10000 > 800`.
+ *
+ * Two qualifying samples anywhere inside a whole second was the loose part, more
+ * than the magnitude was. 8.0 m/s² per 100ms is under 1g of *change*, which
+ * putting a phone down on a table clears comfortably, and two of those had a
+ * full second to find each other. Four inside 700ms is a different question: it
+ * asks for roughly 6Hz of sustained direction reversal, which is what a hand
+ * shaking a phone does and what nothing else in normal handling does. Simulated
+ * against the gestures that were firing it, a single pick-up and two separate
+ * knocks now both produce nothing.
  */
 class ShakeRecognizer {
 
@@ -96,9 +103,24 @@ class ShakeRecognizer {
 
     private companion object {
         const val SAMPLE_INTERVAL_MS = 100L
-        const val THRESHOLD_M_S2_PER_100MS = 8.0
-        const val SAMPLES_TO_CONFIRM = 2
-        const val BURST_WINDOW_MS = 1000L
+
+        /**
+         * Per 100ms of elapsed time, so it does not depend on sample spacing.
+         * Above a firm set-down, well below a deliberate shake, which runs
+         * 25-40.
+         */
+        const val THRESHOLD_M_S2_PER_100MS = 12.0
+
+        /**
+         * The knob that actually stopped the false positives. A bump can clear
+         * any magnitude bar worth having; only a shake can clear one four times
+         * in a row.
+         */
+        const val SAMPLES_TO_CONFIRM = 4
+
+        /** Four samples in 700ms is about 6Hz: an oscillation, not a sequence of knocks. */
+        const val BURST_WINDOW_MS = 700L
+
         const val COOLDOWN_MS = 1500L
     }
 }
