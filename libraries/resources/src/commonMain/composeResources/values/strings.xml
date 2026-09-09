@@ -1,13 +1,20 @@
 <resources>
     <string name="app_name">Sodogku</string>
 
-    <!-- The one line under the wordmark, and the only chance to say what this
-         is to somebody who has never seen it. It names sudoku because that is
-         the fastest way to hand over the row-and-column half of the game, then
-         immediately says the part sudoku does not have. The rules below spell
-         out what "next to each other" means; this line only has to make a
-         sudoku player stop assuming they already know. -->
-    <string name="onboarding_tagline">Sudoku with dogs. They like their space.</string>
+    <!-- The one line under the wordmark, and the only chance to set a tone
+         before the rules start. It names sudoku because that is the fastest way
+         to hand over the row-and-column half of the game, and then stops
+         explaining: the three bullets underneath do the actual teaching, and a
+         tagline that competes with them is a tagline nobody finishes.
+
+         An earlier version spent its second half on the no-touching rule, on
+         the theory that a sudoku player has to be stopped from assuming they
+         already know the game. That is a real risk and the bullets are where it
+         is handled. This line's job is to make somebody want to read them.
+
+         The apostrophe is bare, not backslash-escaped; see the note on the
+         buttons below. -->
+    <string name="onboarding_tagline">Sudoku with cute dogs. What's not to love?</string>
     <!-- The two ways off this screen. Both first person, both about what
          happens next rather than about what the player already knows: the old
          pair asked them to self-assess against sudoku, and this is not sudoku,
@@ -16,9 +23,10 @@
 
          The apostrophes are bare, not backslash-escaped. `\'` is an Android
          resource convention and the Compose Multiplatform parser does not know
-         it: escape one here and the backslash is rendered on screen. These are
+         it: escape one here and the backslash is rendered on screen. These were
          the first apostrophes in this file, which is why nothing caught it
-         before. -->
+         until this screen was written. The tagline above has one too now, and
+         the rule applies to every string in here. -->
     <string name="onboarding_start_tutorial">Walk me through one</string>
     <string name="onboarding_skip_tutorial">I'll figure it out</string>
 

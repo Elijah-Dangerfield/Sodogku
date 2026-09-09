@@ -316,7 +316,11 @@ private fun WelcomeCard(
             ) {
             Text(
                 text = stringResource(Res.string.app_name),
-                typography = AppTheme.typography.Display.D1000,
+                // D1100 (34sp) rather than D1000 (28sp). It is a wordmark, not a
+                // heading -- the only place the app says its own name -- and at
+                // the heading size it sat level with the rules below it instead
+                // of over them.
+                typography = AppTheme.typography.Display.D1100,
             )
 
             VerticalSpacerD300()
