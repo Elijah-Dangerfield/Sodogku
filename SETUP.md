@@ -72,6 +72,13 @@ And under **Settings → Secrets and variables → Actions → Variables** (not 
 | `SENTRY_ORG` | Your Sentry org slug |
 | `SENTRY_PROJECT` | Your Sentry project slug |
 
+`./scripts/setup_sentry.sh` sets all four of the above plus `sentry.dsn` in
+`local.properties`, and verifies the token against the project before writing
+anything. Worth using rather than clicking through the settings pages: getting
+the org and project in as *secrets* instead of variables is an easy mistake and
+fails silently, because `release.yml` reads them via `vars.` and an unset `vars.`
+is the empty string.
+
 ### Grafana Cloud telemetry (optional)
 
 Used by `beta.yml` and `release.yml` to bake client app-event credentials into

@@ -6,6 +6,20 @@ Utility scripts for this project.
 > `verify_template.sh`) is documented in `docs/template-maintenance.md`.
 > Those scripts are removed from generated projects.
 
+## setup_sentry.sh
+
+Turns crash reporting on. Prompts for a Sentry auth token (echo off), verifies
+it against the project before writing anything, then sets `sentry.dsn` in
+`local.properties`, the `SENTRY_DSN` / `SENTRY_AUTH_TOKEN` repo secrets, and
+the `SENTRY_ORG` / `SENTRY_PROJECT` repo **variables**:
+
+```bash
+./scripts/setup_sentry.sh
+```
+
+Safe to re-run. Does not touch the server's own `SENTRY_DSN`, which is a Fly
+secret on a separate deployment. See SETUP.md for where the token comes from.
+
 ## install_hooks.sh
 
 Installs the repo's git hooks (`.githooks/`) into your local clone. Run once

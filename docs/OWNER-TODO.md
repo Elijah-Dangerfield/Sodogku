@@ -280,17 +280,32 @@ obtain each one.
 
 ## 10. Sentry
 
-The DSN resolves at `build-logic/.../Versioning.kt:190` as env `SENTRY_DSN`,
-then `local.properties` key `sentry.dsn`, then blank. `local.properties` today
-holds only `sdk.dir`, so every local build bakes a blank DSN and
-`SentryRuntimeConfig.isEnabled` is false. That is deliberate: a fresh clone
-works with no setup.
+**One command.** The project (`elijah-dangerfield` / `sodogku`) and its DSN
+exist; nothing here needs code:
 
-Beyond the DSN you need a `SENTRY_AUTH_TOKEN` with scopes
-`org:read project:read project:write project:releases`, plus the org and
-project slugs as **variables**. Without the token, Android R8 mapping upload is
-skipped and every crash frame arrives as `a.b.c`; iOS dSYM upload is skipped
-too.
+```bash
+./scripts/setup_sentry.sh
+```
+
+It prompts for an auth token, checks it against the project, then writes
+`sentry.dsn` into `local.properties` and sets the two repo secrets and two repo
+variables. Mint the token at
+`https://elijah-dangerfield.sentry.io/settings/auth-tokens/` with scopes
+`org:read project:read project:write project:releases`.
+
+Why each piece matters, if you want to do it by hand instead. The DSN resolves
+at `build-logic/.../Versioning.kt:190` as env `SENTRY_DSN`, then
+`local.properties` key `sentry.dsn`, then blank; blank leaves
+`SentryRuntimeConfig.isEnabled` false, which is why a fresh clone works with no
+setup. Without the auth token, Android R8 mapping upload is skipped and every
+crash frame arrives as `a.b.c`; iOS dSYM upload is skipped too. The org and
+project go in as **variables, not secrets** — `release.yml:127-128` reads them
+via `vars.`, and getting that wrong fails silently.
+
+**Not covered:** the server's own `SENTRY_DSN`, which is a Fly secret on a
+separate deployment (§ the Fly secrets list above). Point it at a second Sentry
+project rather than this one; server and client share no release string and
+mixing them makes both harder to read.
 
 This also unblocks proving the feedback loop end to end. The in-app panel works
 and the tag reaches telemetry (logcat confirms
