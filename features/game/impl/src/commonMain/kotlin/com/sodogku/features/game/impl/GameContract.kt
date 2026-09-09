@@ -15,6 +15,7 @@ import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.ScoringConfig
+import com.sodogku.libraries.scoring.Standing
 import com.sodogku.libraries.sharing.ShareText
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -208,6 +209,19 @@ data class GameState(
     val showAchievements: Boolean = true,
 
     /**
+     * `features.achievements`. True by default so a board built before the flag
+     * is read offers the trophy rather than losing it, the same way
+     * [boostersEnabled] keeps the economy.
+     */
+    val achievementsEnabled: Boolean = true,
+
+    /**
+     * Badges earned since the player last opened the grid, for the trophy's
+     * count. Zero draws no badge at all rather than a nought.
+     */
+    val newBadgeCount: Int = 0,
+
+    /**
      * `features.boosters`, for the row of Sniff and Treat buttons. True by
      * default so a board built before the flag is read — a preview, a test, a
      * first launch with no network — has the economy rather than losing it.
@@ -347,6 +361,17 @@ data class GameState(
      * count in [treats] already includes it.
      */
     val treatAwarded: Boolean = false,
+
+    /**
+     * How the finished run went, as the win sheet's headline. Null until there
+     * is a run to judge, and null forever on a board that was not cleared —
+     * there is no verdict on an attempt that did not end.
+     *
+     * Set by the win and reset by the next attempt, which happens for free:
+     * `startAttempt` builds a fresh [GameState] rather than copying one, and
+     * this is a field a new board must *not* carry.
+     */
+    val standing: Standing? = null,
 ) {
     /**
      * What this attempt would bank: what it earned, less the boosters it spent.
@@ -407,6 +432,17 @@ data class GameState(
      */
     val visibleAutoMarks: Set<Int>
         get() = if (autoMarkVisible) autoMarks - clearedMarks else emptySet()
+
+    /**
+     * Whether the board offers a way into the badge grid at all.
+     *
+     * Both gates, and both mean "there are no badges in this build of the app
+     * for this player": [showAchievements] is the Settings toggle and
+     * [achievementsEnabled] is `features.achievements`. When either is off the
+     * trophy is **absent** rather than showing a zero — a button that leads to a
+     * screen saying badges are switched off is worse than no button.
+     */
+    val achievementsOffered: Boolean get() = showAchievements && achievementsEnabled
 
     val placedCells: Set<Int> get() = placed.cells().toSet()
 
@@ -508,6 +544,9 @@ sealed interface GameEvent {
 
     data object Won : GameEvent
     data object OpenSettings : GameEvent
+
+    /** The trophy was tapped. The grid is what clears its badge. */
+    data object OpenAchievements : GameEvent
     data object OpenPrivacy : GameEvent
     data object OpenTerms : GameEvent
     data object OpenFeedback : GameEvent
@@ -535,6 +574,14 @@ data class DisplaySettings(
      * underneath does not move, so nothing has to be recomputed when it lands.
      */
     val autoMark: Boolean,
+
+    /**
+     * `AppData.achievementsVisible`. Here for the reason [autoMark] is: the
+     * toggle lives one tap away behind the gear, and read once at load the
+     * trophy would still be sitting on the board after the player switched
+     * badges off and came straight back.
+     */
+    val achievements: Boolean,
 )
 
 /** Something the game wants to stop and point at. */
@@ -632,6 +679,12 @@ sealed interface GameAction {
     data object OpenStreak : GameAction
     data object DismissFreezeMessage : GameAction
     data object OpenSettings : GameAction
+
+    /** The trophy beside the gear. */
+    data object OpenAchievements : GameAction
+
+    /** Badges earned since the player last looked at the grid. */
+    data class NewBadgesChanged(val count: Int) : GameAction
 
     /** The three settings that change what is on the board, as they change. */
     data class DisplaySettingsChanged(val settings: DisplaySettings) : GameAction

@@ -532,4 +532,21 @@
          shown against a clear: a board nobody solved has no "solved in". -->
     <string name="game_time_taken">Solved in %1$s</string>
     <string name="levels_best_time">Best %1$s</string>
+
+    <!-- The trophy beside the gear on the board. The count in the second one is
+         badges earned since the player last looked at the grid, so the button
+         reads its own badge aloud rather than leaving a bare number floating
+         next to it. -->
+    <string name="game_achievements">Badges</string>
+    <string name="game_achievements_new">Badges, %1$d new</string>
+
+    <!-- The win sheet's headline, which is now the verdict on the run rather
+         than a fixed line. It judges this run against the same par the paws use
+         and deliberately says nothing about other players: there is no server to
+         rank against, and a percentile we made up would be the app inventing a
+         measurement. The middle of the range keeps game_won_title, so only the
+         runs that were unusual read differently. -->
+    <string name="game_verdict_scraped">Got there</string>
+    <string name="game_verdict_sharp">Sharp work</string>
+    <string name="game_verdict_flawless">Flawless</string>
 </resources>

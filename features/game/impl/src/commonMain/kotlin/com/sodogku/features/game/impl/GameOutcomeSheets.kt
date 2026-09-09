@@ -28,6 +28,7 @@ import com.sodogku.libraries.sharing.ShareResult
 import com.sodogku.libraries.ui.components.feedback.ShareButton
 import com.sodogku.libraries.ui.components.game.LevelRewardChip
 import com.sodogku.libraries.ui.components.game.RewardBadge
+import com.sodogku.libraries.scoring.Standing
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
@@ -35,6 +36,7 @@ import com.sodogku.system.Radii
 import com.sodogku.system.clip
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.number
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
@@ -59,6 +61,9 @@ import sodogku.libraries.resources.generated.resources.game_skip_level
 import sodogku.libraries.resources.generated.resources.game_skip_none_left
 import sodogku.libraries.resources.generated.resources.game_skip_remaining
 import sodogku.libraries.resources.generated.resources.game_time_taken
+import sodogku.libraries.resources.generated.resources.game_verdict_flawless
+import sodogku.libraries.resources.generated.resources.game_verdict_scraped
+import sodogku.libraries.resources.generated.resources.game_verdict_sharp
 import sodogku.libraries.resources.generated.resources.game_won_title
 import sodogku.libraries.resources.generated.resources.share_footer
 import sodogku.libraries.resources.generated.resources.share_streak
@@ -91,8 +96,17 @@ fun GameOutcomeSheet(
 private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier: Modifier) {
     OutcomeLayout(modifier) {
         Dog(pose = DogPose.Solved)
+        // The verdict **is** the title, rather than a line under it. The sheet
+        // already carries a title, three paws, a rolling score, a time and
+        // sometimes a reward chip and a streak, and the note it came back from
+        // the owner with was that it is far too much text — so a run that went
+        // well should say so in the space the fixed "Good dog!" was using.
+        //
+        // It says nothing about other players, deliberately. See `Standing`: the
+        // percentile the original ask named would have to be invented, and an
+        // invented measurement is worse than none.
         Text(
-            text = stringResource(Res.string.game_won_title),
+            text = stringResource(verdictTitle(state.standing)),
             typography = AppTheme.typography.Heading.H700,
             textAlign = TextAlign.Center,
         )
@@ -200,6 +214,27 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
             }
         }
     }
+}
+
+/**
+ * The word at the top of the win sheet, one per verdict.
+ *
+ * Each is about the run and none is about anybody else. [Standing.Solid] keeps
+ * the sheet's existing headline rather than earning a fourth string: it is the
+ * middle of the range, the words are already right for it, and reusing it makes
+ * the change read as the unusual runs saying something different rather than as
+ * every win being re-captioned.
+ *
+ * Null falls back to the same line. A won sheet with no verdict is a state the
+ * ViewModel does not produce — the verdict is set by the same update as the
+ * phase — but a preview builds one, and the honest fallback for "we did not
+ * measure this run" is the neutral congratulation, not the worst grade.
+ */
+internal fun verdictTitle(standing: Standing?): StringResource = when (standing) {
+    Standing.Scraped -> Res.string.game_verdict_scraped
+    Standing.Sharp -> Res.string.game_verdict_sharp
+    Standing.Flawless -> Res.string.game_verdict_flawless
+    Standing.Solid, null -> Res.string.game_won_title
 }
 
 /** "Sodogku Daily · Sep 8" or "Sodogku · Level 137". */
@@ -460,7 +495,10 @@ private fun OutcomeLayout(modifier: Modifier, content: @Composable () -> Unit) {
 @Composable
 private fun WonSheetPreview() {
     PreviewContent {
-        GameOutcomeSheet(state = GameState(phase = GamePhase.Won, paws = 3), onAction = {})
+        GameOutcomeSheet(
+            state = GameState(phase = GamePhase.Won, paws = 3, standing = Standing.Flawless),
+            onAction = {},
+        )
     }
 }
 

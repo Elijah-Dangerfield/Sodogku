@@ -238,6 +238,53 @@ class AchievementsViewModelTest : CoroutineTest() {
         assertEquals(AchievementsEvent.NavigateBack, vm.eventFlow.first())
     }
 
+    /**
+     * Opening the grid is what clears the board's trophy badge, and this write
+     * is the only thing that does it. Left out, a badge earned once would sit on
+     * the trophy for the life of the install.
+     */
+    @Test
+    fun lookingAtTheGridMarksWhatIsOnItAsSeen() = runUnitTest {
+        val cache = InMemoryAppCache()
+        val repository = FakeAchievements(
+            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to NewestUnlock)),
+        )
+
+        viewModel(repository = repository, cache = cache)
+
+        assertEquals(NewestUnlock, cache.get().achievementsSeenAt)
+    }
+
+    /**
+     * With badges switched off this screen is an explanation rather than a grid,
+     * so nothing on it has been seen. Marking it anyway would bury every badge
+     * earned while they were off on the day they are switched back on.
+     */
+    @Test
+    fun aGridNobodyCanSeeMarksNothing() = runUnitTest {
+        val cache = InMemoryAppCache(AppData(achievementsVisible = false))
+        val repository = FakeAchievements(
+            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to NewestUnlock)),
+        )
+
+        viewModel(repository = repository, cache = cache)
+
+        assertEquals(0L, cache.get().achievementsSeenAt)
+    }
+
+    /** Two screens can write this, and the later one must not uncount a badge. */
+    @Test
+    fun theWatermarkOnlyEverMovesForward() = runUnitTest {
+        val cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock))
+        val repository = FakeAchievements(
+            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to OlderUnlock)),
+        )
+
+        viewModel(repository = repository, cache = cache)
+
+        assertEquals(NewestUnlock, cache.get().achievementsSeenAt)
+    }
+
     private fun viewModel(
         repository: AchievementsRepository = FakeAchievements(),
         cache: AppCache = InMemoryAppCache(),
@@ -291,5 +338,11 @@ class AchievementsViewModelTest : CoroutineTest() {
         override suspend fun get(): AppData = data.value
         override suspend fun set(value: AppData) { data.value = value }
         override suspend fun clear() { data.value = AppData() }
+    }
+
+    private companion object {
+        /** Two unlock times. The watermark is a comparison, so only order matters. */
+        const val OlderUnlock = 1_000L
+        const val NewestUnlock = 2_000L
     }
 }

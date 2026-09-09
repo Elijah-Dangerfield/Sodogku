@@ -52,6 +52,7 @@ import com.sodogku.libraries.ui.components.game.ScoreCounter
 import com.sodogku.libraries.ui.components.icon.IconButton
 import com.sodogku.libraries.ui.components.icon.Icons
 import com.sodogku.libraries.ui.system.coveredByOverlay
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.sodogku.libraries.ui.system.focusTarget
@@ -62,10 +63,14 @@ import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
+import com.sodogku.system.Radii
+import com.sodogku.system.clip
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.achievements_unlocked_toast
+import sodogku.libraries.resources.generated.resources.game_achievements
+import sodogku.libraries.resources.generated.resources.game_achievements_new
 import sodogku.libraries.resources.generated.resources.daily_streak_label
 import sodogku.libraries.resources.generated.resources.game_level_label
 import sodogku.libraries.resources.generated.resources.game_levels_menu
@@ -127,6 +132,7 @@ fun GameScreen(
                 levelId = level.id,
                 onOpenLevels = { onAction(GameAction.LevelsOpened) },
                 onSettings = { onAction(GameAction.OpenSettings) },
+                onAchievements = { onAction(GameAction.OpenAchievements) },
                 onExplainBones = { onAction(GameAction.BoosterTapped(Consumable.Bone)) },
                 onExplainDogs = { dialog = GameDialog.Dogs },
                 onExplainLevel = { dialog = GameDialog.Level },
@@ -282,6 +288,7 @@ private fun GameHeader(
     levelId: Int,
     onOpenLevels: () -> Unit,
     onSettings: () -> Unit,
+    onAchievements: () -> Unit,
     onExplainBones: () -> Unit,
     onExplainDogs: () -> Unit,
     onExplainLevel: () -> Unit,
@@ -332,11 +339,19 @@ private fun GameHeader(
             )
         }
 
-        IconButton(
-            icon = Icons.Settings(stringResource(Res.string.game_settings)),
-            onClick = onSettings,
-            backgroundColor = AppTheme.colors.surfacePrimary,
-        )
+        // The gear keeps the corner it has always had, and the trophy sits
+        // inboard of it. Moving the gear to make room would move the one control
+        // on this screen whose position players already know.
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D400)) {
+            if (state.achievementsOffered) {
+                AchievementsButton(newBadges = state.newBadgeCount, onClick = onAchievements)
+            }
+            IconButton(
+                icon = Icons.Settings(stringResource(Res.string.game_settings)),
+                onClick = onSettings,
+                backgroundColor = AppTheme.colors.surfacePrimary,
+            )
+        }
     }
 
     // Two pills, centred, next to each other. Pushed to opposite edges — which
@@ -371,6 +386,60 @@ private fun GameHeader(
                 remaining = state.livesRemaining,
                 total = maxOf(state.livesRemaining, state.refillTo),
             )
+        }
+    }
+}
+
+/**
+ * The way into the badge grid, carrying what is waiting in it.
+ *
+ * The count is **unopened badges**, not earned ones, and it survives a relaunch
+ * — it is a comparison against a watermark the grid moves, so the only thing
+ * that clears it is going and looking. An unlock toast is a moment the player
+ * can miss; this is the part that waits.
+ *
+ * No badge at all at zero. A permanent "0" would read as a broken counter, and
+ * the button is worth having on its own — it is the only way to the grid from
+ * the board.
+ *
+ * The whole button is drawn only when badges are switched on, in Settings and in
+ * `features.achievements` alike, so this is never a route into a screen that
+ * would tell the player badges are off.
+ */
+@Composable
+private fun AchievementsButton(newBadges: Int, onClick: () -> Unit) {
+    // The count goes in the button's own name rather than being left as a bare
+    // number beside it: "Badges" alone does not say there is anything new, and
+    // the badge itself is hidden from the reader below.
+    val label = if (newBadges > 0) {
+        stringResource(Res.string.game_achievements_new, newBadges)
+    } else {
+        stringResource(Res.string.game_achievements)
+    }
+    Box {
+        IconButton(
+            icon = Icons.Trophy(label),
+            onClick = onClick,
+            backgroundColor = AppTheme.colors.surfacePrimary,
+        )
+        if (newBadges > 0) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    // Already said by the button above, which is the thing being
+                    // pressed. Left alone it announces as a loose "3".
+                    .clearAndSetSemantics {}
+                    .clip(Radii.Round)
+                    .background(AppTheme.colors.danger.color)
+                    .padding(horizontal = Dimension.D200),
+            ) {
+                Text(
+                    text = newBadges.toString(),
+                    typography = AppTheme.typography.Caption.C300,
+                    color = AppTheme.colors.onAccentPrimary,
+                )
+            }
         }
     }
 }

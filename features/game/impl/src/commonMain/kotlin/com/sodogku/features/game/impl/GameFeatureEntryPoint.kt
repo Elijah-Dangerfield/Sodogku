@@ -4,6 +4,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.toRoute
+import com.sodogku.features.achievements.AchievementsRoute
 import com.sodogku.features.game.GameRoute
 import com.sodogku.features.home.FeedbackRoute
 import com.sodogku.features.settings.SettingsRoute
@@ -58,6 +59,7 @@ class GameFeatureEntryPoint(
                     GameEvent.OpenTerms -> router.openWebLink(TermsUrl)
                     GameEvent.OpenFeedback -> router.navigate(FeedbackRoute())
                     GameEvent.OpenSettings -> router.navigate(SettingsRoute())
+                    GameEvent.OpenAchievements -> router.navigate(AchievementsRoute())
                     GameEvent.OpenStreakIntention -> router.navigate(StreakIntentionRoute())
                     is GameEvent.OpenStreak -> router.navigate(StreakRoute(celebrating = event.streak))
                 }

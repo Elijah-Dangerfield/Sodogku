@@ -57,8 +57,14 @@ import com.sodogku.libraries.achievements.AchievementsRepository
 import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.achievements.Stat
+import com.sodogku.libraries.leaderboards.Leaderboard
+import com.sodogku.libraries.leaderboards.Leaderboards
+import com.sodogku.libraries.leaderboards.NoLeaderboards
 import com.sodogku.libraries.puzzle.autoMarkedCells
+import com.sodogku.libraries.scoring.Scoring
+import com.sodogku.libraries.scoring.Standing
 import com.sodogku.libraries.scoring.ScoringConfig
+import com.sodogku.libraries.scoring.standingFor
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -72,6 +78,7 @@ import com.sodogku.libraries.sodogku.ConsumableRefillTo
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -3513,6 +3520,229 @@ class GameViewModelTest : CoroutineTest() {
         )
     }
 
+    // ---- S8: the trophy, and the badge that waits on it. --------------------
+
+    @Test
+    fun theTrophyCountsOnlyTheBadgesEarnedSinceTheGridWasLastOpened() = runUnitTest {
+        val badges = RecordingAchievements(
+            unlocked = mapOf(
+                AchievementId.FirstSteps to SeenUnlockAt,
+                AchievementId.GoodDog to FreshUnlockAt,
+            ),
+        )
+        val cache = InMemoryAppCache().apply { set(AppData(achievementsSeenAt = SeenUnlockAt)) }
+
+        val vm = viewModel(cache = cache, achievements = badges)
+
+        assertEquals(1, vm.state.newBadgeCount, "the one earned since the last look, not both")
+    }
+
+    @Test
+    fun aBadgeEarnedOnTheBoardLandsOnTheTrophy() = runUnitTest {
+        // The whole point of the count: the toast is a moment that can be
+        // missed, and this is the part that waits until it is looked at.
+        val badges = RecordingAchievements(unlocks = listOf(AnyAchievement))
+        val vm = viewModel(achievements = badges)
+        assertEquals(0, vm.state.newBadgeCount)
+
+        solve(vm)
+
+        assertEquals(1, vm.state.newBadgeCount)
+    }
+
+    @Test
+    fun openingTheGridClearsTheTrophysBadge() = runUnitTest {
+        val badges = RecordingAchievements(unlocked = mapOf(AchievementId.FirstSteps to FreshUnlockAt))
+        val cache = InMemoryAppCache()
+        val vm = viewModel(cache = cache, achievements = badges)
+        assertEquals(1, vm.state.newBadgeCount, "unseen until it has been seen")
+
+        // The write `AchievementsViewModel` makes when the grid opens. The board
+        // is still up behind it, so it has to notice without being reloaded.
+        cache.set(cache.get().copy(achievementsSeenAt = FreshUnlockAt))
+        settle()
+
+        assertEquals(0, vm.state.newBadgeCount)
+    }
+
+    @Test
+    fun theBadgeSurvivesMovingToTheNextLevel() = runUnitTest {
+        // `startAttempt` builds a fresh GameState by hand, so anything it forgets
+        // to carry is silently dropped between two boards.
+        val badges = RecordingAchievements(unlocked = mapOf(AchievementId.FirstSteps to FreshUnlockAt))
+        val vm = viewModel(achievements = badges)
+        assertEquals(1, vm.state.newBadgeCount)
+
+        vm.takeAction(GameAction.NextLevel)
+        settle()
+
+        assertEquals(PlainLevel + 1, vm.state.level?.id, "the fixture has to actually move")
+        assertEquals(1, vm.state.newBadgeCount, "a new board is not a look at the grid")
+    }
+
+    @Test
+    fun theTrophyIsAbsentWhenSettingsHasBadgesTurnedOff() = runUnitTest {
+        val cache = InMemoryAppCache().apply { set(AppData(achievementsVisible = false)) }
+
+        val vm = viewModel(cache = cache)
+
+        assertFalse(vm.state.achievementsOffered, "a button into a screen that says badges are off")
+    }
+
+    @Test
+    fun turningBadgesOffBehindTheGearTakesTheTrophyWithIt() = runUnitTest {
+        // The gear is one tap away and comes straight back here, so this cannot
+        // be a value read once when the board opened.
+        val cache = InMemoryAppCache()
+        val vm = viewModel(cache = cache)
+        assertTrue(vm.state.achievementsOffered)
+
+        cache.set(cache.get().copy(achievementsVisible = false))
+        settle()
+
+        assertFalse(vm.state.achievementsOffered)
+    }
+
+    @Test
+    fun theTrophyIsAbsentWhenTheFeatureFlagIsOff() = runUnitTest {
+        assertTrue(viewModel().state.achievementsOffered, "on by default, or this proves nothing")
+
+        val dark = viewModel(config = configOf("features.achievements" to false))
+
+        assertFalse(dark.state.achievementsOffered)
+    }
+
+    @Test
+    fun theTrophyOpensTheGrid() = runUnitTest {
+        val vm = viewModel()
+        val events = eventsOf(vm)
+
+        vm.takeAction(GameAction.OpenAchievements)
+        settle()
+
+        assertTrue(GameEvent.OpenAchievements in events)
+    }
+
+    // ---- S16: the verdict on the run. ---------------------------------------
+
+    @Test
+    fun aClearIsJudgedAndAnAttemptInProgressIsNot() = runUnitTest {
+        val vm = viewModel()
+        assertNull(vm.state.standing, "a run that has not ended has no verdict")
+
+        solve(vm)
+
+        assertEquals(
+            Scoring.standingFor(vm.state.score.total, level.size, level.difficulty, completed = true),
+            vm.state.standing,
+        )
+    }
+
+    @Test
+    fun aBoardThatCostABoneIsNotCalledFlawless() = runUnitTest {
+        // `standingFor` takes lives with a default of "all of them", so a call
+        // site that forgets to pass them rates every good run as Flawless and
+        // nothing here would notice. That is exactly what happened when the
+        // parameter was added underneath this call.
+        //
+        // Bones *unspent this attempt*, not bones held, so an ad refill cannot
+        // buy the top verdict on a board already played badly.
+        val vm = viewModel()
+        vm.commit(cellFor(row = 0))
+        val wrong = vm.state.autoMarks.first { it !in vm.state.placedCells }
+        vm.commit(wrong)
+        vm.commit(wrong)
+        assertTrue(vm.state.livesRemaining < ScoringConfig.MAX_LIVES, "the fixture never spent a bone")
+
+        solve(vm)
+
+        assertEquals(GamePhase.Won, vm.state.phase)
+        assertNotEquals(
+            Standing.Flawless,
+            vm.state.standing,
+            "a board that cost a bone was called flawless",
+        )
+    }
+
+    @Test
+    fun aLostBoardIsNotJudged() = runUnitTest {
+        val vm = viewModel()
+
+        loseCurrent(vm)
+
+        assertEquals(GamePhase.Lost, vm.state.phase)
+        assertNull(vm.state.standing, "the lose sheet is the last place anybody needs a grade")
+    }
+
+    @Test
+    fun theVerdictRatesTheSameRunThePawsDo() = runUnitTest {
+        // A punitive booster rate, so the score the run *earned* and the score it
+        // *banks* land in different bands. Judged on the banked one, a sheet can
+        // show three paws over "Got there".
+        val vm = viewModel(config = configOf("scoring.boosterPenaltyRate" to 0.9))
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        settle()
+        solve(vm)
+
+        val fromEarned = Scoring.standingFor(
+            vm.state.score.total,
+            level.size,
+            level.difficulty,
+            completed = true,
+        )
+        val fromBanked = Scoring.standingFor(
+            vm.state.attemptScore,
+            level.size,
+            level.difficulty,
+            completed = true,
+        )
+        assertNotEquals(fromEarned, fromBanked, "the fixture has to charge enough for the two to differ")
+        assertEquals(fromEarned, vm.state.standing)
+    }
+
+    // ---- Leaderboards: submitted on a clear, and never waited on. ------------
+
+    @Test
+    fun everyClearPostsTheLifetimeTotalAndTheLongestStreak() = runUnitTest {
+        val posts = RecordingLeaderboards()
+
+        val vm = viewModel(leaderboards = posts, streak = SilentStreak(longest = LongestRun))
+        solve(vm)
+
+        assertTrue(vm.state.lifetimeScore > 0, "posting a zero would prove nothing")
+        assertEquals(
+            listOf(
+                Leaderboard.LifetimeScore to vm.state.lifetimeScore.toLong(),
+                Leaderboard.LongestStreak to LongestRun.toLong(),
+            ),
+            posts.submitted,
+        )
+    }
+
+    @Test
+    fun nothingIsPostedForARunThatDidNotFinish() = runUnitTest {
+        val posts = RecordingLeaderboards()
+
+        val vm = viewModel(leaderboards = posts)
+        vm.commit(cellFor(row = 0))
+        loseCurrent(vm)
+
+        assertTrue(posts.submitted.isEmpty(), "a board is posted when it is cleared, not when it is opened")
+    }
+
+    @Test
+    fun aClearThatFailsToReadTheStreakStillPostsTheScore() = runUnitTest {
+        // Fail-open in both directions: a repository that throws must not cost
+        // the player the total they just earned.
+        val posts = RecordingLeaderboards()
+
+        val vm = viewModel(leaderboards = posts, streak = BrokenStreak())
+        solve(vm)
+
+        assertEquals(listOf(Leaderboard.LifetimeScore), posts.submitted.map { it.first })
+    }
+
     private fun day(dayOfMonth: Int, score: Int): DailyResult = DailyResult(
         date = LocalDate(2026, 9, dayOfMonth),
         levelIndex = dayOfMonth,
@@ -3535,6 +3765,10 @@ class GameViewModelTest : CoroutineTest() {
         streak: StreakRepository = SilentStreak(),
         config: AppConfigMap = configOf(),
         lifecycle: HandDrivenAppEvents = HandDrivenAppEvents(),
+        // The binding the app itself uses everywhere except iOS with Game
+        // Center, so the default harness runs the same code an Android player
+        // does: every submit goes nowhere and nothing notices.
+        leaderboards: Leaderboards = NoLeaderboards(),
     ) = GameViewModel(
         levelId,
         isDaily,
@@ -3562,6 +3796,7 @@ class GameViewModelTest : CoroutineTest() {
         skipAfterFailedAttempts = ProgressionSkipAfterFailedAttempts(config),
         achievementsEnabled = FeatureAchievements(config),
         boostersEnabled = FeatureBoosters(config),
+        leaderboards = leaderboards,
         appEvents = AppEvents(lifecycle),
     )
 
@@ -3780,6 +4015,16 @@ class GameViewModelTest : CoroutineTest() {
         /** Any badge will do; these tests care about whether one is shown. */
         val AnyAchievement = Achievement(AchievementId.FirstSteps, Stat.LevelsCleared, target = 1)
 
+        /**
+         * Two unlock times either side of a watermark. The trophy's count is a
+         * comparison, so the numbers only have to be ordered.
+         */
+        const val SeenUnlockAt = 1_000L
+        const val FreshUnlockAt = 2_000L
+
+        /** A streak record worth posting, and not one any other fake reports. */
+        const val LongestRun = 9
+
         /** Mirrors `ProgressionSkipsPerDay.default`. */
         const val DefaultSkipsPerDay = 3
 
@@ -3915,6 +4160,8 @@ class GameViewModelTest : CoroutineTest() {
      */
     private class SilentStreak(
         private val prompt: StreakPrompt = StreakPrompt.None,
+        /** The record the leaderboard is fed, which nothing else here reads. */
+        longest: Int = 0,
     ) : StreakRepository {
         val shown = mutableListOf<StreakPrompt>()
         override fun observe(): Flow<StreakSummary> = flowOf(empty)
@@ -3925,7 +4172,7 @@ class GameViewModelTest : CoroutineTest() {
 
         private val empty = StreakSummary(
             current = 0,
-            longest = 0,
+            longest = longest,
             today = LocalDate(2026, 1, 1),
             days = emptyList(),
             enabled = true,
@@ -3983,23 +4230,61 @@ class GameViewModelTest : CoroutineTest() {
     private class RecordingAchievements(
         /** What every recorded attempt unlocks. Empty is the normal answer. */
         private val unlocks: List<Achievement> = emptyList(),
+        /**
+         * Badges already earned, against the epoch-ms of the attempt that earned
+         * them — the shape the trophy's count reads.
+         */
+        unlocked: Map<AchievementId, Long> = emptyMap(),
     ) : AchievementsRepository {
         val recorded = mutableListOf<LevelResult>()
-        private var state = AchievementState.Empty
 
-        override fun observe(): Flow<AchievementState> = flowOf(state)
+        /**
+         * A live flow rather than a snapshot, because the real repository
+         * re-emits when an unlock lands and the trophy is wired to that.
+         */
+        private val history = MutableStateFlow(AchievementState(unlocked = unlocked))
 
-        override suspend fun state(): AchievementState = state
+        override fun observe(): Flow<AchievementState> = history
+
+        override suspend fun state(): AchievementState = history.value
 
         override suspend fun record(result: LevelResult): List<Achievement> {
             recorded += result
+            // Stamped with the attempt's own time, as `AchievementEngine` does.
+            // A fake that returned unlocks without logging them would let the
+            // badge count pass on a repository that never remembers anything.
+            history.value = history.value.copy(
+                unlocked = history.value.unlocked + unlocks.associate { it.id to result.finishedAt },
+            )
             return unlocks
         }
 
         override suspend fun reset() {
             recorded.clear()
-            state = AchievementState.Empty
+            history.value = AchievementState.Empty
         }
+    }
+
+    /** A streak repository that cannot answer, so the clear has to cope. */
+    private class BrokenStreak : StreakRepository {
+        override fun observe(): Flow<StreakSummary> = emptyFlow()
+        override suspend fun summary(): StreakSummary = error("the streak tables are gone")
+        override suspend fun pendingPrompt(): StreakPrompt = StreakPrompt.None
+        override suspend fun onPromptShown(prompt: StreakPrompt) = Unit
+        override suspend fun reset() = Unit
+    }
+
+    /** Every submission, in order, so a test can see what a clear posted. */
+    private class RecordingLeaderboards : Leaderboards {
+        val submitted = mutableListOf<Pair<Leaderboard, Long>>()
+
+        override val isOfferable: StateFlow<Boolean> = MutableStateFlow(false)
+
+        override fun submit(board: Leaderboard, value: Long) {
+            submitted += board to value
+        }
+
+        override fun openDashboard(board: Leaderboard?) = Unit
     }
 
     private class InMemoryProgress : ProgressRepository {

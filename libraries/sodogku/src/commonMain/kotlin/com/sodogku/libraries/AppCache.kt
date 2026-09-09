@@ -96,6 +96,22 @@ data class AppData(
     val achievementsVisible: Boolean = true,
 
     /**
+     * Epoch-ms of the newest badge the player had already been shown the last
+     * time they opened the badge grid. Anything unlocked after it is what the
+     * board's trophy counts.
+     *
+     * A watermark rather than a count of badges seen, because a count cannot
+     * survive `AchievementsRepository.reset()`: it would outlive the log it
+     * describes and hide every badge earned after the wipe. Unlock times come
+     * from the attempt that earned them, so a re-earned badge is newer than this
+     * and is announced again.
+     *
+     * Zero means never looked, which on a fresh install is also "nothing to
+     * see" — there are no unlocks for it to be older than.
+     */
+    val achievementsSeenAt: Long = 0L,
+
+    /**
      * Bones held, and **the only place the count lives** (SPEC 1.4).
      *
      * One number across the campaign and the daily. It used to be per-attempt,

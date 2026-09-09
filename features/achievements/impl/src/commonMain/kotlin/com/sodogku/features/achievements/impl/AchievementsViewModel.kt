@@ -88,6 +88,33 @@ class AchievementsViewModel(
                 badges = history.toBadges(),
             )
         }
+        // Only what was actually put in front of somebody. With badges switched
+        // off this screen is an explanation rather than a grid, and calling that
+        // "seen" would bury every badge earned while they were off on the day
+        // they are switched back on.
+        if (visible) markSeen(history)
+    }
+
+    /**
+     * Puts the watermark the board's trophy counts against at the newest badge
+     * on screen, so the badge clears when the grid is opened and not before.
+     *
+     * The newest unlock rather than "now", because this module has no clock and
+     * does not need one: the question the trophy asks is whether anything was
+     * unlocked *after* the last look, and the unlock times are the only side of
+     * that comparison. A "now" read from a device clock running ahead of the one
+     * that stamped the unlocks would swallow a badge earned later.
+     *
+     * Never lowers the watermark, so the order two screens happen to write in
+     * cannot uncount a badge.
+     */
+    private suspend fun markSeen(history: AchievementState) {
+        val newest = history.unlocked.values.maxOrNull() ?: return
+        Catching {
+            appCache.update { data ->
+                data.copy(achievementsSeenAt = maxOf(data.achievementsSeenAt, newest))
+            }
+        }.logOnFailure { "Failed to mark badges as seen" }
     }
 
     private suspend fun AchievementsAction.onHistory(history: AchievementState) {

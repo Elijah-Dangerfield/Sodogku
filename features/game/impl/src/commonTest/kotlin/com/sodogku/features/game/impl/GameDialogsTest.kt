@@ -1,6 +1,7 @@
 package com.sodogku.features.game.impl
 
 import com.sodogku.libraries.levels.LevelPacks
+import com.sodogku.libraries.scoring.Standing
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -37,6 +38,31 @@ class GameDialogsTest {
     @Test
     fun theCampaignPackIsTheSourceOfTheLevelCount() {
         assertEquals(ShippedCampaignLevels, LevelPacks.campaign.size)
+    }
+
+    /**
+     * The win sheet's headline is the verdict, so a collapsed `when` would leave
+     * two different runs congratulated identically — which is what S16 asked
+     * for, silently undone. [Standing.Solid] keeps the sheet's original line,
+     * which is a fourth distinct one and not a shared one.
+     */
+    @Test
+    fun everyVerdictGetsItsOwnLine() {
+        // By key: two `Res.string.x` reads are two objects, so a set of the
+        // resources themselves would count four no matter what they point at.
+        val lines = Standing.entries.map { verdictTitle(it).key }
+
+        assertEquals(Standing.entries.size, lines.toSet().size)
+    }
+
+    /**
+     * A won sheet with no verdict is not a state the ViewModel produces, but a
+     * preview builds one, and the fallback has to be the neutral line rather
+     * than the worst grade.
+     */
+    @Test
+    fun anUnjudgedWinFallsBackToTheNeutralLine() {
+        assertEquals(verdictTitle(Standing.Solid).key, verdictTitle(null).key)
     }
 
     private companion object {

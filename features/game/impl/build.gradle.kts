@@ -31,6 +31,10 @@ kotlin {
             implementation(projects.features.streak)
             implementation(projects.libraries.sharing)
             implementation(projects.libraries.scoring)
+            // Submitted to on every clear and never read back. `NoLeaderboards`
+            // is the binding everywhere except iOS with Game Center, so this is
+            // a dependency on an interface that mostly does nothing.
+            implementation(projects.libraries.leaderboards)
             implementation(projects.libraries.ads)
             implementation(projects.libraries.billing)
             // The scoring coefficients, the booster economy and two feature
@@ -58,6 +62,7 @@ kotlin {
             implementation(projects.libraries.achievements)
             implementation(projects.libraries.puzzle)
             implementation(projects.libraries.scoring)
+            implementation(projects.libraries.leaderboards)
             implementation(projects.libraries.ads)
             implementation(projects.libraries.billing)
             implementation(projects.libraries.config)

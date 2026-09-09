@@ -2,6 +2,7 @@ package com.sodogku.features.game.impl
 
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -28,9 +29,12 @@ import com.sodogku.libraries.flowroutines.collectIn
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.achievements.Achievement
+import com.sodogku.libraries.achievements.AchievementState
 import com.sodogku.libraries.achievements.AchievementsRepository
 import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
+import com.sodogku.libraries.leaderboards.Leaderboard
+import com.sodogku.libraries.leaderboards.Leaderboards
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
 import com.sodogku.libraries.progress.LifetimeScore
@@ -55,6 +59,7 @@ import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.ScoringConfig
+import com.sodogku.libraries.scoring.standingFor
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppEvent
 import com.sodogku.libraries.sodogku.AppEvents
@@ -76,6 +81,18 @@ import me.tatarka.inject.annotations.Inject
  * pays is precisely the bug this reward exists to fix.
  */
 internal const val LevelRewardTreats: Int = 1
+
+/**
+ * Badges unlocked strictly after [seenAt], which is what the board's trophy
+ * counts.
+ *
+ * A comparison of timestamps rather than a stored count, so the number is
+ * derived from the log on every read and there is no second copy of it to drift.
+ * Strictly after, because [seenAt] is itself an unlock time: the badge the
+ * player was last shown is not a badge they have not seen.
+ */
+internal fun AchievementState.badgesSince(seenAt: Long): Int =
+    unlocked.count { (_, unlockedAt) -> unlockedAt > seenAt }
 
 /**
  * The lifetime total split in two: everything banked, and the slice of it this
@@ -154,6 +171,12 @@ class GameViewModel(
     private val skipAfterFailedAttempts: ProgressionSkipAfterFailedAttempts,
     private val achievementsEnabled: FeatureAchievements,
     private val boostersEnabled: FeatureBoosters,
+    /**
+     * Fire and forget. Nothing here waits on it, reads a result from it or
+     * branches on one, because [Leaderboards] offers no way to — see its KDoc.
+     * A player signed out of Game Center plays an identical game.
+     */
+    private val leaderboards: Leaderboards,
     /**
      * Foreground and background edges, which is the only thing on this screen
      * that cares the app can go away. See [GameAction.VisibilityChanged].
@@ -310,6 +333,7 @@ class GameViewModel(
                     it.hapticsEnabled,
                     it.reduceAnimations,
                     it.autoMarkEnabled,
+                    it.achievementsVisible,
                 )
             }
             .distinctUntilChanged()
@@ -329,6 +353,17 @@ class GameViewModel(
             .distinctUntilChanged()
             .onEach { bones -> takeAction(GameAction.BonesChanged(bones)) }
             .launchIn(viewModelScope)
+        // The trophy's badge is a comparison between two things that both move
+        // while this screen is up: the log, which a clear writes to, and the
+        // watermark, which the grid moves when the player goes and looks. Both
+        // sides are observed, so coming back from the grid clears the badge
+        // without this screen knowing the grid exists.
+        combine(
+            achievements.observe(),
+            appCache.updates.map { it.achievementsSeenAt }.distinctUntilChanged(),
+        ) { history, seenAt -> history.badgesSince(seenAt) }
+            .distinctUntilChanged()
+            .collectIn(viewModelScope) { takeAction(GameAction.NewBadgesChanged(it)) }
         // The card lives in the drawer of every board, daily or not, and the
         // repository re-emits at local midnight — so a drawer left open past
         // midnight picks up the new board without this screen watching a clock.
@@ -390,6 +425,10 @@ class GameViewModel(
             GameAction.OpenTerms -> sendEvent(GameEvent.OpenTerms)
             GameAction.OpenFeedback -> sendEvent(GameEvent.OpenFeedback)
             GameAction.OpenSettings -> sendEvent(GameEvent.OpenSettings)
+            GameAction.OpenAchievements -> sendEvent(GameEvent.OpenAchievements)
+            is GameAction.NewBadgesChanged -> action.updateState {
+                it.copy(newBadgeCount = action.count)
+            }
             GameAction.TutorialAdvance -> action.tutorialTapped()
             GameAction.SkipTutorial -> action.skipTutorial()
             is GameAction.VisibilityChanged -> holdClock(paused = !action.foreground)
@@ -403,6 +442,7 @@ class GameViewModel(
                         haptics = action.settings.haptics,
                         reduceAnimations = action.settings.reduceAnimations,
                         autoMarkVisible = action.settings.autoMark,
+                        showAchievements = action.settings.achievements,
                     )
                 }
             }
@@ -426,6 +466,7 @@ class GameViewModel(
                 autoMarkVisible = autoMark,
                 reduceAnimations = settings?.reduceAnimations == true,
                 showAchievements = settings?.achievementsVisible != false,
+                achievementsEnabled = achievementsEnabled(),
                 isPro = entitlements.isPro.value,
                 boostersEnabled = boostersEnabled(),
                 refillTo = refillTo(),
@@ -744,6 +785,12 @@ class GameViewModel(
                 reduceAnimations = it.reduceAnimations,
                 autoMarkVisible = it.autoMarkVisible,
                 showAchievements = it.showAchievements,
+                // Both halves of the trophy's gate, and its count. None of the
+                // three is about the board, so a new board carries all of them
+                // — this builds a fresh state rather than copying one, and
+                // anything not named here is silently reset.
+                achievementsEnabled = it.achievementsEnabled,
+                newBadgeCount = it.newBadgeCount,
                 boostersEnabled = it.boostersEnabled,
                 refillTo = it.refillTo,
                 treatBands = it.treatBands,
@@ -1384,6 +1431,21 @@ class GameViewModel(
             completed = true,
             config = scoring,
         )
+        // Rated on the same number as the paws, and it has to be. The two sit
+        // side by side on the sheet and `StandingTest` pins them to each other;
+        // judging this one on the banked total instead would let a run that
+        // leaned on boosters show three paws next to "Got there".
+        // `bonesUnspent` and not the held count, for the same reason the
+        // completion bonus uses it: an ad refill would otherwise buy the top
+        // verdict on a board the player had already made mistakes on.
+        val standing = Scoring.standingFor(
+            finished.total,
+            level.size,
+            level.difficulty,
+            completed = true,
+            livesRemaining = bonesUnspent,
+            config = scoring,
+        )
         val boostersUsed = sniffsUsed + treatsUsed
         val banked = Scoring.afterBoosters(finished.total, boostersUsed, scoring.boosterPenaltyRate)
         val duration = elapsedMs()
@@ -1436,8 +1498,13 @@ class GameViewModel(
         val reward = grantLevelReward(level, firstClear = levelNeverCleared)
 
         sendEvent(GameEvent.Won)
+        // Captured out of the transform rather than read back afterwards, for
+        // the reason `updateBoard` gives: `state` lags an update by a dispatch,
+        // so a leaderboard fed from it would post the total from before this
+        // clear — and post the right one only on the *next* board.
+        var lifetime = 0
         updateBoard {
-            it.copy(
+            val won = it.copy(
                 phase = GamePhase.Won,
                 score = finished,
                 // The rate this clear was priced at, so the sheet's number and
@@ -1451,9 +1518,42 @@ class GameViewModel(
                 newBadges = earnedBadges,
                 dailyStreak = streak,
                 treatAwarded = reward,
+                standing = standing,
             )
+            lifetime = won.lifetimeScore
+            won
         }
+        postToLeaderboards(lifetime)
         offerStreakCeremony()
+    }
+
+    /**
+     * Hands the two boards their numbers, on every clear.
+     *
+     * Both are **totals**, not increments: the platform keeps the best it has
+     * seen, so sending the same number after a replay that banked nothing is a
+     * no-op rather than a double count. That is what makes "call this after
+     * every board" the whole of the integration.
+     *
+     * [lifetimeScore] is passed in because it is only knowable from inside the
+     * update that produced it. The longest streak is read here instead, because
+     * it is not on the board's state at all — [GameState.dailyStreak] is the
+     * *current* run, which is a smaller number and the wrong one.
+     *
+     * Nothing branches on either call and nothing waits for one. A player who is
+     * signed out, offline, or on Android gets a game that behaves identically;
+     * the only thing this can be seen to do is fail to change anything.
+     */
+    private suspend fun postToLeaderboards(lifetimeScore: Int) {
+        leaderboards.submit(Leaderboard.LifetimeScore, lifetimeScore.toLong())
+        // Read on a campaign clear too, cheaply and deliberately. A streak
+        // restored between two dailies raises the record without a daily being
+        // played, and every clear is a chance to notice.
+        val longest = Catching { streak.summary().longest }
+            .logOnFailure { "Failed to read the longest streak" }
+            .getOrNull()
+            ?: return
+        leaderboards.submit(Leaderboard.LongestStreak, longest.toLong())
     }
 
     /**
