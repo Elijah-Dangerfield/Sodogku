@@ -159,6 +159,24 @@ data class TypographyResource internal constructor(
             identifier = "${identifier}-semibold"
         )
 
+    /**
+     * One step up from [Normal], well short of [SemiBold].
+     *
+     * The gap the scale was missing. Every style here is Normal, SemiBold or
+     * Bold, so the only way to firm up a line of body or caption text was to
+     * jump it two steps into a weight that reads as a heading.
+     */
+    val Medium: TypographyResource
+        get() = TypographyResource(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = fontSize,
+            lineHeight = lineHeight,
+            lineBreak = lineBreak,
+            fontStyle = fontStyle,
+            identifier = "${identifier}-medium"
+        )
+
     val Normal: TypographyResource
         get() = TypographyResource(
             fontFamily = fontFamily,

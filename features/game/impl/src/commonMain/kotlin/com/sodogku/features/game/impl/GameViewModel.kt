@@ -13,6 +13,7 @@ import com.sodogku.libraries.ads.AdGate
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
+import com.sodogku.libraries.config.values.AdsEnabled
 import com.sodogku.libraries.config.values.BoostersProSniffsPerAttempt
 import com.sodogku.libraries.config.values.BoostersProTreatsPerAttempt
 import com.sodogku.libraries.config.values.BoostersRefillTo
@@ -173,6 +174,12 @@ class GameViewModel(
     private val skipAfterFailedAttempts: ProgressionSkipAfterFailedAttempts,
     private val achievementsEnabled: FeatureAchievements,
     private val boostersEnabled: FeatureBoosters,
+    /**
+     * `ads.enabled`, for the Ad badges on the booster row and nothing else. The
+     * decision to show an ad stays with [adGate], which re-reads this key at the
+     * moment of use; this is only how the buttons say what a tap will do.
+     */
+    private val adsEnabled: AdsEnabled,
     /**
      * Fire and forget. Nothing here waits on it, reads a result from it or
      * branches on one, because [Leaderboards] offers no way to — see its KDoc.
@@ -501,6 +508,7 @@ class GameViewModel(
                 achievementsEnabled = achievementsEnabled(),
                 isPro = entitlements.isPro.value,
                 boostersEnabled = boostersEnabled(),
+                adsEnabled = adsEnabled(),
                 refillTo = refillTo(),
                 treatBands = treatSchedule(),
                 // Null is "never granted any", which is what a fresh install
@@ -829,6 +837,11 @@ class GameViewModel(
                 achievementsEnabled = it.achievementsEnabled,
                 newBadgeCount = it.newBadgeCount,
                 boostersEnabled = it.boostersEnabled,
+                // Carried for the same reason as the line above it: this builds
+                // a fresh GameState, so a flag it does not name is silently
+                // reset — and the reset value here is `true`, which would put an
+                // Ad badge back on a row where ads are switched off.
+                adsEnabled = it.adsEnabled,
                 refillTo = it.refillTo,
                 treatBands = it.treatBands,
                 isPro = it.isPro,

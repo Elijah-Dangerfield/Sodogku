@@ -12,7 +12,6 @@
     <string name="game_rule_one_per_line">1 dog per row &amp; column</string>
     <string name="game_rule_no_touching">Dogs cannot touch</string>
     <string name="game_sniff">Locate</string>
-    <string name="game_treat">Treat</string>
     <string name="game_won_title">Good dog!</string>
     <string name="game_lost_title">Out of bones</string>
     <string name="game_retry">Start over</string>
@@ -43,7 +42,6 @@
     <string name="game_skip_level">Skip this level</string>
     <string name="game_skip_remaining">%1$d skips left today</string>
     <string name="game_skip_none_left">No skips left today</string>
-    <string name="game_free_bones">Bones</string>
     <string name="game_dogs_found">%1$d/%2$d</string>
 
     <string name="rules_title">How to play</string>
@@ -151,7 +149,7 @@
     <string name="board_glyph_9">chevron</string>
     <string name="booster_sniff_title">Locate</string>
     <string name="booster_sniff_body">Your dog sniffs around and rules out a few squares for you. It never tells you where a dog goes. That part is still yours.</string>
-    <string name="booster_treat_title">Give a treat</string>
+    <string name="booster_treat_title">Use a hint</string>
     <string name="booster_treat_body">Places one dog correctly, free. No bone at risk.</string>
     <string name="booster_bone_title">Bones</string>
     <string name="booster_bone_body">A wrong guess costs a bone. The same three carry across every board, so a new puzzle does not hand you any. Run out and the attempt ends.</string>
@@ -190,8 +188,8 @@
     <string name="tutorial_auto_mark_body">Every square that dog rules out was crossed off for you. On the bigger grids this is most of the work.</string>
     <string name="tutorial_sniff_title">Sniff</string>
     <string name="tutorial_sniff_body">Stuck? A sniff rules a few squares out. It never says where a dog goes, so the puzzle stays yours.</string>
-    <string name="tutorial_treat_title">Treat</string>
-    <string name="tutorial_treat_body">A treat places one dog correctly, with no bone at risk.</string>
+    <string name="tutorial_treat_title">Hint</string>
+    <string name="tutorial_treat_body">A hint places one dog correctly, with no bone at risk.</string>
     <string name="tutorial_try_wrong_title">Get one wrong on purpose</string>
     <string name="tutorial_try_wrong_body">Two taps on the lit square. No dog lives there, and nothing on this board costs you anything.</string>
     <string name="tutorial_wrong_explained_title">That is a wrong guess</string>
@@ -209,12 +207,12 @@
     <string name="settings_rerun_tutorial_body">Runs the guided practice board again, from the start.</string>
 
     <!-- The chip on every level that pays a Treat on its first clear. -->
-    <string name="levels_reward_treat">+%1$d Treat</string>
+    <string name="levels_reward_treat">+%1$d Hint</string>
     <!-- The same chip once the level has been cleared and the reward collected.
          Kept shorter than levels_reward_treat: the chip shares its row with the
          paw rating, and the longer label squeezed the third paw out of view. -->
     <string name="levels_reward_claimed">Earned</string>
-    <string name="game_reward_earned">You earned a Treat</string>
+    <string name="game_reward_earned">You earned a Hint</string>
 
     <string name="daily_title">Daily challenge</string>
     <string name="daily_date">%1$s %2$d</string>
@@ -460,7 +458,7 @@
     <string name="paywall_benefit_no_ads">No ads, ever</string>
     <string name="paywall_benefit_offline">Unlimited offline play</string>
     <string name="paywall_benefit_free_helps">Continues, skips and streak freezes with no ad to watch</string>
-    <string name="paywall_benefit_boosters">Sniffs and Treats topped back up at the start of every attempt</string>
+    <string name="paywall_benefit_boosters">Boosters topped back up at the start of every attempt</string>
     <string name="paywall_benefit_jump">Every level in the campaign, open from the start</string>
     <string name="paywall_buy">Get Pro</string>
     <string name="paywall_one_time">One payment. Not a subscription.</string>
@@ -555,4 +553,14 @@
          one objection a non-subscription has to answer is the one everybody
          brings to a paywall. -->
     <string name="paywall_headline">Everything unlocked, once</string>
+    <!-- The two controls under the board that changed their names rather than
+         their behaviour. "Treat" was a thing a player was given and said nothing
+         about what tapping it did; the button places a dog for you, which is a
+         hint. The bones button used to read "Bones", which named the currency
+         and not the offer — every other control on the row is a verb. The
+         Consumable type, the boosters.* config keys and the treats_used event
+         all keep their old names on purpose: those are persisted, and renaming
+         them would reset what players are holding. -->
+    <string name="game_hint">Hint</string>
+    <string name="game_bones_refill">Refill Bones</string>
 </resources>

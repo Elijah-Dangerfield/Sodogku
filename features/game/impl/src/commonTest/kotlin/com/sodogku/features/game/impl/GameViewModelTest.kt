@@ -9,6 +9,7 @@ import com.sodogku.libraries.billing.RestoreOutcome
 import com.sodogku.libraries.config.AppConfigMap
 import com.sodogku.libraries.config.values.BoostersProSniffsPerAttempt
 import com.sodogku.libraries.config.values.BoostersProTreatsPerAttempt
+import com.sodogku.libraries.config.values.AdsEnabled
 import com.sodogku.libraries.config.values.BoostersRefillTo
 import com.sodogku.libraries.config.values.BoostersStartingSniffs
 import com.sodogku.libraries.config.values.BoostersStartingTreats
@@ -3255,6 +3256,43 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(0, vm.state.sniffs)
     }
 
+    /**
+     * `ads.enabled` reaches the board, because the booster row badges the taps
+     * that play an ad and a badge is a promise. Nothing on the screen shows an
+     * ad on the strength of this — `RealAdGate` re-reads the key at the moment
+     * of use — so the only thing it can get wrong is the label, in the direction
+     * of promising an advert that never comes.
+     */
+    @Test
+    fun switchingAdsOffTakesTheAdBadgesWithIt() = runUnitTest {
+        val vm = viewModel(config = configOf("ads.enabled" to false))
+
+        assertFalse(vm.state.adsEnabled)
+        assertFalse(vm.state.tapPlaysAd(Consumable.Bone), "the bones refill still promised an ad")
+    }
+
+    /**
+     * `startAttempt` builds a fresh `GameState` by hand, so a flag it forgets is
+     * reset to its default — and this one defaults to *true*, which means the
+     * failure is an Ad badge reappearing on the second board of a build where
+     * ads are switched off. The wrong direction for a mistake to fail in.
+     */
+    @Test
+    fun adsStayOffAcrossTheNextBoard() = runUnitTest {
+        val vm = viewModel(config = configOf("ads.enabled" to false))
+
+        vm.takeAction(GameAction.NextLevel)
+        settle()
+
+        assertEquals(PlainLevel + 1, vm.state.level?.id, "the fixture has to actually move")
+        assertFalse(vm.state.adsEnabled, "a new board put the ad badges back")
+    }
+
+    @Test
+    fun withNoConfigTheAdPathIsLive() = runUnitTest {
+        assertTrue(viewModel().state.adsEnabled)
+    }
+
     @Test
     fun withNoConfigTheBoostersAreThere() = runUnitTest {
         val vm = viewModel()
@@ -3992,6 +4030,7 @@ class GameViewModelTest : CoroutineTest() {
         skipAfterFailedAttempts = ProgressionSkipAfterFailedAttempts(config),
         achievementsEnabled = FeatureAchievements(config),
         boostersEnabled = FeatureBoosters(config),
+        adsEnabled = AdsEnabled(config),
         leaderboards = leaderboards,
         appEvents = AppEvents(lifecycle),
     )

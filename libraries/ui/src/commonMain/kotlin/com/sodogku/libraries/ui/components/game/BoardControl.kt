@@ -64,6 +64,21 @@ fun BoardControl(
     modifier: Modifier = Modifier,
     /** Shown as a badge on the circle. Null draws no badge at all. */
     count: Int? = null,
+    /**
+     * Whether tapping this plays an ad, which the badge says out loud.
+     *
+     * **There is one badge corner**, and this wins it. A 70dp circle has room
+     * for exactly one thing in its top-right and stacking two would put them
+     * over the artwork; and the two never both have something to say. A booster
+     * only reaches the ad when its count is zero, and a zero badge is the one
+     * number a player can already read off the greyed-out button — so the
+     * corner spends itself on what the tap *does* instead of on what is left.
+     *
+     * The caller decides. This is a picture of a decision made in the
+     * ViewModel's language (Pro, config, phase, holdings), not a rule this
+     * component is in any position to work out.
+     */
+    adBadge: Boolean = false,
     enabled: Boolean = true,
     /**
      * Whether to draw attention to this control.
@@ -137,24 +152,36 @@ fun BoardControl(
                 }
             }
 
-            if (count != null) {
-                Box(
+            when {
+                adBadge -> RewardBadge(modifier = Modifier.align(Alignment.TopEnd))
+
+                count != null -> Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .clip(Radii.Round)
+                        // Not `danger`. Red is the app's one colour for "this
+                        // cost you something" — a wrong guess, a bone gone —
+                        // and a count of what you are holding is the opposite
+                        // of that. The primary accent also keeps this clear of
+                        // the secondary one, which is what [RewardBadge] wears
+                        // and means "an ad is involved" everywhere it appears.
                         .background(
                             if (count > 0) {
-                                AppTheme.colors.danger.color
+                                AppTheme.colors.accentPrimary.color
                             } else {
                                 AppTheme.colors.textDisabled.color
                             },
                         )
                         .padding(horizontal = Dimension.D300, vertical = Dimension.D50),
                 ) {
+                    // Label rather than Caption, for the same reason the word
+                    // under the circle is: the caption scale is footnote type,
+                    // and this number is the only thing telling a player how
+                    // many they have left.
                     Text(
                         text = count.toString(),
-                        typography = AppTheme.typography.Caption.C300,
+                        typography = AppTheme.typography.Label.L400,
                         color = AppTheme.colors.onAccentPrimary,
                     )
                 }
@@ -173,17 +200,48 @@ fun BoardControl(
     }
 }
 
-/** A bone, sized for the middle of a [BoardControl]. */
+/**
+ * A bone, sized for the middle of a [BoardControl].
+ *
+ * [enabled] false drops [fill] and [edge] for a drained bone rather than dimming
+ * the gold one with alpha. A bone at half opacity on a cream page reads as a
+ * rendering fault.
+ *
+ * The colours invert instead: enabled is a gold bone on a white disc, disabled
+ * is a white bone on the cream disc [BoardControl] switches to. The shape stays
+ * exactly as legible — which is the point of greying a control out rather than
+ * hiding it, since the player still has to know what the button *is* to
+ * understand why it is off.
+ */
 @Composable
-fun BoardControlBone(fill: Color, edge: Color, size: Dp = ArtSize) {
+fun BoardControlBone(fill: Color, edge: Color, size: Dp = ArtSize, enabled: Boolean = true) {
+    val bone = if (enabled) fill else AppTheme.colors.surfacePrimary.color
+    val rim = if (enabled) edge else AppTheme.colors.onSurfaceDisabled.color
     Box(
         modifier = Modifier
             .size(width = size * BoneAspect, height = size)
             .drawBehind {
                 // Tilted, because a bone lying flat reads as a minus sign at
                 // this size.
-                rotate(BoneTilt) { drawBone(fill = fill, edge = edge) }
+                rotate(BoneTilt) { drawBone(fill = bone, edge = rim) }
             },
+    )
+}
+
+/**
+ * A paw, sized for the middle of a [BoardControl].
+ *
+ * Square where [BoardControlBone] is wide, so it is given its own size: at the
+ * bone's height a paw is visibly the smaller of the two sitting side by side,
+ * because the bone spends its bulk on width the paw does not have.
+ */
+@Composable
+fun BoardControlPaw(color: Color, size: Dp = PawArtSize, enabled: Boolean = true) {
+    val ink = if (enabled) color else AppTheme.colors.onSurfaceDisabled.color
+    Box(
+        modifier = Modifier
+            .size(size)
+            .drawBehind { drawPaw(color = ink, filled = true) },
     )
 }
 
@@ -196,14 +254,25 @@ fun BoardControlBone(fill: Color, edge: Color, size: Dp = ArtSize) {
  * it, and the row took more vertical space than a row of three buttons needs.
  *
  * 70dp is the floor rather than a waypoint. It is still comfortably past the
- * 48dp minimum touch target, but the art inside is [ArtSize] and the next step
- * down the scale would put the two within a few dp of each other, which is a
- * picture in a ring rather than a picture on a button.
+ * 48dp minimum touch target, and it is fixed: the art inside it has since come
+ * down a step, which is a different change from shrinking the button, and the
+ * two are easy to confuse when the only thing you can see is the result.
  */
 private val FaceSize = Dimension.D1500
 
-/** Well over half the circle across, so the bone reads rather than sits in it. */
-private val ArtSize = Dimension.D1200
+/**
+ * The bone's height. A step down from where it was.
+ *
+ * At 40dp the bone was 58dp across inside a 70dp circle — six dp of white on
+ * each side — so the disc had stopped reading as a button with a picture on it
+ * and started reading as a picture with a rim. 28dp leaves the art clearly
+ * inside the shape that carries it, which is what makes the row look like three
+ * buttons rather than three stickers.
+ */
+private val ArtSize = Dimension.D1000
+
+/** The paw's side. Square art needs more than the bone's height to weigh the same. */
+private val PawArtSize = Dimension.D1100
 
 /** Matches the aspect `drawBone` is drawn against; a bone in a square is a blob. */
 private const val BoneAspect = 1.45f
@@ -237,11 +306,14 @@ private const val ShakeDegrees = 7f
 private fun BoardControlPreview() {
     PreviewContent {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D600)) {
-            BoardControl(label = "Locate", count = 3) {
-                BoardControlBone(fill = Color(0xFFFFF3E0), edge = Color(0xFFD98324))
+            BoardControl(label = "Hint", count = 3) {
+                BoardControlPaw(color = Color(0xFFD98324))
             }
-            BoardControl(label = "Treat", count = 0, enabled = false) {
-                BoardControlBone(fill = Color(0xFFDEDAD6), edge = Color(0xFFB4AEA8))
+            BoardControl(label = "Hint", count = 0, adBadge = true) {
+                BoardControlPaw(color = Color(0xFFD98324))
+            }
+            BoardControl(label = "Refill Bones", enabled = false) {
+                BoardControlBone(fill = Color(0xFFF5C043), edge = Color(0xFFC8871B), enabled = false)
             }
         }
     }

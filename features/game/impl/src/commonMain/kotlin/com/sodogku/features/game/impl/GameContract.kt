@@ -229,6 +229,18 @@ data class GameState(
      */
     val boostersEnabled: Boolean = true,
 
+    /**
+     * `ads.enabled`, so the row can say which taps play an ad. Nothing on this
+     * screen *shows* an ad on the strength of it — `RealAdGate` re-reads the key
+     * at the moment of use and grants the reward for free when it is off — this
+     * only decides whether the button promises one.
+     *
+     * True by default, matching the shipped config default and [boostersEnabled]
+     * above: a board built before the flag is read gets the honest label rather
+     * than a quietly optimistic one.
+     */
+    val adsEnabled: Boolean = true,
+
     /** How far the player has reached; the level drawer unlocks up to it. */
     val unlockedThrough: Int = LevelRecord.FIRST_LEVEL_ID,
 
@@ -459,6 +471,57 @@ data class GameState(
      * screen saying badges are switched off is worse than no button.
      */
     val achievementsOffered: Boolean get() = showAchievements && achievementsEnabled
+
+    /** How many of [consumable] the player is holding. */
+    fun held(consumable: Consumable): Int = when (consumable) {
+        Consumable.Bone -> livesRemaining
+        Consumable.Sniff -> sniffs
+        Consumable.Treat -> treats
+    }
+
+    /**
+     * Whether the bones control has anything to offer.
+     *
+     * Against [refillTo] rather than the compile-time three, because the refill
+     * tops up to the config number: comparing with a constant would grey the
+     * offer out while an ad still had bones to give.
+     */
+    val bonesRefillable: Boolean
+        get() = phase != GamePhase.Recap && livesRemaining < refillTo
+
+    /**
+     * Whether tapping [consumable]'s control under the board leads to an ad.
+     *
+     * This is the badge's whole reason to exist, so it is written to match what
+     * the ViewModel will actually do rather than what the row looks like:
+     *
+     * - **Pro never sees it.** `RealAdGate` grants Pro the reward without
+     *   showing anything, so an Ad badge on a paying customer's screen would be
+     *   advertising a thing they bought their way out of. First clause on
+     *   purpose — every other condition is irrelevant once this one holds.
+     * - **[adsEnabled] off is the same case.** The gate grants for free, so the
+     *   tap is still a grant and still not an ad.
+     * - **A booster reaches the ad only at zero.** `GameViewModel.boosterTapped`
+     *   spends one outright when the player holds any, and opens the explainer
+     *   on the first tap of each — whose primary button is "use one" while there
+     *   is one to use. Only an empty booster opens a prompt that leads with the
+     *   ad.
+     * - **Bones are an ad whenever the button does anything at all**, because
+     *   the refill *is* the ad. There is no version of that tap that spends
+     *   something the player already has.
+     *
+     * A disabled control promises nothing: [phase] gates the boosters the same
+     * way the row does, and [bonesRefillable] is the bones button's own enabled
+     * state.
+     */
+    fun tapPlaysAd(consumable: Consumable): Boolean = when {
+        isPro -> false
+        !adsEnabled -> false
+        consumable == Consumable.Bone -> bonesRefillable
+        !boostersEnabled -> false
+        phase != GamePhase.Playing -> false
+        else -> held(consumable) == 0
+    }
 
     val placedCells: Set<Int> get() = placed.cells().toSet()
 

@@ -82,9 +82,9 @@ import sodogku.libraries.resources.generated.resources.game_rule_no_touching
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_line
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_region
 import sodogku.libraries.resources.generated.resources.game_bones_remaining
-import sodogku.libraries.resources.generated.resources.game_free_bones
+import sodogku.libraries.resources.generated.resources.game_bones_refill
 import sodogku.libraries.resources.generated.resources.game_sniff
-import sodogku.libraries.resources.generated.resources.game_treat
+import sodogku.libraries.resources.generated.resources.game_hint
 import kotlin.math.abs
 import kotlin.math.sin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -98,6 +98,7 @@ import sodogku.libraries.resources.generated.resources.hint_found_many
 import sodogku.libraries.resources.generated.resources.hint_found_one
 import com.sodogku.libraries.ui.components.game.BoardControl
 import com.sodogku.libraries.ui.components.game.BoardControlBone
+import com.sodogku.libraries.ui.components.game.BoardControlPaw
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import androidx.compose.ui.graphics.Color
@@ -185,9 +186,13 @@ fun GameScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.weight(SpaceBelowBoard))
-
+            // Directly under the grid, before the slack rather than after it.
+            // Sat below the spacer it was pinned to the top of the booster row,
+            // three quarters of the gap away from the thing it is timing, and
+            // read as a label belonging to the buttons.
             BoardClock(elapsed)
+
+            Spacer(modifier = Modifier.weight(SpaceBelowBoard))
 
             // `boosters.enabled` off already stops the economy — a tap spends
             // nothing and an ad refill refuses — but leaving the buttons on
@@ -823,9 +828,14 @@ private fun BoardClock(elapsed: StateFlow<Long>, modifier: Modifier = Modifier) 
     val millis by elapsed.collectAsState()
     Text(
         text = elapsedLabel(millis).orEmpty(),
-        typography = AppTheme.typography.Caption.C300,
+        // Caption scale still, but no longer at caption weight. Sitting right
+        // under the grid the clock has the board's whole width of cream behind
+        // it, and Normal at that size read as a stray number rather than as a
+        // reading; Medium is the least the type scale can do and still look
+        // deliberate.
+        typography = AppTheme.typography.Caption.C300.Medium,
         color = AppTheme.colors.textSecondary,
-        modifier = modifier.padding(bottom = Dimension.D400),
+        modifier = modifier.padding(top = Dimension.D400),
     )
 }
 
@@ -872,28 +882,34 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
             // move" booster; two controls pulsing at once is a row demanding
             // attention rather than a suggestion.
             attention = playing && state.nudgeBoosters && !state.isCovered,
+            adBadge = state.tapPlaysAd(Consumable.Sniff),
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Sniff)) },
         ) {
+            // The dog in its alert pose, glasses and all. It is the pose the
+            // board itself uses for a proposed square, and this booster proposes
+            // squares — it rules cells *out*, which is a search and not a
+            // delivery. The plain resting dog is what a placement looks like,
+            // and that is the Hint beside it.
             Dog(pose = DogPose.Focused, size = BoardControlDog)
         }
         BoardControl(
-            label = stringResource(Res.string.game_treat),
+            label = stringResource(Res.string.game_hint),
             count = state.treats,
             modifier = Modifier.focusTarget(TreatFocusKey),
             enabled = playing,
+            adBadge = state.tapPlaysAd(Consumable.Treat),
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Treat)) },
         ) {
-            BoardControlBone(fill = TreatColor, edge = TreatEdge)
+            BoardControlPaw(color = TreatColor, enabled = playing)
         }
+        val bonesRefillable = state.bonesRefillable
         BoardControl(
-            label = stringResource(Res.string.game_free_bones),
-            // Against `boosters.refillTo`, not the compile-time three: the
-            // refill tops up to the config number, so comparing with a constant
-            // would grey the offer out while an ad still had something to give.
-            enabled = state.phase != GamePhase.Recap && state.livesRemaining < state.refillTo,
+            label = stringResource(Res.string.game_bones_refill),
+            enabled = bonesRefillable,
+            adBadge = state.tapPlaysAd(Consumable.Bone),
             onClick = { onAction(GameAction.RefillBones) },
         ) {
-            BoardControlBone(fill = BoneGold, edge = BoneGoldEdge)
+            BoardControlBone(fill = BoneGold, edge = BoneGoldEdge, enabled = bonesRefillable)
         }
     }
 }
@@ -901,11 +917,16 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
 /**
  * The dog inside a board control.
  *
- * Larger than the bone beside it, because the dog art carries its own margin
- * inside the image while `drawBone` fills its box. Matching the numbers would
- * make the dog visibly the smaller of the two.
+ * Still the largest number on the row, and still for the reason it always was:
+ * the dog art carries its own transparent margin while the bone and the paw
+ * fill their boxes, so matching the numbers would make the dog visibly the
+ * smallest of the three.
+ *
+ * It came down with them, though. At 70dp it was the width of the circle it sat
+ * in, which is the whole of what "the dog on the inside is too big" meant — the
+ * disc had no visible face left, only a rim.
  */
-private val BoardControlDog = Dimension.D1500
+private val BoardControlDog = Dimension.D1300
 
 /**
  * The bones on the refill offer, matching the ones in the life counter.
@@ -915,15 +936,6 @@ private val BoardControlDog = Dimension.D1500
  */
 private val BoneGold = Color(0xFFF5C043)
 private val BoneGoldEdge = Color(0xFFC8871B)
-
-/**
- * The treat, in the orange it wears everywhere else.
- *
- * Not the pale biscuit `LevelRewardChip` uses. That one is drawn *on* orange and
- * is pale so it reads against it; on a white circle it all but disappeared. Same
- * object, opposite background, opposite treatment.
- */
-private val TreatEdge = Color(0xFFB35C0F)
 
 private const val WEIGHT_FILL = 1f
 

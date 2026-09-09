@@ -211,6 +211,13 @@ enum class Icons(
 
     SnowFlake(com.sodogku.libraries.ui.components.icon.icons.SnowFlake),
 
+    /**
+     * The paw print. The same geometry `drawPaw` puts on a canvas, so a paw
+     * rendered through the icon system and a paw drawn into a rating are the
+     * same shape.
+     */
+    Paw(com.sodogku.libraries.ui.components.icon.icons.Paw),
+
     Person(
         androidx.compose.material.icons.Icons.Rounded.Person,
         androidx.compose.material.icons.Icons.Rounded.Person,

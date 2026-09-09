@@ -6,6 +6,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.DrawStyle
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import kotlin.math.cos
 import kotlin.math.sin
@@ -96,42 +98,115 @@ fun DrawScope.drawStarburst(color: Color, elapsed: Float) {
     }
 }
 
-/** A paw print: one pad and four toes. */
-fun DrawScope.drawPaw(color: Color, filled: Boolean) {
-    val width = size.width
-    val height = size.height
-    val padWidth = width * PAW_PAD_WIDTH
-    val padHeight = height * PAW_PAD_HEIGHT
-    val toe = width * PAW_TOE_RADIUS
-    val style = if (filled) null else Stroke(width = width * PAW_OUTLINE)
+/**
+ * The paw print, in the units of `art/source/icons/paw.svg`.
+ *
+ * There is exactly one paw in this app and this is it. It is drawn two ways —
+ * straight onto a canvas by [drawPaw], and as an [androidx.compose.ui.graphics.vector.ImageVector]
+ * by `Icons.Paw` — and both read their geometry from here, so the paw on a
+ * booster button and the paw in a rating cannot drift apart by somebody
+ * retuning one of them.
+ *
+ * Kept in the SVG's own 120-unit box rather than normalised to 0..1, so the
+ * numbers can be checked against the source file by eye.
+ *
+ * **The two renderers frame it differently, on purpose.** The artwork leaves a
+ * margin inside its 120-unit box, which is what an icon wants — every other
+ * entry in `Icons` carries its own optical padding, and a paw that ran to the
+ * edge of its viewport would sit visibly larger than the glyph beside it.
+ * [drawPaw] is handed an exact box by a caller who has already decided how big
+ * the paw should be, so it fits [INK_WIDTH] by [INK_HEIGHT] instead and fills
+ * what it is given.
+ */
+internal object Paw {
+    const val EXTENT = 120f
+    const val PAD_CENTRE_Y = 79f
+    const val PAD_RADIUS_X = 30f
+    const val PAD_RADIUS_Y = 24f
+    const val TOE_RADIUS = 12f
 
-    fun circle(centre: Offset, radius: Float) {
-        if (style == null) drawCircle(color, radius, centre) else drawCircle(color, radius, centre, style = style)
+    /** Toe centres, outer-left to outer-right. The outer pair sits lower. */
+    val TOES = listOf(
+        28f to 47f,
+        49f to 31f,
+        71f to 31f,
+        92f to 47f,
+    )
+
+    /**
+     * Line weight for the hollow paw, in the same units.
+     *
+     * Not from the SVG, which is a solid shape — the rating draws an unearned
+     * paw as an outline and needs a number. Six units against [INK_WIDTH] is
+     * seven percent of the box, which is what the outline weighed before the
+     * geometry changed: the shape is the thing being replaced here, and a line
+     * that quietly got a third heavier at the same time would be a second change
+     * hiding inside the first.
+     */
+    const val OUTLINE = 6f
+
+    /** Where the ink actually starts and how far it runs, in the same units. */
+    const val INK_LEFT = 16f
+    const val INK_TOP = 19f
+    const val INK_WIDTH = 88f
+    const val INK_HEIGHT = 84f
+
+    /**
+     * Where the paw's own coordinates land inside a [width] by [height] box.
+     *
+     * Its own function because the offsets are the part that goes wrong quietly.
+     * A paw drawn at the right size in the wrong place still looks like a paw,
+     * and the two call sites that would catch it — a rating five across and a
+     * button one across — both look plausible while off-centre.
+     */
+    fun fitTo(width: Float, height: Float): Fit {
+        val scale = minOf(width / INK_WIDTH, height / INK_HEIGHT)
+        return Fit(
+            scale = scale,
+            originX = (width - INK_WIDTH * scale) / 2f - INK_LEFT * scale,
+            originY = (height - INK_HEIGHT * scale) / 2f - INK_TOP * scale,
+        )
     }
 
-    if (style == null) {
-        drawRoundRect(
+    /** The paw's coordinate space placed in a draw box. */
+    data class Fit(val scale: Float, val originX: Float, val originY: Float) {
+        fun x(value: Float): Float = originX + value * scale
+        fun y(value: Float): Float = originY + value * scale
+    }
+}
+
+/**
+ * A paw print: one pad and four toes.
+ *
+ * [filled] false draws the same shape hollow, which is how an unearned paw in
+ * the rating is spelled.
+ *
+ * The ink is scaled uniformly to fit the draw box and centred in it, so a caller
+ * can hand this a rectangle without the paw stretching, and a caller who hands
+ * it a square gets a paw that fills the square.
+ */
+fun DrawScope.drawPaw(color: Color, filled: Boolean) {
+    val fit = Paw.fitTo(size.width, size.height)
+    val style: DrawStyle = if (filled) Fill else Stroke(width = Paw.OUTLINE * fit.scale)
+
+    drawOval(
+        color = color,
+        topLeft = Offset(
+            fit.x(Paw.EXTENT / 2f - Paw.PAD_RADIUS_X),
+            fit.y(Paw.PAD_CENTRE_Y - Paw.PAD_RADIUS_Y),
+        ),
+        size = Size(Paw.PAD_RADIUS_X * 2f * fit.scale, Paw.PAD_RADIUS_Y * 2f * fit.scale),
+        style = style,
+    )
+
+    Paw.TOES.forEach { (x, y) ->
+        drawCircle(
             color = color,
-            topLeft = Offset((width - padWidth) / 2f, height - padHeight - height * PAW_PAD_BOTTOM),
-            size = Size(padWidth, padHeight),
-            cornerRadius = CornerRadius(padWidth / 2f, padHeight / 2f),
-        )
-    } else {
-        drawRoundRect(
-            color = color,
-            topLeft = Offset((width - padWidth) / 2f, height - padHeight - height * PAW_PAD_BOTTOM),
-            size = Size(padWidth, padHeight),
-            cornerRadius = CornerRadius(padWidth / 2f, padHeight / 2f),
+            radius = Paw.TOE_RADIUS * fit.scale,
+            center = Offset(fit.x(x), fit.y(y)),
             style = style,
         )
     }
-
-    val toeY = height * PAW_TOE_ROW
-    val outerY = height * PAW_TOE_OUTER_ROW
-    circle(Offset(width * PAW_TOE_X0, outerY), toe * PAW_TOE_OUTER_SCALE)
-    circle(Offset(width * PAW_TOE_X1, toeY), toe)
-    circle(Offset(width * PAW_TOE_X2, toeY), toe)
-    circle(Offset(width * PAW_TOE_X3, outerY), toe * PAW_TOE_OUTER_SCALE)
 }
 
 /** Which rule a [RuleChip] illustrates. */
@@ -238,15 +313,3 @@ private const val BONE_BAR_FRACTION = 0.30f
 private const val BONE_LOBE_SPREAD = 0.95f
 private const val BONE_RIM_FRACTION = 0.22f
 
-private const val PAW_PAD_WIDTH = 0.56f
-private const val PAW_PAD_HEIGHT = 0.40f
-private const val PAW_PAD_BOTTOM = 0.06f
-private const val PAW_TOE_RADIUS = 0.13f
-private const val PAW_TOE_ROW = 0.22f
-private const val PAW_TOE_OUTER_ROW = 0.34f
-private const val PAW_TOE_OUTER_SCALE = 0.86f
-private const val PAW_TOE_X0 = 0.16f
-private const val PAW_TOE_X1 = 0.39f
-private const val PAW_TOE_X2 = 0.61f
-private const val PAW_TOE_X3 = 0.84f
-private const val PAW_OUTLINE = 0.07f
