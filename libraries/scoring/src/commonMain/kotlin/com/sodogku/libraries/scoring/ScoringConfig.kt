@@ -92,12 +92,23 @@ data class ScoringConfig(
     val perfectPraiseAt: Double = 2.3,
 ) {
     init {
-        // These two are the only Ints, and they were the only fields unguarded.
-        // Both land here from remote config, where a dropped minus sign gave
-        // every player three paws for scoring zero: par went negative, so any
-        // score cleared it.
+        // Every field that scales a score is guarded, because the whole set
+        // arrives from remote config and `ConfiguredScoring` only falls back to
+        // the shipped values when this block *throws*. A bad number that
+        // constructs is a bad number that gets played.
+        //
+        // The comment here used to say these two Ints "were the only fields
+        // unguarded", which was wrong: the three rates below had nothing on
+        // them. A `livesBonusRate` of -0.5 constructs happily and inverts the
+        // rating, because par's lives factor goes negative while the player's
+        // stays positive, so a two-strike run scores *better* against it. That
+        // is the same shape as the incident these guards were added for, where a
+        // dropped minus sign gave every player three paws for scoring zero.
         require(basePerPlacement > 0) { "basePerPlacement must be positive" }
         require(completionBase > 0) { "completionBase must be positive" }
+        require(comboStep >= 0.0) { "comboStep must not be negative" }
+        require(livesBonusRate >= 0.0) { "livesBonusRate must not be negative" }
+        require(difficultyBonusRate >= 0.0) { "difficultyBonusRate must not be negative" }
         require(basePerPlacement <= MAX_POINT_VALUE && completionBase <= MAX_POINT_VALUE) {
             "point values must be at most $MAX_POINT_VALUE, so scoring cannot overflow"
         }

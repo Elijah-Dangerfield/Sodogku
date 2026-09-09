@@ -29,12 +29,29 @@ enum class Standing {
     Sharp,
 
     /**
-     * Past par outright.
+     * Past the three-paw line *and* not a single bone lost.
      *
-     * Reachable, and deliberately so: par prices every placement at the *maximum*
-     * speed multiplier but only the starting combo, so a player who builds a long
-     * combo can exceed it. That makes this the one verdict that is genuinely
-     * about doing something unusual rather than about clearing a threshold.
+     * This used to mean "scored at or above par", justified here by a claim that
+     * par priced only the starting combo so a long combo could beat it. That was
+     * simply false: [Scoring.parScore] sums `comboMultiplier(index)` across the
+     * whole board, which is the same full ramp a real run earns, and its own
+     * KDoc says par "is a number no human equals". Driving the real placement
+     * API confirmed it — a perfect run at **1ms** per move lands 1 to 8 points
+     * under par on every shipped shape and comes out [Sharp]. Only a run with
+     * literally zero elapsed milliseconds on every placement reached it.
+     *
+     * So the old definition was a rating nobody could ever earn, which is the
+     * exact bug the third paw already had once. The tests missed it because they
+     * synthesised scores as a fraction of par instead of playing a board, so
+     * they proved a number was classified correctly without ever asking whether
+     * a run could produce that number.
+     *
+     * Repricing par was the other option and it is worse: par is the scale the
+     * paw thresholds are fractions of, so lowering it hands three paws to any
+     * clean finish.
+     *
+     * Measuring mistakes instead is also just what the word means. A flawless
+     * run is one without a flaw, not one that beat an unreachable ceiling.
      */
     Flawless,
 }
@@ -55,13 +72,20 @@ fun Scoring.standingFor(
     size: Int,
     difficulty: Int,
     completed: Boolean,
+    /**
+     * Bones left at the end. Only [Standing.Flawless] reads it, and only to ask
+     * whether any were spent, so a caller that does not track lives can pass
+     * [ScoringConfig.MAX_LIVES] and get the same three verdicts as before.
+     */
+    livesRemaining: Int = ScoringConfig.MAX_LIVES,
     config: ScoringConfig = ScoringConfig.Default,
 ): Standing? {
     if (!completed) return null
     val par = parScore(size, difficulty, config)
+    val sharp = score >= par * config.threePawFraction
     return when {
-        score >= par -> Standing.Flawless
-        score >= par * config.threePawFraction -> Standing.Sharp
+        sharp && livesRemaining >= ScoringConfig.MAX_LIVES -> Standing.Flawless
+        sharp -> Standing.Sharp
         score >= par * config.twoPawFraction -> Standing.Solid
         else -> Standing.Scraped
     }

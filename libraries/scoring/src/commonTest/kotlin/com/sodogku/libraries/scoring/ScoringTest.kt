@@ -448,6 +448,49 @@ class ScoringTest {
     }
 
     @Test
+    fun configRejectsNegativeRates() {
+        // The three rates had no guard at all, while the comment above them
+        // claimed the two Ints "were the only fields unguarded". A negative rate
+        // does not merely lower scores, it inverts the rating: par's factor and
+        // the player's move in opposite directions, so a worse run rates better.
+        listOf(
+            "negative combo step" to { ScoringConfig(comboStep = -0.5) },
+            "negative lives rate" to { ScoringConfig(livesBonusRate = -0.5) },
+            "negative difficulty rate" to { ScoringConfig(difficultyBonusRate = -0.5) },
+        ).forEach { (name, build) ->
+            assertTrue(runCatching(build).isFailure, "$name must not be constructible")
+        }
+    }
+
+    @Test
+    fun aWorseRunIsNeverRatedBetterUnderAnyLegalConfig() {
+        // The property the guards exist to protect, stated directly rather than
+        // as a list of forbidden numbers. This is what a negative rate broke: an
+        // 8x8 run with two strikes came out two paws while the clean run beside
+        // it came out one, because par had shrunk faster than the score did.
+        val clean = ratedRun(strikes = 0)
+        val struck = ratedRun(strikes = ScoringConfig.MAX_LIVES - 1)
+
+        assertTrue(
+            clean >= struck,
+            "a two-strike run rated $struck against a clean run's $clean",
+        )
+    }
+
+    /** Paws for an 8x8 tier-3 run at a fixed pace, varying only the strikes. */
+    private fun ratedRun(strikes: Int): Int {
+        val size = 8
+        var card = ScoreCard.Empty
+        repeat(size) { index ->
+            if (index < strikes) card = Scoring.strike(card)
+            card = Scoring.placement(card, size, millisSinceLastPlacement = 30_000).card
+        }
+        val lives = ScoringConfig.MAX_LIVES - strikes
+        card = Scoring.complete(card, size, difficulty = 3, livesRemaining = lives)
+        return Scoring.paws(card.total, size, difficulty = 3, completed = true)
+    }
+
+    @Test
     fun theLargestLegalConfigStillScoresPositively() {
         // The ceiling is only worth having if everything under it is safe, so
         // check the corner rather than trusting the arithmetic.

@@ -45,24 +45,99 @@ class StandingTest {
     }
 
     @Test
-    fun everyVerdictIsReachable() {
-        // The failure this exists for is a rating nobody can earn, which is
-        // exactly what happened to the third paw: the thresholds were fine and
-        // the score could not reach them. A verdict nobody sees is the same bug
-        // with a different name.
+    fun everyVerdictIsReachableByActuallyPlayingABoard() {
+        // Rewritten, because the version that shipped could not fail. It swept
+        // `par * percent / 100` up to 130% and asked how each number was
+        // classified — which proves the arithmetic and says nothing about
+        // whether a run can produce those numbers. It could not: `Flawless`
+        // meant "at or above par", and par is the formula's exact ceiling, so
+        // only a board solved in zero elapsed milliseconds ever reached it. A
+        // rating nobody can earn is the third-paw bug with a different name, and
+        // the test written to catch that bug had the same hole in it.
+        //
+        // So this one plays. Every verdict below comes out of `placement` and
+        // `complete`, the same calls the game makes.
+        // Swept rather than sampled, over the two things a player actually
+        // varies: how fast they move and how many bones they spend. Hand-picked
+        // runs would need re-picking every time a coefficient moves, and picking
+        // them is how the last version of this ended up proving nothing.
         val seen = buildSet {
             for (size in 4..10) {
                 for (difficulty in 1..4) {
-                    val par = Scoring.parScore(size, difficulty)
-                    for (percent in 0..130) {
-                        Scoring.standingFor(par * percent / 100, size, difficulty, completed = true)
-                            ?.let { add(it) }
+                    for (perMoveMs in listOf(1L, 1_000L, 3_000L, 10_000L, 60_000L)) {
+                        for (strikes in 0 until ScoringConfig.MAX_LIVES) {
+                            add(play(size, difficulty, perMoveMs, strikes))
+                        }
                     }
                 }
             }
         }
 
         assertEquals(Standing.entries.toSet(), seen, "these verdicts are unreachable: ${Standing.entries - seen}")
+    }
+
+    @Test
+    fun aRunAtHumanSpeedCanStillBeFlawless() {
+        // The specific regression. One millisecond a move is already impossible;
+        // the old definition needed *zero*. If Flawless ever again depends on
+        // beating par rather than on keeping every bone, this fails.
+        val quick = play(size = 8, difficulty = 3, perMoveMs = 250)
+
+        assertEquals(Standing.Flawless, quick, "a clean 250ms-a-move run was not flawless")
+    }
+
+    @Test
+    fun aBoneSpentCostsTheFlawlessVerdictAndNothingElse() {
+        // Flawless is the only verdict that reads lives. A strike should drop
+        // this run one step, not to the bottom.
+        val clean = play(size = 8, difficulty = 3, perMoveMs = 250)
+        val struck = play(size = 8, difficulty = 3, perMoveMs = 250, strikes = 1)
+
+        assertEquals(Standing.Flawless, clean)
+        assertEquals(Standing.Sharp, struck)
+    }
+
+    @Test
+    fun parIsExactlyWhatAPerfectRunScores() {
+        // The invariant the old KDoc got wrong, pinned so prose and code cannot
+        // drift again. Par claims to be the formula's ceiling; this is the run
+        // that reaches it. `aPerfectRunClearsPar` asserted only three paws, so
+        // par could have sat 17% above any achievable score without failing.
+        for (size in 4..10) {
+            var card = ScoreCard.Empty
+            repeat(size) { card = Scoring.placement(card, size, millisSinceLastPlacement = 0).card }
+            card = Scoring.complete(card, size, difficulty = 3, livesRemaining = ScoringConfig.MAX_LIVES)
+
+            assertEquals(
+                Scoring.parScore(size, 3),
+                card.total,
+                "par is not the ceiling on a ${size}x$size board",
+            )
+        }
+    }
+
+    /**
+     * A finished run at a given pace, rated the way the game rates it.
+     *
+     * [strikes] both spends bones and breaks the combo, because a strike does
+     * both and modelling only the bone overstates the score. That is what the
+     * first version of this helper got wrong, and the reachability test above
+     * caught it: without the combo break, no run was bad enough to be Scraped.
+     */
+    private fun play(
+        size: Int,
+        difficulty: Int,
+        perMoveMs: Long,
+        strikes: Int = 0,
+    ): Standing {
+        var card = ScoreCard.Empty
+        repeat(size) { index ->
+            if (index < strikes) card = Scoring.strike(card)
+            card = Scoring.placement(card, size, millisSinceLastPlacement = perMoveMs).card
+        }
+        val livesRemaining = ScoringConfig.MAX_LIVES - strikes
+        card = Scoring.complete(card, size, difficulty, livesRemaining)
+        return Scoring.standingFor(card.total, size, difficulty, completed = true, livesRemaining = livesRemaining)!!
     }
 
     @Test
@@ -91,15 +166,18 @@ class StandingTest {
     }
 
     @Test
-    fun beatingParOutrightIsItsOwnVerdict() {
-        // Par prices every placement at the top speed multiplier but only the
-        // starting combo, so a long combo can pass it. If that stops being true
-        // this verdict quietly becomes unreachable, and the reachability test
-        // above would be the only thing to notice.
+    fun parIsNotAThresholdAnyVerdictUses() {
+        // Replaces a test that asserted the opposite and was wrong on its own
+        // premise ("a long combo can pass par"). Par prices the full combo ramp,
+        // so nothing passes it. Kept as a guard rather than deleted: if a future
+        // edit reintroduces a score-beats-par branch, this is what says no.
         val par = Scoring.parScore(size = 8, difficulty = 3)
 
-        assertEquals(Standing.Flawless, Scoring.standingFor(par, 8, 3, completed = true))
-        assertEquals(Standing.Sharp, Scoring.standingFor(par - 1, 8, 3, completed = true))
+        assertEquals(
+            Scoring.standingFor(par, 8, 3, completed = true, livesRemaining = ScoringConfig.MAX_LIVES - 1),
+            Scoring.standingFor(par - 1, 8, 3, completed = true, livesRemaining = ScoringConfig.MAX_LIVES - 1),
+            "crossing par changed the verdict, so par is being used as a threshold again",
+        )
     }
 
     private companion object {
