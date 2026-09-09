@@ -10,9 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
@@ -118,7 +116,6 @@ fun PaywallScreen(
      */
     isStandIn: Boolean = false,
 ) {
-    val scrollState = rememberScrollState()
     val dwelling = state.secondsUntilDismissible > 0
 
     BottomSheet(
@@ -132,8 +129,12 @@ fun PaywallScreen(
         // `PaywallAction.Dismiss`. What the lock buys is a default, not a cage.
         sheetGesturesEnabled = !dwelling,
         shouldDismissOnClickOutside = !dwelling,
+        // The sheet owns the scroll, and with it the sheet's height. See the
+        // anchor note on `scrollableContent`: content-decided height is what let
+        // a drag get snapped back to the top.
+        scrollableContent = true,
     ) {
-        Column(modifier = modifier.fillMaxWidth().verticalScroll(scrollState)) {
+        Column(modifier = modifier.fillMaxWidth()) {
             ProSlab(
                 // Null rather than disabled: a chevron that does nothing reads
                 // as a broken sheet, and this one comes back the moment the

@@ -1,5 +1,8 @@
 package com.sodogku.libraries.ui.components.dialog.bottomsheet
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +45,22 @@ fun BottomSheet(
     shouldDismissOnClickOutside: Boolean = true,
     contentAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
     dragHandle: @Composable (() -> Unit)? = null,
+    /**
+     * Whether [content] is taller than the screen and the sheet should scroll it.
+     *
+     * This also pins the sheet to the full height, and that is the load-bearing
+     * half. Material derives the Expanded anchor from the sheet's *measured*
+     * height (`Expanded at fullHeight - sheetSize.height`) and recomputes it on
+     * every measure pass, snapping the sheet to the new anchor whenever the
+     * anchors differ from the previous ones. A sheet whose height is decided by
+     * its content can therefore be yanked back to Expanded in the middle of a
+     * drag, which is what a player reported: pull down, and about ninety pixels
+     * in the sheet jumps back to the top, over and over, and will not close.
+     *
+     * A fixed height makes the recomputed anchors identical to the old ones, so
+     * `updateAnchors` has nothing to do and the snap cannot happen.
+     */
+    scrollableContent: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -82,7 +101,11 @@ fun BottomSheet(
     ) {
         ProvideContentColor(contentColor) {
             Column(
-                modifier = modifier,
+                modifier = if (scrollableContent) {
+                    modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                } else {
+                    modifier
+                },
                 horizontalAlignment = contentAlignment,
                 content = content
             )
@@ -112,6 +135,3 @@ private fun PreviewBottomSheet(
         }
     }
 }
-
-
-

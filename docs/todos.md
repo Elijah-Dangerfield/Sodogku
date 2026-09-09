@@ -559,24 +559,3 @@ bug than the one being fixed.
 
 `DogPose` options are in `libraries/ui/.../components/dog/`.
 
-## SD-25 [P1] — Dragging the bottom sheet does not track the thumb
-
-**Ask:** Owner, 2026-09-09: "the drag down of the bottom sheet is kinda glitchy.
-Idk if its just iphone but it doesnt stay right under the thumb it kinda jumps
-and glitches around a bit."
-
-**Done when:** A slow drag down moves the sheet exactly with the finger, with no
-jump at the start and no stutter mid-drag, on both platforms.
-
-**Hints:** `libraries/ui/.../components/dialog/bottomsheet/BottomSheet.kt`
-wraps Material3's `ModalBottomSheet`. Two candidates worth ruling out in order:
-
-1. **Nested scroll.** The paywall content scrolls, so a drag starting inside a
-   scrollable competes with the sheet's own drag. The usual symptom is exactly
-   this: the sheet ignores the first few pixels, then catches up in a jump.
-2. **Platform.** The owner suspects iPhone. Compose Multiplatform's iOS
-   touch-slop and fling handling differ from Android's, so reproduce on both
-   before concluding it is one of them.
-
-The paywall is the sheet to test with, since it is the one the owner was using
-and the only real `bottomSheet<>` call site in the app.
