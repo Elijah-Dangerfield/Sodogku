@@ -10,11 +10,11 @@ class ScoringTest {
 
     @Test
     fun firstPlacementOnAFourByFourIsWorthBaseTimesSize() {
-        // Worked example: 100 base x 4 size x 1.0 combo x 1.0 speed.
+        // Worked example: 10 base x 4 size x 1.0 combo x 1.0 speed.
         val scored = Scoring.placement(ScoreCard.Empty, size = 4, millisSinceLastPlacement = null)
 
-        assertEquals(400, scored.points)
-        assertEquals(400, scored.card.total)
+        assertEquals(40, scored.points)
+        assertEquals(40, scored.card.total)
         assertEquals(1, scored.card.combo)
     }
 
@@ -64,7 +64,7 @@ class ScoringTest {
         ).points
 
         assertTrue(afterStrike < beforeStrike, "the streak has to be worth something")
-        assertEquals(800, afterStrike)
+        assertEquals(80, afterStrike)
     }
 
     @Test
@@ -126,8 +126,8 @@ class ScoringTest {
 
     @Test
     fun completionBonusWorkedExample() {
-        // 250 base x 6 size x (1 + 2 tiers above one x 0.2) x (1 + 3 lives x 0.5)
-        assertEquals(5250, Scoring.completionBonus(size = 6, difficulty = 3, livesRemaining = 3))
+        // 25 base x 6 size x (1 + 2 tiers above one x 0.2) x (1 + 3 lives x 0.5)
+        assertEquals(525, Scoring.completionBonus(size = 6, difficulty = 3, livesRemaining = 3))
     }
 
     @Test
@@ -507,13 +507,13 @@ class ScoringTest {
     fun everyCoefficientIsOverridable() {
         // The whole point of the config object: remote config has to be able to
         // move these without a release.
-        val doubled = ScoringConfig(basePerPlacement = 200)
+        val richer = ScoringConfig(basePerPlacement = 20)
 
-        val scored = Scoring.placement(ScoreCard.Empty, size = 5, null, doubled)
+        val scored = Scoring.placement(ScoreCard.Empty, size = 5, null, richer)
 
-        assertEquals(1_000, scored.points)
+        assertEquals(100, scored.points)
         assertTrue(
-            Scoring.parScore(5, 2, doubled) > Scoring.parScore(5, 2),
+            Scoring.parScore(5, 2, richer) > Scoring.parScore(5, 2),
             "par has to move with the coefficients, or the paw thresholds drift",
         )
     }

@@ -3,7 +3,9 @@ package com.sodogku.libraries.achievements
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.puzzle.Board
+import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
+import com.sodogku.libraries.scoring.ScoringConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -45,6 +47,11 @@ class AchievementReachabilityTest {
             AchievementCounters.MAX_BOARD_SIZE,
             "the catalog's idea of a full-size board has drifted from the puzzle module's",
         )
+        assertEquals(
+            Board.MIN_SIZE,
+            ScoreLadder.MIN_BOARD_SIZE,
+            "the score ladder's idea of the first board has drifted from the puzzle module's",
+        )
         assertTrue(
             allLevels.any { it.size >= AchievementCounters.BIG_BOARD_SIZE },
             "no shipped level is a big board",
@@ -53,6 +60,59 @@ class AchievementReachabilityTest {
             allLevels.any { it.size >= AchievementCounters.MAX_BOARD_SIZE },
             "no shipped level is full size",
         )
+        assertEquals(
+            ScoreLadder.MIN_BOARD_SIZE,
+            allLevels.minOf { it.size },
+            "the score ladder prices its first rung on a board no pack ships",
+        )
+    }
+
+    @Test
+    fun everyScoreTargetIsEarnableByARunSomebodyCouldActuallyPlay() {
+        // The hole in `noTargetIsBeyondWhatTheShippedGameCanProduce`, which is
+        // the test that would have caught the 10x rescale and is still the first
+        // line of defence. Its ceiling is par, and par is the score for a board
+        // solved in *zero* elapsed milliseconds — `Scoring.parScore`'s own KDoc
+        // says it is a number no human equals. So a target at 99% of par passes
+        // it and is unearnable, which is the third-paw bug wearing the ceiling
+        // test as a disguise.
+        //
+        // This one plays instead, through the same `placement`/`complete` calls
+        // the game makes, at a pace described in wall clock rather than as a
+        // fraction of a coefficient: nine seconds a move on the biggest board,
+        // clean. That is a good run, not a superhuman one, and every score badge
+        // has to fall out of it.
+        val best = allLevels.maxByOrNull { it.size }!!
+        val banked = playCleanly(best.size, best.difficulty)
+
+        Achievements.catalog.filter { it.stat == Stat.BestScore }.forEach { achievement ->
+            assertTrue(
+                achievement.target <= banked,
+                "${achievement.id} wants ${achievement.target} points and a clean " +
+                    "${FAST_MS_PER_ROW}ms-a-row run on a ${best.size}x${best.size} banks $banked",
+            )
+        }
+    }
+
+    @Test
+    fun theScoreLadderClimbs() {
+        // Three rungs derived from three separate `parScore` calls could come
+        // out in any order if a fraction or a board size were swapped, and a
+        // ladder that reads 2,300 then 450 then 1,600 unlocks backwards without
+        // failing anything else here. `AchievementEngineTest.aLadderNeverRepeats
+        // ARung` has the other half, that no two rungs land on the same number.
+        val targets = Achievements.catalog.filter { it.stat == Stat.BestScore }.map { it.target }
+
+        assertEquals(targets.sorted(), targets, "the score badges are out of order: $targets")
+    }
+
+    /** A whole board placed at [FAST_MS_PER_ROW] per row per move, no bones lost. */
+    private fun playCleanly(size: Int, difficulty: Int): Int {
+        var card = ScoreCard.Empty
+        repeat(size) {
+            card = Scoring.placement(card, size, millisSinceLastPlacement = FAST_MS_PER_ROW * size).card
+        }
+        return Scoring.complete(card, size, difficulty, ScoringConfig.MAX_LIVES).total
     }
 
     @Test
@@ -124,4 +184,16 @@ class AchievementReachabilityTest {
         get() = LevelPacks.campaign.levels + LevelPacks.daily.levels
 
     private val largestBoard: Long get() = allLevels.maxOf { it.size }.toLong()
+
+    private companion object {
+        /**
+         * The pace [everyScoreTargetIsEarnableByARunSomebodyCouldActuallyPlay]
+         * plays at, in milliseconds per row of board per placement — nine
+         * seconds a move on a 10x10, a minute and a half for the board. Per row
+         * because a move on a 10x10 is not the same amount of work as one on a
+         * 4x4, and the same number in `ScoringTest` is the pace that earns three
+         * paws on every shape the campaign ships.
+         */
+        const val FAST_MS_PER_ROW = 900L
+    }
 }

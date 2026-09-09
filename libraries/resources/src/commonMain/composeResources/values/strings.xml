@@ -318,7 +318,7 @@
     <string name="achievement_blitz_name">Blitz</string>
     <string name="achievement_blitz_body">Clear a 7x7 or bigger in under a minute.</string>
     <string name="achievement_high_roller_name">High Roller</string>
-    <string name="achievement_high_roller_body">Score 20,000 points on one level. Only the big boards pay that well.</string>
+    <string name="achievement_high_roller_body">Score 1,600 points on one level. Only the big boards pay that well.</string>
     <string name="achievement_chain_of_eight_name">Chain of Eight</string>
     <string name="achievement_chain_of_eight_body">Place eight dogs in a row without a wrong guess.</string>
     <string name="achievement_show_dog_name">Show Dog</string>
@@ -386,9 +386,9 @@
     <string name="achievement_ten_in_five_name">Ten in Five</string>
     <string name="achievement_ten_in_five_body">Clear a 10x10 in under five minutes.</string>
     <string name="achievement_treat_money_name">Treat Money</string>
-    <string name="achievement_treat_money_body">Score 5,000 points on one level.</string>
+    <string name="achievement_treat_money_body">Score 450 points on one level.</string>
     <string name="achievement_jackpot_name">Jackpot</string>
-    <string name="achievement_jackpot_body">Score 26,000 on one level. Only a fast, clean run on the biggest board pays that well.</string>
+    <string name="achievement_jackpot_body">Score 2,300 on one level. Only a fast, clean run on the biggest board pays that well.</string>
     <string name="achievement_chain_of_five_name">Chain of Five</string>
     <string name="achievement_chain_of_five_body">Place five dogs in a row without a wrong guess.</string>
     <string name="achievement_unbroken_name">Unbroken</string>

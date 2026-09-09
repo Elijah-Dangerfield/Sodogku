@@ -8,7 +8,7 @@ package com.sodogku.libraries.scoring
  * is worth and what counts as a three-paw clear are exactly the kind of dials
  * that want retuning against real play data without an app release.
  *
- * The defaults are the shipped fallbacks, balanced on two things.
+ * The defaults are the shipped fallbacks, balanced on three things.
  *
  * First, placements are roughly 60% of a good run's score and the completion
  * bonus the other 40%. Tilt too far toward completion and a fast clean solve
@@ -29,13 +29,32 @@ package com.sodogku.libraries.scoring
  * it took two minutes or twenty. Three paws at 0.85 of par was unreachable for
  * the whole back half of the campaign. The range has to stay wide *on the board
  * being played*, not just on paper.
+ *
+ * Third, and unlike the other two this one is only about how the number *reads*:
+ * [basePerPlacement] and [completionBase] started at 100 and 250, which paid a
+ * good 10x10 a little under 32,000 points and had a player on level 29 carrying
+ * a six-figure career total. By level 500 it would have been seven figures. Both
+ * are a tenth of that now.
+ *
+ * Dividing the two of them by the same factor is the only safe way to do that,
+ * and it is safe *because* everything else here is a ratio. Every multiplier,
+ * both paw fractions, the praise cutoffs and the booster cost are unitless, so
+ * the whole scale moves together: a score, the par it is rated against and the
+ * thresholds that are fractions of par all shrink by ten and no rating changes
+ * on any board. Retuning only one of the two would not be a rescale, it would
+ * be the 60/40 balance above.
+ *
+ * What a rescale does move is anything outside this file holding an absolute
+ * number of points. The three `Stat.BestScore` achievements are the only ones
+ * in the game, and they are derived from [Scoring.parScore] rather than typed
+ * precisely so this change cannot strand them out of reach.
  */
 data class ScoringConfig(
     /** Points for one correct placement, before size and multipliers. */
-    val basePerPlacement: Int = 100,
+    val basePerPlacement: Int = 10,
 
     /** Points for finishing, before size, difficulty and lives. */
-    val completionBase: Int = 250,
+    val completionBase: Int = 25,
 
     /** Added to the combo multiplier per consecutive correct placement. */
     val comboStep: Double = 0.08,

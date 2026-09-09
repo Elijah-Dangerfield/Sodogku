@@ -1,5 +1,8 @@
 package com.sodogku.libraries.achievements
 
+import com.sodogku.libraries.scoring.Scoring
+import com.sodogku.libraries.scoring.ScoringConfig
+
 /**
  * Stable identity for an achievement. Persisted by name, so renaming one throws
  * away everybody who earned it — add a new entry instead.
@@ -179,6 +182,9 @@ data class AchievementSection(
  * length, a board size, a campaign length — are checked against the shipped
  * packs and the scoring formula by `AchievementReachabilityTest`. A badge nobody
  * can ever earn is worse than no badge, and it looks exactly like a working one.
+ *
+ * The three score targets are not written down here at all — see [ScoreLadder]
+ * for why a number of points is the one target that cannot survive being typed.
  */
 object Achievements {
 
@@ -241,13 +247,9 @@ object Achievements {
         AchievementSection(
             AchievementGroup.Score,
             listOf(
-                // The ladder is pinned to what the formula can actually pay. Par
-                // on the biggest, hardest shipped board is a little under 32,000
-                // and par is also the ceiling, so 26,000 is a fast clean run on a
-                // 10x10 and nothing else — while 5,000 is one good 4x4.
-                Achievement(AchievementId.TreatMoney, Stat.BestScore, target = 5_000),
-                Achievement(AchievementId.HighRoller, Stat.BestScore, target = 20_000),
-                Achievement(AchievementId.Jackpot, Stat.BestScore, target = 26_000),
+                Achievement(AchievementId.TreatMoney, Stat.BestScore, ScoreLadder.goodFirstBoard),
+                Achievement(AchievementId.HighRoller, Stat.BestScore, ScoreLadder.solidTopBoard),
+                Achievement(AchievementId.Jackpot, Stat.BestScore, ScoreLadder.sharpTopBoard),
                 Achievement(AchievementId.ChainOfFive, Stat.BestCombo, target = 5),
                 Achievement(AchievementId.ChainOfEight, Stat.BestCombo, target = 8),
                 // A combo cannot outlive the board: ten placements is the whole
@@ -320,4 +322,77 @@ object Achievements {
     operator fun get(id: AchievementId): Achievement = byId.getValue(id)
 
     fun groupOf(id: AchievementId): AchievementGroup = groupById.getValue(id)
+}
+
+/**
+ * The three score rungs, derived from the scoring formula instead of typed.
+ *
+ * These are the only targets in the catalog whose unit is *points*, and points
+ * are the one quantity in the game with no natural scale — a score is
+ * `scoring.basePerPlacement` times a board times a handful of multipliers, so
+ * halving that one coefficient halves every score there will ever be. The rungs
+ * used to be 5,000, 20,000 and 26,000 against a formula whose ceiling was 31,760.
+ * Dividing the coefficients by ten to keep career totals legible took the ceiling
+ * to 3,176 and would have left all three unearnable by anyone, forever, while
+ * still rendering as ordinary badges with a progress bar stuck near zero. This
+ * game has shipped that exact bug twice already, as an unreachable third paw and
+ * an unreachable `Standing.Flawless`.
+ *
+ * So each rung is a fraction of [Scoring.parScore] — the same par the paws are
+ * fractions of — at the same two fractions the paws use. [solidTopBoard] is a
+ * two-paw run on the biggest board the game ships and [sharpTopBoard] is a
+ * three-paw one; [goodFirstBoard] is a three-paw run on the smallest. That makes
+ * the ladder say something ("a great run on a big board") rather than name a
+ * number, and it moves with the coefficients on its own.
+ *
+ * Every rung is priced at **difficulty 1**, which no board of either size
+ * actually ships at — the 10x10 band is tiers 3 and 4. Par climbs with
+ * difficulty, so pricing the easiest tier is the conservative end: the real
+ * boards all pay more than the rung asks. Getting that backwards is how a target
+ * ends up just barely out of reach.
+ *
+ * The one thing derivation cannot cover: the catalog is compiled into the binary
+ * and reads the *shipped* coefficients, while the game scores on whatever remote
+ * config says. Retuning `scoring.basePerPlacement` downward from the console
+ * therefore still strands these three, and always did. A release is the fix, and
+ * these numbers now move by themselves when it happens.
+ */
+internal object ScoreLadder {
+
+    /** Duplicated from `Board.MIN_SIZE`, pinned by `AchievementReachabilityTest`. */
+    const val MIN_BOARD_SIZE: Int = 4
+
+    /**
+     * The tier every rung is priced at. Not a real board's difficulty — the
+     * lowest one the formula accepts, so par comes out at its floor.
+     */
+    private const val EASIEST_DIFFICULTY: Int = 1
+
+    val goodFirstBoard: Long = rung(MIN_BOARD_SIZE, ScoringConfig.Default.threePawFraction)
+    val solidTopBoard: Long = rung(AchievementCounters.MAX_BOARD_SIZE, ScoringConfig.Default.twoPawFraction)
+    val sharpTopBoard: Long = rung(AchievementCounters.MAX_BOARD_SIZE, ScoringConfig.Default.threePawFraction)
+
+    private fun rung(size: Int, fraction: Double): Long =
+        legible((Scoring.parScore(size, EASIEST_DIFFICULTY) * fraction).toLong())
+
+    /**
+     * [points] rounded down to two significant figures, because a badge whose
+     * description reads "score 2,377 points" is a badge that looks like a bug.
+     *
+     * Down rather than to nearest, so rounding can only ever make a rung easier
+     * than the run it was derived from — the direction that cannot strand it.
+     * Significant figures rather than a fixed step because the step has to
+     * survive the next rescale too: at a tenth of these coefficients this still
+     * returns two digits, where flooring to the nearest hundred would return
+     * zero and `Achievement`'s own `require(target > 0)` would take the app down
+     * at class-init time.
+     */
+    private fun legible(points: Long): Long {
+        var step = 1L
+        while (points / step >= SIGNIFICANT) step *= DECIMAL
+        return (points / step * step).coerceAtLeast(1L)
+    }
+
+    private const val SIGNIFICANT = 100L
+    private const val DECIMAL = 10L
 }

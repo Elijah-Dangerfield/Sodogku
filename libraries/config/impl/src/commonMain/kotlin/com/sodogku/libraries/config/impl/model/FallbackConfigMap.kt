@@ -91,8 +91,8 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
         "refillTo" to 3,
     ),
     "scoring" to mapOf(
-        "basePerPlacement" to 100,
-        "completionBase" to 250,
+        "basePerPlacement" to 10,
+        "completionBase" to 25,
         "comboStep" to 0.08,
         "comboMax" to 2.0,
         "speedWindowMs" to 8_000L,

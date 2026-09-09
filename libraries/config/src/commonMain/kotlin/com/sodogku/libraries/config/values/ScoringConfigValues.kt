@@ -24,6 +24,15 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * run a player could physically finish still scored 63% of par — above the
  * two-paw line at 0.60 — so one paw was unreachable. Compressing the range is the
  * failure mode to watch, and it is invisible until someone checks the floor.
+ *
+ * **These defaults are the ones the game actually plays on.** `ConfiguredScoring`
+ * builds its `ScoringConfig` field by field out of these classes, so a fresh
+ * install with no remote config scores on the numbers below and never reads
+ * `ScoringConfig.Default` at all — that object is only the whole-set fallback for
+ * when a remote value fails validation. Changing a coefficient in `:libraries:
+ * scoring` and not here changes nothing a player sees;
+ * `ConfiguredScoringTest.withNoConfigTheShippedCoefficientsAreUsed` is what says
+ * so, by comparing the assembled config against `ScoringConfig.Default` whole.
  */
 
 /** Points for one correct placement, before grid size and multipliers. */
@@ -33,7 +42,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 class ScoringBasePerPlacement(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
     override val name = "Base points per placement"
     override val path = "scoring.basePerPlacement"
-    override val default = 100
+    override val default = 10
 }
 
 /**
@@ -42,6 +51,11 @@ class ScoringBasePerPlacement(appConfigMap: AppConfigMap) : IntConfigValue(appCo
  * completion bonus the other 40%: tilt too far toward completion and a fast clean
  * solve scores what a slow scrappy one does, too far toward placements and
  * finishing stops mattering.
+ *
+ * The two of them together set the *scale* of every score in the game, and they
+ * were ten times larger until a six-figure career total at level 29 made the
+ * point that nothing is served by big numbers. Move them together or the 60/40
+ * split above is what moves instead.
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -49,7 +63,7 @@ class ScoringBasePerPlacement(appConfigMap: AppConfigMap) : IntConfigValue(appCo
 class ScoringCompletionBase(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
     override val name = "Completion base points"
     override val path = "scoring.completionBase"
-    override val default = 250
+    override val default = 25
 }
 
 /**

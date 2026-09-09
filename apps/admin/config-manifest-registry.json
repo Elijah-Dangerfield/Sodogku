@@ -18,8 +18,8 @@
   { "path": "boosters.proTreatsPerAttempt", "type": "int", "default": 3, "description": "Treats Pro starts every attempt with." },
   { "path": "boosters.refillTo", "type": "int", "default": 3, "description": "What one rewarded ad tops a consumable up to. A floor, never a cap." },
 
-  { "path": "scoring.basePerPlacement", "type": "int", "default": 100, "description": "Points for one correct placement, before size and multipliers." },
-  { "path": "scoring.completionBase", "type": "int", "default": 250, "description": "Points for finishing, before size, difficulty and lives." },
+  { "path": "scoring.basePerPlacement", "type": "int", "default": 10, "description": "Points for one correct placement, before size and multipliers. Sets the scale of every score in the game; move it with completionBase or the 60/40 placement-to-completion balance moves instead." },
+  { "path": "scoring.completionBase", "type": "int", "default": 25, "description": "Points for finishing, before size, difficulty and lives." },
   { "path": "scoring.comboStep", "type": "double", "default": 0.08, "description": "Added to the combo multiplier per consecutive correct placement." },
   { "path": "scoring.comboMax", "type": "double", "default": 2.0, "description": "Ceiling on the combo multiplier." },
   { "path": "scoring.speedWindowMs", "type": "long", "default": 8000, "description": "How long the speed bonus takes to decay to 1.0 on a 4x4. Scales with the grid, so 8000 is 20s on a 10x10." },
