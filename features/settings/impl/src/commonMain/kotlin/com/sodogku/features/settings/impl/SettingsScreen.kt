@@ -1,5 +1,9 @@
 package com.sodogku.features.settings.impl
 
+import androidx.compose.foundation.layout.padding
+import com.sodogku.libraries.ui.components.text.Text
+import com.sodogku.system.Dimension
+import com.sodogku.system.VerticalSpacerD200
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
@@ -171,36 +175,6 @@ fun SettingsScreen(
 
             VerticalSpacerD800()
 
-            // Its own card, not a row inside the achievements one.
-            //
-            // It is the only thing on this screen that is neither a control nor
-            // a place to go: everything else here does something when you touch
-            // it. Sitting it under two toggles made it read as a third setting
-            // whose switch had gone missing, and it is the one line on the
-            // screen a player really needs to have read — there are no accounts,
-            // so a reinstall is the end of three hundred levels.
-            //
-            // The icon does the work the grouping used to. A card with a single
-            // untappable row and no title is ambiguous; the same card with an
-            // info mark in front of it is plainly a notice.
-            ListSection(
-                items = listOf(
-                    ListSectionItem(
-                        headlineText = stringResource(Res.string.settings_progress_local_title),
-                        supportingText = stringResource(Res.string.settings_progress_local_body),
-                        leadingContent = {
-                            Icon(
-                                icon = Icons.Info.decorative,
-                                size = IconSize.Small,
-                                color = AppTheme.colors.textSecondary,
-                            )
-                        },
-                        accessory = ListItemAccessory.None,
-                    ),
-                ),
-            )
-
-            VerticalSpacerD800()
 
             ListSection(
                 title = stringResource(Res.string.settings_section_pro),
@@ -254,6 +228,33 @@ fun SettingsScreen(
                     ),
                 ),
             )
+
+            VerticalSpacerD800()
+
+            // Last on the page and deliberately not in a card.
+            //
+            // Everything above is a control or a destination; this is the only
+            // thing here that is just something to know. In a card it read as a
+            // setting whose switch had gone missing, and no arrangement of icon
+            // and title fixed that, because the card itself is what promises an
+            // interaction. Plain text at the end of the page is what a footnote
+            // looks like, which is what this is.
+            //
+            // Still worth saying at all: there are no accounts, so a reinstall
+            // is the end of three hundred levels.
+            Column(modifier = Modifier.padding(horizontal = Dimension.D500)) {
+                Text(
+                    text = stringResource(Res.string.settings_progress_local_title),
+                    typography = AppTheme.typography.Body.B500.Medium,
+                    color = AppTheme.colors.textSecondary,
+                )
+                VerticalSpacerD200()
+                Text(
+                    text = stringResource(Res.string.settings_progress_local_body),
+                    typography = AppTheme.typography.Body.B400,
+                    color = AppTheme.colors.textSecondary,
+                )
+            }
 
             VerticalSpacerD800()
         }

@@ -108,6 +108,21 @@ jobs:
         # sweep to avoid running twice.
         run: ./gradlew testDebugUnitTest -x :apps:integration:testDebugUnitTest
 
+      - name: Lint with the custom ruleset
+        # Detekt used to run only in the pre-push hook, which is per-machine and
+        # skippable with SKIP_DETEKT=1, so nothing on the server enforced the
+        # `sodogku` rules. They are not style rules: VerifyStrings guards a
+        # crash on a missing key, NoRawDesignValues guards the palette,
+        # AnimatedStateReadInComposition guards a per-frame recomposition, and
+        # ScrollInsideBottomSheet guards a drag bug that took a device session
+        # to find. A gate only the author runs is not a gate.
+        #
+        # `:detekt-rules:test` is separate and easy to miss: detekt-rules is a
+        # JVM module, so `testDebugUnitTest` above never touches it and the
+        # rules' own tests ran nowhere at all. A rule that silently stops
+        # matching is worse than no rule, because the build stays green.
+        run: ./gradlew detekt :detekt-rules:test
+
       - name: Publish unit test results
         # Parses the JUnit XML and posts an inline "Unit test results" check
         # with pass/fail counts + click-through to failing assertions, so a red

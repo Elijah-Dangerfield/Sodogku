@@ -7,7 +7,7 @@
          immediately says the part sudoku does not have. The rules below spell
          out what "next to each other" means; this line only has to make a
          sudoku player stop assuming they already know. -->
-    <string name="onboarding_tagline">Sudoku with dogs, and they won't sit next to each other.</string>
+    <string name="onboarding_tagline">Sudoku with dogs. They like their space.</string>
     <!-- The two ways off this screen. Both first person, both about what
          happens next rather than about what the player already knows: the old
          pair asked them to self-assess against sudoku, and this is not sudoku,
