@@ -456,15 +456,14 @@
     <string name="achievements_group_secrets">Secrets</string>
     <!-- Paywall (C8). No apostrophes anywhere in this file on purpose. -->
     <string name="paywall_title">Sodogku Pro</string>
-    <string name="paywall_subtitle">One purchase. No ads, no waiting, and a few more dogs on your side.</string>
+    <string name="paywall_subtitle">Buy it once and Sodogku stops asking you for anything.</string>
     <string name="paywall_benefit_no_ads">No ads, ever</string>
     <string name="paywall_benefit_offline">Unlimited offline play</string>
-    <string name="paywall_benefit_free_helps">Free continues, free skips and free streak freezes</string>
-    <string name="paywall_benefit_boosters">3 Sniffs and 3 Treats at the start of every attempt</string>
-    <string name="paywall_benefit_jump">Jump to the first level of any band you have reached</string>
+    <string name="paywall_benefit_free_helps">Continues, skips and streak freezes with no ad to watch</string>
+    <string name="paywall_benefit_boosters">Sniffs and Treats topped back up at the start of every attempt</string>
+    <string name="paywall_benefit_jump">Every level in the campaign, open from the start</string>
     <string name="paywall_buy">Get Pro</string>
-    <string name="paywall_buy_priced">Get Pro for %1$s</string>
-    <string name="paywall_one_time">One time purchase. No subscription.</string>
+    <string name="paywall_one_time">One payment. Not a subscription.</string>
     <string name="paywall_restore">Restore purchases</string>
     <string name="paywall_not_now">Not now</string>
     <string name="paywall_already_pro">You already have Pro. Thank you.</string>
@@ -549,4 +548,11 @@
     <string name="game_verdict_scraped">Got there</string>
     <string name="game_verdict_sharp">Sharp work</string>
     <string name="game_verdict_flawless">Flawless</string>
+
+    <!-- The Pro sheet's headline, sitting in the amber slab under the eyebrow.
+         "once" is the whole pitch: the lead line under the slab and the note
+         under the button say the same thing again in plainer words, because the
+         one objection a non-subscription has to answer is the one everybody
+         brings to a paywall. -->
+    <string name="paywall_headline">Everything unlocked, once</string>
 </resources>

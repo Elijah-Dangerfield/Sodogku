@@ -11,6 +11,7 @@ import com.sodogku.libraries.flowroutines.ObserveEvents
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.NavigationOptions
 import com.sodogku.libraries.navigation.Router
+import com.sodogku.libraries.navigation.bottomSheet
 import com.sodogku.libraries.navigation.screen
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -26,7 +27,16 @@ class PaywallFeatureEntryPoint(
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
-        screen<PaywallRoute> { backStackEntry ->
+        // A sheet, not a screen. It is an interruption of whatever the player
+        // was doing and it should read as one that goes away — registered as a
+        // `screen<>` it slid up on the way in and kept going up on the way out,
+        // which is what the player saw and reported.
+        //
+        // Both events close through `sheetState.dismiss()` rather than
+        // `router.goBack()`: the sheet animates down first and the pop happens
+        // in `onDismissed`, once it has landed. Popping first would delete the
+        // destination out from under a sheet that had not moved yet.
+        bottomSheet<PaywallRoute> { backStackEntry, sheetState ->
             val route = backStackEntry.toRoute<PaywallRoute>()
             val viewModel: PaywallViewModel = viewModel {
                 paywallViewModelFactory(route.trigger, route.dwellSeconds)
@@ -35,17 +45,19 @@ class PaywallFeatureEntryPoint(
 
             viewModel.ObserveEvents { event ->
                 when (event) {
-                    PaywallEvent.Dismiss -> router.goBack()
+                    PaywallEvent.Dismiss -> sheetState.dismiss()
                     // Nothing to celebrate on this screen: the board behind it
                     // is already Pro by the time the sheet closes, and a
                     // "thanks!" interstitial after a purchase is one more thing
                     // between the player and the game they just paid for.
-                    PaywallEvent.Purchased -> router.goBack()
+                    PaywallEvent.Purchased -> sheetState.dismiss()
                 }
             }
 
             PaywallScreen(
                 state = state,
+                sheetState = sheetState,
+                onDismissed = { router.goBack() },
                 onAction = viewModel::takeAction,
                 standInNote = route.standInNote,
                 // The dwell is what only a stand-in has, so it is what
@@ -55,6 +67,14 @@ class PaywallFeatureEntryPoint(
             )
         }
 
+        // Deliberately still a `screen<>`. The offline block is the one thing in
+        // this app that stops a player (SPEC 6): it swallows back, it has no
+        // dismiss control of its own, and it leaves only when the network comes
+        // back or the player buys Pro. A bottom sheet is the wrong shape for
+        // that in three separate ways — a scrim you can tap, a drag you can
+        // swipe, and a page visible underneath that the block is there to stop
+        // you reaching. Being a sheet would make it dismissible, which is the
+        // one property it must not have.
         screen<OfflineBlockRoute> {
             val viewModel: OfflineBlockViewModel = viewModel { offlineBlockViewModelFactory() }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value

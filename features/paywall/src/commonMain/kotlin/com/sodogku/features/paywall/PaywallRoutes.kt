@@ -9,8 +9,21 @@ import kotlinx.serialization.Serializable
  *
  * [trigger] is the `paywall.triggers` id that opened it, carried on the route
  * rather than looked up so the screen and `iap.paywall_shown` agree about which
- * moment sold the purchase. Slides up and back down: it is an interruption of
- * whatever the player was doing, and it should read as one that goes away.
+ * moment sold the purchase.
+ *
+ * ## Why there are no animations on it
+ *
+ * It is registered with `bottomSheet<>`, so it is a floating window rather than
+ * an entry in the `NavHost`'s own back stack — the enter/exit/popExit an
+ * ordinary [Route] carries are never read for it, and the motion belongs to the
+ * sheet state instead.
+ *
+ * They *were* set here, to slide up and back down, and that is where the bug
+ * lived: `AnimationType.SlideDown` as an **exit** is `slideOutVertically { -it }`
+ * — a slide out through the *top* of the display. So the sheet came up from the
+ * bottom and left through the ceiling. Naming animations by where a thing goes
+ * rather than by which direction it travels is a trap worth not standing next
+ * to; a sheet that owns its own motion cannot fall into it.
  *
  * A `class`, never a `data object` — an arg-less object route SIGSEGVs the iOS
  * navigator at navigate time.
@@ -32,13 +45,7 @@ class PaywallRoute(
      * requested look identical from the outside.
      */
     val standInNote: String = "",
-) : Route(
-    enter = AnimationType.SlideUp,
-    exit = AnimationType.SlideDown,
-    popExit = AnimationType.SlideDown,
-    // Settings stays exactly where it was while this slides up over it.
-    coversParent = true,
-)
+) : Route()
 
 /**
  * The offline block: the one screen in this app that stops a player.

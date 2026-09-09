@@ -43,3 +43,4 @@ apps/admin/admin-tokens.local.properties
 *.jks
 *.keystore
 *.p12
+__pycache__/
