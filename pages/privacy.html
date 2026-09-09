@@ -13,43 +13,100 @@
         <header>
             <a href="index.html" style="border: none;"><img src="app-icon.png" alt="Sodogku app icon" class="logo"></a>
             <h1>Privacy Policy</h1>
-            <p class="muted">Last updated: 2026-09-07</p>
+            <p class="muted">Last updated: 2026-09-08</p>
         </header>
 
         <main>
-            <p>Sodogku is designed to collect as little information about you as possible. This page explains what is and isn't collected.</p>
+            <p>Sodogku has no accounts and no sign-in, so nothing here is attached to a name, an email address or a profile. Your puzzles and your progress live on your phone. Some things do leave the device: crash reports, gameplay analytics, requests for the app's own configuration, and whatever Google's ad software collects when it shows you an ad. This page says what each of those contains.</p>
 
-            <h2>What's stored on your device</h2>
-            <p>The app stores data locally on your phone, and nowhere else. If you delete the app, this data is deleted with it.</p>
+            <!-- DELETE THIS PARAGRAPH ON LAUNCH DAY. It is true today and it
+                 stops the page overclaiming, but it is the one sentence here
+                 that goes from true to false without anybody editing it, and a
+                 privacy policy that opens with a falsehood is the specific
+                 thing this rewrite existed to fix. -->
+            <p>Sodogku is not released yet. This page describes the current build and will be revised as the app changes.</p>
 
-            <h2>What's sent off your device</h2>
-            <p>The app may send a small amount of information to a third-party service called <a href="https://sentry.io/privacy/">Sentry</a> when the app crashes or encounters an error. This helps find and fix bugs. The information includes:</p>
+            <h2>What stays on your phone</h2>
+            <p>Levels completed, scores, paw ratings, daily results, streaks and badges are written to a database on the device. Your settings, your booster counts, the board you have in progress and the versions of these documents you have accepted are stored in a file next to it.</p>
+            <p>None of this is copied to a server, because there is no server that holds player data. Android's Auto Backup is switched off for Sodogku, so it is not uploaded to your Google Drive either. Uninstalling the app deletes all of it.</p>
+
+            <h2>The install identifier</h2>
+            <p>On first launch the app generates a random identifier (a UUID) and saves it. It is not your advertising identifier, it is not derived from your hardware, and it is not connected to anything that identifies you as a person.</p>
+            <p>It is attached to every crash report, every analytics record and every request the app makes to our own server. It is what lets a crash be read together with the events that led to it. It stays the same until you uninstall the app, and a fresh install gets a new one.</p>
+
+            <h2>Crash reports and diagnostics</h2>
+            <p>The app uses <a href="https://sentry.io/privacy/">Sentry</a> for crash and error reporting. A report can contain:</p>
             <ul>
-                <li>A crash log (what went wrong, where in the code it happened).</li>
-                <li>Your device model and operating system version.</li>
-                <li>The version of the app you're running.</li>
+                <li>The crash or error itself, with a stack trace.</li>
+                <li>Your device model and operating system version, and the app version and the commit it was built from.</li>
+                <li>The screen you were on, the install identifier, and an identifier for the current app session.</li>
+                <li>Recent log lines from the app's own code, carried as breadcrumbs. In a release build these are the app's informational lines and above.</li>
             </ul>
-            <p>This data is <strong>not</strong> tied to your identity.</p>
+            <p>The Sentry SDK is configured not to attach personally identifying data of its own, and the app never gives it a name, an email address or a user id. Sodogku also sends Sentry performance measurements, sampled at 15% in a release build.</p>
 
-            <h2>What isn't collected</h2>
-            <p>The app does <strong>not</strong>:</p>
-            <ul>
-                <li>Use advertising or analytics SDKs (no Google Analytics, no Facebook SDK, no ad networks).</li>
-                <li>Track your location.</li>
-                <li>Sell or share any data.</li>
-                <li>Require an account (unless your project adds one).</li>
-            </ul>
+            <h2>Gameplay analytics</h2>
+            <p>The app sends a stream of gameplay events to <a href="https://grafana.com/legal/privacy-policy/">Grafana Cloud</a>, on an account we control. These are counts and measurements of how the game is being played: the app starting, going to the background and how long the session lasted; a level being started, completed or failed, with its size, difficulty, duration, score, wrong guesses and boosters used; daily puzzle results and streaks; tutorial steps reached; whether an ad was watched, dismissed or failed, and how long it took; whether a purchase succeeded or failed.</p>
+            <p>Every record carries the install identifier, a session identifier, whether the device was offline at the time, the app version and build number, the commit it was built from, and the platform. Log lines from our own code at warning level and above are forwarded to the same place, including the message text, the part of the app that logged it, and the type and message of any exception.</p>
+            <p>Records are buffered in a file on the device before they are sent, so events survive a restart or a period offline. There is no setting inside the app that turns this off. We can switch it off remotely for everyone, but you cannot switch it off for yourself.</p>
 
-            <h2>Permissions the app asks for</h2>
+            <h2>Ads</h2>
+            <p>Sodogku is free and pays for itself with rewarded ads through Google AdMob. Rewarded is the only kind of ad in the app: one is requested when you choose to watch it in exchange for something in the game, such as refilling your bones or covering a missed day of a streak. There are no banners and no ads that interrupt you.</p>
+            <p>Google's ad software collects its own data when it runs, including your device's advertising identifier, and Google is a separate company rather than a service acting on our behalf. What it collects and what Google does with it is covered by <a href="https://policies.google.com/technologies/partner-sites">Google's own policy</a>. On our side we record only the outcome of the ad and how long it took.</p>
+            <p>Two things happen before the first ad is ever requested, on both platforms. In the EEA and the UK, the app shows Google's consent form, and if the result is that ads may not be requested, none are and Google's ad software is not started at all. On iPhone and iPad, the app shows Apple's App Tracking Transparency prompt, so your advertising identifier is available to Google only if you allow it there. Neither prompt appears at launch. They appear the first time you reach for an ad, which is the point at which they mean something.</p>
+            <p>Ads are requested on the basis that Sodogku is a general-audience game and not directed at children.</p>
+            <p>Buying Sodogku Pro gives you the same rewards without an ad being shown.</p>
+
+            <h2>Purchases</h2>
+            <p>Purchases go through Google Play or the App Store. The app never sees your card or your billing details, and it stores nothing about the transaction except a flag saying that Pro is active on this device.</p>
+            <p>Analytics records the outcome only: whether a purchase or a restore succeeded, was cancelled or failed, and the store's error code if it failed. No price, no order number, no receipt.</p>
+
+            <h2>Feedback and bug reports</h2>
+            <p>Sending feedback or a bug report is entirely your choice. Nothing is sent unless you write something and press send.</p>
+            <p>When you do, the report carries your message as you typed it, the app version and the commit it was built from, and a copy of the recent log lines from your current session as an attached text file. Those log lines are the app's own diagnostic output: screens visited, network calls, errors. Before they are kept, bearer tokens, JWTs, anything labelled as a token, secret, password or API key, and anything shaped like an email address are replaced with a placeholder. What remains is deliberately readable, including screen names and the session and install identifiers.</p>
+            <p>Reports go to Sentry, where a person reads them. There is no separate feedback inbox. The form has no email field and asks for no contact details, so if you want a reply you have to put an address in the message, and it arrives as you wrote it.</p>
+            <p>Builds handed to testers before release carry an extra panel that can also attach a screenshot of the screen you were on, with a switch for whether to include the logs. That panel is not present in the App Store or Google Play build.</p>
+
+            <h2>Game Center</h2>
+            <p>On iPhone and iPad the app connects to Apple's Game Center at launch, using whichever Game Center account is signed in on the device, and can submit your lifetime score and your longest streak to it. Those scores go to Apple under your Game Center identity. We do not receive them and keep no copy. If you are not signed in to Game Center, nothing is submitted and the app carries on without it.</p>
+
+            <h2>Requests to our own server</h2>
+            <p>The app fetches its configuration from one endpoint on our server. Each request carries the install identifier, a session identifier, the platform, the app version and build number, the languages your operating system reports, and your country code.</p>
+            <p>That country code is the region set in your device's language and region settings. It is not GPS, not your SIM, and not derived from your IP address. Sodogku requests no location permission on either platform and has no way to read your location.</p>
+            <p>Our server uses the install identifier to decide which configuration values you get. It does not store it. Your IP address is held in memory to limit how often a single device can call the server, and is not written down or used to work out where you are.</p>
+
+            <h2>What the app does not collect</h2>
             <ul>
-                <li><strong>Notifications</strong> (iOS, if granted): used to show timely updates from the app.</li>
+                <li>Your name, email address, phone number, postal address, contacts or calendar.</li>
+                <li>Your location, at any precision.</li>
+                <li>Photos, files, audio, health or fitness data, browsing or search history, or a list of the apps you have installed.</li>
             </ul>
+            <p>We do not sell your data and we do not send it to data brokers. The one third party that receives data for its own purposes rather than ours is Google, through the ads described above.</p>
+
+            <h2>Permissions</h2>
+            <p>Sodogku itself declares no Android permissions. The software it bundles adds internet and network-state access, Google Play's billing permission, Google's advertising identifier permissions, and a notifications permission that the app never asks you for. Sodogku sends no notifications.</p>
+            <p>On iPhone and iPad the app asks for nothing when you open it. The tracking prompt described above is the only permission it ever requests.</p>
+
+            <h2>Who else receives data</h2>
+            <ul>
+                <li><a href="https://sentry.io/privacy/">Sentry</a>, for crash reports, diagnostics and feedback, processing on our behalf.</li>
+                <li><a href="https://grafana.com/legal/privacy-policy/">Grafana Labs</a>, for gameplay analytics, processing on our behalf.</li>
+                <li><a href="https://policies.google.com/privacy">Google</a>, for ads through AdMob and for purchases through Google Play.</li>
+                <li><a href="https://www.apple.com/legal/privacy/">Apple</a>, for purchases through the App Store and for Game Center scores.</li>
+            </ul>
+            <p>Everything the app sends goes over an encrypted connection. Any service receiving a request necessarily sees the IP address it came from.</p>
+
+            <h2>How long it is kept, and how to have it removed</h2>
+            <p>Everything stored on your phone goes when you uninstall the app. Analytics and crash reports are held under our Sentry and Grafana Cloud accounts and expire on those services' retention schedules.</p>
+            <p>We should be straight about the limits of a deletion request. The only key on any record we hold is the install identifier, and the app does not currently show it to you anywhere, so there is no way for you to tell us which records are yours. If this matters to you, write to the address below and we will do what we can, and the app should give you a way to see that identifier. Until it does, uninstalling is the reliable way to stop any further data being sent.</p>
+
+            <h2>Children</h2>
+            <p>Sodogku is a general-audience game and is not directed at children under 13. Ads are requested from Google on that basis. We do not knowingly collect anything from a child under 13.</p>
 
             <h2>Changes to this policy</h2>
-            <p>If this policy ever changes, the new version will be posted here and the "Last updated" date at the top will be revised.</p>
+            <p>If this policy changes, the new version will be posted here and the "Last updated" date at the top will be revised.</p>
 
             <h2>Contact</h2>
-            <p>Questions? Reach out at <a href="mailto:elijahdangerfield111@gmail.com">elijahdangerfield111@gmail.com</a>.</p>
+            <p>Questions, or a request about your data? Write to <a href="mailto:elijahdangerfield111@gmail.com">elijahdangerfield111@gmail.com</a>.</p>
         </main>
 
         <footer>
