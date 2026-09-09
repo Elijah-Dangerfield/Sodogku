@@ -107,7 +107,7 @@ the environment the prod deploy runs unguarded.
 ## Repo settings
 
 - **Actions** → enable workflows.
-- **Pages** → Source: `Deploy from a branch`, Branch: `main` / folder: `/pages`. (The `pages.yml` workflow can also publish on push.)
+- **Pages** → Source: **GitHub Actions**. `pages.yml` publishes `pages/` with `actions/deploy-pages`, which only works on that source; `Deploy from a branch` would ignore the workflow and serve nothing from `/pages`.
 - **Branch protection** on `main`:
   - Require PR.
   - Require status checks: `CI / Build + test`, `commitlint / Validate PR title`.

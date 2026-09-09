@@ -2061,26 +2061,26 @@ the same day and need re-checking on a device before anything is built (S9, S10)
 | # | Item | State |
 |---|---|---|
 | S1 | **Feedback loop, end to end.** Swipe in from the right on iOS in debug and TestFlight builds to slide out a feedback form. Sends to Sentry, with a screenshot and a checkbox to attach a tail of in-memory logs. Owner feedback is a **directive**: a triage skill scans Sentry for these and files them as TODOs, and a worker routine picks items off that list. `Workspace/Cards` has a version of this to copy from | **DONE** (2026-09-08) |
-| S2 | Tapping a dog that is already correctly placed could play the shake animation | |
+| S2 | Tapping a dog that is already correctly placed could play the shake animation | **NOT DONE** — the code now does the opposite on purpose, and a test pins it. See below |
 | S3 | **Puzzle timer.** Persist elapsed time per puzzle, counting only while foregrounded. Show the completion time on the win dialog and in the level pane list | **DONE** (2026-09-08) |
-| S4 | **Three paws feel unreachable.** Solving fast still lands on 2/3. Work out whether par, the thresholds or the multipliers are wrong | |
-| S5 | **A fake interstitial in debug builds**, so it is visible when a real one would show. A black screen saying "Ads go here" is enough, and it must be skippable. Separately: when an ad fails to load, fall back to a Sodogku Pro self-promo with a short forced dwell | |
+| S4 | **Three paws feel unreachable.** Solving fast still lands on 2/3. Work out whether par, the thresholds or the multipliers are wrong | **DONE** (2026-09-08, `f3e6e09`) — it was the speed window, not par or the thresholds |
+| S5 | **A fake interstitial in debug builds**, so it is visible when a real one would show. A black screen saying "Ads go here" is enough, and it must be skippable. Separately: when an ad fails to load, fall back to a Sodogku Pro self-promo with a short forced dwell | self-promo **DONE** (2026-09-08, `fce143d` + `2675078`); the fake interstitial was **overtaken** — there is no interstitial to fake since `b3cac22`. See below |
 | S6 | **The Pro screen's entrance is wrong.** It slides up over Settings while Settings slides out to the left, and coming back Settings slides up from the bottom so it reads as the Pro screen moving. Settings should stay put and only the Pro screen should move | **DONE** (2026-09-08) — see below |
 | S7 | **The achievements dialog renders under the header** — the scrim is not full page. `Workspace/Cards` does dialogs the right way | **already fixed** — verified on device, see below |
-| S8 | A trophy icon with a badge count beside the settings gear on the puzzle screen, the badge persisting until the player opens it | |
+| S8 | A trophy icon with a badge count beside the settings gear on the puzzle screen, the badge persisting until the player opens it | **NOT STARTED** at `e6f12a2`; **in flight uncommitted** as of 2026-09-08. See below |
 | S9 | Tapping the bones bounces but does nothing | **CONFIRMED FIXED** on device (2026-09-08) |
 | S10 | **Some cells still refuse a double tap**, so a deliberate wrong placement is impossible. Losing the bone is the preferred outcome. Only a square that already holds a dog, or one that already failed, should refuse. Also worth exploring: telling the player *why* a placement failed | **CONFIRMED FIXED** on device (2026-09-08); the "why" already exists as the broken-rule highlight, and making it flashier is S21 |
 | S11 | **Win celebration.** Golden paws zip up into the score and the score counts up on an odometer. `Workspace/Cards` `PlayPokerScreen` has the pattern | **DONE** (2026-09-08) |
-| S12 | **Streaks, properly.** After the first few puzzles, a full-screen non-skippable "tap the paws to start your streak" that fills in a greyed-out thing. A streak page that appears on crossing a threshold and animates the day filling in, with haptics. The streak visible somewhere in the app — a flame icon as a small circular button with a badge, which `Workspace/Virtu` already has. Tapping it opens the streak page with no animation. Longest streak shown there. A weekly present for keeping it. Possibly the Duolingo trick of decaying the iOS app icon as the streak dies | |
-| S13 | Game Center on iOS | |
+| S12 | **Streaks, properly.** After the first few puzzles, a full-screen non-skippable "tap the paws to start your streak" that fills in a greyed-out thing. A streak page that appears on crossing a threshold and animates the day filling in, with haptics. The streak visible somewhere in the app — a flame icon as a small circular button with a badge, which `Workspace/Virtu` already has. Tapping it opens the streak page with no animation. Longest streak shown there. A weekly present for keeping it. Possibly the Duolingo trick of decaying the iOS app icon as the streak dies | **MOSTLY DONE** (2026-09-08, `3f3424a` + `078b471`) — intention screen, milestone celebration, badged button, longest streak all shipped. The **weekly present does not exist**, and the button draws a paw where a flame was asked for. See below |
+| S13 | Game Center on iOS | **HALF DONE** (2026-09-08, `bdac05e` + `647d4a8`) — the module, the app graph and the way in are shipped; **nothing submits a score** at `e6f12a2`. Submit-on-win is in flight uncommitted. See below |
 | S14 | **Ads only for bones and sniffs**, nothing else. That constrains how generously streaks and rewards can be handed out, especially with a weekly prize in play | **DONE** (2026-09-08) — see below |
-| S15 | Great telemetry across the puzzle and all of the above. Players will complain about losing a streak and we need to be able to answer | |
-| S16 | "Beat 84.6% of players" on the win dialog. Decide whether that is real data or a qualitative message derived from the player's own run | |
+| S15 | Great telemetry across the puzzle and all of the above. Players will complain about losing a streak and we need to be able to answer | **NOT STARTED** — genuinely open, and the streak half is the worst of it. See below |
+| S16 | "Beat 84.6% of players" on the win dialog. Decide whether that is real data or a qualitative message derived from the player's own run | decision **DONE** (2026-09-08, `9a39641`): qualitative, judged against par. The win sheet did not render it at `e6f12a2`; the wiring is in flight uncommitted. See below |
 | S17 | A trophy on each of the floating achievement pills | **DONE** (2026-09-08) |
-| S18 | **Difficulty ramps too slowly.** It stays easy for too long | |
+| S18 | **Difficulty ramps too slowly.** It stays easy for too long | **DONE** (2026-09-08, `f3e6e09`) — bands no longer restart at the easiest tier. Verified against the shipped pack, not just the curve. See below |
 | S19 | The shake dialog picks a random "sentient" title. Remove all of it and make it normal | **DONE** (2026-09-08) |
 | S20 | **The score dialog is far too much text**, and the score counts up very fast. Question whether the number should get that big at all | copy and count-up **DONE** (2026-09-08); magnitude sits with the scoring pass |
-| S21 | The broken-rule highlight is good and could be more colourful. Consider a small shake of the whole grid on a wrong guess | |
+| S21 | The broken-rule highlight is good and could be more colourful. Consider a small shake of the whole grid on a wrong guess | **DONE** (2026-09-08) — flash in `8579453`, grid shake in `fd1a547`. See below |
 | S22 | An attractor on Sniff when it is worth using: a flashing ring, the bone inside shaking, a slight scale up. A small "look at me" | **DONE** (2026-09-08) |
 | S23 | **The circular icon buttons are hard to see.** They want a soft shadow all the way round, which makes them visible *and* says they are tappable | **DONE** (2026-09-08) |
 | S24 | **Rework the booster row to the competitor's shape** (screenshot 2026-09-08): circular white buttons in a row, each with a picture and a label underneath. They call Sniff "Locate", which is a better word. Use pictures where we can: a paw, a bone, a dog. Consider adding a Clear button | **DONE** (2026-09-08) — Clear deliberately not added, see the commit |
@@ -2192,7 +2192,7 @@ broken-rule highlight outlines the rule that the placement violated. The ask to
 make it more colourful is S21.
 
 
-### S12 · Streaks, quietly. **BUILT, not yet wired in** (2026-09-08)
+### S12 · Streaks, quietly. **BUILT**, and wired in by `078b471` (2026-09-08)
 
 The daily streak itself was already right and is untouched. `DailyStreak.streakOn`
 still owns what a run is, `DailyRepository` still owns the freeze and the restore,
@@ -2335,3 +2335,122 @@ The `UNWIRED` config debt list went from 6 names to 3. The three that went were
 listed as stubs whose feature did not exist, and the honest resolution turned out
 to be the other option that list offers: delete the key rather than build the
 thing.
+
+### The ten blank rows, audited (2026-09-08)
+
+Ten rows had an empty status cell, which read as "not started" and understated
+the list. Every one was checked against the code at `e6f12a2` rather than
+against a commit subject line. Three of them are not what the table implied, and
+those are the ones worth reading.
+
+Three rows are being worked on **right now by another agent and are uncommitted**
+(S8, S13's submit half, S16's rendering half). The verdicts below describe
+`e6f12a2`; where a change is in the working tree it is called out as in flight,
+because a status that quietly counts unlanded work is the failure this audit
+exists to fix.
+
+**S2 · Not fixed, and the code now argues the other way.** `GameViewModel.tap()`
+sends a tap on an occupied square to `nudge()`, which bumps `shakeNonce` and
+fires `GameEvent.Struck` — so the cell wobbles and `GameFeatureEntryPoint` plays
+`Feel.Strike`, the error haptic. `fd1a547` introduced this deliberately ("a
+refused tap shakes instead of doing nothing"), 33 minutes after `b9d5459` wrote
+the row, and `tappingADogThatIsAlreadyThereShakesInsteadOfDoingNothing` now pins
+it. So the two are a straight disagreement about what a refused tap should feel
+like, not an unfinished task.
+
+Half of the original complaint has been met: `nudge()` clears `strikeCell`, so
+there is no rule chip, no red cross and no whole-board flinch — the tap no longer
+reads as *a mistake*. What is left is the wobble and the error haptic. If the
+objection was "it looks like I got it wrong", it is addressed. If it was "it
+should not shake at all", it is not, and closing it means deleting that test.
+**Needs the owner, not an implementer.**
+
+**S4 · Done, `f3e6e09`.** The cause was neither par nor the thresholds: it was
+`speedWindowMs`, a flat 8000ms for every grid, which pinned the speed term at 1.0
+above about 6x6 so a clean run always landed on the same fraction of par.
+`ScoreCard.speedWindowMsFor(size)` now scales it by board size against a 4x4
+reference. Thresholds are untouched at 0.60 / 0.85.
+`allThreeRatingsAreReachableOnEveryBoardShapeTheCampaignShips` sweeps 4x4 to
+10x10 across all four tiers, so this cannot regress quietly.
+
+**S5 · Self-promo done; the fake interstitial was overtaken.** `RealAdGate`
+routes `NoFill`, `Offline`, `NotShown` and `Failed` to
+`paywall.requestAdStandIn(...)` and returns the outcome untouched, so the reward
+is never withheld; the dwell is five seconds and holds the sheet's own close
+control. `paywall.adStandInEnabled` is the kill switch.
+
+The other half asked for a black "Ads go here" screen in debug. It does not
+exist and should not be built: `b3cac22` deleted the interstitial, so there is no
+placement it could stand in for, and debug builds request Google's test units,
+which always fill and stamp themselves "Test Ad". The intent — *make it visible
+when an ad would have shown* — is served by the debug-only `placementId · reason`
+line on the stand-in. Treat the row as answered rather than open.
+
+**S8 · Not started at `e6f12a2`, in flight now.** The puzzle header has two
+buttons, Menu and the settings gear, and `Icons.Trophy` is used only by the
+achievement unlock pills (S17). Achievements are reachable only from Settings.
+The uncommitted work in the tree adds `newBadgeCount` and `OpenAchievements` to
+`GameContract`, an `achievementsSeenAt` watermark on `AppData` that is never
+lowered, and `AchievementsViewModel.markSeen()` that advances it only once the
+grid is actually shown — which is the persist-until-opened half. Nothing renders
+yet.
+
+**S12 · Mostly done; the weekly present is the gap.** The intention screen is
+genuinely non-skippable (`BackHandler` swallows back, no top bar, no close) and
+fires after three clears; milestones are 3/7/14/30+, and only the named cell
+animates, with `Feel.Win`; `StreakButton` is circular and badged and opens the
+page with `celebrating = 0`, so it does not animate on a plain visit; longest
+streak is a fold over `daily_result` and is shown.
+
+Two things are missing. **The weekly present does not exist anywhere** — no
+reward, no config key, no cadence — and per the S14 note it is the part that has
+to be costed against the ad economy rather than just built. Second, the button
+draws a paw where a flame was asked for; `StreakButton`'s own KDoc admits it and
+says the swap is one line. The decaying app icon was written as "possibly" and
+has not been attempted.
+
+**S13 · Half done.** `libraries/leaderboards` has a real Game Center
+implementation (`GKLeaderboard.submitScore`, `GKLocalPlayer.authenticateHandler`)
+with an Android no-op, it is in the app graph so `RealLeaderboards` replaces
+`NoLeaderboards`, and Settings has the row that opens it. At `e6f12a2`
+`Leaderboards.submit` has **zero production call sites** — every reference
+outside the module is a test double — so no score is ever posted and
+`leaderboard.submitted` is an event that cannot fire. `647d4a8` says as much
+itself. Submit-on-win is in the working tree now, uncommitted.
+
+**S15 · Genuinely open, and the streak half is the worst of it.** All three
+previously-named gaps are still real: `game.level_abandoned` is emitted by
+nothing, so drop-off has no denominator; `mode` is on `level_started`, `drag`,
+`commit`, `level_completed`, `level_failed` and `hint_applied` but not on
+`booster_used`, `booster_refilled` or `booster_no_op`; `daily.started` fires only
+from `playDaily()`, so the streak screen's "play now" route is invisible.
+
+Worse than any of those: **`features/streak` emits no events at all.** Nothing
+records a streak starting, a milestone, or the intention moment.
+`StreakRoute : TrackableRoute("streakVisits")` is a local counter on `AppData`,
+not telemetry. The row's stated reason for existing is answering a player who
+complains about a lost streak, and that is exactly the data nobody has.
+
+**S16 · Decided, not rendered.** `9a39641` answered the question — qualitative,
+judged against the player's own run versus par, not a fabricated percentile — and
+`Scoring.standingFor` returns `Scraped / Solid / Sharp / Flawless` with tests. At
+`e6f12a2` nothing calls it outside `libraries/scoring` and `WonSheet` shows
+title, time, reward, streak and share but no verdict; there is no verdict copy in
+`strings.xml`. The wiring is in the working tree now, uncommitted.
+
+**S18 · Done, `f3e6e09`.** Bands no longer restart at the easiest tier:
+`LevelCurve` opens 4x4 at tier 1, 5x5 and 6x6 at tier 2 and everything from 7x7
+at tier 3, with `CurveBand.init` forbidding a band from dipping backwards and the
+one-tier sawtooth at each size change documented as deliberate. Checked against
+the shipped 500-level pack rather than the curve alone: tier counts are 2 / 24 /
+142 / 332, first tier-3 board is level 23 and first tier-4 is level 35, against 38
+and 92 before. `LevelPackVerificationTest` asserts the pack against the curve
+level by level and separately bounds those two crossovers.
+
+**S21 · Done, both halves, but not both in the commit you would expect.** The
+colourful flash is `8579453` — `GameHud` flashes to the danger colour and settles
+to a tint of it in `drawBehind`, snapping straight to the settled tint under
+`reduceAnimations`. The whole-grid shake is **not** in that commit; it landed in
+`fd1a547` as a damped sine `translationX` on `BoardSurface`, keyed on
+`strikeNonce` (a real wrong guess) rather than `shakeNonce` (a refused tap),
+which is the distinction S2 turns on.

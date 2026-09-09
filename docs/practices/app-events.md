@@ -231,13 +231,16 @@ to exist before it renders anything.
 
 `ops/grafana/` is written against this page, and a query is held to it by
 `DashboardQueryContractTest` — a panel referencing an attribute nothing emits fails the build
-rather than rendering an empty chart that reads as "nobody has played yet". Two things the
-boards want are genuinely missing, and each is a one-line addition at a named site:
+rather than rendering an empty chart that reads as "nobody has played yet". One thing the boards
+want is genuinely missing, and it is a one-line addition at a named site:
 
 | Wanted | Where it belongs | What it unlocks |
 |---|---|---|
 | `trigger` on `iap.purchase_result` | `RealEntitlements.purchase()` — the coordinator knows which offer opened | **Conversion by trigger**, which is the question SPEC §14 asks of the paywall board. `iap.paywall_shown` splits by trigger and the buy side does not, so conversion is one blended number |
-| `difficulty` on `game.booster_no_op` | `GameViewModel`, both booster paths | Hint-engine exhaustion **per tier** rather than per booster. The doc already calls a rise here a difficulty signal; without the tier it cannot say which tier |
+
+`difficulty` on `game.booster_no_op` was listed here too and has since been added — `GameViewModel`
+emits it at the one `booster_no_op` site, with a comment saying why. There is one such site, not
+"both booster paths" as this page used to claim.
 
 Specced in SPEC §14 and emitted by nothing at all: `achievement.unlocked`, `share.tapped`,
 `legal.terms_prompt_shown`, `legal.terms_accepted`, `game.level_abandoned`. The first two belong to

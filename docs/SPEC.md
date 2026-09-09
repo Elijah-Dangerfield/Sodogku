@@ -659,10 +659,9 @@ both SDKs read it before any app code runs, so it is in `AndroidManifest.xml` an
 
 ```kotlin
 interface AdGate {
-    suspend fun showInterstitial(placement: Placement): AdOutcome
-    suspend fun showRewarded(placement: Placement): RewardOutcome  // Rewarded | Dismissed |
-                                                                    // NoFill | Offline | Failed
-    fun preload(placement: Placement)
+    suspend fun showRewarded(placement: AdPlacement): RewardOutcome  // Rewarded | Dismissed |
+                                                                     // NoFill | Offline | Failed
+    fun preload(placement: AdPlacement)
 }
 ```
 
@@ -1063,7 +1062,7 @@ State  = board, placedDogs, autoMarks, manualMarks, livesRemaining, score, combo
          elapsedMs, sniffs, treats, phase (Playing | Won | Lost | Paused)
 Action = CellTapped, CellLongPressed, SniffUsed, TreatUsed, Restart, Continue,
          Skip, Pause, Resume, TimerTick
-Event  = ShowRewardedAd(placement), ShowInterstitial, NavigateNext, ShowPaywall,
+Event  = ShowRewardedAd(placement), NavigateNext, ShowPaywall,
          PlaySound, Haptic, ShowShareSheet, FloatPoints(cell, points, praise)
 ```
 
@@ -1441,8 +1440,11 @@ manual "give us a user id" idea, which is more support burden than it is worth.
 based on the two badged icons in the bottom bar. If it turns out to be something else (undo,
 reveal-a-row, shuffle), swapping it is a small change.
 
-**Q2. App-open ads.** Specced and built, defaulted off. They monetize well and they annoy well.
-Worth turning on later with a cooldown once retention is measured, not at launch.
+**Q2. App-open ads.** ~~Specced and built, defaulted off.~~ Answered by deleting them on
+2026-09-08 (`b3cac22`), along with the interstitial and the map banner — see §5.3. They monetize
+well and they annoy well, and none of the three had a call site, so they were paying maintenance
+for zero impressions. Reintroducing one is now a change to `AdFormat` and to `AdPolicyTest`, which
+is the point: it has to be argued for.
 
 **Q3. Does the daily use campaign difficulty or its own curve?** Specced as its own pool at
 moderate difficulty so it stays a 3-to-5-minute daily habit rather than a wall.
@@ -1464,11 +1466,14 @@ moderate difficulty so it stays a 3-to-5-minute daily habit rather than a wall.
 - [ ] Which clips are worth sheeting beyond `dog_look`. `flop` for the lose sheet and `bark` for a
       win are the obvious candidates; each costs about 260KB.
 - [ ] **Bone icon** for lives, **paw** for the rating, and icons for the two boosters.
-- [ ] **App icon** (1024x1024). The **Android launcher icon is already done** (commit `df270fc`:
-      the dog head, no numerals, on a flat cream adaptive background, safe-zone clean). What is
-      still the template's "YOUR APPS IMAGE HERE" placeholder, and what blocks submission, is the
-      **iOS app icon set** and the **Play 512x512 listing icon**. `docs/store/icons.md` §5 lists
-      every file to replace, at every size. A notification icon is not needed: the app posts none.
+- [ ] **App icon** (1024x1024). The **Android launcher icon is done** (commit `df270fc`: the dog
+      head, no numerals, on a flat cream adaptive background, safe-zone clean), and so is the
+      **iOS icon** — `AppIcon.appiconset` holds a real 1024x1024, not the template's "YOUR APPS
+      IMAGE HERE" placeholder. It does not pass review yet: the file has an alpha channel and
+      pre-rounded corners, which Apple rejects as ITMS-90717, so it needs a flattened opaque
+      re-export. That is `docs/OWNER-TODO.md` item 3. Still genuinely missing is the **Play
+      512x512 listing icon**. `docs/store/icons.md` §5 lists every file to replace, at every size.
+      A notification icon is not needed: the app posts none.
 - [ ] **Play feature graphic**, 1024x500. Mandatory for a Play listing and it does not exist.
 - [ ] **iOS screenshots** at 6.9" (1320x2868), and 13" if iPad is supported. Blocked on an iOS
       simulator, which is blocked on `xcode-select`. The eight Android frames are in
@@ -1482,7 +1487,12 @@ moderate difficulty so it stays a 3-to-5-minute daily habit rather than a wall.
 
 ### Accounts and credentials
 
-- [ ] Bundle IDs (proposing `com.sodogku` for both).
+- [x] ~~Bundle IDs.~~ Decided, and **they are not the same on both stores**. Android is
+      `com.sodogku` (`DEFAULT_APPLICATION_ID` in `build-logic/.../Versioning.kt:8`); iOS is
+      `com.sodogku.Sodogku` (`PRODUCT_BUNDLE_IDENTIFIER` in `apps/ios/iosApp.xcodeproj/project.pbxproj`,
+      and `app_identifier` in `apps/ios/fastlane/Appfile`). Create each store record against its own
+      id. The two only have to match each other where something crosses them, which today is
+      nothing — the IAP product id `sodogku_pro` is what has to be identical, and it is.
 - [ ] Sentry DSN.
 - [ ] Grafana Cloud OTLP endpoint and token.
 - [ ] Fly app name and org.
@@ -1496,14 +1506,17 @@ playable and correctly gated today but earns nothing. Nothing below is a code ch
 lines named. Every real id is committed to the binary on purpose — SPEC 4.4 keeps ad units and
 the product id out of remote config, because changing one is a store operation.
 
-**AdMob** (`https://apps.admob.com`). Create one app per platform, then one ad unit per format.
+**AdMob** (`https://apps.admob.com`). Create one app per platform, then **one rewarded unit each,
+and nothing else**. Interstitial, app-open and banner were deleted in `b3cac22`; `AdFormat` in
+`libraries/ads/src/commonMain/.../AdNetwork.kt:22` now has a single entry, so a unit created for
+any other format would never be requested.
 
 | What to create | Where the value goes |
 |---|---|
 | AdMob **Android app** → app ID (`ca-app-pub-…~…`) | `apps/compose/src/androidMain/AndroidManifest.xml`, the `com.google.android.gms.ads.APPLICATION_ID` meta-data |
 | AdMob **iOS app** → app ID | `apps/ios/iosApp/Info.plist`, the `GADApplicationIdentifier` key |
-| Android **rewarded**, **interstitial**, **app-open**, **banner** unit ids | `AdUnits.AndroidLive` in `libraries/ads/src/commonMain/kotlin/com/sodogku/libraries/ads/AdUnits.kt` |
-| iOS **rewarded**, **interstitial**, **app-open**, **banner** unit ids | `AdUnits.IosLive`, same file |
+| Android **rewarded** unit id | `AdUnits.AndroidLive` in `libraries/ads/src/commonMain/kotlin/com/sodogku/libraries/ads/AdUnits.kt` |
+| iOS **rewarded** unit id | `AdUnits.IosLive`, same file |
 | — | then set `AdUnits.useTestUnits = false`. It is the only switch; a missing live id silently falls back to its test unit rather than requesting a blank one |
 
 In the AdMob console also set the app's **privacy and messaging** GDPR message, or the UMP form
@@ -1551,8 +1564,11 @@ until the package is added every iOS ad "fails" and the shared Kotlin grants the
       never shows it to anyone, and there is no in-app analytics opt-out. Cheapest fix is showing
       the install id in Settings plus a support address that accepts requests. See
       `docs/store/data-safety.md` §7.3.
-- [ ] **Android Auto Backup, on or off?** `allowBackup="true"` with no rules means progress and the
-      install id can survive a reinstall and move to a new phone, which is the opposite of what
-      Settings tells the player. Either add backup rules or change the copy; both are fine, but the
-      app should not say one and do the other. See `docs/store/data-safety.md` §7.1.
+- [x] ~~**Android Auto Backup, on or off?**~~ **Off.** `android:allowBackup="false"` at
+      `apps/compose/src/androidMain/AndroidManifest.xml:15`, with the reasoning in a comment above
+      it: Settings tells the player in as many words that progress does not survive a reinstall,
+      and a restore that may or may not happen would have made that copy false *sometimes*, which
+      is worse than either answer. Backup would also have carried the install id to a second
+      device, which is the one thing that identifier must never do. See
+      `docs/store/data-safety.md` §7.1.
 - [ ] Q1 through Q3 above.

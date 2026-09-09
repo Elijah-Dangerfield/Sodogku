@@ -200,7 +200,9 @@ The pipeline ships only the binary + release notes (`skip_metadata: true`, `skip
 
 ### One-time GitHub Pages source
 
-Marketing/landing pages (`index.html`, `privacy.html`, `terms.html`, `style.css`) live in [pages/](../pages/) so that `docs/` can stay developer-focused. Set **Settings → Pages → Source** to `main` / `/pages` so the site serves at `https://<user>.github.io/<repo>/` without any path change. The URLs referenced from the app (`/privacy.html`, `/terms.html`) stay the same.
+Marketing/landing pages (`index.html`, `privacy.html`, `terms.html`, `style.css`) live in [pages/](../pages/) so that `docs/` can stay developer-focused. Set **Settings → Pages → Source** to **GitHub Actions**. [pages.yml](../.github/workflows/pages.yml) then uploads `pages/` as the artifact and publishes it with `actions/deploy-pages`, so the site serves at `https://<user>.github.io/<repo>/` and the URLs referenced from the app (`/privacy.html`, `/terms.html`) resolve.
+
+`Deploy from a branch` is not an option here: it publishes a folder directly and never runs the workflow, so `actions/deploy-pages` would have nothing to deploy to. The app's legal links are hardcoded to this URL in `libraries/config/.../LegalConfigValues.kt`, and a wrong source leaves them 404ing with no error anywhere.
 
 ## Runbook: something broke
 

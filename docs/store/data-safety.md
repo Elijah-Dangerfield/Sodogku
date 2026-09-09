@@ -350,7 +350,14 @@ it is a different app.
 
 ### 7.1 Android Auto Backup contradicts what Settings tells the player
 
-`apps/compose/src/androidMain/AndroidManifest.xml:10` sets `android:allowBackup="true"` and
+**Resolved: backup is off.** `android:allowBackup="false"` at
+`apps/compose/src/androidMain/AndroidManifest.xml:15`, with the reasoning in a comment above it.
+Nothing leaves the device through Auto Backup, so the Settings copy and the `AppCache` KDoc are
+true on both platforms and the declarable-transfer question below does not have to be answered.
+The analysis is kept as written because it is why the answer is what it is.
+
+The state it describes, for the record: `apps/compose/src/androidMain/AndroidManifest.xml:10` set
+`android:allowBackup="true"` and
 declares no `android:dataExtractionRules` and no `android:fullBackupContent`.
 `AndroidFileManager.kt:21` writes the persistent cache to `context.filesDir`, and the Room database
 lives in the default `databases/` directory. Both are inside Auto Backup's default scope.
@@ -421,7 +428,7 @@ Cloud gateway in practice, but the claim on the form is only true if the configu
 
 Written down rather than fixed, per this chunk's scope.
 
-1. **`allowBackup="true"` contradicts a user-facing promise.** §7.1. The highest-value item here.
+1. ~~**`allowBackup="true"` contradicts a user-facing promise.**~~ Fixed: backup is off, see §7.1.
 2. **The feedback path ships a session log the player is not told about.** `AppTelemetry.kt:210`
    attaches `session-log.txt` (Debug and above in release) to every feedback submission. That is
    defensible and probably necessary, but the feedback screen's copy does not mention it, and the
