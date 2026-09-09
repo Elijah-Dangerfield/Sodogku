@@ -509,3 +509,74 @@ lifetime total and there is no "points banked since a date". That addition
 first, then one entry in the `Leaderboard` enum. Do not use a recurring board
 for the daily challenge, for the local-midnight reason already written down
 there.
+
+## SD-24 [P2] — The Pro upsell reads like a shakedown, and looks flat
+
+**Ask:** Owner, 2026-09-09, on the redesigned paywall.
+
+Copy first, because it is the part that actually matters:
+
+> "the copy on the upsell kinda sucks. Like saying 'and Sodogku stops asking
+> you for anything' is like saying 'hey give us money and we will stop
+> bothering you'. Maybe the header could be better too. Could just be 'Unlock
+> Sodogku Pro' and the other text could be 'Here's what you get with pro:' just
+> keeping it super simple."
+
+They are right, and it is worth naming why: the line frames the free product as
+a nuisance the player is paying to switch off. That is an argument for
+resenting the app, printed on the screen asking for money. Replace it. The
+suggested header and lead are deliberately plain and should be taken more or
+less as given rather than "improved" into something clever.
+
+Visual, same message:
+
+> "we should likely use that paw svg and we need a touch more contrast between
+> the background yellow and paw yellow. Also pick a different dog still."
+> "would be really cool if we could make the status bar yellow when the upsell
+> is up. and maybe we need to make the back nav an X since its a slide up type
+> of thing."
+
+**Done when:** The copy no longer implies the app pesters you; the bullets use
+the shared paw; the paw reads clearly against the amber slab; a different
+`DogPose` is chosen; the dismiss affordance is an X rather than a back chevron;
+and the status bar is amber while the sheet is up and back to normal after.
+
+**Hints:** `features/paywall/impl/.../PaywallScreen.kt`. The paw is `Icons.Paw`
+in `libraries/ui/.../components/icon/` (added by the booster-row work — confirm
+the name before using it).
+
+Contrast: the bullets currently draw at an amber close to the slab's own amber.
+Note the slab already had one contrast fix — the type on it is Brown900 rather
+than the white the mockup showed, because white measures 1.79:1 on that amber.
+Whatever colour the paw takes, measure it; `Colors.kt` documents its ratios and
+there is a `NoRawDesignValues` rule.
+
+The status bar is platform-specific. Find how the app sets system bar
+appearance today before adding a second mechanism, and make sure it is restored
+when the sheet closes **by any route** — dismiss, back, purchase, or a process
+death with the sheet open. A status bar left amber over the board is a worse
+bug than the one being fixed.
+
+`DogPose` options are in `libraries/ui/.../components/dog/`.
+
+## SD-25 [P1] — Dragging the bottom sheet does not track the thumb
+
+**Ask:** Owner, 2026-09-09: "the drag down of the bottom sheet is kinda glitchy.
+Idk if its just iphone but it doesnt stay right under the thumb it kinda jumps
+and glitches around a bit."
+
+**Done when:** A slow drag down moves the sheet exactly with the finger, with no
+jump at the start and no stutter mid-drag, on both platforms.
+
+**Hints:** `libraries/ui/.../components/dialog/bottomsheet/BottomSheet.kt`
+wraps Material3's `ModalBottomSheet`. Two candidates worth ruling out in order:
+
+1. **Nested scroll.** The paywall content scrolls, so a drag starting inside a
+   scrollable competes with the sheet's own drag. The usual symptom is exactly
+   this: the sheet ignores the first few pixels, then catches up in a jump.
+2. **Platform.** The owner suspects iPhone. Compose Multiplatform's iOS
+   touch-slop and fling handling differ from Android's, so reproduce on both
+   before concluding it is one of them.
+
+The paywall is the sheet to test with, since it is the one the owner was using
+and the only real `bottomSheet<>` call site in the app.
