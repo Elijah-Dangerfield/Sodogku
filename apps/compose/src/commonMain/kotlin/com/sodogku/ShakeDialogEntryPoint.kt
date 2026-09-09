@@ -1,5 +1,6 @@
 package com.sodogku
 
+import androidx.compose.runtime.DisposableEffect
 import androidx.navigation.NavGraphBuilder
 import com.sodogku.features.profile.BugReportRoute
 import com.sodogku.libraries.core.BuildInfo
@@ -19,10 +20,21 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @Inject
 class ShakeDialogEntryPoint(
     private val networkInspector: NetworkInspector,
+    private val shakeHandler: ShakeHandler,
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
         dialog<ShakeDialogRoute> { _, dialogState ->
+            // The handler suppresses further shakes while this is up, and this
+            // is the only thing that tells it either way. Tied to the
+            // destination leaving composition rather than to a button, so back
+            // presses, scrim taps and navigating away all clear it — and so
+            // does a navigation that never arrived, because then this never ran.
+            DisposableEffect(Unit) {
+                shakeHandler.onDialogShown()
+                onDispose { shakeHandler.onDialogDismissed() }
+            }
+
             ShakeDialog(
                 state = dialogState,
                 onDismiss = { router.goBack() },

@@ -9,9 +9,13 @@ import kotlinx.serialization.Serializable
  * from a few hundred generated quips, so the route existed to ferry copy from a
  * message provider into a dialog. The dialog owns its own words now, which is
  * where a screen's copy belongs.
+ *
+ * A `class` and not a `data object` even though it has no arguments: an
+ * arg-less `data object` route SIGSEGVs the iOS navigator at navigate time.
+ * This was the last one in the repo.
  */
 @Serializable
-data object ShakeDialogRoute : Route(
+class ShakeDialogRoute : Route(
     enter = AnimationType.SlideUp,
     exit = AnimationType.SlideDown,
     popExit = AnimationType.SlideDown,

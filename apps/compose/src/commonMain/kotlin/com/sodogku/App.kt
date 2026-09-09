@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -13,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.navigation.NavDeepLinkRequest
 import androidx.navigation.NavDestination
 import androidx.navigation.NavGraphBuilder
@@ -83,9 +83,17 @@ fun App(appComponent: AppComponent) {
     // before the first Activity; resolving twice is a no-op.)
     remember { appComponent.autoInits }
 
-    DisposableEffect(shakeHandler) {
+    // Keyed on visibility, not on the composition. A DisposableEffect here only
+    // tears down when the whole composition goes away, which backgrounding does
+    // not do — so the accelerometer kept running in a backgrounded app, a phone
+    // going into a pocket registered as a shake, and the router (which only
+    // executes queued navigation at STARTED and above) held the request until
+    // the player came back and then opened a dialog out of nowhere. Same
+    // lifecycle bound here as the router uses there, so a detected shake is
+    // always one the router can act on immediately.
+    LifecycleStartEffect(shakeHandler) {
         shakeHandler.start()
-        onDispose {
+        onStopOrDispose {
             shakeHandler.stop()
         }
     }

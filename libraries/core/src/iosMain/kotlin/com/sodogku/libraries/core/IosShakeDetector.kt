@@ -2,9 +2,10 @@ package com.sodogku.libraries.core
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import me.tatarka.inject.annotations.Inject
 import platform.CoreMotion.CMMotionManager
 import platform.Foundation.NSDate
@@ -14,77 +15,58 @@ import platform.Foundation.timeIntervalSince1970
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
-import kotlin.math.sqrt
 
 @OptIn(ExperimentalForeignApi::class)
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
 class IosShakeDetector : ShakeDetector {
-    
+
     private val motionManager = CMMotionManager()
-    private val shakeChannel = Channel<ShakeEvent>(Channel.BUFFERED)
-    override val shakeEvents: Flow<ShakeEvent> = shakeChannel.receiveAsFlow()
-    
-    private var lastShakeTime = 0L
-    private var lastX = 0.0
-    private var lastY = 0.0
-    private var lastZ = 0.0
-    private var isFirstReading = true
-    
+    private val recognizer = ShakeRecognizer()
+
+    private val events = MutableSharedFlow<ShakeEvent>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    override val shakeEvents: SharedFlow<ShakeEvent> = events.asSharedFlow()
+
     override fun start() {
         if (!motionManager.accelerometerAvailable) return
-        
+
+        recognizer.reset()
         motionManager.accelerometerUpdateInterval = UPDATE_INTERVAL
-        motionManager.startAccelerometerUpdatesToQueue(
-            NSOperationQueue.mainQueue
-        ) { data, _ ->
-            data?.let { accelerometerData ->
-                val acceleration = accelerometerData.acceleration
-                acceleration.useContents {
-                    processAcceleration(x, y, z)
-                }
-            }
+        motionManager.startAccelerometerUpdatesToQueue(NSOperationQueue.mainQueue) { data, _ ->
+            data?.acceleration?.useContents { handleSample(x, y, z) }
         }
     }
-    
+
     override fun stop() {
         motionManager.stopAccelerometerUpdates()
     }
-    
-    private fun processAcceleration(x: Double, y: Double, z: Double) {
-        if (isFirstReading) {
-            lastX = x
-            lastY = y
-            lastZ = z
-            isFirstReading = false
-            return
-        }
-        
-        val currentTime = (NSDate().timeIntervalSince1970 * 1000).toLong()
-        
-        val deltaX = x - lastX
-        val deltaY = y - lastY
-        val deltaZ = z - lastZ
-        
-        lastX = x
-        lastY = y
-        lastZ = z
-        
-        val magnitude = sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ)
-        
-        if (magnitude > SHAKE_THRESHOLD) {
-            if (currentTime - lastShakeTime > SHAKE_COOLDOWN_MS) {
-                lastShakeTime = currentTime
-                
-                shakeChannel.trySend(ShakeEvent(currentTime))
-            }
-        }
+
+    private fun handleSample(xG: Double, yG: Double, zG: Double) {
+        val now = (NSDate().timeIntervalSince1970 * 1000).toLong()
+        val isShake = recognizer.onSample(
+            x = xG * STANDARD_GRAVITY_M_S2,
+            y = yG * STANDARD_GRAVITY_M_S2,
+            z = zG * STANDARD_GRAVITY_M_S2,
+            atMs = now,
+        )
+
+        if (isShake) events.tryEmit(ShakeEvent(now))
     }
-    
-    companion object {
-        private const val UPDATE_INTERVAL: NSTimeInterval = 0.1
-        private const val SHAKE_THRESHOLD = 1.5
-        private const val SHAKE_COOLDOWN_MS = 1500L
+
+    private companion object {
+        /**
+         * Half the recognizer's sample interval, matching Android — CoreMotion
+         * delivers on the interval it is given, and the recognizer does its own
+         * gating on top.
+         */
+        const val UPDATE_INTERVAL: NSTimeInterval = 0.05
+
+        /** CoreMotion reports acceleration in g; the recognizer works in m/s². */
+        const val STANDARD_GRAVITY_M_S2 = 9.80665
     }
 }

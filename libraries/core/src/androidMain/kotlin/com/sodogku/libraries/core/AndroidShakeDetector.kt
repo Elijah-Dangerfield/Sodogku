@@ -5,14 +5,14 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
-import kotlin.math.sqrt
 
 @Inject
 @SingleIn(AppScope::class)
@@ -20,73 +20,56 @@ import kotlin.math.sqrt
 class AndroidShakeDetector(
     private val context: Context,
 ) : ShakeDetector, SensorEventListener {
-    
-    private val sensorManager by lazy { 
-        context.getSystemService(Context.SENSOR_SERVICE) as SensorManager 
+
+    private val sensorManager by lazy {
+        context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     }
-    private val accelerometer by lazy { 
-        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) 
+    private val accelerometer by lazy {
+        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     }
-    
-    private val shakeChannel = Channel<ShakeEvent>(Channel.BUFFERED)
-    override val shakeEvents: Flow<ShakeEvent> = shakeChannel.receiveAsFlow()
-    
-    private var lastShakeTime = 0L
-    private var lastX = 0f
-    private var lastY = 0f
-    private var lastZ = 0f
-    private var lastUpdateTime = 0L
-    
+
+    private val recognizer = ShakeRecognizer()
+
+    private val events = MutableSharedFlow<ShakeEvent>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    override val shakeEvents: SharedFlow<ShakeEvent> = events.asSharedFlow()
+
     override fun start() {
-        accelerometer?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
-        }
+        val sensor = accelerometer ?: return
+        recognizer.reset()
+        sensorManager.registerListener(this, sensor, SAMPLING_PERIOD_US)
     }
-    
+
     override fun stop() {
         sensorManager.unregisterListener(this)
     }
-    
+
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type != Sensor.TYPE_ACCELEROMETER) return
-        
-        val currentTime = System.currentTimeMillis()
-        val timeDiff = currentTime - lastUpdateTime
-        
-        if (timeDiff < SHAKE_SAMPLE_INTERVAL_MS) return
-        
-        lastUpdateTime = currentTime
-        
-        val x = event.values[0]
-        val y = event.values[1]
-        val z = event.values[2]
-        
-        val deltaX = x - lastX
-        val deltaY = y - lastY
-        val deltaZ = z - lastZ
-        
-        lastX = x
-        lastY = y
-        lastZ = z
-        
-        val acceleration = sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ) / timeDiff * 10000
-        
-        if (acceleration > SHAKE_THRESHOLD) {
-            if (currentTime - lastShakeTime > SHAKE_COOLDOWN_MS) {
-                lastShakeTime = currentTime
-                
-                shakeChannel.trySend(ShakeEvent(currentTime))
-            }
-        }
+
+        val now = System.currentTimeMillis()
+        val isShake = recognizer.onSample(
+            x = event.values[0].toDouble(),
+            y = event.values[1].toDouble(),
+            z = event.values[2].toDouble(),
+            atMs = now,
+        )
+
+        if (isShake) events.tryEmit(ShakeEvent(now))
     }
-    
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // Not needed
-    }
-    
-    companion object {
-        private const val SHAKE_THRESHOLD = 800
-        private const val SHAKE_COOLDOWN_MS = 1500L
-        private const val SHAKE_SAMPLE_INTERVAL_MS = 100
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+
+    private companion object {
+        /**
+         * Half the recognizer's sample interval, so a sample is always available
+         * close to when the interval elapses. `SENSOR_DELAY_UI` is ~66ms, which
+         * put consecutive accepted samples ~133ms apart and made the gesture's
+         * sensitivity depend on where the delivery cadence happened to fall.
+         */
+        const val SAMPLING_PERIOD_US = 50_000
     }
 }
