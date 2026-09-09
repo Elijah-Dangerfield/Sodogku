@@ -28,7 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.focusProperties
@@ -89,54 +88,10 @@ fun OnboardingScreen(
     WelcomeContent(
         state = state,
         onAction = onAction,
-        dogAlpha = 1f,
-        restAlpha = 1f,
         // The one place the loop is switched off for a player who asked for
-        // stills. `LoopingDog` holds frame 0, which is the same frame the splash
-        // shows, so reduce-animations gets a composed screen rather than an
-        // empty hole where the dog was.
+        // stills. `LoopingDog` holds frame 0, so reduce-animations gets a
+        // composed screen rather than an empty hole where the dog was.
         dogPlaying = !LocalReduceAnimations.current,
-    )
-}
-
-/**
- * This screen with nothing drawn but its dog, for the iOS splash to fade out of.
- *
- * The splash exists so that launch reads as one screen rather than two: its dog
- * stands exactly where the welcome screen draws its own, so when the splash
- * fades the only thing that happens is the card, the rules and the buttons
- * arriving *around* a dog that never moved. A shared offset constant used to
- * carry that promise, and it only held while both columns kept the same shape.
- * Laying out the real column and hiding all but the dog makes the two agree by
- * construction instead, including after somebody edits this screen.
- *
- * **The amber is on the hidden side of that line, not the shown side**, and that
- * is a decision rather than an oversight. The system launch image is a flat
- * cream (`LaunchBackground` in the iOS asset catalogue) and the splash paints
- * the same cream so that the handover from UIKit to Compose shows nothing at
- * all. Painting the amber here would move that seam rather than remove it: the
- * first Compose frame would jump cream to amber, in front of the player, which
- * is the flash the splash exists to prevent. So the amber arrives with
- * everything else, cross-fading up behind a dog that is opaque in both layers
- * for the whole 450ms.
- *
- * The dog holds a still frame here, and must keep doing so. The splash and the
- * welcome screen are two separate dogs, each stepping its own coroutine: if both
- * played, they would cross-fade between whatever frames they happened to be on,
- * which is a double exposure rather than a handover.
- *
- * What is hidden is drawn but [inert] — a zero-alpha button is still a button
- * until it is told otherwise.
- */
-@Composable
-fun OnboardingDogHandoff(dogAlpha: Float) {
-    WelcomeContent(
-        state = OnboardingState(),
-        onAction = {},
-        dogAlpha = dogAlpha,
-        restAlpha = 0f,
-        dogPlaying = false,
-        modifier = Modifier.inert(),
     )
 }
 
@@ -158,8 +113,6 @@ fun OnboardingDogHandoff(dogAlpha: Float) {
 private fun WelcomeContent(
     state: OnboardingState,
     onAction: (OnboardingAction) -> Unit,
-    dogAlpha: Float,
-    restAlpha: Float,
     dogPlaying: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -171,16 +124,10 @@ private fun WelcomeContent(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             DogField(
-                dogAlpha = dogAlpha,
-                fieldAlpha = restAlpha,
                 playing = dogPlaying,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
-            WelcomeCard(
-                state = state,
-                onAction = onAction,
-                modifier = Modifier.alpha(restAlpha),
-            )
+            WelcomeCard(state = state, onAction = onAction)
         }
     }
 }
@@ -188,10 +135,11 @@ private fun WelcomeContent(
 /**
  * The amber, its paws, and the dog standing on it.
  *
- * The field is painted by a sibling that fills the box rather than by a
- * background on the box itself, because the box's own alpha would take the dog
- * down with it and the dog is the one thing that has to survive the handoff at
- * full opacity.
+ * The field is painted by a sibling Spacer rather than as a background on the
+ * box, which is now only a habit: it was so the field could fade while the dog
+ * stayed opaque through the splash handoff, and there is no handoff any more.
+ * Left alone because a `drawBehind` sibling and a background modifier draw the
+ * same pixels, and the paws want a DrawScope either way.
  *
  * The dog is sized against the field rather than fixed, and it has to be. Its
  * `Modifier.size` is clamped by whatever constraints it is handed, so on a short
@@ -210,8 +158,6 @@ private fun WelcomeContent(
  */
 @Composable
 private fun DogField(
-    dogAlpha: Float,
-    fieldAlpha: Float,
     playing: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -227,7 +173,6 @@ private fun DogField(
         Spacer(
             modifier = Modifier
                 .matchParentSize()
-                .alpha(fieldAlpha)
                 .drawBehind {
                     drawRect(field)
                     drawFieldPaws(texture)
@@ -245,11 +190,7 @@ private fun DogField(
             // the reason it is `LoopingDog` and not `AnimatedDog` — one clip on
             // repeat stops being seen after about three passes, and this dog is
             // the screen.
-            LoopingDog(
-                size = dogSize,
-                playing = playing,
-                modifier = Modifier.alpha(dogAlpha),
-            )
+            LoopingDog(size = dogSize, playing = playing)
         }
     }
 }
@@ -499,34 +440,6 @@ private fun StartButton(enabled: Boolean, onClick: () -> Unit) {
         Text(stringResource(Res.string.onboarding_start_tutorial))
     }
 }
-
-/**
- * Drawn, but reachable by nothing: not a finger, not focus, not a screen reader.
- *
- * Alpha is a drawing property and every input system ignores it, so the splash's
- * invisible copy of this screen would otherwise take taps that land on the real
- * buttons underneath, sit in the keyboard focus order, and give VoiceOver a
- * second "Walk me through one" to read out. Three systems, three modifiers:
- *
- * - taps are consumed on the initial pass, which runs parent to child, so no
- *   descendant gesture detector ever sees an unconsumed down;
- * - the subtree is a focus group that cancels any attempt to enter it, since
- *   `canFocus = false` on its own only skips the group node, not its children;
- * - semantics are hidden for the subtree, which is what maps to VoiceOver's
- *   `accessibilityElementsHidden`.
- */
-@OptIn(ExperimentalComposeUiApi::class)
-private fun Modifier.inert(): Modifier = this
-    .pointerInput(Unit) {
-        awaitPointerEventScope {
-            while (true) {
-                awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
-            }
-        }
-    }
-    .focusProperties { onEnter = { cancelFocusChange() } }
-    .focusGroup()
-    .semantics { hideFromAccessibility() }
 
 /**
  * Paws across the amber, a shade lighter than it, well clear of the dog.

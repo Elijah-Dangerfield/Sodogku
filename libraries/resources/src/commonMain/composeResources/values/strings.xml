@@ -1,6 +1,11 @@
 <resources>
     <string name="app_name">Sodogku</string>
 
+    <!-- Read out while the launch loader is on screen. Not shown: the bone is
+         the only thing there, and a caption under it would be a second thing to
+         look at during the shortest moment in the app. -->
+    <string name="splash_loading">Loading</string>
+
     <!-- The one line under the wordmark, and the only chance to set a tone
          before the rules start. It names sudoku because that is the fastest way
          to hand over the row-and-column half of the game, and then stops
