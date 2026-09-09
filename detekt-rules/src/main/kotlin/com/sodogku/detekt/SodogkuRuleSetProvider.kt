@@ -18,6 +18,7 @@ class SodogkuRuleSetProvider : RuleSetProvider {
             ::VerifyStrings,
             ::AnimatedStateReadInComposition,
             ::NoRawDesignValues,
+            ::ScrollInsideBottomSheet,
         ),
     )
 }
