@@ -37,8 +37,10 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * gestures is a form. The caller is told when the fill lands, and decides what
  * to do next.
  *
- * The paw is [drawPaw] from the game shapes, which is why this is not waiting on
- * artwork. See [StreakMark] for the same note about a flame.
+ * The paw is [drawPaw] from the game shapes, and it stays a paw now that
+ * [StreakMark] is a flame. The flame is the *count's* glyph — it says how long
+ * the run is. This is the commitment that starts one, and the app's own mark is
+ * the right thing to press to make a promise to it.
  */
 @Composable
 fun StreakIntentionMark(

@@ -1,46 +1,54 @@
 package com.sodogku.libraries.ui.components.streak
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import com.sodogku.libraries.ui.Elevation
 import com.sodogku.libraries.ui.PreviewContent
-import com.sodogku.libraries.ui.components.Badge
-import com.sodogku.libraries.ui.components.BadgedBox
 import com.sodogku.libraries.ui.components.Surface
-import com.sodogku.libraries.ui.components.game.drawPaw
-import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Radii
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.flame
 
 /**
- * The streak, as a circular button with a count on it.
+ * The streak, as a flame with its count beside it.
  *
- * **The mark is a paw print, and it is a placeholder for a flame.** The paw is
- * the app's own vocabulary and it is already drawn ([drawPaw] in the game
- * shapes), so the button can ship without waiting on artwork. Swapping it is one
- * line in [StreakMark] once a flame exists.
+ * Lit when the run is alive, a flat grey silhouette when it is not. That is the
+ * same "keeps its shape, loses its colour" rule the achievement grid uses for a
+ * locked badge, so a dead streak is still legible as a streak rather than as a
+ * missing control.
  *
- * Filled when the run is alive, outlined when it is not. That is the same "keeps its
- * shape, loses its colour" rule the achievement grid uses for a locked badge, so
- * a dead streak is still legible as a streak rather than as a missing control.
+ * The count is not a corner badge. It is set into the flame: the digits are
+ * drawn twice, once as a fat stroke in the pill's own colour and once filled on
+ * top, so the outline carves a clean gap wherever the number overlaps the art.
+ * A pill-shaped badge floating off the corner reads as a notification — an
+ * unread count, something to clear — and the streak is the opposite of that.
  *
- * The badge is hidden at zero. A count of nought is the one number that says
- * nothing anybody wants to be told.
+ * The count is absent at zero, which is also what turns the pill back into a
+ * circle. A count of nought is the one number that says nothing anybody wants
+ * to be told.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StreakButton(
     streak: Int,
@@ -60,36 +68,32 @@ fun StreakButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BadgedBox(
-        contentRadius = Radii.Round,
-        badge = {
-            if (streak > 0) {
-                Badge {
-                    // Not labelled: the count is already in `stateLabel` on the
-                    // button, and a badge that announces itself makes a reader
-                    // say the number twice.
-                    Text(text = streak.toString())
-                }
-            }
-        },
+    Surface(
+        color = AppTheme.colors.surfacePrimary,
+        contentColor = AppTheme.colors.onSurfacePrimary,
+        radius = Radii.Round,
+        elevation = Elevation.Button,
+        onClick = onClick,
+        contentPadding = PaddingValues(Dimension.D400),
         modifier = modifier.semantics(mergeDescendants = true) {
             contentDescription = label
             stateDescription = stateLabel
             role = Role.Button
         },
     ) {
-        Surface(
-            color = AppTheme.colors.surfacePrimary,
-            contentColor = AppTheme.colors.onSurfacePrimary,
-            radius = Radii.Round,
-            elevation = Elevation.Button,
-            onClick = onClick,
-            contentPadding = PaddingValues(Dimension.D400),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            // Negative, so the digits sit *on* the flame rather than next to it.
+            // The knockout outline is what keeps them apart, and it needs
+            // something to be knocked out of. Small: the outline already bleeds
+            // half its width past the letterforms, and the two overlaps add up
+            // — at six the number ate the flame down to a crescent.
+            horizontalArrangement = Arrangement.spacedBy(-Dimension.D50),
         ) {
-            StreakMark(
-                alive = streak > 0,
-                modifier = Modifier.size(Dimension.D900),
-            )
+            StreakMark(alive = streak > 0, modifier = Modifier.height(Dimension.D1000))
+            if (streak > 0) {
+                StreakCount(streak)
+            }
         }
     }
 }
@@ -97,14 +101,48 @@ fun StreakButton(
 /**
  * The streak's glyph.
  *
- * One composable so there is exactly one place to change when the flame arrives.
+ * One composable so there is exactly one place to change it, and sized by height
+ * rather than by a square: the art is taller than it is wide, and `size` on a
+ * square would letterbox it and leave the button lopsided.
  */
 @Composable
 internal fun StreakMark(alive: Boolean, modifier: Modifier = Modifier) {
-    val lit = AppTheme.colors.accentPrimary.color
-    val dim = AppTheme.colors.textSecondary.color
-    Canvas(modifier = modifier) {
-        drawPaw(color = if (alive) lit else dim, filled = alive)
+    Image(
+        painter = painterResource(Res.drawable.flame),
+        contentDescription = null,
+        colorFilter = if (alive) null else ColorFilter.tint(AppTheme.colors.textDisabled.color),
+        modifier = modifier,
+    )
+}
+
+/**
+ * The count, cut into whatever is behind it.
+ *
+ * Two passes of the same string: the stroke is drawn first in the surface
+ * colour, then the fill on top. Compose strokes text centred on the glyph
+ * outline, so half the width falls outside the letterform and that half is the
+ * gap — which means the stroke has to be roughly twice the gap you want.
+ *
+ * Silent to a reader. The number is already in the button's state description,
+ * and a count that announces itself makes a reader say it twice.
+ */
+@Composable
+private fun StreakCount(streak: Int, modifier: Modifier = Modifier) {
+    val style = AppTheme.typography.Heading.H700.style
+    val knockout = with(LocalDensity.current) { Dimension.D300.toPx() }
+
+    Box(modifier = modifier.clearAndSetSemantics { }) {
+        BasicText(
+            text = streak.toString(),
+            style = style.copy(
+                color = AppTheme.colors.surfacePrimary.color,
+                drawStyle = Stroke(width = knockout, join = StrokeJoin.Round),
+            ),
+        )
+        BasicText(
+            text = streak.toString(),
+            style = style.copy(color = AppTheme.colors.text.color),
+        )
     }
 }
 

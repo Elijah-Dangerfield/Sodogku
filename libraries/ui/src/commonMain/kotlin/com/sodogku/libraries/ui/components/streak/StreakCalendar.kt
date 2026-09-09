@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -32,6 +33,7 @@ import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
 import com.sodogku.system.Radii
 import com.sodogku.system.clip
+import com.sodogku.system.cornerRadius
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /** How one square on the streak calendar is drawn. */
@@ -134,7 +136,13 @@ private fun StreakDayCell(cell: StreakCell, filling: Boolean, modifier: Modifier
     val done = AppTheme.colors.accentPrimary.color
     val bridged = AppTheme.colors.accentSecondary.color
     val failed = AppTheme.colors.danger.color
-    val today = AppTheme.colors.border.color
+    // `text`, not `border`. The border token is a cream one step off the cream
+    // the cell is filled with — 1.1:1, which is a line you can find once you
+    // have been told it is there. This ring is the only thing on the page that
+    // says which square is today, so it has to survive being glanced at, and it
+    // has to survive being drawn over an accent-blue cell on the days it
+    // matters most.
+    val today = AppTheme.colors.text.color
 
     // Held at 1 in a preview or a screenshot test: an animation that starts at 0
     // and is never driven leaves the day the page is celebrating drawn empty.
@@ -171,9 +179,20 @@ private fun StreakDayCell(cell: StreakCell, filling: Boolean, modifier: Modifier
                     size = Size(size.width, height),
                 )
                 if (cell.isToday) {
-                    drawRect(
+                    val ring = todayRing(
+                        cellExtent = size.minDimension,
+                        widthFraction = TodayRingWidth,
+                        clipCornerRadius = Radii.Cell.cornerRadius(this, size),
+                    )
+                    drawRoundRect(
                         color = today,
-                        style = Stroke(width = size.minDimension * TodayRing),
+                        topLeft = Offset(ring.inset, ring.inset),
+                        size = Size(
+                            size.width - ring.strokeWidth,
+                            size.height - ring.strokeWidth,
+                        ),
+                        cornerRadius = CornerRadius(ring.cornerRadius),
+                        style = Stroke(width = ring.strokeWidth),
                     )
                 }
             }
@@ -185,13 +204,59 @@ private fun StreakDayCell(cell: StreakCell, filling: Boolean, modifier: Modifier
         Text(
             text = cell.label,
             typography = AppTheme.typography.Caption.C200,
+            // Every filled square names the colour it is filled with. A bridged
+            // day fell through to the same brown a *cream* square uses, which put
+            // Brown700 on Purple600 at 1.7:1 — the date on the one square the
+            // player spent a freeze on was the only one they could not read.
             color = when (cell.state) {
                 StreakCellState.Done, StreakCellState.Failed -> AppTheme.colors.onAccentPrimary
+                StreakCellState.Bridged -> AppTheme.colors.onAccentSecondary
                 StreakCellState.Future -> AppTheme.colors.textDisabled
-                else -> AppTheme.colors.textSecondary
+                StreakCellState.Missed -> AppTheme.colors.textSecondary
             },
         )
     }
+}
+
+/**
+ * Where the ring around today goes, given a cell that has already been clipped.
+ *
+ * The shipped version drew `Stroke` on the cell's full bounds. A stroke is
+ * centred on the geometry it is given, so half of it lay outside a clip that had
+ * already been applied — and being a plain rect, its four square corners lay
+ * outside the rounded corners too. What the player saw was not a missing
+ * border. It was a border half as thick as it should be with its corners bitten
+ * out, which reads as the renderer misbehaving rather than as anything anybody
+ * wrote.
+ *
+ * [overhang] is the invariant, and the only reason this is a type rather than
+ * three lines inside `drawBehind`: any ring whose outer edge sits past the
+ * cell's bounds is a ring the clip is about to shave.
+ */
+internal data class TodayRing(
+    val strokeWidth: Float,
+    val inset: Float,
+    val cornerRadius: Float,
+) {
+    /** How far past the cell's bounds the outside of the stroke falls. */
+    val overhang: Float get() = strokeWidth / 2f - inset
+}
+
+internal fun todayRing(
+    cellExtent: Float,
+    widthFraction: Float,
+    clipCornerRadius: Float,
+): TodayRing {
+    val strokeWidth = cellExtent * widthFraction
+    val inset = strokeWidth / 2f
+    // The clip's corner measured at the cell's edge, walked in to where the
+    // stroke's centreline now runs. Left at the clip's own value the ring bulges
+    // at the corners and pinches on the straights.
+    return TodayRing(
+        strokeWidth = strokeWidth,
+        inset = inset,
+        cornerRadius = (clipCornerRadius - inset).coerceAtLeast(0f),
+    )
 }
 
 private const val DaysPerWeek = 7
@@ -200,8 +265,14 @@ private const val ColumnWeight = 1f
 
 private const val Square = 1f
 
-/** Ring width as a fraction of the cell, so it scales with the grid. */
-private const val TodayRing = 0.09f
+/**
+ * Ring width as a fraction of the cell, so it scales with the grid.
+ *
+ * This is now the width that is actually drawn. It used to be the width that was
+ * asked for, of which the clip let half through — so the ring on screen is twice
+ * what shipped, at the same number.
+ */
+private const val TodayRingWidth = 0.09f
 
 @Preview
 @Composable
