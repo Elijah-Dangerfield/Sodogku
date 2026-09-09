@@ -33,6 +33,8 @@ class OnboardingFeatureEntryPoint(
                         GameRoute(),
                         NavigationOptions(launchSingleTop = true, clearBackStack = true),
                     )
+
+                    is OnboardingEvent.OpenLink -> router.openWebLink(event.url)
                 }
             }
 

@@ -27,6 +27,19 @@
          the first apostrophes in this file, which is why nothing caught it
          until this screen was written. The tagline above has one too now, and
          the rule applies to every string in here. -->
+    <!-- The footer under the two buttons. Split into three so the two link
+         words can be tapped without parsing the sentence for them at runtime:
+         a single string with markers would have to be re-split per language,
+         and the split point is exactly what a translator moves.
+
+         "By playing" rather than "By continuing" or "By tapping Continue",
+         because neither button says Continue and both of them start a game.
+         The agreement is formed by the thing the player is actually about to
+         do. -->
+    <string name="onboarding_legal_prefix">By playing you agree to our</string>
+    <string name="onboarding_legal_terms">Terms of Service</string>
+    <string name="onboarding_legal_and">and</string>
+    <string name="onboarding_legal_privacy">Privacy Policy</string>
     <string name="onboarding_start_tutorial">Walk me through one</string>
     <string name="onboarding_skip_tutorial">I'll figure it out</string>
 

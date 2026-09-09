@@ -1,6 +1,12 @@
 package com.sodogku.features.onboarding.impl
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -59,6 +65,10 @@ import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.app_name
+import sodogku.libraries.resources.generated.resources.onboarding_legal_and
+import sodogku.libraries.resources.generated.resources.onboarding_legal_prefix
+import sodogku.libraries.resources.generated.resources.onboarding_legal_privacy
+import sodogku.libraries.resources.generated.resources.onboarding_legal_terms
 import sodogku.libraries.resources.generated.resources.onboarding_rule_lines
 import sodogku.libraries.resources.generated.resources.onboarding_rule_regions
 import sodogku.libraries.resources.generated.resources.onboarding_rule_touch
@@ -353,8 +363,84 @@ private fun WelcomeCard(
             ) {
                 Text(stringResource(Res.string.onboarding_skip_tutorial))
             }
+
+            VerticalSpacerD500()
+
+            LegalFooter(onAction = onAction)
         }
     }
+}
+
+/**
+ * "By playing you agree to..." under the two buttons.
+ *
+ * There is no account here and nothing leaves the device on this screen, so
+ * this is not a consent gate and deliberately does not behave like one: no
+ * checkbox, no blocking, and both buttons work whether or not it is read. What
+ * it does is form the agreement at the moment the player starts, which is worth
+ * having in an app that sells a subscription, serves ads and posts scores to a
+ * server.
+ *
+ * A Row of separate `Text`s rather than one `AnnotatedString` with link
+ * annotations. The strings are already split per phrase for translation, and
+ * clickable spans inside a single string would mean locating the span by index
+ * in copy a translator is free to reorder.
+ *
+ * `FlowRow` because the four pieces do not fit on one line at larger font
+ * scales, and the alternative is either an ellipsis in the middle of a legal
+ * sentence or a link the player cannot reach.
+ *
+ * The links are underlined as well as coloured. Colour alone is not a link to
+ * somebody who cannot see this one, and these are the two pieces of text on the
+ * screen that have to be findable.
+ */
+@Composable
+private fun LegalFooter(onAction: (OnboardingAction) -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(Dimension.D100, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        val plain = AppTheme.typography.Caption.C300
+
+        Text(
+            text = stringResource(Res.string.onboarding_legal_prefix),
+            typography = plain,
+            color = AppTheme.colors.textSecondary,
+        )
+        LegalLink(
+            text = stringResource(Res.string.onboarding_legal_terms),
+            onClick = { onAction(OnboardingAction.OpenTerms) },
+        )
+        Text(
+            text = stringResource(Res.string.onboarding_legal_and),
+            typography = plain,
+            color = AppTheme.colors.textSecondary,
+        )
+        LegalLink(
+            text = stringResource(Res.string.onboarding_legal_privacy),
+            onClick = { onAction(OnboardingAction.OpenPrivacy) },
+        )
+    }
+}
+
+/**
+ * One of the two link words.
+ *
+ * `Role.Button` rather than a bare clickable: a screen reader user needs to be
+ * told this is actionable, and these words are surrounded by text that is not.
+ */
+@Composable
+private fun LegalLink(text: String, onClick: () -> Unit) {
+    Text(
+        text = text,
+        typography = AppTheme.typography.Caption.C300,
+        color = AppTheme.colors.textSecondary,
+        textDecoration = TextDecoration.Underline,
+        modifier = Modifier
+            .semantics { role = Role.Button }
+            .clickable(onClick = onClick),
+    )
 }
 
 /**

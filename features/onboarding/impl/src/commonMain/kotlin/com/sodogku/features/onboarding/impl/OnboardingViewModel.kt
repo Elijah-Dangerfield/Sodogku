@@ -1,5 +1,7 @@
 package com.sodogku.features.onboarding.impl
 
+import com.sodogku.libraries.config.values.LegalPrivacyUrl
+import com.sodogku.libraries.config.values.LegalTermsUrl
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.logging.KLog
@@ -21,6 +23,11 @@ import me.tatarka.inject.annotations.Inject
 @Inject
 class OnboardingViewModel(
     private val appCache: AppCache,
+    // Read from config rather than repeated as constants. The game screen
+    // hardcodes the same two URLs, which is one copy too many already; a third
+    // would guarantee they drift.
+    private val termsUrl: LegalTermsUrl,
+    private val privacyUrl: LegalPrivacyUrl,
 ) : SEAViewModel<OnboardingState, OnboardingEvent, OnboardingAction>(
     initialStateArg = OnboardingState(),
 ) {
@@ -40,6 +47,8 @@ class OnboardingViewModel(
             OnboardingAction.ResolveEntry -> action.handleResolveEntry()
             OnboardingAction.Start -> action.finish(skippedTutorial = false)
             OnboardingAction.SkipTutorial -> action.finish(skippedTutorial = true)
+            OnboardingAction.OpenTerms -> sendEvent(OnboardingEvent.OpenLink(termsUrl()))
+            OnboardingAction.OpenPrivacy -> sendEvent(OnboardingEvent.OpenLink(privacyUrl()))
         }
     }
 
@@ -80,6 +89,9 @@ data class OnboardingState(
 
 sealed interface OnboardingEvent {
     data object NavigateToHome : OnboardingEvent
+
+    /** The legal pages are hosted, so they open in a browser rather than in-app. */
+    data class OpenLink(val url: String) : OnboardingEvent
 }
 
 sealed interface OnboardingAction {
@@ -91,4 +103,8 @@ sealed interface OnboardingAction {
 
     /** Play, marking the tutorial already seen. */
     data object SkipTutorial : OnboardingAction
+
+    data object OpenTerms : OnboardingAction
+
+    data object OpenPrivacy : OnboardingAction
 }

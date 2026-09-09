@@ -13,6 +13,7 @@ kotlin {
             implementation(projects.features.game)
             implementation(projects.libraries.navigation)
 
+            implementation(projects.libraries.config)
             implementation(projects.libraries.core)
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.ui)
@@ -29,6 +30,7 @@ kotlin {
         }
 
         commonTest.dependencies {
+            implementation(projects.libraries.config)
             implementation(projects.libraries.flowroutines.testing)
             implementation(projects.features.onboarding)
             implementation(projects.libraries.core)

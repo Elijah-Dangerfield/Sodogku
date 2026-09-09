@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.Dp
 import com.sodogku.libraries.ui.PreviewContent
+import androidx.compose.ui.text.style.TextAlign
+import com.sodogku.libraries.ui.components.text.OutlinedText
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.libraries.ui.system.color.ColorResource
@@ -215,7 +217,7 @@ fun FloatingPoints(
     LaunchedEffect(nonce) {
         if (nonce == 0) return@LaunchedEffect
         progress.snapTo(0f)
-        progress.animateTo(1f, tween(durationMillis = FloatMillis))
+        progress.animateTo(1f, tween(durationMillis = TotalMillis))
     }
 
     if (progress.value >= 1f) return
@@ -223,21 +225,34 @@ fun FloatingPoints(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier.graphicsLayer {
-            translationY = -riseBy.toPx() * progress.value
-            alpha = (1f - progress.value).coerceIn(0f, 1f)
-            val scale = FloatStartScale + (1f - FloatStartScale) * (progress.value * FloatScaleRamp)
-                .coerceAtMost(1f)
+            // The rise is the back half of the animation, not all of it. It used
+            // to start moving and fading on frame one, which meant the number
+            // was never both still and opaque at the same time -- and a number
+            // that is only fully legible while it is travelling is a number
+            // nobody reads. It holds, then it goes.
+            val rise = ((progress.value - HoldFraction) / (1f - HoldFraction)).coerceIn(0f, 1f)
+            translationY = -riseBy.toPx() * rise
+            alpha = 1f - rise
+            // The pop is measured against the whole animation, so it stays the
+            // same real duration now that the whole is twice as long.
+            val scale = FloatStartScale +
+                (1f - FloatStartScale) * (progress.value / PopFraction).coerceAtMost(1f)
             scaleX = scale
             scaleY = scale
         },
     ) {
-        Text(
+        OutlinedText(
             text = buildString {
                 if (praise != null) append(praise).append('\n')
                 append('+').append(points)
             },
             typography = AppTheme.typography.Heading.H500,
             color = AppTheme.colors.accentPrimary,
+            textAlign = TextAlign.Center,
+            // White, because this lands on the board and the board has no fixed
+            // colour: the same number crosses pink, periwinkle, lime and amber.
+            // The accent alone was legible on roughly none of them.
+            strokeColor = AppTheme.colors.surfacePrimary,
         )
     }
 }
@@ -268,9 +283,22 @@ private const val TENTHS = 10
 
 /** Above three digits before the point, the next suffix up is the shorter answer. */
 private const val AbbreviatedDigits = 3
-private const val FloatMillis = 900
+/**
+ * Long enough to read before it moves. The whole thing used to be 900ms of
+ * simultaneous rise and fade, which is why the points were "barely visible":
+ * they were at full opacity only on the first frame, and already leaving.
+ */
+private const val HoldMillis = 700
+private const val RiseMillis = 700
+private const val TotalMillis = HoldMillis + RiseMillis
+
+/** Where the hold ends, as a fraction of the whole. */
+private const val HoldFraction = HoldMillis.toFloat() / TotalMillis
+
+/** The pop, as a fraction of the whole. Kept at about 150ms of real time. */
+private const val PopFraction = 150f / TotalMillis
+
 private const val FloatStartScale = 0.7f
-private const val FloatScaleRamp = 4f
 
 /**
  * Enough to read as a handful, few enough to arrive as one gesture. Each one is
