@@ -92,6 +92,12 @@ AdMob, the UMP consent SDK, App Tracking Transparency and a Grafana Cloud pipe.
 Both stores require the policy to describe collection accurately, so this blocks
 submission.
 
+**This is now publicly live** at
+`https://elijah-dangerfield.github.io/Sodogku/privacy.html`, as of the repo
+being created on 2026-09-08. It was a 404 when this item was written. Nothing
+links to it yet and the app is not shipped, but a false privacy statement is
+served on the open internet under the owner's name, so this moved up.
+
 **Done when:** The page describes what the code actually sends, and a human has
 read and signed off on it. That second half is not yours to close.
 

@@ -13,35 +13,7 @@ a placeholder or a public test credential, it says so.
 
 ---
 
-## 1. Create the GitHub repository
-
-**Blocks every other item that involves CI, and breaks the app's legal links.**
-
-`git remote -v` returns nothing. There is no `origin`. No workflow has ever
-run, no secret can be added until the repo exists, and GitHub Pages is not
-publishing, so these two URLs 404 today:
-
-```
-https://elijah-dangerfield.github.io/Sodogku/privacy.html
-https://elijah-dangerfield.github.io/Sodogku/terms.html
-```
-
-Those are the Terms and Privacy links inside the app. They are hardcoded as
-config defaults at `libraries/config/.../LegalConfigValues.kt:35,58`, so **the
-owner and repo name are load-bearing**: create it as exactly `Sodogku` under
-`elijah-dangerfield`, or the in-app links and the store listings that must
-match them break silently.
-
-Then: Settings → Pages → Source → **GitHub Actions**.
-
-Note that `SETUP.md:110` and `docs/release-automation.md:205` both say to
-publish from `main` / `/pages`. That is wrong and GitHub no longer offers it;
-`.github/workflows/pages.yml:10` uses `actions/deploy-pages`, which requires
-the Actions source. Those two docs need correcting, which an agent can do.
-
----
-
-## 2. Two paid developer accounts
+## 1. Two paid developer accounts
 
 - **Apple Developer Program**, $99/year. Precondition for the App Store Connect
   record, Game Center, In-App Purchase, and every signing secret below.
@@ -49,7 +21,7 @@ the Actions source. Those two docs need correcting, which an agent can do.
 
 ---
 
-## 3. Rewrite the privacy policy, because the shipped one is false
+## 2. Rewrite the privacy policy, because the shipped one is false
 
 **Would fail review at both stores.**
 
@@ -74,7 +46,7 @@ enough to stand.
 
 ---
 
-## 4. Re-export the iOS app icon without transparency
+## 3. Re-export the iOS app icon without transparency
 
 **App Store Connect rejects the upload (ITMS-90717).**
 
@@ -99,7 +71,7 @@ Also still missing and owner-supplied:
 
 ---
 
-## 5. App Store Connect and the Apple developer portal
+## 4. App Store Connect and the Apple developer portal
 
 The bundle ID is **`com.sodogku.Sodogku`**, not `com.sodogku`
 (`apps/ios/iosApp.xcodeproj/project.pbxproj:264`, `apps/ios/fastlane/Appfile:1`).
@@ -139,7 +111,7 @@ which is the designed behaviour and produces no error anywhere.
 
 ---
 
-## 6. Google Play Console
+## 5. Google Play Console
 
 Package `com.sodogku`, read from `versions.properties:1` by
 `.github/workflows/release.yml:145-152`.
@@ -166,7 +138,7 @@ Package `com.sodogku`, read from `versions.properties:1` by
 
 ---
 
-## 7. AdMob: nothing exists yet, and the app ships Google's test IDs
+## 6. AdMob: nothing exists yet, and the app ships Google's test IDs
 
 Every ad identifier compiled into the app today is a Google-published sample,
 labelled as such in source:
@@ -210,7 +182,7 @@ Two related gaps:
 
 ---
 
-## 8. In-app purchase: one product, same ID on both stores
+## 7. In-app purchase: one product, same ID on both stores
 
 ```kotlin
 // libraries/billing/.../StoreBilling.kt:95-98
@@ -236,7 +208,7 @@ header of `apps/ios/iosApp/Platform/StoreBilling.swift:12-24`.
 
 ---
 
-## 9. Save the art you have described into the repo
+## 8. Save the art you have described into the repo
 
 **Blocking four punch-list items,** including the welcome screen having any
 background at all.
@@ -263,10 +235,11 @@ and fade are parameters rather than a re-export.
 
 ---
 
-## 10. GitHub secrets and variables
+## 9. GitHub secrets and variables
 
-All of these are undone, because there is no repo yet. `GITHUB_TOKEN` is
-automatic and needs nothing.
+The repo exists and is public as of 2026-09-08, and Pages is live, so the app's
+Terms and Privacy URLs resolve. Everything below is still unset.
+`GITHUB_TOKEN` is automatic and needs nothing.
 
 **Secrets** (Settings → Secrets and variables → Actions → Secrets):
 
@@ -305,7 +278,7 @@ obtain each one.
 
 ---
 
-## 11. Sentry
+## 10. Sentry
 
 The DSN resolves at `build-logic/.../Versioning.kt:190` as env `SENTRY_DSN`,
 then `local.properties` key `sentry.dsn`, then blank. `local.properties` today
@@ -328,7 +301,7 @@ land.
 
 ---
 
-## 12. Run one command in a terminal
+## 11. Run one command in a terminal
 
 ```bash
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
@@ -345,7 +318,7 @@ panel's swipe and anything behind a Game Center sign-in. It also blocks the
 
 ---
 
-## 13. Grafana Cloud, for product analytics
+## 12. Grafana Cloud, for product analytics
 
 Three values, all blank today, from Grafana Cloud → OpenTelemetry:
 `GRAFANA_OTLP_BASE_URL`, `GRAFANA_OTLP_INSTANCE_ID`, `GRAFANA_LOGS_WRITE_TOKEN`.
@@ -361,7 +334,7 @@ repos.
 
 ---
 
-## 14. Fly.io and Supabase, for remote config
+## 13. Fly.io and Supabase, for remote config
 
 Nothing serves remote config today. The client falls back to compiled defaults
 in `FallbackConfigMap.kt` and stays fully playable, by design. This is the
@@ -389,7 +362,7 @@ overrides it, so even a deployed server is unreachable by the client.
 
 ---
 
-## 15. Decisions I need from you
+## 14. Decisions I need from you
 
 - **Kids category or general audience.** `docs/SPEC.md:1543-1548`, and the
   expensive one. It gates both stores' privacy questionnaires, not just the ad
