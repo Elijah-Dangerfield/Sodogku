@@ -171,9 +171,9 @@
     <string name="board_glyph_7">bar</string>
     <string name="board_glyph_8">double bar</string>
     <string name="board_glyph_9">chevron</string>
-    <string name="booster_sniff_title">Locate</string>
+    <string name="booster_sniff_title">Use a hint</string>
     <string name="booster_sniff_body">Your dog sniffs around and rules out a few squares for you. It never tells you where a dog goes. That part is still yours.</string>
-    <string name="booster_treat_title">Use a hint</string>
+    <string name="booster_treat_title">Locate a dog</string>
     <string name="booster_treat_body">Places one dog correctly, free. No bone at risk.</string>
     <string name="booster_bone_title">Bones</string>
     <string name="booster_bone_body">A wrong guess costs a bone. The same three carry across every board, so a new puzzle does not hand you any. Run out and the attempt ends.</string>
