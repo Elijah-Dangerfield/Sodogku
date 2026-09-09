@@ -148,12 +148,20 @@ internal fun BasicButton(
     }
 }
 
-/** Lip depth by size — the constant strip the face drops onto. */
+/**
+ * Lip depth by size — the constant strip the face drops onto.
+ *
+ * Deliberately chunky. At the old 5/4/3 the lip read as a hairline that could be
+ * mistaken for a border, and a button you cannot see is thick does not look like
+ * something you press. These are roughly the depths in the designs: enough that
+ * the face visibly sits on top of something, still short of the two-stacked-pills
+ * look you get past about a third of the button's height.
+ */
 private fun ButtonSize.pressDepth(): Dp = when (this) {
-    ButtonSize.Large -> 5.dp
-    ButtonSize.Medium -> 4.dp
-    ButtonSize.Small -> 3.dp
-    ButtonSize.ExtraSmall -> 3.dp
+    ButtonSize.Large -> 8.dp
+    ButtonSize.Medium -> 6.dp
+    ButtonSize.Small -> 5.dp
+    ButtonSize.ExtraSmall -> 4.dp
 }
 
 

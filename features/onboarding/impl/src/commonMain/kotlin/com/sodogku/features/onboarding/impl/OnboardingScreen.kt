@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Offset
@@ -217,7 +219,21 @@ private fun DogField(
 
         Spacer(
             modifier = Modifier
-                .matchParentSize()
+                .fillMaxWidth()
+                // Taller than the field it fills, and painted past the bottom of
+                // it on purpose. The card below is a sibling, so its rounded top
+                // corners cut out to whatever is *behind the column* — which is
+                // the page, not the amber — and the curve disappeared into cream
+                // on cream with only the shadow left, reading as a smudge. The
+                // amber runs on under the card instead; the card is drawn after
+                // and covers all of it but the corners.
+                //
+                // Overdraw rather than moving the field behind the whole column,
+                // which was the other way to fix it: the paws are placed as
+                // fractions of the field, so a field the height of the screen
+                // puts half of them under the card and thins out the texture in
+                // the part you can actually see.
+                .requiredHeight(maxHeight + CardCornerRadius)
                 .alpha(fieldAlpha)
                 .drawBehind {
                     drawRect(field)
@@ -259,9 +275,23 @@ private fun WelcomeCard(
     onAction: (OnboardingAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // `shadow` rather than the `backgroundOverlay` BottomBar reaches for. Both
+    // are black underneath so they render the same, but overlay means the scrim
+    // behind a dialog, and a name that happens to resolve correctly is the kind
+    // of thing that stops being true when someone retunes the palette.
+    val lift = AppTheme.colors.shadow.withAlpha(CardShadowAlpha).color
     Column(
         modifier = modifier
             .fillMaxWidth()
+            // Cast upward, because the card meets the amber along its top edge
+            // and nowhere else. `BottomBar` does the same thing for the same
+            // reason; the only difference is the shape it is cast through, since
+            // this one has corners and that one does not.
+            .dropShadow(CardShape) {
+                radius = CardShadowRadius
+                offset = Offset(0f, -CardShadowOffset)
+                color = lift
+            }
             .background(AppTheme.colors.background.color, CardShape)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
             .padding(horizontal = Dimension.D800)
@@ -443,11 +473,34 @@ internal val FieldPaws = listOf(
     PawSpot(x = 0.40f, y = 0.95f, scale = 0.05f, turn = 14f),
 )
 
-/** Square along the bottom, where the card runs off the edge of the screen. */
+/**
+ * Square along the bottom, where the card runs off the edge of the screen.
+ *
+ * The top corners are generous rather than tidy. This card is the only thing
+ * between the amber and the buttons, so the curve is what says it is a separate
+ * surface sitting in front rather than a colour change halfway down the page,
+ * and a small radius reads as the latter.
+ */
+private val CardCornerRadius = Dimension.D1400
+
 private val CardShape = RoundedCornerShape(
-    topStart = Dimension.D1000,
-    topEnd = Dimension.D1000,
+    topStart = CardCornerRadius,
+    topEnd = CardCornerRadius,
 )
+
+/**
+ * Soft and wide rather than tight and dark. The card is lifting a few
+ * millimetres off a flat colour field, not floating over a photograph, so a hard
+ * edge under it would read as a drawn line rather than as depth.
+ *
+ * The alpha is low for a reason particular to this screen: the shadow blurs out
+ * past the card's rounded corners onto saturated amber, and neutral black over
+ * amber goes grey-brown. At any strength that reads as a shadow on white it
+ * reads as a smudge here.
+ */
+private const val CardShadowAlpha = 0.13f
+private const val CardShadowRadius = 22f
+private const val CardShadowOffset = 6f
 
 private const val FieldTextureAlpha = 0.16f
 

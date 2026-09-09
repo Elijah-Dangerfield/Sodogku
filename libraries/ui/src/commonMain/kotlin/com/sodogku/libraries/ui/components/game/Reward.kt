@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -121,22 +122,44 @@ fun RewardButton(
  *
  * Same accent as [RewardButton] on purpose: one colour means "an ad is
  * involved" everywhere it appears.
+ *
+ * A play triangle rather than the word "Ad". The word was two letters at 8sp on
+ * the shoulder of a 70dp disc, which is small enough that it reads as a smudge
+ * before it reads as anything, and it only worked in English. The triangle is
+ * the one glyph that means "this plays" to everybody, it is the same glyph
+ * [RewardButton] already wears, and it survives being shrunk. The word moves to
+ * the content description, where a screen reader gets the whole sentence rather
+ * than an abbreviation.
  */
 @Composable
 fun RewardBadge(
     modifier: Modifier = Modifier,
     label: String = stringResource(Res.string.game_watch_ad_badge),
 ) {
-    Text(
-        text = label,
-        typography = AppTheme.typography.Caption.C200,
-        color = AppTheme.colors.onAccentSecondary,
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = modifier
+            .semantics { contentDescription = label }
             .clip(Radii.Round)
             .background(AppTheme.colors.accentSecondary.color)
-            .padding(horizontal = Dimension.D300, vertical = Dimension.D50),
-    )
+            .padding(BadgeInset),
+    ) {
+        Icon(
+            icon = Icons.PlayArrow.decorative,
+            size = IconSize.Smallest,
+            color = AppTheme.colors.onAccentSecondary,
+        )
+    }
 }
+
+/**
+ * The ring of colour around the triangle.
+ *
+ * Even all round, so the disc is a disc: horizontal-and-vertical padding around
+ * a square glyph would give an oval, and the badge sits next to the round count
+ * badge on the same row of controls.
+ */
+private val BadgeInset = Dimension.D200
 
 /** Barely there. Big enough to catch peripheral vision, small enough not to shove neighbours. */
 private const val PulseScale = 1.05f

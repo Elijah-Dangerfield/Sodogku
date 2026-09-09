@@ -62,7 +62,7 @@
     <string name="shake_body">You shook your device. If something is wrong, tell us about it.</string>
     <string name="shake_report">Report a bug</string>
     <string name="shake_dismiss">Dismiss</string>
-    <string name="game_watch_ad_badge">Ad</string>
+    <string name="game_watch_ad_badge">Plays an ad</string>
     <string name="game_skip_level">Skip this level</string>
     <string name="game_skip_remaining">%1$d skips left today</string>
     <string name="game_skip_none_left">No skips left today</string>

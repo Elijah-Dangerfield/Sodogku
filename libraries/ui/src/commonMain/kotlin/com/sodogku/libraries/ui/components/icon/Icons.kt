@@ -55,6 +55,7 @@ import androidx.compose.material.icons.rounded.Receipt
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlayCircleOutline
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.ThumbDown
@@ -240,6 +241,15 @@ enum class Icons(
 
     /** Watch an ad for something. */
     PlayCircle(androidx.compose.material.icons.Icons.Rounded.PlayCircleOutline),
+
+    /**
+     * The same offer as [PlayCircle], for somewhere that already has a circle.
+     *
+     * The badge on a booster is a coloured disc, and a play-circle drawn inside
+     * one is two rings with a triangle lost in the middle. This is just the
+     * triangle.
+     */
+    PlayArrow(androidx.compose.material.icons.Icons.Rounded.PlayArrow),
 
     ChevronLeft(androidx.compose.material.icons.Icons.Rounded.ChevronLeft),
 

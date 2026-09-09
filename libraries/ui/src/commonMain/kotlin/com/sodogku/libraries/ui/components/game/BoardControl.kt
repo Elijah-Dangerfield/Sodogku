@@ -173,15 +173,20 @@ fun BoardControl(
                                 AppTheme.colors.textDisabled.color
                             },
                         )
-                        .padding(horizontal = Dimension.D300, vertical = Dimension.D50),
+                        .padding(horizontal = Dimension.D400, vertical = Dimension.D100),
                 ) {
                     // Label rather than Caption, for the same reason the word
                     // under the circle is: the caption scale is footnote type,
                     // and this number is the only thing telling a player how
                     // many they have left.
+                    //
+                    // Medium rather than the scale's default SemiBold. A single
+                    // digit set heavy on a small coloured disc closes up its
+                    // counters and turns 8 into a blob; a step up in size and a
+                    // step down in weight is more legible than the reverse.
                     Text(
                         text = count.toString(),
-                        typography = AppTheme.typography.Label.L400,
+                        typography = AppTheme.typography.Label.L500.Medium,
                         color = AppTheme.colors.onAccentPrimary,
                     )
                 }
@@ -192,9 +197,15 @@ fun BoardControl(
         // under the board, so they are UI labels and not footnotes — the caption
         // scale is 8sp Normal, which on a cream page under a white disc read as
         // something the design had finished with.
+        //
+        // L500 Medium rather than L400 SemiBold: two points bigger and a weight
+        // lighter. The heavier small size was legible but tight, and these words
+        // sit under artwork rather than inside a control, so they want the
+        // relaxed weight the clock under the board uses rather than the button
+        // weight.
         Text(
             text = label,
-            typography = AppTheme.typography.Label.L400,
+            typography = AppTheme.typography.Label.L500.Medium,
             color = if (enabled) AppTheme.colors.textSecondary else AppTheme.colors.onSurfaceDisabled,
         )
     }
