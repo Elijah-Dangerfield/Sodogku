@@ -224,3 +224,31 @@ codebase actually has:
 Ask for a ranked list with a file:line and a concrete failure scenario for each,
 and require it to say which findings it verified versus which are hunches. Take
 nothing on trust: reviews from agents have been confidently wrong here before.
+
+## SD-7 [P1] — `docs/store/data-safety.md` is stale, and a store form gets filled from it
+
+**Ask:** Three of its findings no longer match the code. That file is the input
+for Play's Data safety form and Apple's App Privacy questionnaire, so a stale
+claim there becomes a false declaration to a store rather than just a wrong doc.
+
+**Done when:** Every claim in it has been re-derived from the current code, and
+anything already fixed is marked fixed rather than left reading as outstanding.
+
+**Hints:** Found while writing the new privacy policy (SD-2), and each one
+verified directly:
+
+- **§2.10 and §7.2** say `android.permission.CAMERA` is declared. It is not.
+  `apps/compose/src/androidMain/AndroidManifest.xml` declares no permissions at
+  all; the merged manifest's set comes entirely from bundled libraries.
+- **§7.1** says `allowBackup="true"` contradicts the Settings copy. It is
+  `android:allowBackup="false"` now, with the reasoning in a comment at
+  `AndroidManifest.xml:5-14`. That was the file's highest-value finding and it
+  is already done.
+- **§2.5** says `FeedbackRepositoryImpl` passes neither screenshots nor email.
+  It passes `screenshots: List<ByteArray>` and `includeLogs: Boolean` now
+  (`libraries/sodogku/src/commonMain/kotlin/com/sodogku/libraries/FeedbackRepository.kt:40-55`).
+  Email is still never passed, so that half stands.
+
+The new `pages/privacy.html` was written against the code rather than against
+this file, so it is the more trustworthy of the two. Reconcile toward it, and
+where they disagree, check the code rather than picking one.
