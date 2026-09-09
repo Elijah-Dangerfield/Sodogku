@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		40F7ACE82EE5E1E70057F44F /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 40F7ACE72EE5E1E70057F44F /* Sentry */; };
+		40F7ACF22EE5E1E70057F44F /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 40F7ACF12EE5E1E70057F44F /* GoogleMobileAds */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +47,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				40F7ACE82EE5E1E70057F44F /* Sentry in Frameworks */,
+				40F7ACF22EE5E1E70057F44F /* GoogleMobileAds in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,6 +93,7 @@
 			name = iosApp;
 			packageProductDependencies = (
 				40F7ACE72EE5E1E70057F44F /* Sentry */,
+				40F7ACF12EE5E1E70057F44F /* GoogleMobileAds */,
 			);
 			productName = iosApp;
 			productReference = 43650040A35ABEE2FF88A523 /* Sodogku.app */;
@@ -122,6 +125,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				40F7ACE62EE5E1E70057F44F /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
+				40F7ACF02EE5E1E70057F44F /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AAAD9064E8710953FC84629E /* Products */;
@@ -403,6 +407,14 @@
 				version = 8.57.3;
 			};
 		};
+		40F7ACF02EE5E1E70057F44F /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads.git";
+			requirement = {
+				kind = exactVersion;
+				version = 13.9.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -410,6 +422,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 40F7ACE62EE5E1E70057F44F /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
 			productName = Sentry;
+		};
+		40F7ACF12EE5E1E70057F44F /* GoogleMobileAds */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 40F7ACF02EE5E1E70057F44F /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
+			productName = GoogleMobileAds;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

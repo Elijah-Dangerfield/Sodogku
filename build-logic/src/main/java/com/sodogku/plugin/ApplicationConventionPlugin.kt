@@ -68,6 +68,11 @@ class ApplicationConventionPlugin : Plugin<Project> {
                     isStatic = true
                     binaryOption("bundleId", "com.sodogku")
                     export(project(":libraries:core"))
+                    // Swift reads `AdUnits` directly: the ad unit id lives in
+                    // one file on purpose, so the iOS ad code asks Kotlin for it
+                    // rather than keeping a second copy that could drift to a
+                    // test id while Kotlin held the real one.
+                    export(project(":libraries:ads"))
                 }
             }
             configureKotlinInject()

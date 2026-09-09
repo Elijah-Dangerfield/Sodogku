@@ -19,17 +19,36 @@
 //  the offline grace, and the rule that a failed ad still pays the player —
 //  is in `RealAdGate` in shared Kotlin. This file only loads and shows.
 //
-//  ── SETUP REQUIRED ───────────────────────────────────────────────────────
-//  The `#if canImport(GoogleMobileAds)` guards exist so the app still builds
-//  before the SDK is added. Until it is, every ad "fails", and the shared
-//  Kotlin grants the reward anyway — correct, but revenue-free.
+//  The `#if canImport(GoogleMobileAds)` guards are kept because the whole point
+//  of them is that a missing SDK degrades to "every ad fails", which the shared
+//  Kotlin already pays the player for. They are no longer the live path: the
+//  `GoogleMobileAds` product (which carries `UserMessagingPlatform` with it) is
+//  a package dependency of the iosApp target, so both branches are real and the
+//  `#else` is the thing that should never fire.
 //
-//  In Xcode: File ▸ Add Package Dependencies ▸
-//    https://github.com/googleads/swift-package-manager-google-mobile-ads
-//  and add both the `GoogleMobileAds` and `UserMessagingPlatform` products to
-//  the iOS target. Then add `GADApplicationIdentifier` to Info.plist (it is
-//  already there with Google's sample id) and flip
-//  `AdUnits.useTestUnits` in shared Kotlin when the real units exist.
+//  The app id lives in `Info.plist` under `GADApplicationIdentifier` and the
+//  unit ids in `AdUnits.kt`. Both are Google's published test values today;
+//  they flip together when the real AdMob app exists.
+//
+//  ── ONE THING STILL MISSING ──────────────────────────────────────────────
+//  `AdUnits` is not in the generated ComposeApp framework, so the two
+//  `AdUnits.shared.ios(format:)` calls below do not resolve. Kotlin/Native
+//  only exports declarations reachable from the framework's API, and on iOS
+//  nothing in Kotlin reads `AdUnits` — the one caller, `AdMobAdNetwork`, is
+//  androidMain. `AdNetwork`, `AdFormat` and `AdShowOutcome` are all present
+//  because `IosAppComponentFactory.create(adNetwork:)` names them.
+//
+//  Fixing it is two lines outside this directory:
+//    - `apps/compose/build.gradle.kts`: `implementation(projects.libraries.ads)`
+//      becomes `api(...)`, because Kotlin/Native refuses to export a
+//      dependency that is not an API dependency.
+//    - `ApplicationConventionPlugin.kt`: `export(project(":libraries:ads"))`
+//      next to the existing `:libraries:core` export.
+//
+//  Do not answer this by hardcoding the unit id here. `AdUnits.kt` is
+//  deliberately the only file that carries one, and the failure it is
+//  guarding against is exactly a half-migrated app with a real id in Kotlin
+//  and a test id in Swift.
 //
 import ComposeApp
 import Foundation
@@ -59,13 +78,26 @@ class IOSAdNetwork: NSObject, AdNetwork {
         await requestConsent()
         await requestTrackingAuthorization()
         guard canRequestAds() else { return }
-        await MobileAds.shared.start()
-        MobileAds.shared.requestConfiguration.tagForChildDirectedTreatment = false
+        // SPEC 7.1 calls the app general-audience. Set before `start()`, as on
+        // Android, so no request can go out ahead of the configuration.
+        //
+        // `.unspecified` is this SDK's current spelling of Android's
+        // `TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE`: the age-treatment enum
+        // replaced the child-directed and under-age-of-consent flags, and it has
+        // no "definitely not restricted" case — declaring neither child nor teen
+        // *is* the general-audience answer. It is also the default, so this line
+        // is a statement of the decision rather than a change of behaviour.
+        MobileAds.shared.requestConfiguration.ageRestrictedTreatment = .unspecified
+        _ = await MobileAds.shared.start()
         initialised = true
         #endif
     }
 
-    func __show(format: AdFormat) async throws -> AdShowOutcome {
+    // `AdFormat` is qualified because GoogleMobileAds exports a type of that
+    // name too (`GADAdFormat`), and an unqualified mention is ambiguous once
+    // both modules are imported. The Kotlin one is the contract being
+    // implemented here.
+    func __show(format: ComposeApp.AdFormat) async throws -> AdShowOutcome {
         try await __prepare()
         #if canImport(GoogleMobileAds)
         guard initialised else {
@@ -77,37 +109,22 @@ class IOSAdNetwork: NSObject, AdNetwork {
         switch format {
         case .rewarded:
             return await showRewarded(from: root)
-        case .interstitial:
-            return await showInterstitial(from: root)
-        case .appOpen:
-            return await showAppOpen(from: root)
-        default:
-            // A banner is a view in a hierarchy, not something you show and
-            // wait on. `ads.bannerOnLevelMap` is off by default.
-            return AdShowOutcome(result: .notShown, errorKind: "banner_is_not_a_full_screen_format")
         }
         #else
         return AdShowOutcome(result: .notShown, errorKind: "google_mobile_ads_not_linked")
         #endif
     }
 
-    func preload(format: AdFormat) {
+    func preload(format: ComposeApp.AdFormat) {
         #if canImport(GoogleMobileAds)
         Task { [weak self] in
             try? await self?.__prepare()
             guard self?.initialised == true else { return }
             switch format {
             case .rewarded:
+                guard self?.cachedRewarded == nil else { return }
                 self?.cachedRewarded = try? await RewardedAd.load(
                     with: AdUnits.shared.ios(format: .rewarded), request: Request())
-            case .interstitial:
-                self?.cachedInterstitial = try? await InterstitialAd.load(
-                    with: AdUnits.shared.ios(format: .interstitial), request: Request())
-            case .appOpen:
-                self?.cachedAppOpen = try? await AppOpenAd.load(
-                    with: AdUnits.shared.ios(format: .appOpen), request: Request())
-            default:
-                break
             }
         }
         #endif
@@ -116,8 +133,6 @@ class IOSAdNetwork: NSObject, AdNetwork {
     #if canImport(GoogleMobileAds)
 
     private var cachedRewarded: RewardedAd?
-    private var cachedInterstitial: InterstitialAd?
-    private var cachedAppOpen: AppOpenAd?
 
     private func showRewarded(from root: UIViewController) async -> AdShowOutcome {
         let ad: RewardedAd
@@ -150,76 +165,14 @@ class IOSAdNetwork: NSObject, AdNetwork {
         }
     }
 
-    private func showInterstitial(from root: UIViewController) async -> AdShowOutcome {
-        let ad: InterstitialAd
-        do {
-            if let cached = cachedInterstitial {
-                ad = cached
-                cachedInterstitial = nil
-            } else {
-                ad = try await InterstitialAd.load(
-                    with: AdUnits.shared.ios(format: .interstitial), request: Request())
-            }
-        } catch {
-            return Self.loadFailure(error)
-        }
-        let outcome = await present(ad: ad, from: root)
-        preload(format: .interstitial)
-        return outcome
-    }
-
-    private func showAppOpen(from root: UIViewController) async -> AdShowOutcome {
-        let ad: AppOpenAd
-        do {
-            if let cached = cachedAppOpen {
-                ad = cached
-                cachedAppOpen = nil
-            } else {
-                ad = try await AppOpenAd.load(
-                    with: AdUnits.shared.ios(format: .appOpen), request: Request())
-            }
-        } catch {
-            return Self.loadFailure(error)
-        }
-        return await present(ad: ad, from: root)
-    }
-
-    private func present(ad: FullScreenPresentingAd, from root: UIViewController) async -> AdShowOutcome {
-        let delegate = DismissalDelegate()
-        ad.fullScreenContentDelegate = delegate
-        let dismissal = await withCheckedContinuation { (continuation: CheckedContinuation<Dismissal, Never>) in
-            delegate.onFinished = { continuation.resume(returning: $0) }
-            Task { @MainActor in
-                if let interstitial = ad as? InterstitialAd {
-                    interstitial.present(from: root)
-                } else if let appOpen = ad as? AppOpenAd {
-                    appOpen.present(from: root)
-                } else {
-                    delegate.onFinished?(.failed("unsupported_format"))
-                }
-            }
-        }
-        switch dismissal {
-        case .failed(let kind): return AdShowOutcome(result: .failed, errorKind: kind)
-        case .closed: return AdShowOutcome(result: .completed, errorKind: nil)
-        }
-    }
-
+    /// Main-actor because the second half presents a view controller. Both
+    /// failures are swallowed on purpose: a consent update that errors leaves
+    /// `canRequestAds` false, which `prepare` already reads as "no ads today".
+    @MainActor
     private func requestConsent() async {
-        let parameters = RequestParameters()
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            ConsentInformation.shared.requestConsentInfoUpdate(with: parameters) { _ in
-                continuation.resume()
-            }
-        }
-        guard let root = await Self.rootViewController() else { return }
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            Task { @MainActor in
-                ConsentForm.loadAndPresentIfRequired(from: root) { _ in
-                    continuation.resume()
-                }
-            }
-        }
+        try? await ConsentInformation.shared.requestConsentInfoUpdate(with: RequestParameters())
+        guard let root = Self.rootViewController() else { return }
+        try? await ConsentForm.loadAndPresentIfRequired(from: root)
     }
 
     /// `canRequestAds` is the gate, not "did the form show". UMP answers true
@@ -232,11 +185,14 @@ class IOSAdNetwork: NSObject, AdNetwork {
 
     private static func loadFailure(_ error: Error) -> AdShowOutcome {
         let code = (error as NSError).code
-        // GADErrorCode.noFill == 1, .networkError == 2
-        switch code {
-        case 1: return AdShowOutcome(result: .noFill, errorKind: "load_\(code)")
-        case 2: return AdShowOutcome(result: .offline, errorKind: "load_\(code)")
-        default: return AdShowOutcome(result: .failed, errorKind: "load_\(code)")
+        let kind = "load_\(code)"
+        // Qualified: UserMessagingPlatform exports a `RequestError` of its own.
+        switch GoogleMobileAds.RequestError.Code(rawValue: code) {
+        // A timed-out load is Android's `load_timeout`, and it says the same
+        // thing about the player's situation: nothing to watch right now.
+        case .noFill, .timeout: return AdShowOutcome(result: .noFill, errorKind: kind)
+        case .networkError: return AdShowOutcome(result: .offline, errorKind: kind)
+        default: return AdShowOutcome(result: .failed, errorKind: kind)
         }
     }
 

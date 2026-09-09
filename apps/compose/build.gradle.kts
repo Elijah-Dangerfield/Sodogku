@@ -87,7 +87,14 @@ kotlin {
             implementation(projects.libraries.puzzle)
             implementation(projects.libraries.levels)
             implementation(projects.libraries.scoring)
-            implementation(projects.libraries.ads)
+            // `api`, not `implementation`, because Swift needs `AdUnits`.
+            // Kotlin/Native only exports declarations reachable from the
+            // framework's own API, and refuses to export a non-api dependency at
+            // all. `AdUnits` is named by nothing on iOS — its only other caller
+            // is `AdMobAdNetwork` in androidMain — so without this it never
+            // reaches ComposeApp.h and `AdNetwork.swift` cannot see it. Paired
+            // with the `export(...)` in ApplicationConventionPlugin.
+            api(projects.libraries.ads)
             implementation(projects.libraries.ads.impl)
             implementation(projects.libraries.billing)
             implementation(projects.libraries.billing.impl)
