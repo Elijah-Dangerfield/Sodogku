@@ -13,7 +13,21 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
-    <!-- Splash background matches the app theme background (ColorResource.Gray50) -->
-    <!-- Matches the launcher icon background, so the splash reads as the icon growing. -->
+    <!--
+      Matches the launcher icon background (`drawable/ic_launcher_background.xml`,
+      also #FAF5EB), so Android's splash animation reads as the icon growing out
+      of the page rather than appearing on a different one.
+
+      It deliberately does *not* match the app background, which is
+      `ColorResource.Cream50` (#F8F2ED) — the same value iOS paints in its
+      `LaunchBackground` colorset. The two cannot both be matched, and the icon
+      wins because that is what the platform animates. The residual step to the
+      app background is two or three units per channel.
+
+      A comment here used to claim this matched the app background and named
+      `ColorResource.Gray50` (#FAFAFA), which is neither this value nor the app's.
+      Changing the colour to fit that comment would have cost the icon animation
+      to gain about one percent of one shade.
+    -->
     <color name="splash_background">#FAF5EB</color>
 </resources>
