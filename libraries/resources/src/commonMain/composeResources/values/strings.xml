@@ -1,9 +1,26 @@
 <resources>
     <string name="app_name">Sodogku</string>
 
-    <string name="onboarding_tagline">Find where every dog belongs. One per color, one per row and column, and never touching.</string>
-    <string name="onboarding_start_tutorial">Teach me how</string>
-    <string name="onboarding_skip_tutorial">I know how to play</string>
+    <!-- The one line under the wordmark, and the only chance to say what this
+         is to somebody who has never seen it. It names sudoku because that is
+         the fastest way to hand over the row-and-column half of the game, then
+         immediately says the part sudoku does not have. The rules below spell
+         out what "next to each other" means; this line only has to make a
+         sudoku player stop assuming they already know. -->
+    <string name="onboarding_tagline">Sudoku with dogs, and they won't sit next to each other.</string>
+    <!-- The two ways off this screen. Both first person, both about what
+         happens next rather than about what the player already knows: the old
+         pair asked them to self-assess against sudoku, and this is not sudoku,
+         so the confident answer was the wrong one. "one" is one puzzle: the
+         tutorial is levels 1 to 3 of the campaign, not a slideshow.
+
+         The apostrophes are bare, not backslash-escaped. `\'` is an Android
+         resource convention and the Compose Multiplatform parser does not know
+         it: escape one here and the backslash is rendered on screen. These are
+         the first apostrophes in this file, which is why nothing caught it
+         before. -->
+    <string name="onboarding_start_tutorial">Walk me through one</string>
+    <string name="onboarding_skip_tutorial">I'll figure it out</string>
 
     <string name="game_level_label">Level</string>
     <string name="game_score_label">Score</string>
@@ -459,9 +476,10 @@
     <string name="achievements_group_daily">Daily challenge</string>
     <string name="achievements_group_dedication">Time on the boards</string>
     <string name="achievements_group_secrets">Secrets</string>
-    <!-- Paywall (C8). No apostrophes anywhere in this file on purpose. -->
-    <string name="paywall_title">Sodogku Pro</string>
-    <string name="paywall_subtitle">Buy it once and Sodogku stops asking you for anything.</string>
+    <!-- Paywall (C8). The lead-in to the five bullets, and nothing else. It used
+         to read "Buy it once and Sodogku stops asking you for anything", which
+         sold the free app as a nuisance you pay to switch off. -->
+    <string name="paywall_subtitle">Here's what you get with Pro:</string>
     <string name="paywall_benefit_no_ads">No ads, ever</string>
     <string name="paywall_benefit_offline">Unlimited offline play</string>
     <string name="paywall_benefit_free_helps">Continues, skips and streak freezes with no ad to watch</string>
@@ -554,12 +572,12 @@
     <string name="game_verdict_sharp">Sharp work</string>
     <string name="game_verdict_flawless">Flawless</string>
 
-    <!-- The Pro sheet's headline, sitting in the amber slab under the eyebrow.
-         "once" is the whole pitch: the lead line under the slab and the note
-         under the button say the same thing again in plainer words, because the
-         one objection a non-subscription has to answer is the one everybody
-         brings to a paywall. -->
-    <string name="paywall_headline">Everything unlocked, once</string>
+    <!-- The Pro sheet's headline, and now the only line in the amber slab. It
+         used to sit under an all-caps "SODOGKU PRO" eyebrow, which said the
+         product name twice as soon as the headline started with it. The
+         non-subscription pitch moved down to paywall_one_time under the button,
+         where a player who is weighing the price is actually reading. -->
+    <string name="paywall_headline">Unlock Sodogku Pro</string>
     <!-- The two controls under the board that changed their names rather than
          their behaviour. "Treat" was a thing a player was given and said nothing
          about what tapping it did; the button places a dog for you, which is a
@@ -570,4 +588,19 @@
          them would reset what players are holding. -->
     <string name="game_booster_treat">Locate</string>
     <string name="game_bones_refill">Refill Bones</string>
+
+    <!-- The three paw bullets on the first-run card: the whole game, before the
+         player has tapped anything. They are the same three rules the in-game
+         sheet states at length (rules_line_body, rules_region_body,
+         rules_touch_body), cut to a bullet each. "holds one dog" and "corner to
+         corner" are carried over word for word, so a player who reads them here
+         and opens that sheet later is being reminded rather than taught
+         something that sounds new.
+
+         The order is not the sheet's. The two rules a sudoku player already
+         knows go first and go by fast, and the one that is not sudoku is last,
+         where it lands. -->
+    <string name="onboarding_rule_lines">Every row and every column holds one dog</string>
+    <string name="onboarding_rule_regions">Every color holds one dog</string>
+    <string name="onboarding_rule_touch">No two dogs may touch, not even corner to corner</string>
 </resources>

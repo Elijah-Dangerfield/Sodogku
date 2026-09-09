@@ -38,9 +38,17 @@ private const val FadeOutMillis = 450
  * Only the dog arrives. Then the whole overlay fades out, and because the dog is
  * standing where the first-run screen draws its own dog, at the same size, what
  * is revealed underneath is the same shape in the same place. The player sees
- * the title and the tagline arrive *around* a dog that never moved. For a
- * returning player there is no dog underneath and the overlay simply fades; the
- * nesting below multiplies the two alphas, so that case needs no special code.
+ * the amber, the card and the rules arrive *around* a dog that never moved. For
+ * a returning player there is no dog underneath and the overlay simply fades;
+ * the nesting below multiplies the two alphas, so that case needs no special
+ * code.
+ *
+ * The welcome screen behind this is mostly amber now, and the cream here did not
+ * follow it. The cream is not a colour choice, it is the launch image: it has to
+ * be the colour UIKit already painted, or the handover from the launch image to
+ * the first Compose frame is a visible jump. So the amber is one of the things
+ * that arrives during the fade-out rather than something the splash shows, which
+ * is a cross-fade the dog sits still through rather than a cut.
  */
 @Composable
 fun SplashOverlay(
@@ -81,7 +89,14 @@ fun SplashOverlay(
  * So the geometry is not copied from `OnboardingScreen`, it *is*
  * `OnboardingScreen` — `OnboardingDogHandoff` lays out that screen's real column
  * and draws nothing but the dog. There is no offset here to keep in step with
- * one over there, and no way for the two to drift apart.
+ * one over there, and no way for the two to drift apart. That now matters more
+ * than it used to: the welcome dog is centred in the amber field, whose height
+ * is the screen minus a card measured from its own copy, so where the dog lands
+ * is a number no constant here could have tracked.
+ *
+ * The dog is drawn from the same sprite sheet the welcome screen animates, held
+ * on frame 0. `OnboardingDogHandoff` decides that; see `WelcomeDogLoop` there
+ * for why a launch screen does not get the loop.
  */
 @Composable
 private fun SplashContent(screenAlpha: Float, dogAlpha: Float) {

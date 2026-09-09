@@ -5,11 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -17,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.inset
@@ -25,10 +24,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.HorizontalDivider
@@ -40,7 +36,9 @@ import com.sodogku.libraries.ui.components.dialog.bottomsheet.rememberBottomShee
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.game.drawPaw
+import com.sodogku.libraries.ui.components.icon.Icon
 import com.sodogku.libraries.ui.components.icon.IconButton
+import com.sodogku.libraries.ui.components.icon.IconSize
 import com.sodogku.libraries.ui.components.icon.Icons
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.system.DeepSurface
@@ -53,11 +51,10 @@ import com.sodogku.system.VerticalSpacerD300
 import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.system.VerticalSpacerD800
 import com.sodogku.system.VerticalSpacerD1200
-import com.sodogku.system.sp
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
-import sodogku.libraries.resources.generated.resources.common_back
+import sodogku.libraries.resources.generated.resources.common_close
 import sodogku.libraries.resources.generated.resources.paywall_already_pro
 import sodogku.libraries.resources.generated.resources.paywall_benefit_boosters
 import sodogku.libraries.resources.generated.resources.paywall_benefit_free_helps
@@ -75,7 +72,6 @@ import sodogku.libraries.resources.generated.resources.paywall_stand_in_reason
 import sodogku.libraries.resources.generated.resources.paywall_store_unavailable
 import sodogku.libraries.resources.generated.resources.paywall_store_unreachable
 import sodogku.libraries.resources.generated.resources.paywall_subtitle
-import sodogku.libraries.resources.generated.resources.paywall_title
 
 /**
  * The Pro offer, SPEC 5.1.
@@ -117,6 +113,7 @@ fun PaywallScreen(
     isStandIn: Boolean = false,
 ) {
     val dwelling = state.secondsUntilDismissible > 0
+    val cream = AppTheme.colors.background.color
 
     BottomSheet(
         onDismissRequest = onDismissed,
@@ -133,47 +130,73 @@ fun PaywallScreen(
         // anchor note on `scrollableContent`: content-decided height is what let
         // a drag get snapped back to the top.
         scrollableContent = true,
+        // The amber status bar, as a fill rather than a system call. The sheet's
+        // container already runs to the top of the display; what sits under the
+        // clock is that container, padded down by the status bar inset, which is
+        // why the strip used to be cream. Colouring it is the whole feature, and
+        // it costs nothing on the way out: no window flag is set, so there is
+        // nothing to restore when the sheet leaves by the X, by back, by a drag,
+        // by a purchase, or by not existing after a process death.
+        backgroundColor = ProAmber,
+        // The cream the container used to supply, painted back everywhere except
+        // that strip. It lands on the sheet's own scrolling column, which is
+        // pinned to the viewport, so it covers the sheet whether the content
+        // fills it or not; painting the content instead left a slab of amber
+        // under the last button on a tall phone.
+        //
+        // Drawn past the bottom edge because the sheet pads by the *bottom*
+        // inset too, and that band is outside anything laid out in here. A draw
+        // modifier ahead of the scroll in the chain escapes the scroll's clip,
+        // and the sheet's own rounded-corner clip trims the overdraw at the
+        // bottom of the display, where the sheet ends anyway.
+        modifier = Modifier.drawBehind {
+            drawRect(color = cream, size = Size(size.width, size.height * BottomInsetOverdraw))
+        },
     ) {
         Column(modifier = modifier.fillMaxWidth()) {
             ProSlab(
-                // Null rather than disabled: a chevron that does nothing reads
-                // as a broken sheet, and this one comes back the moment the
-                // dwell is up.
-                onBack = if (dwelling) null else ({ onAction(PaywallAction.Dismiss) }),
+                // Null rather than disabled: a close button that does nothing
+                // reads as a broken sheet, and this one comes back the moment
+                // the dwell is up.
+                onClose = if (dwelling) null else ({ onAction(PaywallAction.Dismiss) }),
             )
 
             Column(modifier = Modifier.padding(horizontal = Dimension.D800)) {
                 VerticalSpacerD500()
-
-                Text(
-                    text = stringResource(Res.string.paywall_subtitle),
-                    typography = AppTheme.typography.Body.B600,
-                    color = AppTheme.colors.textSecondary,
-                )
 
                 // Why this appeared, in the player's words. Without it the sheet
                 // is a decent Pro pitch that turns up unbidden after a booster
                 // tap, which reads as the app selling at you rather than as a
                 // substitute for something it could not deliver.
                 if (isStandIn) {
-                    VerticalSpacerD500()
                     Text(
                         text = stringResource(Res.string.paywall_stand_in_reason),
                         typography = AppTheme.typography.Body.B500,
                         color = AppTheme.colors.textSecondary,
                     )
+                    VerticalSpacerD500()
                 }
 
                 if (standInNote.isNotEmpty()) {
-                    VerticalSpacerD300()
                     Text(
                         text = standInNote,
                         typography = AppTheme.typography.Caption.C300,
                         color = AppTheme.colors.status.warning,
                     )
+                    VerticalSpacerD300()
                 }
 
-                VerticalSpacerD800()
+                // Last thing before the list, and it has to stay last. It reads
+                // as a lead-in to the bullets rather than as a pitch of its own,
+                // so anything printed between it and the first paw orphans it.
+                // The stand-in explanation used to land in exactly that gap.
+                Text(
+                    text = stringResource(Res.string.paywall_subtitle),
+                    typography = AppTheme.typography.Body.B600,
+                    color = AppTheme.colors.textSecondary,
+                )
+
+                VerticalSpacerD500()
 
                 Benefit(stringResource(Res.string.paywall_benefit_no_ads))
                 Benefit(stringResource(Res.string.paywall_benefit_offline))
@@ -254,9 +277,10 @@ fun PaywallScreen(
  * *outside* its own background, and the dog is aligned to the bottom of the box
  * they share. Half the dog therefore lands on the amber and half on the cream,
  * and neither half can be clipped, because nothing here clips.
+ *
  */
 @Composable
-private fun ProSlab(onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
+private fun ProSlab(onClose: (() -> Unit)?, modifier: Modifier = Modifier) {
     val texture = ColorResource.White.withAlpha(SlabTextureAlpha).color
 
     Box(modifier = modifier.fillMaxWidth()) {
@@ -269,13 +293,17 @@ private fun ProSlab(onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
                 .padding(horizontal = Dimension.D800)
                 .padding(top = Dimension.D500, bottom = Dimension.D1200),
         ) {
-            // Reserved whether or not the chevron is there, so the slab does not
-            // change height — and the dog does not jump — when the dwell ends.
-            Box(modifier = Modifier.height(BackRowHeight), contentAlignment = Alignment.CenterStart) {
-                if (onBack != null) {
+            // An X, not a chevron. A chevron says there is a page behind this
+            // one to go back to; this is a sheet that slid up over the board and
+            // the only thing it can do is go away again.
+            //
+            // Reserved whether or not the button is there, so the slab does not
+            // change height, and the dog does not jump, when the dwell ends.
+            Box(modifier = Modifier.height(CloseRowHeight), contentAlignment = Alignment.CenterStart) {
+                if (onClose != null) {
                     IconButton(
-                        icon = Icons.ChevronLeft(stringResource(Res.string.common_back)),
-                        onClick = onBack,
+                        icon = Icons.X(stringResource(Res.string.common_close)),
+                        onClick = onClose,
                         iconColor = AppTheme.colors.text,
                         size = IconButton.Size.Large,
                     )
@@ -283,19 +311,6 @@ private fun ProSlab(onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
             }
 
             VerticalSpacerD500()
-
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(SpanStyle(letterSpacing = Dimension.D50.sp())) {
-                        append(stringResource(Res.string.paywall_title))
-                    }
-                },
-                allCaps = true,
-                typography = AppTheme.typography.Label.L300,
-                color = AppTheme.colors.text,
-            )
-
-            VerticalSpacerD300()
 
             Text(
                 text = stringResource(Res.string.paywall_headline),
@@ -308,8 +323,14 @@ private fun ProSlab(onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
             )
         }
 
+        // Not [DogPose.Solved]. That one is holding a trophy, which is the pose
+        // the win sheet uses, and on a screen asking for money it congratulates
+        // the player for a purchase they have not made. Thinking is alert, it is
+        // tilted back toward the headline it sits beside, and the pencil behind
+        // its ear is the only prop in the set that belongs to a puzzle rather
+        // than to a result.
         Dog(
-            pose = DogPose.Solved,
+            pose = DogPose.Thinking,
             size = SlabDogSize,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -324,17 +345,22 @@ private fun ProSlab(onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
  * A paw rather than a tick because a tick is a form control and this is a list
  * of things a dog does for you. Decorative, and unlabelled on purpose: the paw
  * says nothing the sentence beside it does not.
+ *
+ * Drawn through [Icons.Paw] rather than straight onto a canvas, so the bullet is
+ * the same shape as every other paw in the app and picks up the icon system's
+ * sizing. It is [com.sodogku.system.color.Colors.textSecondary] and not the
+ * amber: the amber the slab and the button are made of measures **1.6:1** on the
+ * sheet's cream, which is a bullet you cannot see. Brown-700 measures 7.0:1 on
+ * the same cream and still sits a step behind the sentence it marks.
  */
 @Composable
 private fun Benefit(text: String) {
-    val ink = ProAmber.color
-
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        Spacer(
-            modifier = Modifier
-                .padding(top = Dimension.D100)
-                .size(PawBulletSize)
-                .drawBehind { drawPaw(ink, filled = true) },
+        Icon(
+            icon = Icons.Paw.decorative,
+            size = PawBulletSize,
+            color = AppTheme.colors.textSecondary,
+            modifier = Modifier.padding(top = Dimension.D100),
         )
         HorizontalSpacerD400()
         Text(text = text, typography = AppTheme.typography.Body.B500)
@@ -443,14 +469,33 @@ private val SlabShape = RoundedCornerShape(
     bottomEnd = Dimension.D1000,
 )
 
-private const val SlabTextureAlpha = 0.14f
+/**
+ * How far the texture paws lift off the amber they sit on.
+ *
+ * Raised from 0.14, which was a paw you had to be told was there: white at that
+ * alpha over amber-600 lands on `#FFBE24`, **1.08:1** against the slab and 2.7
+ * points of CIE L*. At 0.28 it is `#FFC847`, **1.16:1** and 5.3 points of L*.
+ * About double the step, and still nowhere near the 3:1 that would turn a
+ * texture into a pattern of spots competing with the headline.
+ */
+private const val SlabTextureAlpha = 0.28f
 private const val HeadlineWidthFraction = 0.72f
+
+/**
+ * How far past the sheet's viewport the cream is painted, as a multiple of it.
+ *
+ * Only the bottom system-bar inset is actually being covered, which is 24dp on
+ * gesture navigation and 48dp with three buttons. A whole extra viewport is
+ * cheap, needs no inset lookup, and cannot come up short on a device whose bars
+ * are taller than either.
+ */
+private const val BottomInsetOverdraw = 2f
 
 /** How far the dog hangs below the slab. Half of it, so half of it is on cream. */
 private val DogOverhang: Dp = Dimension.D1500
 private val SlabDogSize: Dp = Dimension.D1900 + Dimension.D1500
-private val BackRowHeight: Dp = Dimension.D1300
-private val PawBulletSize: Dp = Dimension.D800
+private val CloseRowHeight: Dp = Dimension.D1300
+private val PawBulletSize = IconSize.Small
 
 private fun PaywallMessage.resource() = when (this) {
     PaywallMessage.AlreadyPro -> Res.string.paywall_already_pro
