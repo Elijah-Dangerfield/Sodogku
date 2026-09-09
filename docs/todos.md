@@ -650,6 +650,22 @@ commit, which reduces the trigger but does not fix this). Note the feedback
 panel had a keyboard up immediately before, and `ShakeDialogRoute` arrived while
 that was tearing down.
 
+**UPDATE 2026-09-09, from the crash log.** The stampede half is fixed and the
+stall half is not. Shaking the device during the stall restarted collection, and
+twelve banked `OpenAchievements` events -- the eleven taps from 17:11:08-17:11:16
+plus one at 17:17:45 -- drained 1.5ms apart and crashed NavController with
+`Attempted to pop Destination route=AchievementsRoute, which is not the top of
+the back stack`. Events now expire after five seconds, so a stall can no longer
+end in that crash. **The stall itself is still unexplained and is what this item
+is now only about.**
+
+Also added since: lifecycle-gated collection logs when it starts and stops,
+tagged. Reproducing this should now produce `Collection stopped for
+GameViewModel events` and `Collection stopped for navigation queue`, which is
+the evidence that was missing. Owner reports being fully on the game screen at
+the time, so a phantom window from the bug-report dialog is the standing
+suspicion.
+
 **Done when:** Opening the feedback panel, submitting, then triggering the shake
 dialog and dismissing it leaves navigation working. And, separately, an
 enqueued-but-undrained command cannot sit silently: either the router surfaces a
