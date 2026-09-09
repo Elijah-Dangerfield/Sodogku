@@ -115,5 +115,15 @@ private fun Color.deepen(): Color =
 
 private const val Deepening = 0.28f
 
-/** Deep enough to read as an edge, shallow enough not to look like two stacked pills. */
-private val DefaultDepth: Dp = 4.dp
+/**
+ * Deep enough to read as an edge, shallow enough not to look like two stacked
+ * pills.
+ *
+ * 8dp, up from 4. At 4 the lip was a hairline that read as a border, which is
+ * the one thing it must not read as: a button whose thickness you cannot see
+ * does not look like something you press. This is the depth the designs use, and
+ * it matches `BasicButton`'s Large so the welcome screen's primary -- which is a
+ * DeepSurface rather than a Button, because the button ladder has no accent slot
+ * meaning "the amber" -- sits at the same thickness as every other primary.
+ */
+private val DefaultDepth: Dp = 8.dp

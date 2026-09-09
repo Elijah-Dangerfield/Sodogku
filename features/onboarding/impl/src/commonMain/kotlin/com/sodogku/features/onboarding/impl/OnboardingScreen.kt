@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -219,21 +218,7 @@ private fun DogField(
 
         Spacer(
             modifier = Modifier
-                .fillMaxWidth()
-                // Taller than the field it fills, and painted past the bottom of
-                // it on purpose. The card below is a sibling, so its rounded top
-                // corners cut out to whatever is *behind the column* — which is
-                // the page, not the amber — and the curve disappeared into cream
-                // on cream with only the shadow left, reading as a smudge. The
-                // amber runs on under the card instead; the card is drawn after
-                // and covers all of it but the corners.
-                //
-                // Overdraw rather than moving the field behind the whole column,
-                // which was the other way to fix it: the paws are placed as
-                // fractions of the field, so a field the height of the screen
-                // puts half of them under the card and thins out the texture in
-                // the part you can actually see.
-                .requiredHeight(maxHeight + CardCornerRadius)
+                .matchParentSize()
                 .alpha(fieldAlpha)
                 .drawBehind {
                     drawRect(field)
@@ -268,6 +253,23 @@ private fun DogField(
  * drags, nothing dismisses, and there is no scrim: it is the bottom third of
  * the layout that happens to have two round corners. A sheet would have given
  * the player a gesture that either does nothing or, worse, does something.
+ *
+ * **The card paints its own amber**, in a box exactly its own size, and the
+ * cream rounded rect goes on top of that. This looks redundant — the field
+ * above is already amber — and it is the whole fix.
+ *
+ * A rounded corner is a hole. Whatever is behind the card shows through the two
+ * wedges outside the arc, and the card is a *sibling* of the amber field, so
+ * what is behind it is the page: the same cream as the card. First the curve was
+ * invisible. Then the field was made to overdraw past its own bottom edge to
+ * cover the wedges, and that traded an invisible curve for a worse artifact —
+ * the overdraw ended partway down the arc, so each corner had a hard horizontal
+ * line with amber above it and a grey shadow-on-cream wedge below. Measured on
+ * device: amber to y=1515, cream from y=1570, 55px of dull grey in between.
+ *
+ * Two boxes in one layout node cannot disagree about where they end. There is no
+ * distance to get wrong, no constraint to be clamped by, and nothing to keep in
+ * sync when somebody changes the radius.
  */
 @Composable
 private fun WelcomeCard(
@@ -280,57 +282,64 @@ private fun WelcomeCard(
     // behind a dialog, and a name that happens to resolve correctly is the kind
     // of thing that stops being true when someone retunes the palette.
     val lift = AppTheme.colors.shadow.withAlpha(CardShadowAlpha).color
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            // Cast upward, because the card meets the amber along its top edge
-            // and nowhere else. `BottomBar` does the same thing for the same
-            // reason; the only difference is the shape it is cast through, since
-            // this one has corners and that one does not.
-            .dropShadow(CardShape) {
-                radius = CardShadowRadius
-                offset = Offset(0f, -CardShadowOffset)
-                color = lift
+    Box(modifier = modifier.fillMaxWidth().background(AppTheme.colors.status.warning.color)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                // Cast upward, because the card meets the amber along its top edge
+                // and nowhere else. `BottomBar` does the same thing for the same
+                // reason; the only difference is the shape it is cast through, since
+                // this one has corners and that one does not.
+                //
+                // Now that the amber is behind it, this lands on amber rather than on
+                // cream, which is the difference between a shadow and a stain: a
+                // neutral black over cream is a grey blob, over amber it is darker
+                // amber.
+                .dropShadow(CardShape) {
+                    radius = CardShadowRadius
+                    offset = Offset(0f, -CardShadowOffset)
+                    color = lift
+                }
+                .background(AppTheme.colors.background.color, CardShape)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                .padding(horizontal = Dimension.D800)
+                .padding(top = Dimension.D900, bottom = Dimension.D700),
+            ) {
+            Text(
+                text = stringResource(Res.string.app_name),
+                typography = AppTheme.typography.Display.D1000,
+            )
+
+            VerticalSpacerD300()
+
+            Text(
+                text = stringResource(Res.string.onboarding_tagline),
+                typography = AppTheme.typography.Body.B500,
+                color = AppTheme.colors.textSecondary,
+            )
+
+            VerticalSpacerD700()
+
+            Rule(stringResource(Res.string.onboarding_rule_lines))
+            Rule(stringResource(Res.string.onboarding_rule_regions))
+            Rule(stringResource(Res.string.onboarding_rule_touch))
+
+            VerticalSpacerD700()
+
+            StartButton(
+                enabled = !state.isFinishing,
+                onClick = { onAction(OnboardingAction.Start) },
+            )
+
+            VerticalSpacerD400()
+
+            ButtonGhost(
+                onClick = { onAction(OnboardingAction.SkipTutorial) },
+                enabled = !state.isFinishing,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(Res.string.onboarding_skip_tutorial))
             }
-            .background(AppTheme.colors.background.color, CardShape)
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
-            .padding(horizontal = Dimension.D800)
-            .padding(top = Dimension.D900, bottom = Dimension.D700),
-    ) {
-        Text(
-            text = stringResource(Res.string.app_name),
-            typography = AppTheme.typography.Display.D1000,
-        )
-
-        VerticalSpacerD300()
-
-        Text(
-            text = stringResource(Res.string.onboarding_tagline),
-            typography = AppTheme.typography.Body.B500,
-            color = AppTheme.colors.textSecondary,
-        )
-
-        VerticalSpacerD700()
-
-        Rule(stringResource(Res.string.onboarding_rule_lines))
-        Rule(stringResource(Res.string.onboarding_rule_regions))
-        Rule(stringResource(Res.string.onboarding_rule_touch))
-
-        VerticalSpacerD700()
-
-        StartButton(
-            enabled = !state.isFinishing,
-            onClick = { onAction(OnboardingAction.Start) },
-        )
-
-        VerticalSpacerD400()
-
-        ButtonGhost(
-            onClick = { onAction(OnboardingAction.SkipTutorial) },
-            enabled = !state.isFinishing,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(Res.string.onboarding_skip_tutorial))
         }
     }
 }

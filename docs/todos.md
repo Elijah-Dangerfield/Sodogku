@@ -559,3 +559,41 @@ bug than the one being fixed.
 
 `DogPose` options are in `libraries/ui/.../components/dog/`.
 
+
+## SD-25 [P2] — Custom quick actions on the iOS home-screen long press
+
+**Ask:** Owner, 2026-09-09: *"on iOS how can I edit the options shown on the hold
+to delete? Maybe like a 'bugs? Contact us' or a 'Stay, we value you!'"*
+
+The long-press menu on the app icon. iOS builds it from two halves and we only
+control one: **Delete App, Share App, Edit Home Screen and Require Face ID are
+system entries and cannot be removed, reordered or renamed.** Everything above
+them is ours, via `UIApplicationShortcutItems` in `Info.plist` (static) or
+`UIApplication.shared.shortcutItems` (dynamic, so the list can react to state).
+
+So a literal "Stay, we value you!" cannot be attached to the Delete row, and
+nothing can intercept a delete. What is available is putting a route or two above
+it, which is where a "Report a bug" belongs anyway.
+
+Worth deciding what earns a slot before building it. Three or four is the visible
+maximum and the menu is a place people go to delete the app, not to browse, so a
+list that reads as marketing is worse than no list. The two that survive that test
+are probably *Report a bug* (straight into the feedback panel, which is the one
+thing a frustrated player wants and currently has to hunt for in Settings) and
+*Daily puzzle* (straight into today's board).
+
+**Done when:** Long-pressing the icon on a device shows our entries above the
+system ones, and each opens the app on the right screen from cold start as well as
+from background.
+
+**Hints:** `apps/ios/iosApp/Info.plist` for the static list; each item needs
+`UIApplicationShortcutItemType`, `...Title` and `...IconType`/`...IconFile`.
+Handling is `application(_:performActionFor:completionHandler:)` on cold start and
+`windowScene(_:performActionFor:)` when already running — both have to work, and
+the cold-start path is the one that gets missed, because the shortcut arrives
+before Compose has a router. Route through the same deep-link entry the app
+already has rather than inventing a second way in. Android's equivalent is
+`android.app.shortcuts` in the manifest, so this is worth doing on both or
+neither.
+
+**Not blocked on anything.** No store review implication, no new permission.
