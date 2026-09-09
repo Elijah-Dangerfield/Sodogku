@@ -22,6 +22,15 @@ with dozens of launches hits it repeatedly — which is what happened during
 launch-gate verification on 2026-09-07, where it closed a banner twice and wrote
 a persisted dismissal into AppData, making the feature look broken.
 
+`text` and `content-desc` are the only labels this can see. A `uiautomator`
+dump has no state-description attribute, because `getStateDescription()` is
+readable only by an accessibility service. So a control that puts its identity
+in `contentDescription` and its state in `stateDescription` — which is the
+correct split, and what the board does — reads here as if the state were
+missing. Identical output from this script is not evidence that two states are
+announced the same way. That mistake has been made once already, and filed as a
+bug against a board that was announcing every state correctly.
+
 That rate is the reason this matters. Tooling that fails outright gets fixed;
 tooling that acts on the app 6% of the time makes every screenshot after it one
 interaction ahead of where you think you are, and you blame the app.
@@ -114,6 +123,11 @@ def tap(label: str, timeout: float = 30.0) -> bool:
 
 
 def main() -> int:
+    # Bare `drive.py` used to raise IndexError here rather than print the usage
+    # the last line of this function exists to print.
+    if len(sys.argv) < 2:
+        print(__doc__, file=sys.stderr)
+        return 2
     command = sys.argv[1]
     if command == "launch":
         adb("shell", "am", "force-stop", PKG)

@@ -118,29 +118,32 @@ accounts, progress only on the device, no server-side record of a player.
 `pages/terms.html` is generic enough to stand unless you find something false.
 A formal register is right here; boilerplate that says nothing is not.
 
-## SD-3 [P1] — A crossed-off square is invisible to a screen reader
+## SD-3 [P1] — A Settings toggle tells a screen reader "on" without saying what is on
 
-**Ask:** Whether a square is ruled out is the most important piece of state on
-the board, and nothing announces it.
+**Ask:** Every toggle row in Settings exposes an unnamed `checkable` node beside
+its label, so a screen reader announces the state with nothing naming the
+setting it belongs to.
 
-**Done when:** A cell's `contentDescription` says whether it is crossed off,
-manually marked, a wrong guess, or holds a dog, and `drive.py text` shows a
-difference between a marked and an unmarked cell.
+**Done when:** Each toggle is one node carrying both its name and its state, and
+an accessibility dump shows no unnamed checkable node in Settings.
 
-**Hints:** Reproduced on the emulator (`com.sodogku.debug`, 4x4 level 1) with
-`python3 scripts/dev/drive.py text`. With "Cross off squares for me" off and on,
-every cell read identically, e.g. "Row 1, column 3, pink", while the ON case was
-visibly painted with a large white X.
+**Hints:** Found on an API 36 emulator while investigating the item this
+section used to hold. The switch is rendered by the shared list item, so the fix
+is in `libraries/ui`'s list components and reaches every toggle at once rather
+than in `features/settings`.
 
-The description is built in the board component under
-`libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/components/game/`.
-Relevant sets are `GameState.visibleAutoMarks`, `manualMarks`, `wrongGuesses`,
-`placedCells`.
+The board is the worked example of the right shape: `BoardCellLabels.kt` puts
+identity in `contentDescription` and state in `stateDescription`, on one node.
 
-The trap: auto-marks are display-only, so this must follow `visibleAutoMarks` and
-**not** `autoMarks`, or it leaks the deduction to a player who turned the assist
-off. `VerifyStrings` is enforced, so new strings go in
-`libraries/resources/.../values/strings.xml`.
+**This replaces the original SD-3, which was my mistake.** I reported that a
+crossed-off square is invisible to a screen reader, having seen identical
+`drive.py text` output with the assist on and off. The board has announced all
+five cell states since `bc81aa5`, through `stateDescription`. `drive.py` reads
+only `text` and `content-desc` from a `uiautomator` dump, and
+`stateDescription` is not in that attribute set at all: it is readable only by
+an accessibility service. So the tool is structurally blind to exactly the half
+of the label that carries state, and identical output was never evidence of
+anything. `scripts/dev/drive.py` now says so in its docstring.
 
 ## SD-4 [P2] — Two docs give GitHub Pages instructions that no longer exist
 
