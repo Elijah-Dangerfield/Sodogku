@@ -151,12 +151,11 @@ internal fun BasicButton(
 /**
  * Lip depth by size — the constant strip the face drops onto.
  *
- * Deliberately chunky. At the original 5/4/3 the lip read as a hairline that
- * could be mistaken for a border, and a button you cannot see is thick does not
- * look like something you press. A first pass at 8/6/5/4 was still shy of the
- * designs, so these are a second step up: enough that the face visibly sits on
- * top of something, still short of the two-stacked-pills look you get past about
- * a third of the button's height.
+ * Chunky, but settled by looking rather than by argument. At the original 5/4/3
+ * the lip read as a hairline that could be mistaken for a border, and a button
+ * you cannot see is thick does not look like something you press. 8/6/5/4 was
+ * still shy of the designs; 10/8/6/5 overshot and read as a slab under the face.
+ * These are where it landed on screen.
  *
  * Keep Large in step with [com.sodogku.libraries.ui.system.DeepSurface]'s default
  * depth. The welcome screen's primary is a DeepSurface rather than a Button, and
@@ -164,10 +163,10 @@ internal fun BasicButton(
  * you see without being able to say what is wrong.
  */
 private fun ButtonSize.pressDepth(): Dp = when (this) {
-    ButtonSize.Large -> 10.dp
-    ButtonSize.Medium -> 8.dp
-    ButtonSize.Small -> 6.dp
-    ButtonSize.ExtraSmall -> 5.dp
+    ButtonSize.Large -> 8.dp
+    ButtonSize.Medium -> 7.dp
+    ButtonSize.Small -> 5.dp
+    ButtonSize.ExtraSmall -> 4.dp
 }
 
 

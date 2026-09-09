@@ -300,12 +300,17 @@ private fun WelcomeCard(
                 }
                 .background(AppTheme.colors.background.color, CardShape)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
-                // Roomier than the D800/D900/D700 this started at, and the top
-                // is the one that had to move most. The corners are D1400 (58dp)
-                // of radius, so at 24dp of top padding the title was set inside
-                // the arc and the card read as cramped precisely where it is
-                // meant to look like it has room. Half the radius is about
-                // right: clear of the curve without stranding the title.
+                // Roomier than the D800/D900/D700 this started at. The card is
+                // the only thing on the screen with words in it, and at the old
+                // padding the title sat close enough to the corner that the card
+                // read as cramped precisely where it is meant to look like it
+                // has room.
+                //
+                // Not derived from [CardCornerRadius], though an earlier note
+                // here claimed it was. These held up unchanged when the radius
+                // came down from 58dp to 24dp, which is the evidence that the
+                // two are independent: the padding is set by the text, and the
+                // radius by how separate the card should look.
                 .padding(horizontal = Dimension.D1000)
                 .padding(top = Dimension.D1100, bottom = Dimension.D900),
             ) {
@@ -482,12 +487,16 @@ internal val FieldPaws = listOf(
 /**
  * Square along the bottom, where the card runs off the edge of the screen.
  *
- * The top corners are generous rather than tidy. This card is the only thing
- * between the amber and the buttons, so the curve is what says it is a separate
- * surface sitting in front rather than a colour change halfway down the page,
- * and a small radius reads as the latter.
+ * This card is the only thing between the amber and the buttons, so the curve is
+ * what says it is a separate surface sitting in front rather than a colour
+ * change halfway down the page. Square corners read as the latter.
+ *
+ * Tuned down from D1400 by eye. The argument for a generous radius was that a
+ * small one stops reading as a separate surface, and that turned out to be true
+ * only of a *very* small one: at 58dp the arc ate the top corners of the card
+ * and crowded the title, and 24dp still reads as an edge sitting in front.
  */
-private val CardCornerRadius = Dimension.D1400
+private val CardCornerRadius = Dimension.D900
 
 private val CardShape = RoundedCornerShape(
     topStart = CardCornerRadius,
