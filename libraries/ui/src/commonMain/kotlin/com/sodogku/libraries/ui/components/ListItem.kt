@@ -1,5 +1,14 @@
 package com.sodogku.libraries.ui.components
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -133,6 +142,44 @@ fun ListItem(
     dividerStartInset: Dp = ListItemDefaults.dividerStartInset(leadingContent != null),
     dividerColor: ColorResource = AppTheme.colors.borderSecondary,
 ) {
+    // A switch accessory takes the whole row over. `Modifier.toggleable` puts
+    // the role and the on/off state on the row itself, so the row is one node
+    // that says its own name and its own state.
+    //
+    // Before this, the switch was independently checkable *and* the row was
+    // clickable, so the same setting appeared twice in the traversal: once as
+    // the label, then again as a bare "on" with no name, because `bounceClick`
+    // contributes an action and a role and nothing else. `toggleItem` in
+    // Settings passes `onClick` and `onCheckedChange` doing the same thing, so
+    // collapsing them loses no behaviour. Any caller that gives a switch row an
+    // `onClick` meaning something *different* has written two controls in one
+    // row, and this deliberately does not support that.
+    val toggle = accessory as? ListItemAccessory.Switch
+    val toggleEnabled = enabled && toggle?.enabled != false
+
+    // The press animation is built here rather than through `bounceClick`, and
+    // that is the whole reason this works.
+    //
+    // `Modifier.toggleable` merges its descendants, which is what folds the
+    // headline into the row so the row can say its own name. Wrapped in a
+    // `composed { }` helper it did not: the row came out of a `uiautomator` dump
+    // checkable and unnamed with the text still in separate child nodes, and an
+    // explicit `contentDescription` beside it became *another* child rather than
+    // naming the row. `bounceClick`'s KDoc guessed `composed { }` was why; this
+    // is that guess confirmed, since the same `toggleable` applied directly
+    // merges.
+    val toggleInteraction = remember { MutableInteractionSource() }
+    val pressScale = remember { Animatable(1f) }
+    LaunchedEffect(toggleInteraction) {
+        toggleInteraction.interactions.collect { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> pressScale.animateTo(BounceScaleDown)
+                is PressInteraction.Release -> pressScale.animateTo(1f)
+                is PressInteraction.Cancel -> pressScale.animateTo(1f)
+            }
+        }
+    }
+
     Column(
         modifier = modifier.fillMaxWidth()
     ) {
@@ -143,14 +190,47 @@ fun ListItem(
                 .thenIf(supportingContent != null) {
                     padding(vertical = Dimension.D400)
                 }
+                // Named here, one link *earlier* than the modifier that takes
+                // the gesture, because that is the only position that reaches
+                // the tree. `mergeDescendants` was tried first and does not
+                // work even from here — the row came out of a dump still
+                // checkable and still unnamed, which is the same trap
+                // `bounceClick` documents. An explicit `contentDescription`
+                // does work, and it is what `RuleChip` and `BoosterButton`
+                // already do.
+                //
+                // The headline alone, not the supporting sentence. The
+                // supporting text stays its own node and is read after; folding
+                // it in would make the control's *name* a paragraph.
+                //
+                // No `stateDescription`: `Role.Switch` plus the toggleable value
+                // already gives a reader "on" or "off" in its own words, and
+                // saying it twice is worse than the house pattern in
+                // `BoardCellLabels`, where nothing else supplies the state.
                 .then(
-                    if (onClick != null) {
-                        Modifier.bounceClick(
+                    when {
+                        toggle != null -> Modifier
+                            // Read in the draw phase, never in composition.
+                            .graphicsLayer {
+                                val scale = pressScale.value
+                                scaleX = scale
+                                scaleY = scale
+                            }
+                            .toggleable(
+                                value = toggle.checked,
+                                enabled = toggleEnabled,
+                                interactionSource = toggleInteraction,
+                                indication = null,
+                                role = Role.Switch,
+                                onValueChange = { toggle.onCheckedChange(it) },
+                            )
+
+                        onClick != null -> Modifier.bounceClick(
                             enabled = enabled,
                             onClick = onClick
                         )
-                    } else {
-                        Modifier
+
+                        else -> Modifier
                     }
                 )
                 .padding(contentPadding),
@@ -224,6 +304,9 @@ sealed interface ListItemAccessory {
     ) : ListItemAccessory
 }
 
+/** Matches `bounceClick`'s default, so a toggle row presses like every other row. */
+private const val BounceScaleDown = 0.90f
+
 object ListItemDefaults {
     private val HorizontalPadding = Dimension.D500
     private val VerticalPadding = Dimension.D0
@@ -260,9 +343,13 @@ private fun Accessory(
     when (accessory) {
         ListItemAccessory.None -> Unit
 
+        // Decorative, because the row is what you activate and it already says
+        // where it goes. Labelled "Navigate", this was a second node after every
+        // such row, so a reader heard the destination and then the word
+        // "Navigate" with nothing attached to it.
         ListItemAccessory.Chevron ->
             Icon(
-                icon = Icons.ChevronRight("Navigate"),
+                icon = Icons.ChevronRight.decorative,
                 color = AppTheme.colors.onSurfacePrimary,
                 size = IconSize.Small
             )
@@ -274,11 +361,16 @@ private fun Accessory(
                 size = accessory.size
             )
 
+        // `onCheckedChange = null` and no semantics of its own: the row owns
+        // both the gesture and the state now, and a switch that kept either
+        // would be the duplicate node this exists to remove. Still drawn, still
+        // animates, still shows enabled or disabled.
         is ListItemAccessory.Switch ->
             Switch(
                 checked = accessory.checked,
-                onCheckedChange = accessory.onCheckedChange,
-                enabled = enabled && accessory.enabled
+                onCheckedChange = null,
+                enabled = enabled && accessory.enabled,
+                modifier = Modifier.clearAndSetSemantics { },
             )
 
 

@@ -31,6 +31,14 @@ import androidx.compose.ui.graphics.graphicsLayer
  * link earlier in the chain, works. The difference is `composed { }`, which is
  * deprecated for reasons of about this shape; rewriting this onto `Modifier.Node`
  * is the real fix and would let the label move back in here where it belongs.
+ *
+ * Confirmed on a device while fixing the Settings toggles: the identical
+ * `Modifier.toggleable`, applied straight onto a Row rather than through a
+ * `composed { }` wrapper like this one, *does* merge its descendants and does
+ * name the row. So `composed { }` is the cause rather than a suspicion, and
+ * `ListItem` builds its own press animation instead of calling this. Anything
+ * here that needs a merged, named node has to do the same until this is a
+ * `Modifier.Node`.
  */
 fun Modifier.bounceClick(
     enabled: Boolean = true,
