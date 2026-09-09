@@ -236,3 +236,276 @@ makes both cheaper in real terms.
 
 **Blocked** until the agents working `features/streak/impl` and
 `features/game/impl` have landed; both are in the way.
+
+<!--
+SD-9 through SD-23 came out of one sitting on 2026-09-09: a feature-by-feature
+read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
+ship, plus the owner's own ideas in the same conversation. The competitor notes
+live in `docs/reference/meowdoku.md`, which until now only covered the look.
+-->
+
+## SD-9 [P1] — There is no leaderboard at all on Android
+
+**Ask:** `RealLeaderboards` is bound to `NoGameServices` on Android, which
+reports `Unavailable` from construction and never changes its mind. So
+`isOfferable` stays false, no entry point is ever drawn, and every score is
+collected and never flushed. Meowdoku ships a global board on Android, which is
+where most of this genre's installs are.
+
+**Done when:** An Android player can reach the same leaderboard entry point iOS
+draws, a `LifetimeScore` submission is accepted, and the platform's own
+dashboard opens.
+
+**Hints:** `libraries/leaderboards/impl/src/androidMain/.../NoGameServices.kt`
+already names the whole mapping in its doc comment: `GamesSignInClient` answers
+`startAuthentication`, `LeaderboardsClient.submitScore(id, value)` answers
+`submit`, `getLeaderboardIntent` answers `presentDashboard`. Play mints its own
+ids, so `Leaderboard` needs a second id per board and a resolver in the shape of
+`AdUnits.android(format)`.
+
+Two things that are not true of Game Center: Play Games sign-in can fail for a
+player who has never opted into a Games profile, which is a normal state and not
+an error, and the console needs the boards created and published before a
+submission is anything but a silent no-op.
+
+## SD-10 [P1] — The game makes no sound
+
+**Ask:** Haptics ship (`AppCache.hapticsEnabled`, `rememberHaptics`), audio does
+not exist anywhere: no clips, no player, no `soundEnabled`, and SPEC 11 still
+lists the Settings row as outstanding. Audio is one of the two things
+Meowdoku's reviewers praise unprompted, the other being its hint.
+
+**Done when:** Dog placed, strike, level win, praise sting, button tap and
+achievement unlock all play; a Settings row silences them; and nothing plays
+over the iOS silent switch.
+
+**Hints:** SPEC 20 lists the six clips under "Art and audio" and they are still
+unordered. Follow the haptics shape exactly: a flag in `AppCache`, a toggle in
+Settings, and playback at the screen rather than in the ViewModel.
+
+## SD-11 [P1] — A sniff should say what proved it
+
+**Ask:** `HintFinder.ruledOutCells` returns `List<Int>` and throws away the
+`Deduction.technique` the engine has already computed. The single most praised
+feature in Meowdoku's reviews is that its hint explains why a cat can or cannot
+go somewhere instead of just handing over the square. We do the harder half
+already and say nothing.
+
+**Done when:** The sniff reveal carries the technique that ruled those squares
+out, and the board shows one sentence naming it in a player's words, for example
+"only one square in this region is still open in this row".
+
+**Hints:** `libraries/puzzle/.../Difficulty.kt:105` is the function.
+`Techniques.kt` already has five named tiers whose doc comments read almost as
+the copy. Words live in `:libraries:resources` and map with an exhaustive
+`when`, the same rule achievements follow, so a new technique fails the build
+until somebody writes its sentence. The strike path already names the rule that
+was broken (`b490d40`); this is the same idea on the help path.
+
+## SD-12 [P1] — The starter dog leaves too early
+
+**Ask:** Owner, 2026-09-09: "I feel like we remove the starting dog too soon."
+`StarterDogThroughLevel = 25` is a hardcoded constant, so the head start ends
+inside the 5x5 band and never comes back for a player's first 7x7, 8x8, 9x9 or
+10x10, which are the boards where the auto-mark cascade is most worth watching.
+
+**Done when:** The free dog is granted by position within a band rather than by
+one absolute level id, so the first levels of every new grid size open with one
+placed, and the number is remote config rather than a constant.
+
+**Hints:** `features/game/impl/.../GameViewModel.kt:2577`. `LevelCurve` knows
+the bands. It scores nothing, so widening it cannot inflate an early best, and
+that property has to survive the change. Config key belongs under
+`progression.*`.
+
+## SD-13 [P1] — 500 levels is not a campaign
+
+**Ask:** Meowdoku reviewers report being at level 1912 and past 1000. Ours ends
+at 500, and clearing it walks the player out of the app (`proposals.md` item 4).
+Two problems, and the second one is worse than the first.
+
+**Done when:** Finishing the last level lands on something that says so, and the
+shipped campaign is at least 1000 levels.
+
+**Hints:** The generator makes 1,230 boards in about 42 seconds, so content is
+cheap; verification is what costs. `LevelPacks.PACK_VERSION` exists because
+progress is keyed on level id, which makes appending safe and reordering a
+silent reassignment of everyone's history. Do not spend the daily pool on this,
+for the reason in `proposals.md`. Meowdoku's own reviewers say its boards start
+repeating around every 100, so this is a place where we can be better rather
+than merely bigger.
+
+## SD-14 [P1] — Share the daily only, and without the grid
+
+**Ask:** Owner, 2026-09-09: only the daily should be shareable, and the text
+should not carry the region layout. Today `ShareButton` is on every win sheet
+and `ShareResult` carries `regions`.
+
+**Done when:** A campaign win has no share control, the daily's share text is
+the date, time, score, paws, bones and streak with no grid at all, and
+`ShareResult` has nowhere to put a layout.
+
+**Hints:** `features/game/impl/.../GameOutcomeSheets.kt:162`,
+`libraries/sharing/.../ShareResult.kt`, `ShareText.kt`. Dropping the grid makes
+the no-spoilers property trivially true instead of carefully arranged, and it
+retires the `🔲` compromise for ten-region boards. Tests pin the emoji grid;
+they go with it.
+
+## SD-15 [P1] — Say the daily is waiting, on the button that opens it
+
+**Ask:** Owner, 2026-09-09: a badge on the menu icon while today's daily exists
+and has not been played.
+
+**Done when:** The drawer button carries a dot while today has no result, and it
+clears the moment the day is completed or forfeited.
+
+**Hints:** `AchievementsButton` in `GameScreen.kt:442` is the pattern, including
+the rule that there is no badge at zero. `DailyRepository.status()` already
+answers the question. A dot is invisible to a screen reader, so the button's
+label has to say it too.
+
+## SD-16 [P2] — A QA panel that can move the day
+
+**Ask:** Owner, 2026-09-09: "How can I test out streaks without actually playing
+them?" Streak, freeze and restore are all built and none of them is reachable in
+under a week of real calendar time.
+
+**Done when:** A debug-only panel can move the date the daily and streak code
+sees, write a result for an arbitrary past date, and clear the lot, and a
+freeze offer and a restore offer can both be produced in one sitting.
+
+**Hints:** The shake dialog is the way in: `ShakeDialogEntryPoint` already
+gates the network inspector on `BuildInfo.isDebug` and is the established place
+for this. The streak folds out of stored rows (`DailyStreak.kt`), so seeding
+rows is enough and a second source of truth would be a bug. Two rules to respect
+rather than route around: future-dated results are deliberately invisible to the
+walk, and the skip allowance keeps a high-water day on purpose.
+
+## SD-17 [P2] — A time to beat on a replay
+
+**Ask:** Owner, 2026-09-09, on the ghost race: "I wouldn't wanna see my previous
+placements tho. I'd probably just wanna have a time to beat."
+
+**Done when:** Reopening a cleared level shows the best time for it, the running
+clock is measured against it, and the moment the run passes or misses it is
+marked. Offline, no identity, no server.
+
+**Hints:** `level_progress.best_time_ms` already exists and is already written.
+The whole feature is display plus one comparison, which is why it is the cheapest
+competitive thing on this list. Decide what a replay that beats the time does to
+`best_score`, which keeps the better of the two today.
+
+## SD-18 [P2] — Golden Race: a periodic pack where one mistake ends the run
+
+**Ask:** Owner's design, 2026-09-09, taking the shape of Meowdoku's Golden Fish
+(added late August 2026: one error and the run is over). A pool of 100 to 200
+boards compiled every few weeks, not repeated in the campaign, entered from the
+side pane with a badge, one mistake ends the run, ranked on how far and how
+fast.
+
+**Done when:** A decision is written down first, then built. The mode itself is
+small; where the ranking lives is not.
+
+**Decision needed:** Game Center and Play Games can both host a recurring
+leaderboard that resets on a schedule, which covers ranking with no accounts and
+no server. What they cannot host is the content, and what nothing can host
+without a durable player identity is the Duolingo-style bracket the owner also
+raised: promotion and relegation need cohorts assigned and remembered somewhere.
+So this splits into (a) a local mode plus a platform recurring board, which can
+ship now, and (b) a served event with brackets, which is v2 and reopens the
+accounts question C0 closed. Pick (a) first and say so in `decisions.md`.
+
+**Hints:** Content delivery is SD-19. One mistake ending the run interacts with
+bones, which are one global count across the whole game: a race must not spend
+them, or a bad run costs a player the campaign too. Meowdoku's own players are
+angry about Golden Fish, and the complaint is that it changed the main loop
+underneath them rather than sitting beside it. Ours has to be opt-in.
+
+## SD-19 [P2] — Deliver level packs over the wire
+
+**Ask:** Owner, 2026-09-09: a way to add levels, remove levels, and reorder the
+campaign without a release. Today both packs are Kotlin source compiled into the
+binary (`CampaignPackData.kt`, `DailyPackData.kt`) and decoded lazily by
+`LevelPacks`, so every content change is an app update.
+
+**Done when:** The app can fetch a pack, verify it, and use it in place of the
+bundled one, and falls back to the bundled pack when the fetch fails, the device
+is offline, or verification does not pass.
+
+**Hints:** This does not break SPEC 3. Generation stays offline on a JVM;
+only delivery moves. SPEC 18 lists server-delivered packs as a v1 non-goal, so
+this is a deliberate reversal and belongs in `decisions.md`.
+
+Two hazards, both sharp. Progress is keyed on level id, so a pack that removes
+or reorders ids silently reassigns a player's completed levels;
+`PACK_VERSION` exists for exactly this and there is no migration behind it yet.
+And `LevelPackVerificationTest` is the only thing standing between an unsolvable
+board and a player, and it runs at build time, so a served pack needs the same
+uniqueness check before it is signed, not after it is downloaded.
+
+## SD-20 [P2] — Boards past 10x10, with zoom and pan (spike)
+
+**Ask:** Owner brainstorm, 2026-09-09: "Maybe we could even make larger grid
+sizes where you need to zoom in and pan?"
+
+**Done when:** There is a written answer with a recommendation, not a feature.
+
+**Hints:** Three things to price before any of it is built. The 44pt touch
+target rule against a 12x12 on a phone, which is what forces the zoom in the
+first place. Pan against the single-tap and double-tap gestures the entire game
+rests on, and against the coach marks that point at specific squares. And the
+generator, which converts 23 of 40 attempts to a unique board at 10x10 and gets
+worse from there. Also answer whether size adds difficulty at all: SPEC 1.7 says
+it does not, difficulty is deduction depth, and a 12x12 that falls to repeated
+last-candidate is a long board rather than a hard one.
+
+## SD-21 [P2] — Lockdown mode, where regions fade and the board reshuffles (spike)
+
+**Ask:** Owner brainstorm, 2026-09-09: lock a colour in by finding its dog, and
+if you do not, watch it fade to grey and the remaining tiles shuffle up into a
+new valid configuration. "The animation there would need to be sick."
+
+**Done when:** There is a written answer with a recommendation.
+
+**Hints:** The animation is not the hard part. Every board has exactly one
+solution, and that is the entire reason a tap can be answered right or wrong
+(SPEC 1.1). A reshuffle changes the answer underneath the player, so "wrong"
+stops being a fact about the puzzle. The only version that keeps the promise is
+a precomputed chain generated offline: board 2 is a valid unique board that
+agrees with every dog already locked on board 1. Price that in the generator
+before anybody designs the screen, because nothing is generated on device.
+
+The cheap cousin worth costing in the same pass: the fade as pure time pressure,
+with no reshuffle at all.
+
+## SD-22 [P2] — Write down what the game actually offers
+
+**Ask:** Owner, 2026-09-09: "It seems like it would be nice to have a wiki
+markdown about the features we do offer." SPEC is a design document that argues
+with itself across 1,500 lines and records decisions that were later reversed.
+There is nowhere to read what is true today.
+
+**Done when:** `docs/reference/features.md` lists every player-facing feature
+with its rules, which numbers are remote config, and where it lives in code, and
+the doc map in `README.md` points at it.
+
+**Hints:** Candidate sections: the board and auto-mark, bones, sniffs and
+treats, score and paws, skip, the campaign ladder and its bands, the daily, the
+streak with freeze and restore, achievements, sharing, leaderboards, Pro, ads,
+settings, accessibility. Derive every line from the code, not from SPEC. Where
+the two disagree the code is right and SPEC gets a correction in the same pass.
+
+## SD-23 [P2] — A weekly score board, so a newcomer can win something
+
+**Ask:** `Leaderboard.kt` names this itself: an all-time score board is
+unwinnable for anyone who installed today, and the standard answer is a rolling
+window everyone starts level in. Game Center supports recurring boards natively.
+
+**Done when:** A weekly board exists and is submitted to, and it resets without
+anything on the device having to know it did.
+
+**Hints:** The blocker is upstream and small: `:libraries:progress` folds a
+lifetime total and there is no "points banked since a date". That addition
+first, then one entry in the `Leaderboard` enum. Do not use a recurring board
+for the daily challenge, for the local-midnight reason already written down
+there.
