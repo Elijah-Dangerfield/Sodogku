@@ -54,6 +54,10 @@ say "The auth token needs scopes: org:read project:read project:write project:re
 say "Mint one at: https://$ORG.sentry.io/settings/auth-tokens/"
 say ""
 
+# Refuse rather than fall back to a visible prompt. Somewhere that cannot hide
+# the input is somewhere the token ends up in a scrollback buffer.
+[ -t 0 ] || die "this needs an interactive terminal to read the token without echoing it"
+
 # `stty -echo` rather than `read -s`, which is not portable and means something
 # else entirely in zsh. The trap puts echo back if the read is interrupted --
 # without it, a ctrl-c here leaves the terminal silently swallowing keystrokes.
