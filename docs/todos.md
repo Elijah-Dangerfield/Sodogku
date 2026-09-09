@@ -50,73 +50,55 @@ annoying.
 
 <!-- Newest at the bottom. -->
 
-## SD-1 [P0] — iOS hands out rewarded boosters for free, because it has no ad SDK
+## SD-1 [P2] — Nobody has watched a rewarded ad on iOS
 
-**Ask:** A player on iOS taps "watch an ad" for bones or sniffs, sees no ad, and
-is given the reward anyway. That is the whole rewarded economy not running on
-one of two platforms.
+**Ask:** The SDK work is done (`b1d5905`): the Google Mobile Ads package is
+linked, the `#if canImport(GoogleMobileAds)` paths compile, `AdUnits` is exported
+to Swift, and `xcodebuild` is green. What is unproven is the only thing that
+matters to a player, that a rewarded request actually shows Google's test ad and
+the reward lands after it.
 
-**Done when:** The Google Mobile Ads SDK is a Swift Package Manager dependency of
-the `iosApp` target, the `#if canImport(GoogleMobileAds)` paths in
-`Platform/AdNetwork.swift` actually compile in, and a rewarded request on the
-simulator shows Google's test ad before the reward lands.
+**Done when:** Someone has watched a test ad on an iOS simulator or device and
+seen the bones or sniffs arrive afterwards.
 
-**Hints:** `apps/ios/iosApp.xcodeproj/project.pbxproj:397-406` has exactly one
-`XCRemoteSwiftPackageReference`, `sentry-cocoa`, and `Package.resolved` pins only
-that. Every ad path is behind `#if canImport(GoogleMobileAds)` at
-`apps/ios/iosApp/Platform/AdNetwork.swift:42-47`, so the file compiles to a stub
-and the shared Kotlin reads the result as a success.
+**Hints:** Blocked on `docs/OWNER-TODO.md` item 11: tapping the simulator needs a
+`sudo xcode-select` this host cannot run. Dropped from P0 to P2 because the free
+rewards are fixed; this is verification debt, not a live defect.
 
-Package is `https://github.com/googleads/swift-package-manager-google-mobile-ads.git`.
+Check the fail-open rule while you are there: pull the network mid-ad and confirm
+the reward still lands. Only a deliberate dismissal may withhold it.
 
-Constraints that are easy to get wrong: ads are **rewarded only**
-(`libraries/ads/.../AdNetwork.kt:22-24` declares one `AdFormat`, so no
-interstitial, banner or app-open), and monetization **fails open**, so a load or
-show failure must still grant the reward and only a deliberate `Dismissed` may
-withhold it. Match the Android semantics in
-`libraries/ads/impl/src/androidMain/.../AdMobAdNetwork.kt`.
+**Known gap, filed rather than fixed:** Android wraps its load and consent calls
+in `withTimeoutOrNull` so a wedged SDK becomes a free reward instead of a frozen
+board. iOS has no equivalent, because racing an `async throws` whose cancellation
+is opaque risks a leaked continuation, which fails worse than what it guards.
+Worth doing properly once someone can test it.
 
-Leave `Info.plist:30`'s test app id and `AdUnits.kt:39`'s `useTestUnits = true`
-alone. Real IDs are blocked on the owner (`OWNER-TODO.md` item 7) and test units
-are what you want for verifying this anyway. Work out whether iOS needs the UMP
-consent equivalent of `AdMobAdNetwork.kt:134` and say what you decided.
+## SD-2 [P1] — Nobody has read and owned the new privacy policy
 
-Tapping the iOS simulator is blocked (`OWNER-TODO.md` item 12), so be explicit
-about what you could not verify rather than implying a gesture was tested.
+**Ask:** `pages/privacy.html` was rewritten against the code in `1ec24e0` and is
+live. The false "no ad networks" claim is gone and every statement traces to a
+file. What is left is the half an agent cannot do: a person has to read it and
+accept it as their own.
 
-## SD-2 [P1] — The privacy policy says the app does none of what it does
+**Done when:** The owner has read it end to end and said so.
 
-**Ask:** `pages/privacy.html:37` states the app does not "use advertising or
-analytics SDKs (no Google Analytics, no Facebook SDK, no ad networks)". It ships
-AdMob, the UMP consent SDK, App Tracking Transparency and a Grafana Cloud pipe.
-Both stores require the policy to describe collection accurately, so this blocks
-submission.
+**Hints:** Three passages deserve a deliberate decision rather than a factual
+check.
 
-**This is now publicly live** at
-`https://elijah-dangerfield.github.io/Sodogku/privacy.html`, as of the repo
-being created on 2026-09-08. It was a 404 when this item was written. Nothing
-links to it yet and the app is not shipped, but a false privacy statement is
-served on the open internet under the owner's name, so this moved up.
+- **The opening line says the app is not released yet.** True today, false on
+  launch day, and nothing catches it. There is a `DELETE THIS ON LAUNCH DAY`
+  comment on the paragraph.
+- **The deletion paragraph** states plainly that the install identifier is the
+  only key on our records, that the app never shows it to the player, and that a
+  deletion request therefore cannot be matched to anything. That is honest and it
+  is also a product gap the page now commits us to closing. Play's Data safety
+  form asks the question directly.
+- **Analytics have an operator kill switch and no in-app opt-out.** The page says
+  so rather than implying a choice the player does not have.
 
-**Done when:** The page describes what the code actually sends, and a human has
-read and signed off on it. That second half is not yours to close.
-
-**Hints:** Inherited template text. Evidence for each falsehood:
-`libraries/ads/impl/src/androidMain/.../AdMobAdNetwork.kt:134` (UMP),
-`apps/ios/iosApp/Info.plist:37` (ATT),
-`libraries/telemetry/impl/.../GrafanaAppEvents.kt:139-151` (Grafana).
-
-`docs/store/data-safety.md` is the drafted input. Ground every claim in the code:
-what `GrafanaAppEvents` emits, what Sentry captures in `AppTelemetry.kt`, the
-redaction rules in `libraries/core/.../logging/LogRedaction.kt`, and the install
-id in `AppCache.kt`. Cover the feedback panel, which can attach a screenshot and
-a log tail and is opt-in.
-
-The genuinely privacy-preserving facts are real and worth stating plainly: no
-accounts, progress only on the device, no server-side record of a player.
-
-`pages/terms.html` is generic enough to stand unless you find something false.
-A formal register is right here; boilerplate that says nothing is not.
+`pages/terms.html` was left alone. Nothing in it is false, but it says nothing
+about purchases or ads, which is a gap rather than an error.
 
 ## SD-3 [P1] — A Settings toggle tells a screen reader "on" without saying what is on
 
@@ -144,45 +126,6 @@ only `text` and `content-desc` from a `uiautomator` dump, and
 an accessibility service. So the tool is structurally blind to exactly the half
 of the label that carries state, and identical output was never evidence of
 anything. `scripts/dev/drive.py` now says so in its docstring.
-
-## SD-4 [P2] — Two docs give GitHub Pages instructions that no longer exist
-
-**Ask:** `SETUP.md:110` and `docs/release-automation.md:203` both say to set
-Pages source to `main` / `/pages`. GitHub does not offer that, and
-`.github/workflows/pages.yml:10` uses `actions/deploy-pages`, which requires the
-**GitHub Actions** source instead.
-
-**Done when:** Both files say GitHub Actions, and nothing else in the repo still
-describes branch-folder publishing.
-
-**Hints:** This matters more than a normal doc fix because the app's Terms and
-Privacy links are hardcoded to that Pages URL
-(`libraries/config/.../LegalConfigValues.kt:35,58`), so following the wrong
-instruction leaves them 404ing with no error anywhere.
-
-While in there, `docs/SPEC.md` §20 is stale in three places: SPEC:1505-1506 asks
-for rewarded, interstitial, app-open and banner ad units when only rewarded
-exists; SPEC:1467-1471 says the iOS icon is still the template placeholder when a
-real one is in `AppIcon.appiconset`; SPEC:1554-1557 asks whether Auto Backup
-should be on when it was decided off with reasoning at
-`apps/compose/src/androidMain/AndroidManifest.xml:15`. SPEC:1485 also says one
-bundle id for both stores, but iOS is `com.sodogku.Sodogku` and Android is
-`com.sodogku`.
-
-## SD-5 [P2] — Dead `BuildConfig` actual in `flowroutines`' jvmMain
-
-**Ask:** `libraries/flowroutines/src/jvmMain/kotlin/com/sodogku/libraries/core/BuildConfig.jvm.kt`
-looks like a leftover: it sits in `flowroutines` but declares into the
-`libraries.core` package.
-
-**Done when:** Either it is deleted and everything still builds on every target,
-or there is a comment saying which target needs it and why it lives in this
-module.
-
-**Hints:** Check whether any jvm target actually resolves the `expect` through
-this module before deleting. `libraries/core` has its own
-`BuildConfig.android.kt` and `BuildConfig.ios.kt`, which is what makes this one
-look misplaced. Verify with the full matrix, not just Android.
 
 ## SD-6 [P2] — Standing code review, by an agent that did not write the code
 
