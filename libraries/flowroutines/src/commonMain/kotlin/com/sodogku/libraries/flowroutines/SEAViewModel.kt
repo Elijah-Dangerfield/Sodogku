@@ -9,7 +9,11 @@ import com.sodogku.libraries.core.ConcurrentHashMap
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.throwIfDebug
 import kotlinx.coroutines.FlowPreview
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -54,10 +58,16 @@ class IllegalViewModelStateException(
 abstract class SEAViewModel<S : Any, E : Any, A : Any>(
     private val initialStateArg: S? = null,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
+    /**
+     * Only ever overridden by tests, so event expiry can be exercised without a
+     * five second sleep. `runTest`'s virtual clock cannot help here: the marks
+     * come from a monotonic source, which does not advance with the scheduler.
+     */
+    private val timeSource: TimeSource = TimeSource.Monotonic,
 ) : ViewModel() {
 
     private val actions = Channel<A>(Channel.UNLIMITED)
-    private val events = Channel<E>(Channel.UNLIMITED)
+    private val events = Channel<TimedEvent<E>>(Channel.UNLIMITED)
     private val actionDebouncer = ConcurrentHashMap<String, Channel<suspend (S) -> S>>()
     private val _initialState: S by lazy { initialState() }
 
@@ -88,9 +98,42 @@ abstract class SEAViewModel<S : Any, E : Any, A : Any>(
     }
 
     /**
-     * The flow exposing events from the view mode
+     * The flow exposing events from the view model.
+     *
+     * **Events expire.** An event is a side effect that was worth doing when it
+     * was sent -- navigate, play a haptic, show a toast -- and none of those are
+     * worth doing several minutes later. The channel underneath is UNLIMITED and
+     * the collector is lifecycle-gated, so anything sent while the collector is
+     * stopped banks up instead of being lost, and arrives in a burst when it
+     * restarts.
+     *
+     * That is not theoretical. On 2026-09-09 a lifecycle stall left the game
+     * screen taking taps with nothing collecting; twelve `OpenAchievements`
+     * events accumulated over eight minutes, then replayed 1.5ms apart when
+     * collection resumed, and the twelve navigations crashed NavController with
+     * "Attempted to pop Destination ... which is not the top of the back stack".
+     *
+     * `ShakeDetector` already carries this lesson in its own doc -- "a shake is
+     * only meaningful in the moment it happens" -- and it is the same mistake
+     * one layer up, in the base class every screen uses.
+     *
+     * The shelf life only ever bites when nothing is collecting. While a
+     * collector is attached, delivery is immediate and every event is
+     * microseconds old, so this cannot drop an event from a slow view model. It
+     * drops events from a stopped screen, which is the intent.
      */
-    val eventFlow = events.receiveAsFlow()
+    val eventFlow: Flow<E> = events.receiveAsFlow().mapNotNull { timed ->
+        val age = timed.sentAt.elapsedNow()
+        if (age > EventShelfLife) {
+            KLog.w(
+                "Dropping stale event ${timed.event::class.simpleName} " +
+                    "after ${age.inWholeMilliseconds}ms with nothing collecting"
+            )
+            null
+        } else {
+            timed.event
+        }
+    }
 
     /**
      * The current state value
@@ -187,7 +230,7 @@ abstract class SEAViewModel<S : Any, E : Any, A : Any>(
      */
     fun sendEvent(event: E) {
         KLog.i("Sending event ${event::class.simpleName}")
-        events.trySend(event)
+        events.trySend(TimedEvent(event, timeSource.markNow()))
     }
 
     /**
@@ -232,6 +275,27 @@ abstract class SEAViewModel<S : Any, E : Any, A : Any>(
 
     companion object {
         private const val STATE_KEY = "state"
+
+        /**
+         * How long an undelivered event stays worth delivering.
+         *
+         * Generous on purpose. This only has to be longer than the gap between a
+         * view model sending an event in `init` and the screen composing its
+         * collector, which is milliseconds, and shorter than a stall anybody
+         * would notice. It is not a tuning knob for how long a screen may be
+         * backgrounded: a screen that comes back after five seconds should not
+         * be replaying what it meant to do before it left.
+         */
+        private val EventShelfLife = 5.seconds
     }
 }
+
+/**
+ * An event and when it was sent, so [SEAViewModel.eventFlow] can tell a fresh
+ * event from one that has been sitting in the channel.
+ *
+ * A [TimeMark] rather than a wall-clock stamp: this measures an interval, and
+ * wall clocks jump backwards.
+ */
+private data class TimedEvent<E : Any>(val event: E, val sentAt: TimeMark)
 

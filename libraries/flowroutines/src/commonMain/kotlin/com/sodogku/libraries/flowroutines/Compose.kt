@@ -3,6 +3,7 @@ package com.sodogku.libraries.flowroutines
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.Lifecycle
+import com.sodogku.libraries.core.logging.KLog
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.sodogku.libraries.flowroutines.SEAViewModel
@@ -20,21 +21,22 @@ import kotlinx.coroutines.withContext
  * Observes on main immediate which ensures no emissions are missed
  */
 @Composable
-fun <T> ObserveWithLifecycle(flow: Flow<T>,  onItem: suspend (T) -> Unit) {
+fun <T> ObserveWithLifecycle(flow: Flow<T>, tag: String = "flow", onItem: suspend (T) -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(lifecycleOwner.lifecycle, flow) {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            withContext(Dispatchers.Main.immediate) {
-                flow.collect(onItem)
-            }
-        }
+        flow.collectLogging(
+            tag = tag,
+            lifecycle = lifecycleOwner.lifecycle,
+            state = Lifecycle.State.STARTED,
+            onItem = onItem,
+        )
     }
 }
 
 @Composable
 fun <T : Any> SEAViewModel<*, T, *>.ObserveEvents(onItem: suspend (T) -> Unit) {
-    ObserveWithLifecycle(eventFlow, onItem = onItem)
+    ObserveWithLifecycle(eventFlow, tag = "${this::class.simpleName} events", onItem = onItem)
 }
 
 /**
@@ -49,14 +51,16 @@ fun <T : Any> SEAViewModel<*, T, *>.ObserveEvents(onItem: suspend (T) -> Unit) {
  fun <T> Flow<T>.observeWithLifecycleIn(
     lifecycleOwner: Lifecycle,
     scope: CoroutineScope,
+    tag: String = "flow",
     onItem: suspend (T) -> Unit
 ) {
     scope.launch {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            withContext(Dispatchers.Main.immediate) {
-                collect(onItem)
-            }
-        }
+        collectLogging(
+            tag = tag,
+            lifecycle = lifecycleOwner,
+            state = Lifecycle.State.STARTED,
+            onItem = onItem,
+        )
     }
 }
 
@@ -69,14 +73,40 @@ fun <T : Any> SEAViewModel<*, T, *>.ObserveEvents(onItem: suspend (T) -> Unit) {
  *
  * Observes on main immediate which ensures no emissions are missed
  */
+/**
+ * Says out loud when lifecycle-gated collection starts and stops.
+ *
+ * Every one of these is a place the app goes quiet without going wrong: below
+ * STARTED the collector detaches, the producer keeps producing, and nothing in
+ * the logs says so. Chasing a stall on 2026-09-09 the only way to tell whether
+ * the lifecycle had dropped was to infer it from what had *stopped* appearing,
+ * which is a slow way to learn something the framework already knows.
+ *
+ * [tag] names the caller so two collectors on one screen are tellable apart.
+ */
+private suspend fun <T> Flow<T>.collectLogging(
+    tag: String,
+    lifecycle: Lifecycle,
+    state: Lifecycle.State,
+    onItem: suspend (T) -> Unit,
+) {
+    lifecycle.repeatOnLifecycle(state) {
+        KLog.i("Collection started for $tag (lifecycle reached $state)")
+        try {
+            withContext(Dispatchers.Main.immediate) {
+                collect(onItem)
+            }
+        } finally {
+            KLog.i("Collection stopped for $tag (lifecycle fell below $state)")
+        }
+    }
+}
+
 suspend fun <T> Flow<T>.observeWithLifecycle(
     state: Lifecycle.State = Lifecycle.State.STARTED,
     lifecycle: Lifecycle,
+    tag: String = "flow",
     onItem: suspend (T) -> Unit
 ) {
-    lifecycle.repeatOnLifecycle(state) {
-        withContext(Dispatchers.Main.immediate) {
-            collect(onItem)
-        }
-    }
+    collectLogging(tag = tag, lifecycle = lifecycle, state = state, onItem = onItem)
 }
