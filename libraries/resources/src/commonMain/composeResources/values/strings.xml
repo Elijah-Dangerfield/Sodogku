@@ -11,7 +11,14 @@
     <string name="game_rule_one_per_region">1 dog per color</string>
     <string name="game_rule_one_per_line">1 dog per row &amp; column</string>
     <string name="game_rule_no_touching">Dogs cannot touch</string>
-    <string name="game_sniff">Locate</string>
+    <!-- The two booster labels, keyed by the consumable and valued by what the
+         button says. They read backwards from the code names on purpose, and the
+         code names are the ones that are wrong: a *sniff* paints the squares a
+         dog cannot be on, which is a hint, and a *treat* runs HintFinder and
+         points at a square a dog belongs on, which is locating one. Renaming
+         `Consumable` would mean migrating persisted holdings and config keys, so
+         the labels carry the correction instead. -->
+    <string name="game_booster_sniff">Hint</string>
     <string name="game_won_title">Good dog!</string>
     <string name="game_lost_title">Out of bones</string>
     <string name="game_retry">Start over</string>
@@ -561,6 +568,6 @@
          Consumable type, the boosters.* config keys and the treats_used event
          all keep their old names on purpose: those are persisted, and renaming
          them would reset what players are holding. -->
-    <string name="game_hint">Hint</string>
+    <string name="game_booster_treat">Locate</string>
     <string name="game_bones_refill">Refill Bones</string>
 </resources>

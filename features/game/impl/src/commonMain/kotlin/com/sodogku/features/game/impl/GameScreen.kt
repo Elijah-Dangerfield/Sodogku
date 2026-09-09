@@ -83,8 +83,8 @@ import sodogku.libraries.resources.generated.resources.game_rule_one_per_line
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_region
 import sodogku.libraries.resources.generated.resources.game_bones_remaining
 import sodogku.libraries.resources.generated.resources.game_bones_refill
-import sodogku.libraries.resources.generated.resources.game_sniff
-import sodogku.libraries.resources.generated.resources.game_hint
+import sodogku.libraries.resources.generated.resources.game_booster_sniff
+import sodogku.libraries.resources.generated.resources.game_booster_treat
 import kotlin.math.abs
 import kotlin.math.sin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -833,7 +833,7 @@ private fun BoardClock(elapsed: StateFlow<Long>, modifier: Modifier = Modifier) 
         // it, and Normal at that size read as a stray number rather than as a
         // reading; Medium is the least the type scale can do and still look
         // deliberate.
-        typography = AppTheme.typography.Caption.C300.Medium,
+        typography = AppTheme.typography.Body.B500.Medium,
         color = AppTheme.colors.textSecondary,
         modifier = modifier.padding(top = Dimension.D400),
     )
@@ -862,7 +862,7 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
         itemVerticalAlignment = Alignment.Top,
     ) {
         BoardControl(
-            label = stringResource(Res.string.game_sniff),
+            label = stringResource(Res.string.game_booster_sniff),
             count = state.sniffs,
             modifier = Modifier.focusTarget(SniffFocusKey),
             enabled = playing,
@@ -890,17 +890,17 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
             // squares — it rules cells *out*, which is a search and not a
             // delivery. The plain resting dog is what a placement looks like,
             // and that is the Hint beside it.
-            Dog(pose = DogPose.Focused, size = BoardControlDog)
+            BoardControlPaw(color = SniffColor, enabled = playing)
         }
         BoardControl(
-            label = stringResource(Res.string.game_hint),
+            label = stringResource(Res.string.game_booster_treat),
             count = state.treats,
             modifier = Modifier.focusTarget(TreatFocusKey),
             enabled = playing,
             adBadge = state.tapPlaysAd(Consumable.Treat),
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Treat)) },
         ) {
-            BoardControlPaw(color = TreatColor, enabled = playing)
+            Dog(pose = DogPose.Focused, size = BoardControlDog)
         }
         val bonesRefillable = state.bonesRefillable
         BoardControl(
@@ -956,6 +956,12 @@ private const val WEIGHT_FILL = 1f
  * dog" long before they read either word, and that only works if the colours
  * never move. Both are chosen against the cream page and against each other for
  * anyone who cannot separate red from green.
+ *
+ * The colours were right the whole time; the *words* on top of them were
+ * swapped. Blue is the sniff, which paints squares a dog cannot be on, and that
+ * is a hint. Orange is the treat, which points at a square a dog belongs on,
+ * and that is locating one. The labels now match the colours instead of
+ * contradicting them.
  */
 private val SniffColor = ColorResource.Blue500.color
 
