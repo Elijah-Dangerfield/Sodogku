@@ -1543,7 +1543,13 @@ class GameViewModel(
             "mode" to modeName,
             "auto_mark" to autoMark,
         )
-        val streak = if (isDaily) {
+        // The streak, and the one write that feeds it. Before either branch
+        // below, because both of them are a finished board and the streak does
+        // not care which: it is about turning up, not about which puzzle.
+        Catching { streak.onBoardCompleted() }
+            .logOnFailure { "Failed to record today as played" }
+
+        val streakDays = if (isDaily) {
             recordDailyClear(banked, paws, duration)
         } else {
             // Every metric here is a *best*, not a last: the repository keeps the
@@ -1564,7 +1570,7 @@ class GameViewModel(
             duration,
             completed = true,
             strikes = strikesThisAttempt,
-            dailyStreakDays = streak,
+            dailyStreakDays = streakDays,
         )
         // Before the sheet is built, so the sheet can say so and the count it
         // shows already includes the Treat. `progress.onCompleted` above has
@@ -1591,7 +1597,7 @@ class GameViewModel(
                 elapsedMs = duration,
                 unlockedThrough = maxOf(it.unlockedThrough, unlocked),
                 newBadges = earnedBadges,
-                dailyStreak = streak,
+                dailyStreak = streakDays,
                 treatAwarded = reward,
                 standing = standing,
             )
@@ -1642,14 +1648,18 @@ class GameViewModel(
      * After the win sheet's state is written, so closing the ceremony lands
      * back on the finished board rather than on nothing.
      *
-     * Not on the daily: the daily is the thing the streak is *about*, so a
-     * celebration on top of the daily's own recap would be two pages about one
-     * board. There is deliberately no rehearsal check — `win` is already gated
-     * on `!rehearsing` and this is only reachable from inside it, so a second
-     * guard here would be a line no test could ever fail.
+     * **Daily boards come through here too now.** They used to be excluded, on
+     * the grounds that the daily was what the streak was about and a
+     * celebration on top of the daily's recap would be two pages about one
+     * board. The streak is fed by any board now, so excluding the daily would
+     * mean the one board a player came back specifically to do was the one that
+     * never acknowledged their run.
+     *
+     * There is deliberately no rehearsal check — `win` is already gated on
+     * `!rehearsing` and this is only reachable from inside it, so a second guard
+     * here would be a line no test could ever fail.
      */
     private suspend fun GameAction.offerStreakCeremony() {
-        if (isDaily) return
         val prompt = Catching { streak.pendingPrompt() }
             .logOnFailure { "Failed to read the streak prompt" }
             .getOrNull()

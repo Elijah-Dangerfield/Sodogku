@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.LocalDate
+import kotlin.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -113,8 +114,12 @@ private class RecordingStreak : StreakRepository {
         longest = 0,
         today = LocalDate(2026, 9, 7),
         days = emptyList(),
-        enabled = true,
+        playedToday = true,
+        untilTomorrow = Duration.ZERO,
     )
+
+    override suspend fun onBoardCompleted() = Unit
+
 
     override suspend fun pendingPrompt(): StreakPrompt = StreakPrompt.None
 

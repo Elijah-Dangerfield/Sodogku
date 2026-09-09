@@ -1,16 +1,12 @@
 package com.sodogku.libraries.progress.impl.streak
 
-import com.sodogku.libraries.config.AppConfigMap
-import com.sodogku.libraries.config.values.DailyEnabled
-import com.sodogku.libraries.config.values.FeatureDailyChallenge
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
 import com.sodogku.libraries.progress.ProgressRepository
-import com.sodogku.libraries.progress.daily.DailyOutcome
 import com.sodogku.libraries.progress.daily.DeviceTimeZone
-import com.sodogku.libraries.progress.db.DailyResultDao
-import com.sodogku.libraries.progress.db.DailyResultEntity
+import com.sodogku.libraries.progress.db.PlayDayDao
+import com.sodogku.libraries.progress.db.PlayDayEntity
 import com.sodogku.libraries.progress.streak.StreakDayState
 import com.sodogku.libraries.progress.streak.StreakPrompt
 import com.sodogku.libraries.progress.streak.StreakSummary
@@ -38,7 +34,7 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTime::class)
 class StreakRepositoryImplTest : CoroutineTest() {
 
-    private val dao = FakeDailyResultDao()
+    private val dao = FakePlayDayDao()
     private val prompts = FakeStreakPromptCache()
     private val progress = FakeProgressRepository()
     private val clock = MutableClock(Instant.parse("2026-09-07T23:30:00Z"))
@@ -47,7 +43,7 @@ class StreakRepositoryImplTest : CoroutineTest() {
     @Test
     fun theCalendarIsBuiltFromThePlayersLocalDate() = runUnitTest {
         // 23:30 UTC on Monday the 7th is already Tuesday the 8th in Berlin.
-        dao.put(LocalDate(2026, 9, 8), DailyOutcome.Completed)
+        dao.put(LocalDate(2026, 9, 8))
 
         zone = TimeZone.UTC
         val inUtc = repository().summary()
@@ -127,8 +123,8 @@ class StreakRepositoryImplTest : CoroutineTest() {
     }
 
     @Test
-    fun theIntentionIsDueOnTheThirdClearAndOnlyOnce() = runUnitTest {
-        progress.completedLevels = 3
+    fun theIntentionIsDueOnTheSecondBoardAndOnlyOnce() = runUnitTest {
+        progress.completedLevels = 2
         val repo = repository()
 
         assertEquals(StreakPrompt.Intention, repo.pendingPrompt())
@@ -144,18 +140,18 @@ class StreakRepositoryImplTest : CoroutineTest() {
 
     @Test
     fun skippedLevelsAreNotClears() = runUnitTest {
-        progress.completedLevels = 2
+        progress.completedLevels = 1
         progress.skippedLevels = 5
 
         assertEquals(
             StreakPrompt.None,
             repository().pendingPrompt(),
-            "skipping past three boards is not choosing to keep playing them",
+            "skipping past boards is not choosing to keep playing them",
         )
     }
 
     @Test
-    fun aMilestoneIsOfferedOnceAndRecordedAsShown() = runUnitTest {
+    fun aCelebrationIsOfferedOnceAndRecordedAsShown() = runUnitTest {
         seed(completedDaysBack = (0..6).toList())
         prompts.value = StreakPromptState(intentionShown = true)
         val repo = repository()
@@ -170,47 +166,43 @@ class StreakRepositoryImplTest : CoroutineTest() {
     }
 
     @Test
-    fun playingTheDailyRetiresTheIntentionWithoutShowingIt() = runUnitTest {
-        progress.completedLevels = 10
-        seed(completedDaysBack = listOf(0))
+    fun finishingAnyBoardMarksTheDay() = runUnitTest {
+        // The whole point of the decoupling: no daily involved anywhere.
+        val repo = repository()
+        assertEquals(0, repo.summary().current)
 
-        assertEquals(StreakPrompt.None, repository().pendingPrompt())
-        assertTrue(!prompts.value.intentionShown, "nothing was shown, so nothing was recorded")
+        repo.onBoardCompleted()
+
+        val after = repo.summary()
+        assertEquals(1, after.current)
+        assertTrue(after.playedToday)
     }
 
     @Test
-    fun aLostDailyCountsAsHavingStarted() = runUnitTest {
-        progress.completedLevels = 10
-        dao.put(LocalDate(2026, 9, 6), DailyOutcome.Failed)
+    fun asecondBoardOnTheSameDayChangesNothing() = runUnitTest {
+        val repo = repository()
+        repo.onBoardCompleted()
+        repo.onBoardCompleted()
+        repo.onBoardCompleted()
 
+        assertEquals(1, repo.summary().current, "a day is a day however many boards it held")
+    }
+
+    @Test
+    fun theCountdownIsToTheNextLocalMidnight() = runUnitTest {
+        // 21:00 UTC is 23:00 in Berlin, which is two hours from UTC's midnight
+        // and one from Berlin's.
+        clock.set(Instant.parse("2026-09-07T21:00:00Z"))
+
+        zone = TimeZone.UTC
+        assertEquals(3, repository().summary().untilTomorrow.inWholeHours)
+
+        zone = TimeZone.of("Europe/Berlin")
         assertEquals(
-            StreakPrompt.None,
-            repository().pendingPrompt(),
-            "they turned up and ran out of bones; telling them to start would deny the attempt",
+            1,
+            repository().summary().untilTomorrow.inWholeHours,
+            "the countdown is to the player's midnight, not to UTC's",
         )
-    }
-
-    @Test
-    fun aBridgedDayIsNotHavingPlayed() = runUnitTest {
-        progress.completedLevels = 10
-        dao.put(LocalDate(2026, 9, 6), DailyOutcome.Frozen)
-
-        assertEquals(
-            StreakPrompt.Intention,
-            repository().pendingPrompt(),
-            "a frozen day is a day nobody played, whoever paid for it",
-        )
-    }
-
-    @Test
-    fun killSwitchAndFeatureFlagBothCloseTheStreak() = runUnitTest {
-        progress.completedLevels = 3
-
-        assertTrue(repository().summary().enabled)
-        assertTrue(!repository(dailyEnabled = false).summary().enabled)
-        assertTrue(!repository(featureEnabled = false).summary().enabled)
-        assertEquals(StreakPrompt.None, repository(dailyEnabled = false).pendingPrompt())
-        assertEquals(StreakPrompt.None, repository(featureEnabled = false).pendingPrompt())
     }
 
     private fun StreakSummary.dayOn(date: LocalDate) =
@@ -219,7 +211,7 @@ class StreakRepositoryImplTest : CoroutineTest() {
     private fun seed(completedDaysBack: List<Int>) {
         val today = LocalDate(2026, 9, 7)
         completedDaysBack.forEach { back ->
-            dao.put(today.minusDays(back), DailyOutcome.Completed)
+            dao.put(today.minusDays(back))
         }
     }
 
@@ -232,25 +224,12 @@ class StreakRepositoryImplTest : CoroutineTest() {
     private fun LocalDate.minusOneDay(): LocalDate =
         LocalDate.fromEpochDays(toEpochDays() - 1)
 
-    private fun repository(
-        dailyEnabled: Boolean = true,
-        featureEnabled: Boolean = true,
-    ) = StreakRepositoryImpl(
+    private fun repository() = StreakRepositoryImpl(
         dao = dao,
         progress = progress,
         prompts = prompts,
         clock = clock,
         timeZone = DeviceTimeZone { zone },
-        dailyEnabled = DailyEnabled(
-            object : AppConfigMap() {
-                override val map = mapOf("daily" to mapOf("enabled" to dailyEnabled))
-            },
-        ),
-        featureEnabled = FeatureDailyChallenge(
-            object : AppConfigMap() {
-                override val map = mapOf("features" to mapOf("dailyChallenge" to featureEnabled))
-            },
-        ),
     )
 }
 
@@ -263,38 +242,31 @@ private class MutableClock(private var current: Instant) : Clock {
     }
 }
 
-private class FakeDailyResultDao : DailyResultDao {
+private class FakePlayDayDao : PlayDayDao {
 
-    private val rows = MutableStateFlow<Map<String, DailyResultEntity>>(emptyMap())
+    private val rows = MutableStateFlow<Set<String>>(emptySet())
 
-    override suspend fun insertIfAbsent(row: DailyResultEntity): Long {
-        if (rows.value.containsKey(row.date)) return -1L
-        rows.value = rows.value + (row.date to row)
-        return 1L
+    override suspend fun insertIfAbsent(row: PlayDayEntity): Long {
+        val existed = row.date in rows.value
+        rows.value = rows.value + row.date
+        return if (existed) -1L else 1L
     }
 
-    override fun observeAll(): Flow<List<DailyResultEntity>> = rows.map { it.values.sortedBy { r -> r.date } }
+    override fun observeAll(): Flow<List<PlayDayEntity>> =
+        rows.map { dates -> dates.sorted().map(::PlayDayEntity) }
 
-    override suspend fun all(): List<DailyResultEntity> = rows.value.values.sortedBy { it.date }
+    override suspend fun all(): List<PlayDayEntity> = rows.value.sorted().map(::PlayDayEntity)
 
     override suspend fun deleteAll() {
-        rows.value = emptyMap()
+        rows.value = emptySet()
     }
 
-    fun put(date: LocalDate, outcome: DailyOutcome) {
-        val row = DailyResultEntity(
-            date = date.toString(),
-            levelIndex = 0,
-            outcome = outcome.name,
-            score = 0,
-            paws = 0,
-            timeMs = 0,
-        )
-        rows.value = rows.value + (row.date to row)
+    fun put(date: LocalDate) {
+        rows.value = rows.value + date.toString()
     }
 
     fun clear() {
-        rows.value = emptyMap()
+        rows.value = emptySet()
     }
 }
 

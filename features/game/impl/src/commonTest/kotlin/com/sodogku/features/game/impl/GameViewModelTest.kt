@@ -76,6 +76,7 @@ import com.sodogku.libraries.sodogku.AppEvent
 import com.sodogku.libraries.sodogku.AppEventBus
 import com.sodogku.libraries.sodogku.AppEvents
 import com.sodogku.libraries.sodogku.ConsumableRefillTo
+import kotlin.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -688,9 +689,12 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun clearingTheDailyDoesNotOpenTheStreakOnTopOfItsOwnRecap() = runUnitTest {
-        // The daily is what the streak is about, so celebrating it over the
-        // daily's own recap would be two pages about one board.
+    fun clearingTheDailyCelebratesTheStreakLikeAnyOtherBoard() = runUnitTest {
+        // It used to be excluded, back when the streak *was* the daily and a
+        // celebration over the daily's own recap was two pages about one board.
+        // Now that any board feeds the streak, excluding the daily would make
+        // the one board a player came back specifically to do the only one that
+        // never acknowledged their run.
         val vm = viewModel(
             isDaily = true,
             daily = FakeDaily(levelId = DailyLevel),
@@ -702,9 +706,21 @@ class GameViewModelTest : CoroutineTest() {
 
         assertTrue(events.any { it == GameEvent.Won }, "the daily was never won, so this proves nothing")
         assertTrue(
-            events.none { it is GameEvent.OpenStreak },
-            "the daily opened a streak celebration over its own recap: $events",
+            events.any { it is GameEvent.OpenStreak },
+            "the daily did not celebrate the streak it just fed: $events",
         )
+    }
+
+    @Test
+    fun everyClearedBoardMarksTheDayWhicheverBoardItWas() = runUnitTest {
+        // The write the streak is folded from. It has to happen for a campaign
+        // board too, which is the whole point of the decoupling: six campaign
+        // clears on a Tuesday used to do nothing for a streak.
+        val recording = SilentStreak(StreakPrompt.None)
+
+        solveCurrent(viewModel(streak = recording))
+
+        assertEquals(1, recording.boardsRecorded, "a campaign clear did not count as turning up")
     }
 
     @Test
@@ -4440,6 +4456,13 @@ class GameViewModelTest : CoroutineTest() {
         val shown = mutableListOf<StreakPrompt>()
         override fun observe(): Flow<StreakSummary> = flowOf(empty)
         override suspend fun summary(): StreakSummary = empty
+        var boardsRecorded = 0
+            private set
+
+        override suspend fun onBoardCompleted() {
+            boardsRecorded++
+        }
+
         override suspend fun pendingPrompt(): StreakPrompt = prompt
         override suspend fun onPromptShown(prompt: StreakPrompt) { shown += prompt }
         override suspend fun reset() = Unit
@@ -4449,7 +4472,8 @@ class GameViewModelTest : CoroutineTest() {
             longest = longest,
             today = LocalDate(2026, 1, 1),
             days = emptyList(),
-            enabled = true,
+            playedToday = true,
+            untilTomorrow = Duration.ZERO,
         )
     }
 
@@ -4543,6 +4567,8 @@ class GameViewModelTest : CoroutineTest() {
     private class BrokenStreak : StreakRepository {
         override fun observe(): Flow<StreakSummary> = emptyFlow()
         override suspend fun summary(): StreakSummary = error("the streak tables are gone")
+        override suspend fun onBoardCompleted() = Unit
+
         override suspend fun pendingPrompt(): StreakPrompt = StreakPrompt.None
         override suspend fun onPromptShown(prompt: StreakPrompt) = Unit
         override suspend fun reset() = Unit

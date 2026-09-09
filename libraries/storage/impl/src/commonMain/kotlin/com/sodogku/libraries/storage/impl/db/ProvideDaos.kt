@@ -3,6 +3,7 @@ package com.sodogku.libraries.storage.impl.db
 import com.sodogku.libraries.achievements.db.AchievementDao
 import com.sodogku.libraries.progress.db.DailyResultDao
 import com.sodogku.libraries.progress.db.LevelProgressDao
+import com.sodogku.libraries.progress.db.PlayDayDao
 import com.sodogku.libraries.sodogku.storage.db.ClearableDao
 import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataDao
 import me.tatarka.inject.annotations.Inject
@@ -56,3 +57,15 @@ class ProvideDailyResultDao @Inject constructor(
 class ProvideAchievementDao @Inject constructor(
     provider: AppDatabaseProvider
 ) : AchievementDao by provider.database.achievementDao()
+
+/**
+ * And again, most sharply of all. `play_day` is the streak: not a cached count
+ * but the list of days it is folded from. There is no server copy and no
+ * account, so deleting a row here removes a day the player actually turned up,
+ * permanently, with nothing able to prove it happened.
+ */
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = PlayDayDao::class)
+class ProvidePlayDayDao @Inject constructor(
+    provider: AppDatabaseProvider
+) : PlayDayDao by provider.database.playDayDao()

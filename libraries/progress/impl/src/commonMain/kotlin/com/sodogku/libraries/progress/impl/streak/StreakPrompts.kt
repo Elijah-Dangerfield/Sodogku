@@ -11,73 +11,69 @@ import kotlinx.serialization.Serializable
  */
 internal fun promptFor(
     streak: Int,
-    campaignClears: Int,
-    dailyPlayedEver: Boolean,
-    dailyEnabled: Boolean,
+    boardsCleared: Int,
     state: StreakPromptState,
 ): StreakPrompt = when {
-    // A ceremony for a feature that is switched off is the worst interruption
-    // available: it asks for a commitment and then leads nowhere.
-    !dailyEnabled -> StreakPrompt.None
+    // The intention moment outranks a celebration. They cannot both be due in
+    // practice, since the intention fires on the second board ever and a
+    // celebration needs a run of two days, but the order says which wins rather
+    // than leaving it to whichever branch is written first.
+    intentionIsDue(boardsCleared, state) -> StreakPrompt.Intention
 
-    // The intention moment outranks a celebration, and the two cannot both be
-    // due anyway, because a player with a streak has played a daily.
-    intentionIsDue(campaignClears, dailyPlayedEver, state) -> StreakPrompt.Intention
-
-    isMilestone(streak) && streak != state.celebratedStreak -> StreakPrompt.Celebrate(streak)
+    celebrationIsDue(streak, state) -> StreakPrompt.Celebrate(streak)
 
     else -> StreakPrompt.None
 }
 
 /**
- * After [IntentionAfterClears] cleared campaign levels, once, and only to a
- * player who has never played a daily.
+ * After the second board, once, ever.
  *
- * **Three, and the number is the whole design.** One clear is the first thirty
- * seconds of the app, before the game has earned the right to ask for anything,
- * and a full-screen interruption there is indistinguishable from an ad. Ten is
- * past the point where a player has decided; whatever they were going to do
- * about coming back, they have already done it. Three is the first moment the
- * player has *chosen* to keep playing twice, is still inside their first
- * session, and still has time to spend the streak they just started.
+ * **Two, and the number is the whole design.** The first board is a practice
+ * run: the player is still working out what the game *is*, and a full-screen
+ * page asking them to come back every day is indistinguishable from an ad. The
+ * second board is the first one they chose. That is the earliest moment the ask
+ * is honest, and it is still inside the first session, which is where a habit is
+ * won or lost.
  *
- * The "never played a daily" clause is not belt and braces. The daily card sits
- * in the level pane from level one, so a curious player can be four days into a
- * streak before they clear their third campaign board, and "tap to start your
- * streak" would be telling them something they can see is false.
+ * It used to be three, and it used to also require that the player had never
+ * played a daily, because the streak was the daily's. Neither clause survives
+ * the streak being about turning up: there is no daily to have played, and the
+ * player already has a streak of one by the time they see this, because
+ * finishing those two boards is what a streak is made of.
  */
-private fun intentionIsDue(
-    campaignClears: Int,
-    dailyPlayedEver: Boolean,
-    state: StreakPromptState,
-): Boolean = !state.intentionShown && !dailyPlayedEver && campaignClears >= IntentionAfterClears
+private fun intentionIsDue(boardsCleared: Int, state: StreakPromptState): Boolean =
+    !state.intentionShown && boardsCleared >= IntentionAfterBoards
 
 /**
- * Which runs get a page: 3, 7, 14, 30, and every 30 after that.
+ * Every day the run grows, after the first.
  *
- * Thinning out fast is the point. Duolingo can celebrate every week because the
- * streak *is* its product; here the puzzle is the product and the streak is a
- * reason to come back, so a page that appears on day 4, 5 and 6 stops being a
- * reward and becomes something standing between the player and the next board.
+ * Deliberately not milestones any more. The old rule fired on 3, 7, 14 and every
+ * 30, on the reasoning that the puzzle is the product and a page between the
+ * player and the next board stops being a reward. That reasoning holds for a
+ * page you have to *dismiss*; it does not hold for the one being built here,
+ * which is the streak going up, in front of you, and then getting out of the way.
+ * A run that is only acknowledged four times a month is a run nobody is keeping
+ * for its own sake.
  *
- * Three is the first run worth noticing and lands inside the first week, which
- * is where a habit is won or lost. Seven is the number people say out loud.
- * After thirty the run is its own reward and a month is a decent wait for the
- * next page.
+ * A streak of one is excluded because the intention moment is already that
+ * conversation, and two pages about the same day is one too many.
+ *
+ * [StreakPromptState.celebratedStreak] is what stops it firing twice for the
+ * same day: the number only moves when the date does.
  */
-internal fun isMilestone(streak: Int): Boolean =
-    streak in EarlyMilestones || (streak >= MonthlyMilestoneFrom && streak % MonthlyMilestoneFrom == 0)
+private fun celebrationIsDue(streak: Int, state: StreakPromptState): Boolean =
+    streak >= FirstCelebratedStreak && streak != state.celebratedStreak
 
 /**
  * What has already been said, and the only streak state that is stored rather
  * than folded.
  *
  * It has to be stored: "we have shown this once" is not recoverable from the
- * daily rows, and the alternative, inferring it from the streak itself,
- * re-fires a celebration every time the page is opened on a milestone day.
+ * play days, and the alternative, inferring it from the streak itself, re-fires
+ * a celebration every time the app is reopened on the same day.
  *
  * Deliberately not part of `AppData`. These two fields are machinery and neither
- * means anything without [isMilestone] beside it, which is the same argument
+ * means anything without the rules above beside it, which is the same argument
  * `SkipState` makes for living next door rather than in the shared blob.
  */
 @Serializable
@@ -87,17 +83,16 @@ data class StreakPromptState(
     /**
      * The streak the last celebration was for, or `0`.
      *
-     * A single number rather than a set of milestones already seen, and that is
+     * A single number rather than a set of days already celebrated, and that is
      * a decision: a run that breaks at 30 and climbs back to 7 gets its page
      * again, because it is a different run and the player did the work twice. A
-     * set would silently retire each milestone for the life of the install.
+     * set would silently retire each number for the life of the install.
      */
     val celebratedStreak: Int = 0,
 )
 
-/** Cleared campaign levels before the intention moment is offered. */
-internal const val IntentionAfterClears = 3
+/** Boards cleared before the intention moment is offered. */
+internal const val IntentionAfterBoards = 2
 
-private val EarlyMilestones = setOf(3, 7, 14)
-
-private const val MonthlyMilestoneFrom = 30
+/** The first run worth a page. One is the intention moment's job. */
+internal const val FirstCelebratedStreak = 2

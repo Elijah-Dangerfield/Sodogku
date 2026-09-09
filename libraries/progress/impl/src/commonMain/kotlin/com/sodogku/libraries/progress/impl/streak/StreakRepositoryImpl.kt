@@ -1,15 +1,11 @@
 package com.sodogku.libraries.progress.impl.streak
 
-import com.sodogku.libraries.config.values.DailyEnabled
-import com.sodogku.libraries.config.values.FeatureDailyChallenge
 import com.sodogku.libraries.progress.LevelState
 import com.sodogku.libraries.progress.ProgressRepository
-import com.sodogku.libraries.progress.daily.DailyOutcome
 import com.sodogku.libraries.progress.daily.DeviceTimeZone
-import com.sodogku.libraries.progress.db.DailyResultDao
+import com.sodogku.libraries.progress.db.PlayDayDao
+import com.sodogku.libraries.progress.db.PlayDayEntity
 import com.sodogku.libraries.progress.impl.daily.dayOf
-import com.sodogku.libraries.progress.impl.daily.streakOn
-import com.sodogku.libraries.progress.impl.daily.toOutcomes
 import com.sodogku.libraries.progress.impl.daily.untilNextDay
 import com.sodogku.libraries.progress.streak.StreakPrompt
 import com.sodogku.libraries.progress.streak.StreakRepository
@@ -30,45 +26,51 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
- * The streak page's view of the same `daily_result` rows the card reads.
+ * The streak, folded from `play_day`.
  *
- * It goes to the dao rather than to `DailyRepository` on purpose. The clock and
+ * **Not from `daily_result` any more, and that is the whole change.** The streak
+ * used to be "days you played the daily", which quietly made two unrelated ideas
+ * into one: a player who cleared six campaign boards on a Tuesday had done
+ * nothing for their streak. The daily is only a way to know you are solving the
+ * same board as everybody else. The streak is about turning up, so any finished
+ * board keeps it.
+ *
+ * It goes to the dao rather than to another repository on purpose. The clock and
  * the zone are the two things every date bug in this app has come from, and
  * borrowing today's date from another object's snapshot would put the calendar
- * one indirection away from the seam that makes it testable. Both take the zone
- * as an argument here, exactly as the daily's own arithmetic does.
+ * one indirection away from the seam that makes it testable.
  *
- * The current streak is `streakOn`, the daily's fold, called rather than
- * reimplemented. Two answers to "how long is the streak" is one more than the
- * app can afford.
+ * It also no longer reads the daily's config. A streak that switched itself off
+ * because the daily was disabled made sense when the daily was the only way to
+ * feed it, and is now just a way to lose a run to a remote flag.
  */
 @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
 @Inject
 class StreakRepositoryImpl(
-    private val dao: DailyResultDao,
+    private val dao: PlayDayDao,
     private val progress: ProgressRepository,
     private val prompts: StreakPromptCache,
     private val clock: Clock,
     private val timeZone: DeviceTimeZone,
-    private val dailyEnabled: DailyEnabled,
-    private val featureEnabled: FeatureDailyChallenge,
 ) : StreakRepository {
 
     override fun observe(): Flow<StreakSummary> = dayChanges()
-        .flatMapLatest { day -> dao.observeAll().map { rows -> summaryOn(day, rows.toOutcomes()) } }
+        .flatMapLatest { day -> dao.observeAll().map { rows -> summaryOn(day, rows.toDates()) } }
         .distinctUntilChanged()
 
-    override suspend fun summary(): StreakSummary = summaryOn(today(), dao.all().toOutcomes())
+    override suspend fun summary(): StreakSummary = summaryOn(today(), dao.all().toDates())
+
+    override suspend fun onBoardCompleted() {
+        dao.insertIfAbsent(PlayDayEntity(date = today().toString()))
+    }
 
     override suspend fun pendingPrompt(): StreakPrompt {
-        val outcomes = dao.all().toOutcomes()
+        val played = dao.all().toDates()
         return promptFor(
-            streak = streakOn(today(), outcomes),
-            campaignClears = progress.all().count { it.state == LevelState.Completed },
-            dailyPlayedEver = outcomes.values.any { it.wasPlayed() },
-            dailyEnabled = enabled(),
+            streak = playStreakOn(today(), played),
+            boardsCleared = progress.all().count { it.state == LevelState.Completed },
             state = prompts.get(),
         )
     }
@@ -85,12 +87,13 @@ class StreakRepositoryImpl(
         prompts.clear()
     }
 
-    private fun summaryOn(day: LocalDate, outcomes: Map<LocalDate, DailyOutcome>) = StreakSummary(
-        current = streakOn(day, outcomes),
-        longest = longestStreakOn(day, outcomes),
+    private fun summaryOn(day: LocalDate, played: Set<LocalDate>) = StreakSummary(
+        current = playStreakOn(day, played),
+        longest = longestPlayStreak(played),
         today = day,
-        days = calendarOn(day, outcomes, WeeksShown),
-        enabled = enabled(),
+        days = playCalendarOn(day, played, WeeksShown),
+        playedToday = day in played,
+        untilTomorrow = untilNextDay(clock.now(), timeZone.current()),
     )
 
     /** Mirrors `DailyRepositoryImpl.dayChanges`: the zone is re-read every pass. */
@@ -104,19 +107,10 @@ class StreakRepositoryImpl(
     }
 
     private fun today(): LocalDate = dayOf(clock.now(), timeZone.current())
-
-    private fun enabled(): Boolean = dailyEnabled() && featureEnabled()
 }
 
-/**
- * Whether the player actually sat down to this day, as opposed to buying it.
- *
- * A loss counts. Somebody who opened the daily and ran out of bones has started
- * their streak in every sense the intention moment cares about, and telling them
- * to start one would be telling them their attempt did not happen.
- */
-private fun DailyOutcome.wasPlayed(): Boolean =
-    this == DailyOutcome.Completed || this == DailyOutcome.Failed
+private fun List<PlayDayEntity>.toDates(): Set<LocalDate> =
+    mapTo(mutableSetOf()) { LocalDate.parse(it.date) }
 
 /**
  * Five weeks of calendar: the current week and the four behind it.

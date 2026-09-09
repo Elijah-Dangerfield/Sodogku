@@ -1,0 +1,138 @@
+package com.sodogku.libraries.progress.impl.streak
+
+import com.sodogku.libraries.progress.streak.StreakDayState
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+
+/**
+ * The streak, folded from the days a board was finished.
+ *
+ * Replaces `StreakFoldTest`, which tested the same questions against the daily's
+ * four outcomes. The rules that survived the move are here; the ones that did
+ * not were about a daily being failed or frozen, which a streak measured in
+ * "did you turn up" has no opinion on.
+ */
+class PlayStreakTest {
+
+    @Test
+    fun aRunEndingTodayIsCounted() {
+        val played = daysBackFrom(Today, 5)
+
+        assertEquals(5, playStreakOn(Today, played))
+    }
+
+    @Test
+    fun todayNotYetPlayedDoesNotBreakTheRun() {
+        // The day is not over. A player opening the app at breakfast on day nine
+        // has a streak of eight, and telling them zero would be the app breaking
+        // a run they still have hours to keep.
+        val played = daysBackFrom(Today.minus(DatePeriod(days = 1)), 8)
+
+        assertEquals(8, playStreakOn(Today, played))
+    }
+
+    @Test
+    fun aGapEndsTheRun() {
+        val played = daysBackFrom(Today, 3) + daysBackFrom(Today.minus(DatePeriod(days = 4)), 10)
+
+        assertEquals(3, playStreakOn(Today, played), "the run stops at the missing day")
+    }
+
+    @Test
+    fun aPlayerWhoHasNeverPlayedHasNothing() {
+        assertEquals(0, playStreakOn(Today, emptySet()))
+        assertEquals(0, longestPlayStreak(emptySet()))
+    }
+
+    @Test
+    fun onlyYesterdayIsAStreakOfOne() {
+        // The boundary of the "today does not count against you" rule. One more
+        // day of not playing and this is zero.
+        assertEquals(1, playStreakOn(Today, setOf(Today.minus(DatePeriod(days = 1)))))
+        assertEquals(0, playStreakOn(Today, setOf(Today.minus(DatePeriod(days = 2)))))
+    }
+
+    @Test
+    fun theLongestRunIsFoundAnywhereInHistory() {
+        val old = daysBackFrom(Today.minus(DatePeriod(days = 40)), 9)
+        val current = daysBackFrom(Today, 3)
+
+        assertEquals(9, longestPlayStreak(old + current))
+    }
+
+    @Test
+    fun theLongestRunIsNeverShorterThanTheCurrentOne() {
+        // The property the old page depended on: a record smaller than the run
+        // you are looking at is a page that opens by contradicting itself.
+        for (length in 1..30) {
+            val played = daysBackFrom(Today, length)
+            assertTrue(
+                longestPlayStreak(played) >= playStreakOn(Today, played),
+                "a run of $length reported a shorter record",
+            )
+        }
+    }
+
+    @Test
+    fun daysInTheFutureAreNotARun() {
+        // Clocks go backwards, from a timezone change or a player fiddling with
+        // the date. Rows ahead of today must not count toward a run ending today.
+        val timeTravelled = daysBackFrom(Today.plus(DatePeriod(days = 5)), 3)
+
+        assertEquals(0, playStreakOn(Today, timeTravelled))
+    }
+
+    @Test
+    fun theCalendarIsWholeWeeksStartingOnMonday() {
+        val days = playCalendarOn(Today, emptySet(), weeks = 5)
+
+        assertEquals(35, days.size)
+        assertEquals(DayOfWeek.MONDAY, days.first().date.dayOfWeek)
+        assertEquals(DayOfWeek.SUNDAY, days.last().date.dayOfWeek)
+        assertEquals(1, days.count { it.isToday })
+    }
+
+    @Test
+    fun theCalendarMarksPlayedMissedAndFuture() {
+        val played = setOf(Today, Today.minus(DatePeriod(days = 1)))
+        val days = playCalendarOn(Today, played, weeks = 1)
+
+        val byDate = days.associateBy { it.date }
+        assertEquals(StreakDayState.Completed, byDate.getValue(Today).state)
+        assertEquals(StreakDayState.Completed, byDate.getValue(Today.minus(DatePeriod(days = 2 - 1))).state)
+        assertEquals(
+            StreakDayState.Missed,
+            byDate.getValue(Today.minus(DatePeriod(days = 2))).state,
+            "a day before today with no row is missed",
+        )
+        assertTrue(
+            days.filter { it.date > Today }.all { it.state == StreakDayState.Future },
+            "days after today are holes, not misses",
+        )
+    }
+
+    @Test
+    fun theCalendarAlwaysContainsToday() {
+        // Swept across a whole week, because the Monday-first arithmetic is
+        // exactly the kind that is right six days out of seven.
+        for (offset in 0..6) {
+            val day = Today.plus(DatePeriod(days = offset))
+            val days = playCalendarOn(day, emptySet(), weeks = 5)
+            assertTrue(days.any { it.date == day && it.isToday }, "$day (${day.dayOfWeek}) fell outside its own calendar")
+        }
+    }
+
+    private fun daysBackFrom(end: LocalDate, count: Int): Set<LocalDate> =
+        (0 until count).mapTo(mutableSetOf()) { end.minus(DatePeriod(days = it)) }
+
+    private companion object {
+        /** A Wednesday, so the Monday-first grid is exercised off its own edges. */
+        val Today = LocalDate(2026, 9, 9)
+    }
+}

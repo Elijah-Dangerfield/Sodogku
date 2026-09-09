@@ -12,6 +12,8 @@ import com.sodogku.libraries.achievements.db.AchievementUnlockEntity
 import com.sodogku.libraries.progress.db.DailyResultDao
 import com.sodogku.libraries.progress.db.DailyResultEntity
 import com.sodogku.libraries.progress.db.LevelProgressDao
+import com.sodogku.libraries.progress.db.PlayDayDao
+import com.sodogku.libraries.progress.db.PlayDayEntity
 import com.sodogku.libraries.progress.db.LevelProgressEntity
 import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataDao
 import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataEntity
@@ -23,8 +25,9 @@ import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataEntity
         DailyResultEntity::class,
         AchievementFactEntity::class,
         AchievementUnlockEntity::class,
+        PlayDayEntity::class,
     ],
-    version = 8,
+    version = 9,
     /**
      * Every bump from [FIRST_PLAYER_DATA_VERSION] on has to be listed here.
      *
@@ -40,6 +43,7 @@ import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataEntity
     autoMigrations = [
         AutoMigration(from = 6, to = 7),
         AutoMigration(from = 7, to = 8),
+        AutoMigration(from = 8, to = 9),
     ],
     exportSchema = true
 )
@@ -50,6 +54,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun levelProgressDao(): LevelProgressDao
     abstract fun dailyResultDao(): DailyResultDao
     abstract fun achievementDao(): AchievementDao
+    abstract fun playDayDao(): PlayDayDao
 
     companion object {
         /**

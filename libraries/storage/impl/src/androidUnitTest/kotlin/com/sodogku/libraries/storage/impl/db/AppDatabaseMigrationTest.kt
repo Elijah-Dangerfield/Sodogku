@@ -85,7 +85,13 @@ class AppDatabaseMigrationTest {
         val tables = query("SELECT name FROM sqlite_master WHERE type = 'table'") { stmt ->
             buildList { while (stmt.step()) add(stmt.getText(0)) }
         }
-        listOf("level_progress", "daily_result", "achievement_fact", "achievement_unlock").forEach {
+        listOf(
+            "level_progress",
+            "daily_result",
+            "achievement_fact",
+            "achievement_unlock",
+            "play_day",
+        ).forEach {
             assertTrue(it in tables, "$it is missing after the upgrade; found $tables")
         }
     }
@@ -167,6 +173,7 @@ class AppDatabaseMigrationTest {
         val migrations: List<Migration> = listOf(
             AppDatabase_AutoMigration_6_7_Impl(),
             AppDatabase_AutoMigration_7_8_Impl(),
+            AppDatabase_AutoMigration_8_9_Impl(),
         )
         // Checked against the *exported schemas*, which Room writes on every
         // build, rather than against a constant in this file. The first version

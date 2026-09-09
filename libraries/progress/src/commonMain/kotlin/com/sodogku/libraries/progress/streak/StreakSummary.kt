@@ -1,24 +1,24 @@
 package com.sodogku.libraries.progress.streak
 
+import kotlin.time.Duration
 import kotlinx.datetime.LocalDate
 
 /**
  * How one day looks on the streak page.
  *
- * [Bridged] deliberately covers both `DailyOutcome.Frozen` and
- * `DailyOutcome.Restored`. The two are separate on disk so their monthly
- * allowances can be counted apart, and that distinction is bookkeeping. A
- * player looking at a calendar wants to know whether the day is covered, not
- * which budget paid for it.
- *
- * [Failed] is its own state rather than a kind of miss, because the difference
- * matters to the player: a missed day can still be bought back and a lost one
- * never can.
+ * There is no `Failed` any more. It existed when the streak was the daily's, and
+ * a daily can be attempted and lost; a day you turned up and did not finish
+ * anything is, for a streak about turning up, simply a day you did not finish
+ * anything. Losing a board no longer costs a day that another board could still
+ * save.
  */
 enum class StreakDayState {
+    /** The player finished a board. Any board. */
     Completed,
+
+    /** A freeze covered it. Nothing spends one yet; see SD-28. */
     Bridged,
-    Failed,
+
     Missed,
 
     /** Later than today. Drawn as a hole in the grid, not as a miss. */
@@ -65,8 +65,24 @@ data class StreakSummary(
      */
     val days: List<StreakDay>,
 
-    /** `daily.enabled` and `features.dailyChallenge`. The daily is the only input. */
-    val enabled: Boolean,
+    /**
+     * Whether today already counts.
+     *
+     * Kept as its own field rather than left for the caller to dig out of
+     * [days], because it is the one thing the status page is really asking and
+     * every caller would compute it the same way.
+     */
+    val playedToday: Boolean,
+
+    /**
+     * How long until the local date rolls over, so the status page can say how
+     * long is left to keep the run.
+     *
+     * Resolved from the same clock snapshot as everything else here: a countdown
+     * built from a second reading of the clock can disagree with the calendar
+     * beside it across midnight.
+     */
+    val untilTomorrow: Duration,
 ) {
     /** The newest day the player actually played. What a celebration animates. */
     val latestCompleted: StreakDay?

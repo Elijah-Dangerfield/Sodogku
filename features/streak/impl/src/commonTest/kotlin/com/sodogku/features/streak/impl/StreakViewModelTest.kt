@@ -11,6 +11,7 @@ import com.sodogku.libraries.sodogku.AppData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.LocalDate
+import kotlin.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -148,7 +149,8 @@ class StreakViewModelTest : CoroutineTest() {
             longest = completedThrough,
             today = today,
             days = days,
-            enabled = true,
+            playedToday = true,
+            untilTomorrow = Duration.ZERO,
         )
     }
 }
@@ -167,6 +169,9 @@ private class FakeStreak(initial: StreakSummary) : StreakRepository {
     override fun observe(): Flow<StreakSummary> = summaries
 
     override suspend fun summary(): StreakSummary = summaries.value
+
+    override suspend fun onBoardCompleted() = Unit
+
 
     override suspend fun pendingPrompt(): StreakPrompt = StreakPrompt.None
 

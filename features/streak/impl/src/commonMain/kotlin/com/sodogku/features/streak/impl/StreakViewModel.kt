@@ -5,6 +5,7 @@ import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.flowroutines.SEAViewModel
 import com.sodogku.libraries.flowroutines.collectIn
+import kotlin.time.Duration
 import com.sodogku.libraries.progress.streak.StreakDay
 import com.sodogku.libraries.progress.streak.StreakPrompt
 import com.sodogku.libraries.progress.streak.StreakRepository
@@ -104,7 +105,8 @@ class StreakViewModel(
                 longest = summary.longest,
                 today = summary.today,
                 days = summary.days,
-                enabled = summary.enabled,
+                playedToday = summary.playedToday,
+                untilTomorrow = summary.untilTomorrow,
                 // Resolved here rather than in the screen, so the composable
                 // never searches a list during composition, and so a
                 // celebration that arrives with nothing completed (a wiped
@@ -127,7 +129,11 @@ data class StreakState(
     val longest: Int = 0,
     val today: LocalDate? = null,
     val days: List<StreakDay> = emptyList(),
-    val enabled: Boolean = true,
+    /** Whether today already counts, so the page can say what is left to do. */
+    val playedToday: Boolean = false,
+
+    /** How long the player has to keep the run, if they have not played today. */
+    val untilTomorrow: Duration = Duration.ZERO,
 
     /** The player's setting. Provided to the design system, not read here. */
     val haptics: Boolean = true,

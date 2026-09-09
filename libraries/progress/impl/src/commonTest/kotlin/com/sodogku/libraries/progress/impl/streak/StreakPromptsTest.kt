@@ -6,125 +6,95 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Which ceremony fires, and mostly which one does not.
+ * When the streak is allowed to take the screen.
  *
- * Every one of these is an interruption, so the tests that matter are the
- * refusals. A rule phrased as "the intention shows after three clears" is
- * satisfied by a function that always returns `Intention`, which is why each
- * case below pins the *other* answer as well.
+ * Rewritten when the streak stopped being the daily's. The old rules asked
+ * whether the player had ever played a daily and whether the daily feature was
+ * switched on, neither of which means anything now, and celebrated on
+ * milestones rather than on every day the run grew.
  */
 class StreakPromptsTest {
 
     @Test
-    fun nothingIsOfferedBeforeTheThirdClear() {
-        assertEquals(StreakPrompt.None, prompt(campaignClears = 0))
-        assertEquals(StreakPrompt.None, prompt(campaignClears = 2))
-        assertEquals(
-            StreakPrompt.Intention,
-            prompt(campaignClears = 3),
-            "the third clear is the moment; the first two are the game earning the right to ask",
-        )
-        assertEquals(
-            StreakPrompt.Intention,
-            prompt(campaignClears = 40),
-            "and a player who got there without ever seeing it still gets it",
-        )
+    fun theFirstBoardIsPracticeAndIsNotInterrupted() {
+        // The player is still working out what the game is. A full-screen page
+        // asking them to come back every day reads as an ad.
+        assertEquals(StreakPrompt.None, promptFor(streak = 1, boardsCleared = 1, state = Fresh))
     }
 
     @Test
-    fun theIntentionIsNeverShownTwice() {
+    fun theSecondBoardEarnsTheIntention() {
+        // The first board they chose.
+        assertEquals(StreakPrompt.Intention, promptFor(streak = 1, boardsCleared = 2, state = Fresh))
+    }
+
+    @Test
+    fun theIntentionIsShownOnceEver() {
         val shown = StreakPromptState(intentionShown = true)
 
-        assertEquals(StreakPrompt.None, prompt(campaignClears = 3, state = shown))
-        assertEquals(StreakPrompt.None, prompt(campaignClears = 99, state = shown))
+        for (boards in 2..50) {
+            assertTrue(
+                promptFor(streak = 1, boardsCleared = boards, state = shown) !is StreakPrompt.Intention,
+                "the intention came back at $boards boards",
+            )
+        }
     }
 
     @Test
-    fun aPlayerWhoAlreadyPlaysTheDailyIsNotToldToStart() {
-        assertEquals(
-            StreakPrompt.None,
-            prompt(campaignClears = 3, dailyPlayedEver = true),
-            "the daily card is in the pane from level one, so this is reachable and it would be a lie",
-        )
+    fun everyDayTheRunGrowsGetsAPage() {
+        // Deliberately not milestones. A run acknowledged four times a month is
+        // a run nobody keeps for its own sake.
+        val seen = StreakPromptState(intentionShown = true)
+
+        for (streak in 2..40) {
+            assertEquals(
+                StreakPrompt.Celebrate(streak),
+                promptFor(streak = streak, boardsCleared = 20, state = seen),
+                "no page for a run of $streak",
+            )
+        }
     }
 
     @Test
-    fun aDisabledDailyAsksForNothing() {
-        assertEquals(StreakPrompt.None, prompt(campaignClears = 3, dailyEnabled = false))
-        assertEquals(
-            StreakPrompt.None,
-            prompt(streak = 7, dailyPlayedEver = true, dailyEnabled = false, state = intentionDone()),
-            "a milestone page for a feature that is switched off leads nowhere",
-        )
+    fun aStreakOfOneIsTheIntentionsJobAndNotCelebratedSeparately() {
+        // Two pages about the same day is one too many.
+        val seen = StreakPromptState(intentionShown = true)
+
+        assertEquals(StreakPrompt.None, promptFor(streak = 1, boardsCleared = 20, state = seen))
     }
 
     @Test
-    fun milestonesAreThreeSevenFourteenAndEveryThirtyAfterThirty() {
-        val celebrated = (1..95).filter { isMilestone(it) }
+    fun theSameDayIsNotCelebratedTwice() {
+        // Reopening the app on a day already celebrated must be quiet, which is
+        // what `celebratedStreak` is for.
+        val state = StreakPromptState(intentionShown = true, celebratedStreak = 6)
 
-        assertEquals(listOf(3, 7, 14, 30, 60, 90), celebrated)
-    }
-
-    @Test
-    fun aMilestoneIsCelebratedOnceAndThenLeftAlone() {
-        val started = intentionDone()
-
-        assertEquals(StreakPrompt.Celebrate(7), prompt(streak = 7, state = started))
-        assertEquals(
-            StreakPrompt.None,
-            prompt(streak = 7, state = started.copy(celebratedStreak = 7)),
-            "opening the app again on the same day must not replay it",
-        )
-        assertEquals(
-            StreakPrompt.None,
-            prompt(streak = 8, state = started.copy(celebratedStreak = 7)),
-            "and the day after a milestone is not itself one",
-        )
-    }
-
-    @Test
-    fun aRunThatBreaksAndClimbsBackEarnsItsMilestoneAgain() {
-        val afterAThirtyDayRun = intentionDone().copy(celebratedStreak = 30)
-
+        assertEquals(StreakPrompt.None, promptFor(streak = 6, boardsCleared = 20, state = state))
         assertEquals(
             StreakPrompt.Celebrate(7),
-            prompt(streak = 7, state = afterAThirtyDayRun),
-            "they did the seven days a second time; a set of retired milestones would swallow it",
+            promptFor(streak = 7, boardsCleared = 20, state = state),
+            "the next day still gets its page",
         )
+    }
+
+    @Test
+    fun aRebuiltRunIsCelebratedAgain() {
+        // Broke at 30, climbed back to 7. That is a different run and the player
+        // did the work twice, so it is not retired.
+        val state = StreakPromptState(intentionShown = true, celebratedStreak = 30)
+
+        assertEquals(StreakPrompt.Celebrate(7), promptFor(streak = 7, boardsCleared = 60, state = state))
     }
 
     @Test
     fun theIntentionOutranksACelebration() {
-        // Not reachable through the repository, since a streak means a daily
-        // was played, but the ordering is stated rather than left to argument.
-        val both = prompt(streak = 7, campaignClears = 3, state = StreakPromptState())
-
-        assertEquals(StreakPrompt.Intention, both)
+        // They cannot both be due in practice, since the intention fires on the
+        // second board ever. The order is stated rather than left to whichever
+        // branch happens to be written first.
+        assertEquals(StreakPrompt.Intention, promptFor(streak = 9, boardsCleared = 2, state = Fresh))
     }
 
-    @Test
-    fun aStreakWithNoMilestoneSaysNothingAtAll() {
-        val started = intentionDone()
-
-        val quiet = (1..29).filter { prompt(streak = it, state = started) == StreakPrompt.None }
-
-        assertEquals((1..29).toList() - listOf(3, 7, 14), quiet, "26 of the first 29 days say nothing")
-        assertTrue(quiet.isNotEmpty())
+    private companion object {
+        val Fresh = StreakPromptState()
     }
-
-    private fun intentionDone() = StreakPromptState(intentionShown = true)
-
-    private fun prompt(
-        streak: Int = 0,
-        campaignClears: Int = 0,
-        dailyPlayedEver: Boolean = false,
-        dailyEnabled: Boolean = true,
-        state: StreakPromptState = StreakPromptState(),
-    ): StreakPrompt = promptFor(
-        streak = streak,
-        campaignClears = campaignClears,
-        dailyPlayedEver = dailyPlayedEver,
-        dailyEnabled = dailyEnabled,
-        state = state,
-    )
 }

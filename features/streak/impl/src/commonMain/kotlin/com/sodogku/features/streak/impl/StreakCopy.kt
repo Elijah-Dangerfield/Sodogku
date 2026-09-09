@@ -11,7 +11,6 @@ import org.jetbrains.compose.resources.stringResource
 import sodogku.features.streak.impl.generated.resources.Res
 import sodogku.features.streak.impl.generated.resources.streak_day_bridged
 import sodogku.features.streak.impl.generated.resources.streak_day_completed
-import sodogku.features.streak.impl.generated.resources.streak_day_failed
 import sodogku.features.streak.impl.generated.resources.streak_day_future
 import sodogku.features.streak.impl.generated.resources.streak_day_missed
 import sodogku.features.streak.impl.generated.resources.streak_day_today
@@ -72,7 +71,6 @@ internal fun StreakDay.toCell(): StreakCell {
 private fun StreakDayState.toCellState(): StreakCellState = when (this) {
     StreakDayState.Completed -> StreakCellState.Done
     StreakDayState.Bridged -> StreakCellState.Bridged
-    StreakDayState.Failed -> StreakCellState.Failed
     StreakDayState.Missed -> StreakCellState.Missed
     StreakDayState.Future -> StreakCellState.Future
 }
@@ -80,7 +78,6 @@ private fun StreakDayState.toCellState(): StreakCellState = when (this) {
 private fun StreakDayState.spoken(): StringResource = when (this) {
     StreakDayState.Completed -> Res.string.streak_day_completed
     StreakDayState.Bridged -> Res.string.streak_day_bridged
-    StreakDayState.Failed -> Res.string.streak_day_failed
     StreakDayState.Missed -> Res.string.streak_day_missed
     StreakDayState.Future -> Res.string.streak_day_future
 }

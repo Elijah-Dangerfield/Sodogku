@@ -3,14 +3,13 @@ package com.sodogku.libraries.progress.streak
 import kotlinx.coroutines.flow.Flow
 
 /**
- * What the streak *looks like*, and when it is allowed to interrupt.
+ * What the streak *looks like*, when it is allowed to interrupt, and the one
+ * write that feeds it.
  *
- * Separate from `DailyRepository` rather than four more methods on it, for two
- * reasons. The daily owns the rules (which day it is, what a freeze covers,
- * how the run is folded) and none of that changes here; this reads the same
- * rows and presents them. And the daily card is on the hot path of the level
- * pane, while this is opened deliberately, so the two have no reason to share
- * a lifecycle.
+ * Nothing to do with `DailyRepository` any more. The streak is fed by finishing
+ * any board and owns its own table; the daily owns which puzzle everybody shares
+ * today and how a freeze is budgeted. They used to be the same rows, which meant
+ * clearing six campaign boards in a day did nothing for a streak.
  *
  * Device-local, like everything else in `:libraries:progress`. There is no
  * server to arbitrate a streak and no account to carry one between phones.
@@ -18,12 +17,21 @@ import kotlinx.coroutines.flow.Flow
 interface StreakRepository {
 
     /**
-     * Re-emits when a daily result is written and when the local date rolls
-     * over, so a page left open at midnight redraws its calendar.
+     * Re-emits when a board is finished and when the local date rolls over, so a
+     * page left open at midnight redraws its calendar.
      */
     fun observe(): Flow<StreakSummary>
 
     suspend fun summary(): StreakSummary
+
+    /**
+     * Records that the player finished a board today, whichever board it was.
+     *
+     * Idempotent, and called on every completion rather than only the first of
+     * the day: the caller has no way of knowing whether today already counts
+     * without asking, and asking is the same round trip as writing.
+     */
+    suspend fun onBoardCompleted()
 
     /**
      * The ceremony owed to the player right now, if any.

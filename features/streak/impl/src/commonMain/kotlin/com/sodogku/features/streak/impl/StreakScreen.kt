@@ -73,9 +73,6 @@ fun StreakScreen(
     ) { padding ->
         when {
             state.loading -> FullScreenLoader()
-            !state.enabled -> DailyOff(
-                modifier = Modifier.fillMaxSize().screenContentPadding(padding),
-            )
             else -> StreakBody(
                 state = state,
                 modifier = Modifier
@@ -172,37 +169,6 @@ private fun StreakBody(state: StreakState, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * What the page says when the daily is switched off.
- *
- * It says the history survives, for the same reason the badges screen does: the
- * reading that stops somebody coming back is the one where turning a thing off
- * threw their record away.
- */
-@Composable
-private fun DailyOff(modifier: Modifier = Modifier) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = modifier.padding(horizontal = Dimension.D800),
-    ) {
-        Dog(pose = DogPose.Thinking)
-        VerticalSpacerD500()
-        Text(
-            text = stringResource(Res.string.streak_off_title),
-            typography = AppTheme.typography.Heading.H700,
-            textAlign = TextAlign.Center,
-        )
-        VerticalSpacerD300()
-        Text(
-            text = stringResource(Res.string.streak_off_body),
-            typography = AppTheme.typography.Body.B500,
-            color = AppTheme.colors.textSecondary,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
 @Preview
 @Composable
 private fun StreakScreenPreview() {
@@ -226,14 +192,6 @@ private fun StreakScreenEmptyPreview() {
     }
 }
 
-@Preview
-@Composable
-private fun StreakScreenOffPreview() {
-    PreviewContent {
-        StreakScreen(state = previewState().copy(enabled = false), onAction = {})
-    }
-}
-
 @Suppress("MagicNumber")
 private fun previewState(): StreakState {
     val start = LocalDate(2026, 8, 10)
@@ -251,7 +209,6 @@ private fun previewState(): StreakState {
                     date > today -> StreakDayState.Future
                     index >= 23 -> StreakDayState.Completed
                     index == 22 -> StreakDayState.Bridged
-                    index == 18 -> StreakDayState.Failed
                     index >= 12 -> StreakDayState.Completed
                     else -> StreakDayState.Missed
                 },

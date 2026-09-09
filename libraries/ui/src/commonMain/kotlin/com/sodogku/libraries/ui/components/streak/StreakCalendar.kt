@@ -44,9 +44,6 @@ enum class StreakCellState {
     /** Covered by a freeze or a restore. Drawn as a held place, not as a win. */
     Bridged,
 
-    /** Played and lost. */
-    Failed,
-
     /** In the past and never played. */
     Missed,
 
@@ -135,7 +132,6 @@ private fun StreakDayCell(cell: StreakCell, filling: Boolean, modifier: Modifier
     val empty = AppTheme.colors.surfaceSecondary.color
     val done = AppTheme.colors.accentPrimary.color
     val bridged = AppTheme.colors.accentSecondary.color
-    val failed = AppTheme.colors.danger.color
     // `text`, not `border`. The border token is a cream one step off the cream
     // the cell is filled with — 1.1:1, which is a line you can find once you
     // have been told it is there. This ring is the only thing on the page that
@@ -166,7 +162,6 @@ private fun StreakDayCell(cell: StreakCell, filling: Boolean, modifier: Modifier
                 val colour = when (cell.state) {
                     StreakCellState.Done -> done
                     StreakCellState.Bridged -> bridged
-                    StreakCellState.Failed -> failed
                     StreakCellState.Missed, StreakCellState.Future -> Color.Transparent
                 }
                 // A rising fill rather than a fade. The day the celebration is
@@ -209,7 +204,7 @@ private fun StreakDayCell(cell: StreakCell, filling: Boolean, modifier: Modifier
             // Brown700 on Purple600 at 1.7:1 — the date on the one square the
             // player spent a freeze on was the only one they could not read.
             color = when (cell.state) {
-                StreakCellState.Done, StreakCellState.Failed -> AppTheme.colors.onAccentPrimary
+                StreakCellState.Done -> AppTheme.colors.onAccentPrimary
                 StreakCellState.Bridged -> AppTheme.colors.onAccentSecondary
                 StreakCellState.Future -> AppTheme.colors.textDisabled
                 StreakCellState.Missed -> AppTheme.colors.textSecondary
@@ -297,7 +292,6 @@ private fun previewDays(): List<StreakCell> = List(35) { index ->
             index == 22 -> StreakCellState.Done
             index in 16..21 -> StreakCellState.Done
             index == 15 -> StreakCellState.Bridged
-            index == 9 -> StreakCellState.Failed
             index in 10..14 -> StreakCellState.Done
             else -> StreakCellState.Missed
         },
