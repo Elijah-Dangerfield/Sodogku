@@ -5,31 +5,20 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import com.sodogku.features.onboarding.impl.OnboardingDogHandoff
 import com.sodogku.libraries.core.BuildInfo
 import com.sodogku.libraries.core.Platform
 import com.sodogku.libraries.ui.PreviewContent
-import com.sodogku.libraries.ui.components.dog.Dog
-import com.sodogku.libraries.ui.components.dog.DogHeroTopInset
-import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.system.AppTheme
-import com.sodogku.system.Dimension
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -89,11 +78,10 @@ fun SplashOverlay(
  * screen puts it, so when the splash fades the only thing that changes is
  * everything *around* the dog arriving.
  *
- * The geometry below therefore has to match `OnboardingScreen`'s column exactly —
- * system-bar insets, then the same leading spacer — or the dog jumps by however
- * much the two disagree, which is the one thing a viewer notices. The spacer is
- * `DogHeroTopInset` in both places rather than the same number written twice, so
- * moving one moves the other.
+ * So the geometry is not copied from `OnboardingScreen`, it *is*
+ * `OnboardingScreen` — `OnboardingDogHandoff` lays out that screen's real column
+ * and draws nothing but the dog. There is no offset here to keep in step with
+ * one over there, and no way for the two to drift apart.
  */
 @Composable
 private fun SplashContent(screenAlpha: Float, dogAlpha: Float) {
@@ -103,19 +91,7 @@ private fun SplashContent(screenAlpha: Float, dogAlpha: Float) {
             .background(AppTheme.colors.background.color)
             .graphicsLayer { this.alpha = screenAlpha },
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(horizontal = Dimension.D800),
-        ) {
-            Spacer(modifier = Modifier.height(DogHeroTopInset))
-            Dog(
-                pose = DogPose.Still,
-                modifier = Modifier.graphicsLayer { this.alpha = dogAlpha },
-            )
-        }
+        OnboardingDogHandoff(dogAlpha = dogAlpha)
     }
 }
 
