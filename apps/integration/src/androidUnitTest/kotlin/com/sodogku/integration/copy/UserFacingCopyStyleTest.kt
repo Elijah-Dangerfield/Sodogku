@@ -70,6 +70,58 @@ class UserFacingCopyStyleTest {
         )
     }
 
+    @Test
+    fun noResourceCommentContainsADoubleHyphen() {
+        // Not style. `--` is illegal inside an XML comment, and the build
+        // failure it produces is `convertXmlValueResourcesForCommonMain task was
+        // failed` with no file, no line and no mention of hyphens. Written after
+        // hitting it twice in one day while using `--` as a dash in a comment
+        // explaining why not to use em dashes.
+        val offenders = resourceFiles().flatMap { file ->
+            COMMENT.findAll(file.readText())
+                .filter { "--" in it.value.removePrefix("<!--").removeSuffix("-->") }
+                .map { "  ${file.name}: ${it.value.take(70).replace('\n', ' ')}" }
+        }
+
+        assertTrue(
+            offenders.isEmpty(),
+            "`--` cannot appear inside an XML comment. Use a semicolon or a full stop:\n" +
+                offenders.joinToString("\n"),
+        )
+    }
+
+    @Test
+    fun noStringEscapesAnApostrophe() {
+        // `\'` is an Android resource convention the Compose Multiplatform
+        // parser does not share: at best the backslash renders on screen, at
+        // worst the file stops parsing.
+        // Every resource file, not only the shared one. Scoping this to
+        // `strings()` missed the per-feature files entirely, which is where the
+        // escape was actually written.
+        val offenders = resourceFiles().flatMap { file ->
+            STRING.findAll(file.readText())
+                .filter { "\\'" in it.groupValues[2] }
+                .map { "  ${file.name}: ${it.groupValues[1]}: ${it.groupValues[2]}" }
+        }
+
+        assertTrue(
+            offenders.isEmpty(),
+            "Apostrophes are bare in Compose resources:\n" + offenders.joinToString("\n"),
+        )
+    }
+
+    /** Every `values/strings.xml` in the repo, not only the shared one. */
+    private fun resourceFiles(): List<File> {
+        val root = File(repoRoot())
+        val files = root.walkTopDown()
+            .onEnter { it.name != "build" && it.name != ".git" }
+            .filter { it.isFile && it.name == "strings.xml" && it.parentFile.name == "values" }
+            .toList()
+
+        assertTrue(files.size >= MIN_RESOURCE_FILES, "only found ${files.size} strings.xml files")
+        return files
+    }
+
     /** Every `<string name="...">body</string>` in the shared resources. */
     private fun strings(): List<Pair<String, String>> {
         val file = File(
@@ -98,5 +150,12 @@ class UserFacingCopyStyleTest {
 
         /** Long enough that a body was captured rather than just an attribute. */
         const val SENTENCE = 60
+
+        /** Shared resources plus the per-feature ones. A floor, so a broken walk reports it. */
+        const val MIN_RESOURCE_FILES = 2
+
+        val COMMENT = Regex("""<!--.*?-->""", RegexOption.DOT_MATCHES_ALL)
+
+        val STRING = Regex("""<string name="([^"]+)"[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL)
     }
 }

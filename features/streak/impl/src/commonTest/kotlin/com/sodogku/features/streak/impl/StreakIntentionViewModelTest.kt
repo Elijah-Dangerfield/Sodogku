@@ -1,125 +1,102 @@
 package com.sodogku.features.streak.impl
 
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
-import com.sodogku.libraries.progress.daily.DailyRepository
-import com.sodogku.libraries.progress.daily.DailyResult
-import com.sodogku.libraries.progress.daily.DailyStatus
-import com.sodogku.libraries.progress.daily.FreezeResult
-import com.sodogku.libraries.progress.daily.RestoreResult
+import com.sodogku.libraries.progress.streak.StreakDay
+import com.sodogku.libraries.progress.streak.StreakDayState
 import com.sodogku.libraries.progress.streak.StreakPrompt
 import com.sodogku.libraries.progress.streak.StreakRepository
 import com.sodogku.libraries.progress.streak.StreakSummary
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.datetime.LocalDate
-import kotlin.time.Duration
+import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration
 
 /**
- * The moment the player cannot skip, and the two ways out of it.
+ * The one-off "you have a streak, keep it" moment.
  *
- * The test that matters is the last one: a screen with no back button, whose
- * only exit is a board, is a trap the moment the board cannot be resolved.
+ * Rewritten with the screen. The old version had a paw to fill and two ways out,
+ * one of which launched the daily, and its tests were mostly about that fork.
+ * There is no fork now: the streak exists whether or not the player taps, and
+ * the tap is an acknowledgement.
  */
 class StreakIntentionViewModelTest : CoroutineTest() {
 
     @Test
-    fun itIsRecordedAsShownBeforeThePlayerDoesAnything() = runUnitTest {
+    fun itRecordsItselfAsShownImmediately() = runUnitTest {
+        // Before the player does anything, and that is the point: the screen has
+        // no way past it except through it, so a force-quit un-recording it
+        // would make killing the app the only exit.
         val streak = RecordingStreak()
 
-        viewModel(streak = streak)
+        viewModel(streak)
 
-        assertEquals(
-            listOf<StreakPrompt>(StreakPrompt.Intention),
-            streak.shown,
-            "there is no way past this screen, so a force-quit must not earn a second one",
-        )
+        assertEquals(1, streak.shown.size)
+        assertEquals(StreakPrompt.Intention, streak.shown.single())
     }
 
     @Test
-    fun nothingIsOfferedUntilThePawIsFull() = runUnitTest {
-        val vm = viewModel()
+    fun itShowsTheRunThePlayerAlreadyHas() = runUnitTest {
+        val state = viewModel(RecordingStreak(current = 1)).state
 
-        assertTrue(!vm.state.started)
-
-        vm.takeAction(StreakIntentionAction.Filled)
-
-        assertTrue(vm.state.started)
+        assertEquals(1, state.streak)
+        assertEquals(7, state.week.size, "the week under the number came through")
     }
 
     @Test
-    fun playingOpensTodaysDailyRatherThanABoardCapturedEarlier() = runUnitTest {
-        val vm = viewModel(daily = FakeDaily(levelId = 42))
-
-        vm.takeAction(StreakIntentionAction.Play)
-
-        assertEquals(StreakIntentionEvent.OpenDaily(42), vm.eventFlow.first())
+    fun aFailedReadStillShowsADayRatherThanZero() = runUnitTest {
+        // This screen only opens off a finished board, so the run is at least a
+        // day. "0 day streak" under "can you keep this up?" would be the app
+        // contradicting itself because a read failed.
+        assertEquals(1, viewModel(RecordingStreak(current = 0)).state.streak)
     }
 
     @Test
-    fun aDisabledDailyClosesTheScreenRatherThanTrappingThePlayer() = runUnitTest {
-        val vm = viewModel(daily = FakeDaily(enabled = false))
+    fun theOneButtonCloses() = runUnitTest {
+        val vm = viewModel(RecordingStreak())
 
-        vm.takeAction(StreakIntentionAction.Play)
-
-        assertEquals(
-            StreakIntentionEvent.Close,
-            vm.eventFlow.first(),
-            "no board to send them to, and no back button either",
-        )
-    }
-
-    @Test
-    fun theHapticsSettingReachesTheState() = runUnitTest {
-        // The paw's fill is the only thing in the app that buzzes outside a
-        // board, and `LocalHaptics` defaults to silent, so a setting that never
-        // arrives is a moment that is quiet for everybody.
-        assertTrue(viewModel().state.haptics, "on by default")
-        assertTrue(
-            !viewModel(cache = InMemoryAppCache(AppData(hapticsEnabled = false))).state.haptics,
-        )
-    }
-
-    @Test
-    fun laterClosesWithoutOpeningAnything() = runUnitTest {
-        val vm = viewModel()
-
-        vm.takeAction(StreakIntentionAction.Later)
+        vm.takeAction(StreakIntentionAction.Commit)
 
         assertEquals(StreakIntentionEvent.Close, vm.eventFlow.first())
     }
 
+    @Test
+    fun theHapticsSettingIsCarriedToTheScreen() = runUnitTest {
+        // Read, not applied. The design system decides what buzzes; this only
+        // has to not lose the player's answer.
+        assertTrue(viewModel(RecordingStreak()).state.haptics, "on by default")
+        assertTrue(
+            !viewModel(RecordingStreak(), InMemoryAppCache(AppData(hapticsEnabled = false))).state.haptics,
+        )
+    }
+
     private fun viewModel(
-        streak: StreakRepository = RecordingStreak(),
-        daily: DailyRepository = FakeDaily(),
+        streak: StreakRepository,
         cache: AppCache = InMemoryAppCache(),
-    ) = StreakIntentionViewModel(streak = streak, daily = daily, appCache = cache)
+    ) = StreakIntentionViewModel(streak = streak, appCache = cache)
 }
 
-private class RecordingStreak : StreakRepository {
+private class RecordingStreak(private val current: Int = 1) : StreakRepository {
 
     val shown = mutableListOf<StreakPrompt>()
 
     override fun observe(): Flow<StreakSummary> = emptyFlow()
 
     override suspend fun summary(): StreakSummary = StreakSummary(
-        current = 0,
-        longest = 0,
-        today = LocalDate(2026, 9, 7),
-        days = emptyList(),
+        current = current,
+        longest = current,
+        today = Today,
+        days = week(),
         playedToday = true,
         untilTomorrow = Duration.ZERO,
     )
 
     override suspend fun onBoardCompleted() = Unit
-
 
     override suspend fun pendingPrompt(): StreakPrompt = StreakPrompt.None
 
@@ -128,36 +105,17 @@ private class RecordingStreak : StreakRepository {
     }
 
     override suspend fun reset() = Unit
-}
 
-private class FakeDaily(
-    private val levelId: Int = 1,
-    private val enabled: Boolean = true,
-) : DailyRepository {
+    private fun week(): List<StreakDay> = (0..6).map { index ->
+        val date = LocalDate.fromEpochDays(Today.toEpochDays() - (2 - index))
+        StreakDay(
+            date = date,
+            state = if (date <= Today) StreakDayState.Completed else StreakDayState.Future,
+            isToday = date == Today,
+        )
+    }
 
-    override fun observe(): Flow<DailyStatus> = emptyFlow()
-
-    override suspend fun status(): DailyStatus = DailyStatus(
-        date = LocalDate(2026, 9, 7),
-        packIndex = 0,
-        levelId = levelId,
-        result = null,
-        streak = 0,
-        freezeOffer = null,
-        restoreOffer = null,
-        resetsIn = 1.hours,
-        enabled = enabled,
-    )
-
-    override suspend fun history(): List<DailyResult> = emptyList()
-
-    override suspend fun onCompleted(date: LocalDate, score: Int, paws: Int, timeMs: Long) = Unit
-
-    override suspend fun onFailed(date: LocalDate, timeMs: Long) = Unit
-
-    override suspend fun useFreeze(): FreezeResult = FreezeResult.NothingToFreeze
-
-    override suspend fun restoreStreak(): RestoreResult = RestoreResult.NothingToRestore
-
-    override suspend fun reset() = Unit
+    private companion object {
+        val Today = LocalDate(2026, 9, 9)
+    }
 }

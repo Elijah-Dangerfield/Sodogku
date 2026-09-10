@@ -109,14 +109,21 @@ tasks.withType<Test>().configureEach {
         },
     ).withPropertyName("iosProjectScan")
 
-    // And the shared strings, for the same reason: `UserFacingCopyStyleTest`
-    // reads them at runtime and Gradle cannot see that.
+    // And the strings, for the same reason: `UserFacingCopyStyleTest` reads
+    // them at runtime and Gradle cannot see that.
+    //
+    // The whole repo, not just `libraries/resources`. Features carry their own
+    // `composeResources` too, and scoping this to the shared module left every
+    // one of them invisible: mutating a comment in the streak feature's
+    // strings.xml to something the rule forbids left the task UP-TO-DATE and the
+    // suite green, and it only went red under `--rerun-tasks`. A test that
+    // passes because Gradle did not run it is not a test.
     inputs.files(
-        rootProject.fileTree(repo.dir("libraries/resources")) {
+        rootProject.fileTree(repo) {
             include("**/composeResources/**/*.xml")
             exclude("**/build/**")
         },
-    ).withPropertyName("sharedStringsScan")
+    ).withPropertyName("stringResourceScan")
 
     // Same again for the agent skills. `FeedbackTriageQueryContractTest` holds
     // the triage skill's Sentry queries against the enum that produces the tag

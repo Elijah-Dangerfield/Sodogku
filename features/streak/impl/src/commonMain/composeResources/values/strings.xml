@@ -37,12 +37,24 @@
     <string name="streak_celebrate_body">Same time tomorrow.</string>
     <string name="streak_celebrate_done">Nice</string>
 
-    <string name="streak_intention_title">One a day</string>
-    <string name="streak_intention_body">There is a new puzzle every day. Play it and this fills in, one paw a day, for as long as you keep coming back.</string>
-    <string name="streak_intention_mark">Start your streak</string>
-    <string name="streak_intention_waiting">Not started</string>
-    <string name="streak_intention_filled">Started</string>
-    <string name="streak_intention_cta">Play today\'s puzzle</string>
-    <!-- Offered only after the paw is filled. The moment itself has no way past it. -->
-    <string name="streak_intention_later">Maybe later</string>
+    <!-- The question above the number, which is the number's answer. Asked
+         rather than asserted, because a page that opens by telling somebody
+         they are committed has decided for them. -->
+    <string name="streak_intention_title">Can you keep this up?</string>
+    <!-- Under the streak. Names the stake in the only terms this game has: the
+         dog. Deliberately not a mechanic explanation; the player can see the
+         week filling in above it, and a paragraph about how streaks work would
+         be teaching something the picture already taught. -->
+    <string name="streak_intention_body">Every day you keep it going is another good day for this dog.</string>
+    <!-- One button, and it is an agreement rather than an instruction. "I'm
+         game" over "I'm committed" because this is a puzzle about dogs and the
+         contract register belongs to a language app. -->
+    <string name="streak_intention_cta">I'm game</string>
+
+    <!-- Under the big number. A plural because "1 days" is the kind of thing a
+         player notices on the one screen that is congratulating them. -->
+    <plurals name="streak_day_label">
+        <item quantity="one">day streak</item>
+        <item quantity="other">day streak</item>
+    </plurals>
 </resources>

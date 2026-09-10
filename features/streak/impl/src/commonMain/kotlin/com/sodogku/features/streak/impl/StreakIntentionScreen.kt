@@ -12,41 +12,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.text.style.TextAlign
 import com.sodogku.libraries.core.doNothing
+import com.sodogku.libraries.progress.streak.StreakDay
+import com.sodogku.libraries.progress.streak.StreakDayState
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.Screen
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
-import com.sodogku.libraries.ui.components.button.ButtonSecondary
-import com.sodogku.libraries.ui.components.streak.StreakIntentionMark
+import com.sodogku.libraries.ui.components.streak.StreakHero
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.screenContentPadding
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.system.VerticalSpacerD800
+import kotlinx.datetime.LocalDate
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.features.streak.impl.generated.resources.Res
+import sodogku.features.streak.impl.generated.resources.streak_day_label
 import sodogku.features.streak.impl.generated.resources.streak_intention_body
 import sodogku.features.streak.impl.generated.resources.streak_intention_cta
-import sodogku.features.streak.impl.generated.resources.streak_intention_filled
-import sodogku.features.streak.impl.generated.resources.streak_intention_later
-import sodogku.features.streak.impl.generated.resources.streak_intention_mark
 import sodogku.features.streak.impl.generated.resources.streak_intention_title
-import sodogku.features.streak.impl.generated.resources.streak_intention_waiting
 
 /**
  * The one moment in the app that will not let the player past.
  *
  * No top bar, no close, and the back press is swallowed at the entry point.
- * What makes that defensible rather than hostile is how little it asks: one tap,
- * on a big target, on a screen with one idea on it. The two buttons appear only
- * *after* the paw is filled, so before the tap there is nothing to read past and
- * nothing to weigh up.
+ * What makes that defensible rather than hostile is how little it asks and how
+ * little it takes: one tap, on one button, on a screen showing a run the player
+ * has already earned.
  *
- * The second button matters. "Non-skippable" is about the moment, not about the
- * puzzle. A player interrupted three levels into their first session may well
- * not want to start a fourth board right now, and marching them into one is how
- * a nice moment becomes the reason they close the app.
+ * **One button now.** There used to be a paw to fill and then two choices, "play
+ * today's puzzle" and "maybe later", which made the moment a fork in a road the
+ * player had not asked to be standing on. There is nothing here to decline: the
+ * streak exists whether or not they tap, and the tap is an acknowledgement, not
+ * a contract. Duolingo's version is the same shape and it is the right one.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -69,12 +69,29 @@ fun StreakIntentionScreen(
                 .screenContentPadding(padding)
                 .padding(horizontal = Dimension.D800),
         ) {
+            // The question comes first, above the number, because the number is
+            // the answer to it. Reversed, the page states a fact and then asks
+            // something that sounds like doubt.
             Text(
                 text = stringResource(Res.string.streak_intention_title),
-                typography = AppTheme.typography.Display.D900,
+                typography = AppTheme.typography.Heading.H600,
                 textAlign = TextAlign.Center,
             )
+
             VerticalSpacerD500()
+
+            StreakHero(
+                streak = state.streak,
+                week = state.week.toWeekStrip(),
+                dayLabel = pluralStringResource(Res.plurals.streak_day_label, state.streak, state.streak),
+                // Slammed in, because the player has just earned it. This is the
+                // one screen where `countUpFrom` is the number below the run
+                // rather than the previous day's: there is no previous day.
+                countUpFrom = state.streak - 1,
+            )
+
+            VerticalSpacerD800()
+
             Text(
                 text = stringResource(Res.string.streak_intention_body),
                 typography = AppTheme.typography.Body.B500,
@@ -84,35 +101,11 @@ fun StreakIntentionScreen(
 
             VerticalSpacerD800()
 
-            StreakIntentionMark(
-                label = stringResource(Res.string.streak_intention_mark),
-                stateLabel = if (state.started) {
-                    stringResource(Res.string.streak_intention_filled)
-                } else {
-                    stringResource(Res.string.streak_intention_waiting)
-                },
-                onFilled = { onAction(StreakIntentionAction.Filled) },
-            )
-
-            VerticalSpacerD800()
-
-            // Held out of the tree until the paw is full rather than shown
-            // disabled. A greyed button under an untapped paw invites a tap on
-            // the wrong thing, and the whole moment is one gesture long.
-            if (state.started) {
-                ButtonPrimary(
-                    onClick = { onAction(StreakIntentionAction.Play) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(Res.string.streak_intention_cta))
-                }
-                VerticalSpacerD500()
-                ButtonSecondary(
-                    onClick = { onAction(StreakIntentionAction.Later) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(Res.string.streak_intention_later))
-                }
+            ButtonPrimary(
+                onClick = { onAction(StreakIntentionAction.Commit) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(Res.string.streak_intention_cta))
             }
         }
     }
@@ -122,14 +115,29 @@ fun StreakIntentionScreen(
 @Composable
 private fun StreakIntentionPreview() {
     PreviewContent {
-        StreakIntentionScreen(state = StreakIntentionState(), onAction = {})
+        StreakIntentionScreen(
+            state = StreakIntentionState(
+                loaded = true,
+                streak = 1,
+                week = previewWeek(),
+            ),
+            onAction = {},
+        )
     }
 }
 
-@Preview
-@Composable
-private fun StreakIntentionStartedPreview() {
-    PreviewContent {
-        StreakIntentionScreen(state = StreakIntentionState(started = true), onAction = {})
+private fun previewWeek(): List<StreakDay> {
+    val today = LocalDate(2026, 9, 9)
+    return (0..6).map { index ->
+        val date = LocalDate.fromEpochDays(today.toEpochDays() - (2 - index))
+        StreakDay(
+            date = date,
+            state = when {
+                date > today -> StreakDayState.Future
+                date == today -> StreakDayState.Completed
+                else -> StreakDayState.Missed
+            },
+            isToday = date == today,
+        )
     }
 }

@@ -62,13 +62,9 @@ class StreakFeatureEntryPoint(
 
             viewModel.ObserveEvents { event ->
                 when (event) {
-                    // Popped first, so the daily is pushed onto the screen the
-                    // player came from. Leaving this on the stack would put a
-                    // moment they have already had behind the back button.
-                    is StreakIntentionEvent.OpenDaily -> {
-                        router.goBack()
-                        router.navigate(GameRoute(levelId = event.levelId, daily = true))
-                    }
+                    // Back to the board they were on. The moment does not send
+                    // them anywhere any more: the streak is fed by whatever they
+                    // were already playing.
                     StreakIntentionEvent.Close -> router.goBack()
                 }
             }

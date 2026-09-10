@@ -2,6 +2,7 @@ package com.sodogku.features.streak.impl
 
 import androidx.compose.runtime.Composable
 import com.sodogku.libraries.progress.streak.StreakDay
+import com.sodogku.libraries.ui.components.streak.StreakWeekDay
 import com.sodogku.libraries.progress.streak.StreakDayState
 import com.sodogku.libraries.ui.components.streak.StreakCell
 import com.sodogku.libraries.ui.components.streak.StreakCellState
@@ -113,3 +114,26 @@ private val MonthNames = listOf(
     SharedRes.string.month_short_11,
     SharedRes.string.month_short_12,
 )
+
+/**
+ * The last seven days of the calendar, as the strip [StreakHero] draws.
+ *
+ * Takes the tail of the grid the repository already built rather than asking for
+ * a second window. The repository's last row *is* the current week, Monday
+ * first, so slicing it means the strip and the full calendar can never disagree
+ * about which day is which.
+ */
+@Composable
+internal fun List<StreakDay>.toWeekStrip(): List<StreakWeekDay> {
+    val week = takeLast(DaysInWeek)
+    return week.mapIndexed { index, day ->
+        StreakWeekDay(
+            initial = stringResource(WeekdayInitials[index]),
+            filled = day.state == StreakDayState.Completed || day.state == StreakDayState.Bridged,
+            isToday = day.isToday,
+            spoken = day.toCell().description + ", " + stringResource(day.state.spoken()),
+        )
+    }
+}
+
+private const val DaysInWeek = 7
