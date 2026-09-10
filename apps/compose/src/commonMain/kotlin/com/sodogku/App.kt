@@ -146,7 +146,7 @@ fun App(appComponent: AppComponent) {
 
     CompositionLocalProvider(
         LocalAppState provides appState,
-        LocalClock provides appComponent.provideClock(),
+        LocalClock provides appComponent.clock,
         LocalBuildInfo provides BuildInfo,
         LocalDialogHostState provides dialogHostState,
         // One provider for the whole tree: a component that moves on its own

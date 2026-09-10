@@ -26,6 +26,12 @@ import kotlin.time.ExperimentalTime
  * production interface to serve a debug screen is how a debug affordance ends up
  * shipping.
  *
+ * The day shift is the other half of the same idea from the other end: seeding
+ * covers everything about a streak except the moment it rolls over, and a
+ * rollover needs the date to move. It moves the one `Clock` the whole app
+ * derives dates from, so the daily's board, its countdown, the streak fold and
+ * the calendar grid all change together rather than one at a time.
+ *
  * Everything here is destructive and none of it asks. That is the right trade
  * for a screen only reachable in a debug build, and a confirm on every row would
  * make the menu slower than editing the database by hand.
@@ -42,6 +48,14 @@ class QaToolsViewModel(
     initialStateArg = QaToolsState(),
 ) {
 
+    /**
+     * Null in any build without the day-shift override, which is every release
+     * build. See [ShiftableClock]. A cast rather than an injected dependency
+     * because the type has no implementation in the graph there at all, so
+     * asking for one would stop the graph compiling.
+     */
+    private val shiftable = clock as? ShiftableClock
+
     init {
         takeAction(QaToolsAction.Refresh)
     }
@@ -56,6 +70,8 @@ class QaToolsViewModel(
             is QaToolsAction.ShowFeedbackFab -> action.write {
                 feedbackFab.update { it.copy(hidden = !action.shown) }
             }
+            is QaToolsAction.ShiftDay -> action.write { shiftable?.shiftBy(action.days) }
+            QaToolsAction.ClearDayShift -> action.write { shiftable?.clearShift() }
             QaToolsAction.Back -> sendEvent(QaToolsEvent.Back)
         }
     }
@@ -95,6 +111,8 @@ class QaToolsViewModel(
                 playedToday = summary?.playedToday == true,
                 daysRecorded = days.size,
                 today = today().toString(),
+                canShiftDay = shiftable != null,
+                dayShift = shiftable?.shiftedDays ?: 0,
                 feedbackFabShown = fab?.hidden != true,
             )
         }
@@ -110,6 +128,12 @@ data class QaToolsState(
     val playedToday: Boolean = false,
     val daysRecorded: Int = 0,
     val today: String = "",
+
+    /** False in any build without the override, which hides the whole section. */
+    val canShiftDay: Boolean = false,
+
+    /** Calendar days the app's clock is moved by, positive or negative. */
+    val dayShift: Int = 0,
     /**
      * Defaults to shown, which is what the cache defaults to. A false here
      * before the read lands would blink the toggle off on every open.
@@ -128,5 +152,7 @@ sealed interface QaToolsAction {
     data object ClearPlayDays : QaToolsAction
     data object ResetPrompts : QaToolsAction
     data class ShowFeedbackFab(val shown: Boolean) : QaToolsAction
+    data class ShiftDay(val days: Int) : QaToolsAction
+    data object ClearDayShift : QaToolsAction
     data object Back : QaToolsAction
 }

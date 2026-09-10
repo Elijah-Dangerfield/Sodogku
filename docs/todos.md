@@ -201,33 +201,6 @@ for the reason in `proposals.md`. Meowdoku's own reviewers say its boards start
 repeating around every 100, so this is a place where we can be better rather
 than merely bigger.
 
-## SD-16 [P2] — The QA panel cannot move the day
-
-**Ask:** Owner, 2026-09-09: "How can I test out streaks without actually playing
-them?"
-
-**Half of this shipped.** `com.sodogku.qa.QaToolsScreen` exists, is reachable
-from Settings and from the shake dialog in debug builds, and can seed past days,
-mark today played, reset the streak prompts and wipe the lot. That covers
-testing the streak itself, which was the original need.
-
-**What is left is the clock.** Nothing can move the date the daily and streak
-code sees, so anything that depends on a *rollover* still needs real calendar
-time: watching a run break at midnight, checking the countdown as it runs down,
-or seeing the calendar redraw when the day changes.
-
-**Done when:** The panel can set the date the app resolves as today, and undo it.
-
-**Hints:** Both `DailyRepositoryImpl` and `StreakRepositoryImpl` take a
-`kotlin.time.Clock` and a `DeviceTimeZone` and derive everything from them, so
-the seam already exists and there is exactly one place to override. Two rules to
-respect rather than route around: future-dated results are deliberately invisible
-to the walk (`playCalendarOn` checks future before played, for exactly this), and
-the skip allowance keeps a high-water day on purpose.
-
-Freeze and restore were part of the original ask and are no longer testable
-because they are no longer designed; see SD-28.
-
 ## SD-17 [P2] — A time to beat on a replay
 
 **Ask:** Owner, 2026-09-09, on the ghost race: "I wouldn't wanna see my previous

@@ -186,6 +186,11 @@ jobs:
       # not -P, so the pre-build link and the xcodebuild-driven embedAndSign
       # agree — see libraries/networking/impl/build.gradle.kts.
       SODOGKU_WIRETAP_IOS: "false"
+      # Leave the QA panel's day-shift clock out of the framework, so the
+      # store binary has no override to bind and Clock resolves to
+      # SystemClock. Same env-var reasoning as above — see
+      # apps/compose/build.gradle.kts.
+      SODOGKU_QA_CLOCK_IOS: "false"
       # In-app BuildInfo.* only — the store CFBundleVersion is a timestamp set by
       # fastlane's beta lane. See release.yml for the same note.
       VERSION_CODE_OVERRIDE: ${{ needs.build-number.outputs.value }}

@@ -77,6 +77,46 @@ fun QaToolsScreen(
             // way to undo it: their play days are the only copy there is.
             if (!BuildInfo.isDebug) return@Column
 
+            if (state.canShiftDay) {
+                VerticalSpacerD500()
+
+                Text(text = "Clock", typography = AppTheme.typography.Heading.H600)
+
+                Text(
+                    text = if (state.dayShift == 0) {
+                        "Running on real time. Shifting the day moves the daily, its " +
+                            "countdown, the streak and the calendar together, and survives " +
+                            "a restart. Screens already open pick it up when they next " +
+                            "reload — the streak page redraws on entry, the game screen on " +
+                            "relaunch."
+                    } else {
+                        "Shifted ${state.dayShift.withSign()} days. " +
+                            "Real time is untouched; only the date the app resolves has moved."
+                    },
+                    typography = AppTheme.typography.Body.B500,
+                    color = AppTheme.colors.textSecondary,
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D400)) {
+                    listOf(-7, -1, 1, 7).forEach { days ->
+                        ButtonSecondary(
+                            onClick = { onAction(QaToolsAction.ShiftDay(days)) },
+                            size = ButtonSize.Small,
+                        ) {
+                            Text("${days.withSign()}d")
+                        }
+                    }
+                }
+
+                ButtonSecondary(
+                    onClick = { onAction(QaToolsAction.ClearDayShift) },
+                    size = ButtonSize.Small,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Back to real time")
+                }
+            }
+
             Text(text = "Streak", typography = AppTheme.typography.Heading.H600)
 
             Text(
@@ -133,3 +173,5 @@ fun QaToolsScreen(
         }
     }
 }
+
+private fun Int.withSign(): String = if (this < 0) toString() else "+$this"

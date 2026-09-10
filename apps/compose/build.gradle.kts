@@ -62,6 +62,43 @@ sentry {
     telemetry.set(false)
 }
 
+// The QA panel's day-shift clock (`src/qaClock/kotlin`) is debug-only, and
+// "debug-only" has to be spelled twice because the two platforms disagree
+// about what a build type is.
+//
+// Android has one: `androidDebug` is compiled into the debug variant and into
+// nothing else, so the release APK — and `benchmarkRelease` and
+// `nonMinifiedRelease` with it — contains no override to bind, and `Clock`
+// resolves to `SystemClock`. No flag, nothing to remember.
+//
+// iOS has no such split at the Gradle level: `iosMain` compiles once and both
+// framework link steps consume it. So the directory is chosen by a flag, the
+// same way `libraries/networking/impl` picks the real Wiretap versus its noop,
+// and for the same reasons — default on so a local iOS dev build has the tool
+// without being asked, and an env var rather than `-P` because the release
+// framework is linked by two separate Gradle invocations (the CI pre-build and
+// the xcodebuild-driven embedAndSign) and only an env var is inherited by
+// both. The Fastfile and the beta/release workflows set it to false.
+// `QaShiftedClock` also refuses to load a stored shift outside a debug binary,
+// so a Release-configuration build that skipped the flag is still unshifted.
+val qaClockIosEnabled =
+    (providers.environmentVariable("SODOGKU_QA_CLOCK_IOS").orNull
+        ?: providers.gradleProperty("sodogku.qaclock.ios").orNull
+        ?: "true").toBoolean()
+
+// `configureEach` rather than `named(...)`: AGP creates the per-variant Kotlin
+// source sets after this file is evaluated, so naming them here is too early.
+kotlin.sourceSets.configureEach {
+    when (name) {
+        "androidDebug" -> kotlin.srcDir("src/qaClock/kotlin")
+        "iosMain" -> if (qaClockIosEnabled) kotlin.srcDir("src/qaClock/kotlin")
+        // Tests for the above. `androidUnitTestDebug`, not `androidUnitTest`:
+        // only the debug unit-test variant has that source directory on its
+        // compile path, so a level up would break `testReleaseUnitTest`.
+        "androidUnitTestDebug" -> kotlin.srcDir("src/qaClockTest/kotlin")
+    }
+}
+
 kotlin {
 
     sourceSets {

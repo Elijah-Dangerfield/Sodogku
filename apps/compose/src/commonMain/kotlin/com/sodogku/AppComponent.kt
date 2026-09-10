@@ -92,8 +92,13 @@ interface AppComponent {
      */
     val autoInits: Set<AutoInit>
 
-    @Provides
-    fun provideClock(): Clock = Clock.System
+    /**
+     * Wall time, for `LocalClock`. Bound by [SystemClock], or by the QA
+     * panel's day-shifted clock in a build that has one — see
+     * [com.sodogku.qa.ShiftableClock]. An accessor rather than a `@Provides`
+     * so there is exactly one binding to override.
+     */
+    val clock: Clock
 
     /**
      * The monotonic clock, for anything measuring *elapsed* time rather than

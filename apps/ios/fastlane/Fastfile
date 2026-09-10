@@ -27,6 +27,10 @@ platform :ios do
     # -Psodogku.wiretap.ios, so every Gradle invocation in the build
     # agrees — see libraries/networking/impl/build.gradle.kts.
     ENV["SODOGKU_WIRETAP_IOS"] ||= "false"
+    # Same deal for the QA panel's day-shift clock: keep the override out of
+    # the framework so a store build has only the system clock to bind. See
+    # apps/compose/build.gradle.kts.
+    ENV["SODOGKU_QA_CLOCK_IOS"] ||= "false"
   end
 
   desc "Preview: upload to TestFlight internal only (used on pushes to main)"
