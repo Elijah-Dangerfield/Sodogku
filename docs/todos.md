@@ -397,55 +397,6 @@ do to the hosting `UIViewController` and therefore to the lifecycle owner.
 
 Reproduce with the log lines above rather than by guessing: `Enqueuing
 navigation` with no visible result is the signature.
-## SD-32 [P1] — The app still ships a Supabase anon key, and a pile of account machinery nothing calls
-
-**Found by:** the SD-30 agent, 2026-09-10, while clearing account-era leftovers.
-
-Accounts were deleted in C0. The machinery was not, and some of it is still
-compiled into the shipped binary.
-
-**The one that is not merely untidy:** `libraries/core/SupabaseInfo.kt` exposes
-`SUPABASE_PROJECT_ID`, `SUPABASE_URL` and `SUPABASE_ANON_KEY`, wired through
-`build-logic/.../Versioning.kt:150` into `BuildConfig`. **Nothing reads it**, and
-a grep for `SupabaseInfo.` returns no call sites at all. So every release build
-carries a Supabase anon key for a project the app never contacts. Not a
-vulnerability on its own, an anon key is meant to be public, but shipping a
-credential for a service you do not use is the kind of thing a security review
-asks about and nobody can answer.
-
-The rest, all confirmed present and uncalled:
-
-- **The server still has a Supabase auth surface.** `ServerConfig.kt:162-188`
-  parses `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and KDocs in
-  `Application.kt` and `ServerConfig.kt` describe "the authenticated `/v1/me`
-  route". There is no `MeRoutes` and no auth plugin.
-- `libraries/core/AuthGate.kt`, a whole guest/claimed/anonymous vocabulary,
-  referenced in 13 places.
-- `libraries/networking/`: `SessionRejectionBus` (AGENTS.md already notes nothing
-  can trigger it), `AuthTokenInvalidator`, `AuthTokenProvider`.
-- `NativeViewFactory.createAppleSignInButton` and `AppleSignInButtonHost` in
-  `IOSNativeViewFactory.swift`, fully implemented, no caller.
-- `libraries/navigation/impl/build.gradle.kts:18-22`, comments about minting
-  guest sessions and a `SignInRoute`.
-- `config/detekt/baseline.xml:42,45`, baselined onboarding strings "Continue as
-  guest" and "sign in to pick up where you left off".
-
-**Done when:** no Supabase credential is compiled into a release build, and a
-grep for `AuthGate`, `SignIn`, `guest` or `Supabase` in `libraries/` and
-`apps/compose/` returns nothing live.
-
-**Do the key first and separately.** It is the only part with a consequence, and
-it should not wait behind a large deletion.
-
-**This app was generated from `Workspace/KMPTemplate`, so the key is probably
-still there too.** Whatever the fix is here, it belongs in the template as well,
-or the next app generated from it ships the same credential. The template keeps
-`docs/PORT-CANDIDATES.md` for exactly this.
-
-**Hints:** Start from `Versioning.kt:138,150` and work outward. `PROFILE_WRITE_LIMIT`
-on the server was left in place deliberately by the SD-30 agent because that
-todo named only two rate limits; decide whether it goes too.
-
 ## SD-34 [P1] — There is no way to test a composable
 
 **Found by:** the SD-26 investigation, 2026-09-10.
@@ -481,3 +432,60 @@ Weigh this against what it costs. A UI test tier that nobody trusts is worse
 than none, so the bar is that it runs in CI, does not flake, and fails for a real
 reason. If the first two tests cannot meet that, say so and close this rather
 than leaving a tier half built.
+
+## SD-35 [P2] — Remote config offers a targeting axis that can never match
+
+**Found by:** the SD-32 agent, 2026-09-10, while clearing account-era leftovers.
+
+The admin console still offers a "uuid (for allow/deny + rollout)" input,
+`RuleEditor` seeds `userAllow` from it, and the server deserializes
+`ResolveRequest.userId` and then discards it. There are no accounts, so there is
+no user id to match on and there never will be under the current design.
+
+So an operator can author a rule, save it, see it listed, and have it silently
+never fire. A control that looks like it works and does not is worse than a
+missing one, because the operator debugs the feature instead of the console.
+
+**Done when:** the axis is either removed from the console and the request
+shape, or it is wired to something that exists (the install id is the obvious
+candidate, and is what every other targeting decision already uses).
+
+**Hints:** Prefer removing it. Install-id targeting sounds free and is not: it
+would make config resolution depend on an identifier the privacy policy
+describes as device-scoped, which is a policy question rather than a code one.
+Touches `:apps:admin` and possibly a migration.
+
+## SD-36 [P2] — `docs/store/data-safety.md` answers against code that no longer exists
+
+**Found by:** the SD-32 agent, 2026-09-10.
+
+Items 5, 6 and 8 cite `DELETE_ACCOUNT_LIMIT`, `PLAYER_REPORT_LIMIT` and manifest
+comments that were deleted with the account machinery. The file is a dated
+derivation record rather than the form itself, so nothing is broken today, but a
+store form filled from it would be answering Google about a code state that has
+not existed since C0.
+
+**Done when:** the three items are re-derived against the code that exists, or
+the file says at the top which date it was true on and that it must be re-derived
+before use.
+
+**Hints:** Cheaper than it looks. The owner has already filed the form once, so
+this is about the next time rather than this time. Decide first whether the file
+is worth keeping at all: if the answer is "re-derive it when asked", a two-line
+note beats a stale nine-item table.
+
+## SD-37 [P2] — `ConfigValuesAreReadTest` walks directories Gradle is writing
+
+**Found by:** the SD-32 agent, 2026-09-10, after it failed once and passed on
+re-run with no change.
+
+It walks `apps/**` including `build/` directories, and `FileTreeWalk` throws when
+a file vanishes underneath it. A test that fails once in twenty for a reason that
+has nothing to do with what it asserts is a test people re-run instead of read.
+
+**Done when:** the walk cannot see a generated directory.
+
+**Hints:** `UserFacingCopyStyleTest` had the same class of bug and the fix is
+already there to copy: an `onEnter` filter excluding `build`, `.git` and
+`.claude`. Check every other source-walking test in `:apps:integration` in the
+same pass rather than fixing the one that happened to fail.
