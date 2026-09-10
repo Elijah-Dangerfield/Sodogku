@@ -11,6 +11,7 @@ import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.progress.daily.FreezeResult
 import com.sodogku.libraries.progress.daily.RestoreResult
 import com.sodogku.libraries.puzzle.Solution
+import com.sodogku.libraries.puzzle.Technique
 import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
@@ -306,6 +307,18 @@ data class GameState(
      * asking to keep them puts the hint on the board and keeps it a decision.
      */
     val hintCells: Set<Int> = emptySet(),
+
+    /**
+     * The reasoning that shut every square in [hintCells], for the sheet to say
+     * out loud. Null whenever [hintCells] is empty, and never otherwise.
+     *
+     * One technique for the whole set rather than one per square, which is only
+     * honest because the set is cut to fit it: `HintFinder.strongestReason`
+     * picks the reason first and lights the squares that reason proved. A
+     * sentence covering crosses it does not explain is worse than no sentence,
+     * because a player who checks it once learns not to check it again.
+     */
+    val hintReason: Technique? = null,
 
     /**
      * Whether the boosters should be asking to be pressed, from

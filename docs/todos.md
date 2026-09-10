@@ -149,25 +149,6 @@ player who has never opted into a Games profile, which is a normal state and not
 an error, and the console needs the boards created and published before a
 submission is anything but a silent no-op.
 
-## SD-11 [P1] — A sniff should say what proved it
-
-**Ask:** `HintFinder.ruledOutCells` returns `List<Int>` and throws away the
-`Deduction.technique` the engine has already computed. The single most praised
-feature in Meowdoku's reviews is that its hint explains why a cat can or cannot
-go somewhere instead of just handing over the square. We do the harder half
-already and say nothing.
-
-**Done when:** The sniff reveal carries the technique that ruled those squares
-out, and the board shows one sentence naming it in a player's words, for example
-"only one square in this region is still open in this row".
-
-**Hints:** `libraries/puzzle/.../Difficulty.kt:105` is the function.
-`Techniques.kt` already has five named tiers whose doc comments read almost as
-the copy. Words live in `:libraries:resources` and map with an exhaustive
-`when`, the same rule achievements follow, so a new technique fails the build
-until somebody writes its sentence. The strike path already names the rule that
-was broken (`b490d40`); this is the same idea on the help path.
-
 ## SD-12 [P1] — The starter dog leaves too early
 
 **Ask:** Owner, 2026-09-09: "I feel like we remove the starting dog too soon."

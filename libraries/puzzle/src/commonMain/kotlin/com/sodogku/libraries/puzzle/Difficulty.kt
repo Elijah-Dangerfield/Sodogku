@@ -45,6 +45,26 @@ object Difficulty {
 object HintFinder {
 
     /**
+     * A square deduction shut, and the [Technique] whose step shut it.
+     *
+     * First step wins. A square is usually re-proved by everything that follows,
+     * so crediting the latest step would credit the deepest reasoning for a
+     * square the shallowest had already closed, and the sentence the player
+     * reads would be harder than the one they could have used.
+     */
+    data class RuledOut(val cell: Int, val technique: Technique)
+
+    /**
+     * One technique, and only the squares that technique proved.
+     *
+     * [cells] is a subset of what was found rather than all of it, and that is
+     * the point of the type: a batch usually spans two or three techniques, and
+     * naming one of them over all of the crosses would be false for some of the
+     * squares the player is looking at.
+     */
+    data class HintReason(val technique: Technique, val cells: Set<Int>)
+
+    /**
      * The cell to reveal given what the player has already placed, or null when
      * the board is finished or the placements have gone wrong.
      *
@@ -101,27 +121,70 @@ object HintFinder {
      * [limit] has no default. Left unbounded this returns every non-dog square on
      * the board — 90 of 100 at 10x10 — which hands over the answer by exclusion.
      * That is never what a caller wants, so it has to be an explicit choice.
+     *
+     * Each square carries the technique that shut it, because a cross the player
+     * cannot account for teaches them to stop asking. Which of those techniques
+     * the hint actually says out loud is [strongestReason]'s decision.
      */
-    fun ruledOutCells(board: Board, placed: Solution, limit: Int): List<Int> {
+    fun ruledOutCells(board: Board, placed: Solution, limit: Int): List<RuledOut> {
         if (placed.isComplete || limit <= 0) return emptyList()
         if (isDeadEnd(board, placed)) return emptyList()
 
         val grid = CandidateGrid.of(board, placed)
         val alreadyKnown = (0 until board.cellCount).filterNot { grid.isCandidate(it) }.toSet()
-        val found = LinkedHashSet<Int>()
+        val found = LinkedHashMap<Int, Technique>()
 
         while (found.size < limit && !grid.isSolved && !grid.isContradicted) {
-            when (val step = DeductionEngine.nextStep(grid) ?: break) {
+            val step = DeductionEngine.nextStep(grid) ?: break
+            when (step) {
                 is Deduction.Place -> grid.place(step.cell)
                 is Deduction.Eliminate -> step.cells.forEach { grid.eliminate(it) }
             }
             (0 until board.cellCount).forEach { cell ->
                 if (cell !in alreadyKnown && !grid.isCandidate(cell) && !grid.isPlaced(cell)) {
-                    found += cell
+                    // A placement shuts a square as surely as an elimination
+                    // does, and on an easy board it is the only thing that ever
+                    // shuts one. The step that did it owns the square either way.
+                    found.getOrPut(cell) { step.technique }
                 }
             }
         }
-        return found.take(limit)
+        return found.entries.take(limit).map { RuledOut(it.key, it.value) }
+    }
+
+    /**
+     * The one technique worth saying, and only the squares it proved.
+     *
+     * A batch of squares is rarely all one technique's work, so there are three
+     * ways to report it and two of them are bad. Per-square reasons are four
+     * sentences in a speech bubble that already holds a title, a count and two
+     * buttons. One reason over all the squares is worse than verbose: it is
+     * wrong about the squares the other techniques closed, and a player who
+     * checks the sentence against a cross it does not explain learns that the
+     * sentence is decoration.
+     *
+     * So the reason is chosen first and the reveal is cut to fit it. That sounds
+     * like it costs the player squares and measurably does not: over 199 hints
+     * on generated boards, 39% of batches spanned more than one technique and
+     * cutting them cost 5 crosses in total, none of them more than one from a
+     * single hint. The biggest group is nearly always big enough to fill the
+     * sheet on its own.
+     *
+     * Ordered by how many squares a technique accounts for, counted as they will
+     * be *shown* rather than as they were found: two techniques that both fill
+     * the sheet are equally generous, and between equals the shallower tier wins
+     * because it is the one the player has a chance of following.
+     */
+    fun strongestReason(ruledOut: List<RuledOut>, limit: Int): HintReason? {
+        if (limit <= 0) return null
+        return ruledOut.groupBy { it.technique }
+            .map { (technique, shut) ->
+                HintReason(technique, shut.take(limit).map { it.cell }.toSet())
+            }
+            .sortedWith(
+                compareByDescending<HintReason> { it.cells.size }.thenBy { it.technique.tier },
+            )
+            .firstOrNull()
     }
 
     /**

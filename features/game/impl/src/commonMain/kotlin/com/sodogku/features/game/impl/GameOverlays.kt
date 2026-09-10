@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import com.sodogku.libraries.puzzle.Technique
 import com.sodogku.libraries.ui.components.game.CoachMark
 import com.sodogku.libraries.ui.components.text.Text
 import androidx.compose.ui.geometry.Rect
@@ -32,6 +33,11 @@ import sodogku.libraries.resources.generated.resources.board_action_mark
 import sodogku.libraries.resources.generated.resources.board_action_place
 import sodogku.libraries.resources.generated.resources.game_last_bone_body
 import sodogku.libraries.resources.generated.resources.game_last_bone_title
+import sodogku.libraries.resources.generated.resources.hint_reason_adjacency
+import sodogku.libraries.resources.generated.resources.hint_reason_confinement
+import sodogku.libraries.resources.generated.resources.hint_reason_contradiction
+import sodogku.libraries.resources.generated.resources.hint_reason_last_candidate
+import sodogku.libraries.resources.generated.resources.hint_reason_naked_set
 import sodogku.libraries.resources.generated.resources.hint_title
 import sodogku.libraries.resources.generated.resources.tutorial_auto_mark_body
 import sodogku.libraries.resources.generated.resources.tutorial_auto_mark_title
@@ -160,6 +166,17 @@ fun BoxScope.SniffHint(state: GameState, onAction: (GameAction) -> Unit) {
                 color = AppTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
             )
+            state.hintReason?.let { technique ->
+                Text(
+                    // The lesson, and the only line here that is not chrome, so
+                    // it keeps the full-contrast text the count gives up. The
+                    // count above it is a receipt; this is what the charge
+                    // bought.
+                    text = stringResource(reasonOf(technique)),
+                    typography = AppTheme.typography.Body.B400,
+                    textAlign = TextAlign.Center,
+                )
+            }
             // Stacked, not side by side. The bubble is narrower than the
             // screen and two buttons in a row truncated the second one to
             // "LEAV..." on a 1080p phone. This is also what every dialog in the
@@ -184,6 +201,27 @@ fun BoxScope.SniffHint(state: GameState, onAction: (GameAction) -> Unit) {
             }
         }
     }
+}
+
+/**
+ * The sentence for the reasoning that shut the lit squares.
+ *
+ * An exhaustive `when` over [Technique] rather than a lookup with a fallback,
+ * which is the whole safety of it: adding a sixth technique to the engine stops
+ * compiling here until somebody has written what it says to a player. A default
+ * branch would ship the new reasoning under the old sentence, and the sentence
+ * would be wrong about the squares without being wrong on screen.
+ *
+ * Every line is in the three rules the chips under the board already name, not
+ * in the solver's vocabulary. A player has read "1 dog per color" a hundred
+ * times and has never heard of a candidate set.
+ */
+internal fun reasonOf(technique: Technique): StringResource = when (technique) {
+    Technique.LastCandidateInGroup -> Res.string.hint_reason_last_candidate
+    Technique.AdjacencyConfinement -> Res.string.hint_reason_adjacency
+    Technique.GroupConfinement -> Res.string.hint_reason_confinement
+    Technique.NakedSet -> Res.string.hint_reason_naked_set
+    Technique.Contradiction -> Res.string.hint_reason_contradiction
 }
 
 /**

@@ -246,6 +246,23 @@
     <string name="booster_have">You have %1$d</string>
     <string name="hint_title">No dogs here</string>
 
+    <!-- What proved it, one line per Technique, mapped by an exhaustive `when` in
+         GameOverlays so a new technique fails the build until its sentence is
+         written. One sentence covers the whole reveal, which is only honest
+         because `HintFinder.strongestReason` cuts the reveal down to the squares
+         that one technique proved.
+
+         Written in the three rules the player already reads off the chips under
+         the board: 1 dog per color, 1 dog per row and column, dogs cannot touch.
+         The solver's own names for these are about candidate sets, and a player
+         has never seen a candidate set. None of them says which square holds the
+         dog, because the booster promises it never will. -->
+    <string name="hint_reason_last_candidate">One square has to hold a dog, and these are the ones it rules out.</string>
+    <string name="hint_reason_adjacency">A dog on any of these would leave the next row or column nowhere to sit without touching it.</string>
+    <string name="hint_reason_confinement">One color has to share its dog with a row or column, so these squares are out.</string>
+    <string name="hint_reason_naked_set">A few colors have only the same few rows or columns left, so nothing else fits there.</string>
+    <string name="hint_reason_contradiction">A dog on any of these leaves the rest of the board with no answer.</string>
+
     <!-- Tutorial (SPEC 10). One title + body per TutorialStep; the exhaustive
          `when` in TutorialCoachMark is what keeps this list honest.
 

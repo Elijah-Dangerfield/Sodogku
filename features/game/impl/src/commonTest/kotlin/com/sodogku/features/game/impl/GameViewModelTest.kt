@@ -63,6 +63,7 @@ import com.sodogku.libraries.achievements.Stat
 import com.sodogku.libraries.leaderboards.Leaderboard
 import com.sodogku.libraries.leaderboards.Leaderboards
 import com.sodogku.libraries.leaderboards.NoLeaderboards
+import com.sodogku.libraries.puzzle.HintFinder
 import com.sodogku.libraries.puzzle.autoMarkedCells
 import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.Standing
@@ -740,6 +741,62 @@ class GameViewModelTest : CoroutineTest() {
             vm.state.hintCells.none { it in vm.state.manualMarks },
             "the sniff crossed squares off without being asked",
         )
+    }
+
+    @Test
+    fun aSniffSaysWhatProvedIt() = runUnitTest {
+        // The crosses without the sentence are the game saying trust me, which
+        // is the one thing a deduction puzzle cannot afford to say.
+        val vm = viewModel(levelId = MixedReasonLevel)
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+        settle()
+
+        assertTrue(vm.state.hintCells.isNotEmpty(), "the sniff proposed nothing, so this proves nothing")
+        val reason = assertNotNull(vm.state.hintReason, "the sniff crossed squares off and said nothing")
+        // Not a mirror of the ViewModel's own arithmetic. This asks the engine
+        // the question the sheet is about to answer for the player: is every
+        // square it lit one this reasoning actually shut? A reveal assembled
+        // from the whole batch and labelled with one technique passes every
+        // count-based assertion and fails this one.
+        val batch = HintFinder.ruledOutCells(
+            assertNotNull(vm.state.level).board,
+            vm.state.placed,
+            limit = WHOLE_BATCH,
+        )
+        // The premise, checked rather than assumed. A regenerated pack moves
+        // every board under its id, and on a board with one technique in it the
+        // assertion below passes whatever the sniff lights.
+        assertTrue(
+            batch.map { it.technique }.distinct().size > 1,
+            "level $MixedReasonLevel has one reason in it now, so this test cannot fail",
+        )
+        val proved = batch.filter { it.technique == reason }.map { it.cell }.toSet()
+        assertEquals(
+            emptySet(),
+            vm.state.hintCells - proved,
+            "$reason did not prove every square the sniff crossed",
+        )
+    }
+
+    @Test
+    fun theSentenceLeavesWithTheSquares() = runUnitTest {
+        // Both exits, in one test, because the failure is the same shape either
+        // way: a reason outliving its squares is a sentence about a board that
+        // has moved on, and the next sniff that finds nothing would show it.
+        listOf(GameAction.ApplyHint, GameAction.DiscardHint).forEach { exit ->
+            val vm = viewModel()
+            vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+            vm.takeAction(GameAction.BoosterConfirmed(Consumable.Sniff))
+            settle()
+            assertNotNull(vm.state.hintReason, "nothing was proposed, so $exit proves nothing")
+
+            vm.takeAction(exit)
+            settle()
+
+            assertNull(vm.state.hintReason, "$exit left the reason on screen")
+        }
     }
 
     @Test
@@ -4251,6 +4308,12 @@ class GameViewModelTest : CoroutineTest() {
         }
 
     private companion object {
+        /**
+         * Everything the engine can reach, so a check against what a
+         * technique proved is not fenced in by the sheet's own limit.
+         */
+        const val WHOLE_BATCH = 200
+
         const val FixedHour = 12
 
         /** Arbitrary, and deliberately not "today" — nothing here reads a clock. */
@@ -4273,6 +4336,19 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Past the starter-dog band, so the board opens empty. */
         const val PlainLevel = 200
+
+        /**
+         * A shipped board whose opening sniff has more than one reason in it: 4
+         * squares from confinement and 20 from a forced dog, and the two sets do
+         * not overlap.
+         *
+         * Named rather than reached for at random because most boards do not
+         * work here. On the usual one the whole batch comes from a single
+         * technique, so a hint that lit the entire batch and named one reason
+         * would be telling the truth by accident, and a test on that board
+         * cannot tell the two apart.
+         */
+        const val MixedReasonLevel = 173
 
         /** Inside the starter-dog band. */
         const val StarterDogLevel = 1

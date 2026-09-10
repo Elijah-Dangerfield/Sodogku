@@ -440,10 +440,12 @@ class GameViewModel(
             GameAction.Retry -> action.restart()
             GameAction.Leave -> sendEvent(GameEvent.NavigateBack)
             GameAction.DismissWarning -> action.updateState {
-                it.copy(warning = null, hintCells = emptySet())
+                it.copy(warning = null, hintCells = emptySet(), hintReason = null)
             }
             GameAction.ApplyHint -> action.applyHint()
-            GameAction.DiscardHint -> action.updateState { it.copy(hintCells = emptySet()) }
+            GameAction.DiscardHint -> action.updateState {
+                it.copy(hintCells = emptySet(), hintReason = null)
+            }
             GameAction.RefillBones -> action.refillBones()
             is GameAction.BonesChanged -> action.updateState {
                 it.copy(livesRemaining = action.bones)
@@ -2321,16 +2323,19 @@ class GameViewModel(
         // `HintFinder` excludes the cascade on its own, so this line is belt and
         // braces there; it is load-bearing for the other three sets.
         val known = state.autoMarks + state.manualMarks + state.placedCells + state.wrongGuesses
+        // Filtered *before* the reason is chosen, not after. The squares the
+        // player already has crossed off are not part of what this sniff is
+        // explaining, so counting them would let a technique that shows the
+        // player nothing new out-vote one that shows them four squares.
         val ruledOut = HintFinder
             .ruledOutCells(level.board, state.placed, limit = SniffRevealLimit * SniffSearchSlack)
-            .filterNot { cell -> cell in known }
-            .take(SniffRevealLimit)
-            .toSet()
+            .filterNot { it.cell in known }
+        val reason = HintFinder.strongestReason(ruledOut, limit = SniffRevealLimit)
 
         // A booster that costs a charge and shows nothing is worse than one that
         // refuses. If deduction has nothing left to add, close the prompt and
         // keep the sniff.
-        if (ruledOut.isEmpty()) {
+        if (reason == null) {
             logger.logEvent(
                 "game.booster_no_op",
                 "booster" to "sniff",
@@ -2343,7 +2348,14 @@ class GameViewModel(
             return
         }
 
-        logger.logEvent("game.booster_used", "booster" to "sniff", "level_id" to level.id)
+        logger.logEvent(
+            "game.booster_used",
+            "booster" to "sniff",
+            "level_id" to level.id,
+            // Which reasoning the hint had to reach for, which is the closest
+            // thing to a read on where players actually get stuck.
+            "technique" to reason.technique.name,
+        )
         sniffsUsed++
         persistCounts(Consumable.Sniff, state.sniffs - 1)
         // `updateBoard`, not `updateState`, and that is the whole fix.
@@ -2363,7 +2375,8 @@ class GameViewModel(
                 // from the count the win writes.
                 boostersUsed = sniffsUsed + treatsUsed,
                 boosterPrompt = null,
-                hintCells = ruledOut,
+                hintCells = reason.cells,
+                hintReason = reason.technique,
             )
         }
     }
@@ -2387,6 +2400,7 @@ class GameViewModel(
             it.copy(
                 manualMarks = it.manualMarks + proposed,
                 hintCells = emptySet(),
+                hintReason = null,
             )
         }
         logger.logEvent(

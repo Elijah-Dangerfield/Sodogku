@@ -141,7 +141,7 @@ class DeductionSoundnessTest {
         var placed = Solution.empty(board.size)
 
         repeat(board.size) {
-            val ruledOut = HintFinder.ruledOutCells(board, placed, limit = HINT_LIMIT)
+            val ruledOut = HintFinder.ruledOutCells(board, placed, limit = HINT_LIMIT).map { it.cell }
             assertTrue(
                 ruledOut.none { it in truth },
                 "hint ruled out ${ruledOut.filter { c -> c in truth }} from the answer\n$board",
