@@ -121,7 +121,9 @@ tasks.withType<Test>().configureEach {
     inputs.files(
         rootProject.fileTree(repo) {
             include("**/composeResources/**/*.xml")
-            exclude("**/build/**")
+            // `.claude` holds agent worktrees, which are full checkouts: without
+            // this the task's inputs change every time an agent edits anything.
+            exclude("**/build/**", ".claude/**")
         },
     ).withPropertyName("stringResourceScan")
 

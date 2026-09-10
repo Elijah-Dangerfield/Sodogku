@@ -114,7 +114,11 @@ class UserFacingCopyStyleTest {
     private fun resourceFiles(): List<File> {
         val root = File(repoRoot())
         val files = root.walkTopDown()
-            .onEnter { it.name != "build" && it.name != ".git" }
+            // `.claude` holds agent worktrees, which are full checkouts of this
+            // repo. Without excluding it the walk scans every worktree's copy of
+            // every strings.xml, so a rule fails against a file that is not in
+            // the tree and may be several commits stale.
+            .onEnter { it.name !in setOf("build", ".git", ".claude") }
             .filter { it.isFile && it.name == "strings.xml" && it.parentFile.name == "values" }
             .toList()
 
