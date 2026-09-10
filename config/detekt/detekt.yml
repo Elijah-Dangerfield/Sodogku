@@ -8,10 +8,17 @@ sodogku:
   active: true
   VerifyStrings:
     active: true
-    # The config admin tool (:apps:admin) is a local-only, English-only dev
-    # utility with no :libraries:resources dependency — the i18n rule doesn't
-    # apply. Its `Text(...)` is Compose HTML's, not the DS composable anyway.
-    excludes: ['**/apps/admin/**']
+    # Two dev-only surfaces, both English-only and neither shipped to a player.
+    #
+    # The config admin tool (:apps:admin) is a local-only utility with no
+    # :libraries:resources dependency — the i18n rule doesn't apply, and its
+    # `Text(...)` is Compose HTML's, not the DS composable anyway.
+    #
+    # The QA menu renders only in debug builds, reached from Settings or the
+    # shake dialog. Putting "Seed 6 days" in strings.xml would hand a translator
+    # developer tooling and put it in the shipped resource table. `ShakeDialog`
+    # already hardcodes its own debug-only button label for the same reason.
+    excludes: ['**/apps/admin/**', '**/com/sodogku/qa/**']
   AnimatedStateReadInComposition:
     active: true
   NoRawDesignValues:

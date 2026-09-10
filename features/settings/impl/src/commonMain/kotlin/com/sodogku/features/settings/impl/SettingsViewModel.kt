@@ -67,6 +67,7 @@ class SettingsViewModel(
             SettingsAction.ToggleAchievements -> action.toggleAchievements()
             SettingsAction.RerunTutorial -> action.rerunTutorial()
             SettingsAction.OpenAchievements -> sendEvent(SettingsEvent.OpenAchievements)
+            SettingsAction.OpenQaTools -> sendEvent(SettingsEvent.OpenQaTools)
             SettingsAction.OpenLeaderboards -> leaderboards.openDashboard()
             is SettingsAction.LeaderboardsOfferable -> action.updateState {
                 it.copy(leaderboardsOfferable = action.offerable)
@@ -265,6 +266,9 @@ sealed interface SettingsEvent {
     data object OpenFeedback : SettingsEvent
     data object OpenAchievements : SettingsEvent
 
+    /** Debug builds only; the row that sends it is behind `BuildInfo.isDebug`. */
+    data object OpenQaTools : SettingsEvent
+
     /** The Pro sheet, opened by the player rather than offered. */
     data object OpenPaywall : SettingsEvent
 
@@ -285,6 +289,8 @@ sealed interface SettingsAction {
     data object ToggleAchievements : SettingsAction
     data object RerunTutorial : SettingsAction
     data object OpenAchievements : SettingsAction
+
+    data object OpenQaTools : SettingsAction
 
     /**
      * Opens the platform's leaderboard dashboard.

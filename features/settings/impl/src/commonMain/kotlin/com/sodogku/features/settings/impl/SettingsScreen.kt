@@ -60,6 +60,7 @@ import sodogku.libraries.resources.generated.resources.settings_version_label
 import com.sodogku.libraries.ui.components.icon.Icon
 import com.sodogku.libraries.ui.components.icon.IconSize
 import com.sodogku.libraries.ui.components.icon.Icons
+import com.sodogku.libraries.core.BuildInfo
 import com.sodogku.system.AppTheme
 
 /**
@@ -228,6 +229,27 @@ fun SettingsScreen(
                     ),
                 ),
             )
+
+            // Debug builds only. A hardcoded label rather than a string
+            // resource, like every other dev-facing affordance: it never renders
+            // in release and a translator should not be handed "QA tools".
+            //
+            // Here as well as on the shake dialog because the two are reached
+            // from different places. Shaking is what you do mid-board; this is
+            // what you find when you are looking for it.
+            if (BuildInfo.isDebug) {
+                VerticalSpacerD800()
+
+                ListSection(
+                    title = "Debug",
+                    items = listOf(
+                        ListSectionItem(
+                            headlineText = "QA tools",
+                            onClick = { onAction(SettingsAction.OpenQaTools) },
+                        ),
+                    ),
+                )
+            }
 
             VerticalSpacerD800()
 

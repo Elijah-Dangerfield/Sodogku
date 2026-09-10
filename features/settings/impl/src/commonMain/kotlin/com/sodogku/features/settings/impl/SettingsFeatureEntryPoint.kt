@@ -15,6 +15,7 @@ import com.sodogku.features.settings.impl.feedback.FeedbackViewModel
 import com.sodogku.libraries.flowroutines.ObserveEvents
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.NavigationOptions
+import com.sodogku.libraries.navigation.QaToolsRoute
 import com.sodogku.libraries.navigation.Router
 import com.sodogku.libraries.navigation.screen
 import me.tatarka.inject.annotations.Inject
@@ -40,6 +41,7 @@ class SettingsFeatureEntryPoint(
                     SettingsEvent.NavigateBack -> router.goBack()
                     SettingsEvent.OpenFeedback -> router.navigate(FeedbackRoute())
                     SettingsEvent.OpenAchievements -> router.navigate(AchievementsRoute())
+                    SettingsEvent.OpenQaTools -> router.navigate(QaToolsRoute())
                     // `Direct` is the one trigger exempt from the trigger list
                     // and the session cap: refusing to sell to someone who
                     // walked into the shop would be absurd.

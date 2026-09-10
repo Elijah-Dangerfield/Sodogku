@@ -26,6 +26,7 @@ import sodogku.libraries.resources.generated.resources.shake_title
 // Debug-only CTA label — dev-facing, so a constant rather than a string
 // resource (the button never renders in release builds).
 private const val NetworkInspectorCta = "Network inspector"
+private const val QaToolsCta = "QA tools"
 
 /**
  * "You shook your phone, did you mean to report something?"
@@ -49,6 +50,9 @@ fun ShakeDialog(
     // Debug-only: when non-null, an extra action opens the on-device network
     // inspector. Release callers leave this null so the button never shows.
     onOpenNetworkInspector: (() -> Unit)? = null,
+    // Debug-only, same contract. The shake is the only gesture that reaches the
+    // QA menu from inside a game, which is where you are when you need it.
+    onOpenQaTools: (() -> Unit)? = null,
 ) {
     BasicDialog(
         state = state,
@@ -82,6 +86,21 @@ fun ShakeDialog(
                     type = ButtonType.Danger,
                 ) {
                     Text(stringResource(Res.string.shake_report))
+                }
+
+                if (onOpenQaTools != null) {
+                    Spacer(modifier = Modifier.height(Dimension.D500))
+                    Button(
+                        onClick = {
+                            state.dismiss()
+                            onOpenQaTools()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        size = ButtonSize.Medium,
+                        type = ButtonType.Secondary,
+                    ) {
+                        Text(QaToolsCta)
+                    }
                 }
 
                 if (onOpenNetworkInspector != null) {
