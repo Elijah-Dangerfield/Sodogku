@@ -8,6 +8,7 @@ import com.sodogku.libraries.leaderboards.SubmitResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 
 /**
  * The Android binding, which has to be inert in a way the layer above respects.
@@ -25,16 +26,23 @@ class NoGameServicesTest : CoroutineTest() {
 
         assertEquals(GameServicesStatus.Unavailable, services.status.value)
         assertEquals(SubmitResult.NotAuthenticated, services.submit("any.board", 100L))
+        assertNull(services.currentWindowStart("any.board"), "no platform, so no week")
     }
 
     @Test
     fun noEntryPointIsOfferedAndScoresGoNowhere() = runUnitTest {
         val leaderboards = RealLeaderboards(NoGameServices(), AppCoroutineScope(dispatchers))
+        var weeklyScoreRead = false
 
         leaderboards.submit(Leaderboard.LifetimeScore, 4_200L)
         leaderboards.submit(Leaderboard.LongestStreak, 30L)
+        leaderboards.submitWindowed(Leaderboard.WeeklyScore) {
+            weeklyScoreRead = true
+            900L
+        }
         leaderboards.openDashboard()
 
         assertFalse(leaderboards.isOfferable.value)
+        assertFalse(weeklyScoreRead, "Android must not read the ledger for a board it cannot show")
     }
 }

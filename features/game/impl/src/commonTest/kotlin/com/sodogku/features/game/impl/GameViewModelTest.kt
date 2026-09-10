@@ -44,6 +44,7 @@ import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
 import com.sodogku.libraries.progress.ProgressRepository
+import com.sodogku.libraries.progress.ScoreLedger
 import com.sodogku.libraries.progress.SkipRepository
 import com.sodogku.libraries.progress.SkipResult
 import com.sodogku.libraries.progress.daily.DailyOutcome
@@ -64,6 +65,7 @@ import com.sodogku.libraries.achievements.Stat
 import com.sodogku.libraries.leaderboards.Leaderboard
 import com.sodogku.libraries.leaderboards.Leaderboards
 import com.sodogku.libraries.leaderboards.NoLeaderboards
+import com.sodogku.libraries.leaderboards.WindowedScore
 import com.sodogku.libraries.puzzle.HintFinder
 import com.sodogku.libraries.puzzle.autoMarkedCells
 import com.sodogku.libraries.scoring.Scoring
@@ -4398,6 +4400,50 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(listOf(Leaderboard.LifetimeScore), posts.submitted.map { it.first })
     }
 
+    @Test
+    fun theWeeklyBoardIsPostedAsAQuestionRatherThanTheLifetimeTotal() = runUnitTest {
+        // The mistake this is here to fail on is a one-word one: passing the
+        // number already on screen to the weekly board. It would submit fine,
+        // rank everyone by lifetime score, and look right on the device.
+        val posts = RecordingLeaderboards()
+        val ledger = FixedScoreLedger(since = WeekSoFar)
+
+        val vm = viewModel(leaderboards = posts, scoreLedger = ledger)
+        solve(vm)
+
+        val (board, points) = posts.windowed.single()
+        assertEquals(Leaderboard.WeeklyScore, board)
+        assertNotEquals(
+            vm.state.lifetimeScore.toLong(),
+            WeekSoFar.toLong(),
+            "the fixture has to make the two numbers differ or this proves nothing",
+        )
+        assertEquals(WeekSoFar.toLong(), points.bankedSince(WindowStart))
+        assertEquals(listOf(WindowStart), ledger.asked, "priced against the window it was handed")
+    }
+
+    @Test
+    fun aLedgerThatCannotBeReadCostsTheWeeklyEntryAndNothingElse() = runUnitTest {
+        val posts = RecordingLeaderboards()
+
+        val vm = viewModel(
+            leaderboards = posts,
+            scoreLedger = FixedScoreLedger(broken = true),
+            streak = SilentStreak(longest = LongestRun),
+        )
+        solve(vm)
+
+        assertEquals(0L, posts.windowed.single().second.bankedSince(WindowStart))
+        assertEquals(
+            listOf(
+                Leaderboard.LifetimeScore to vm.state.lifetimeScore.toLong(),
+                Leaderboard.LongestStreak to LongestRun.toLong(),
+            ),
+            posts.submitted,
+            "the other two boards do not care that the ledger is broken",
+        )
+    }
+
     private fun day(dayOfMonth: Int, score: Int): DailyResult = DailyResult(
         date = LocalDate(2026, 9, dayOfMonth),
         levelIndex = dayOfMonth,
@@ -4426,6 +4472,7 @@ class GameViewModelTest : CoroutineTest() {
         entitlements: Entitlements = FreeEntitlementsFake(),
         cache: AppCache = InMemoryAppCache(),
         progress: ProgressRepository = InMemoryProgress(),
+        scoreLedger: ScoreLedger = FixedScoreLedger(),
         skips: SkipRepository = FakeSkips(),
         daily: DailyRepository = FakeDaily(),
         achievements: AchievementsRepository = RecordingAchievements(),
@@ -4444,6 +4491,7 @@ class GameViewModelTest : CoroutineTest() {
         clock,
         cache,
         progress,
+        scoreLedger,
         skips,
         daily,
         achievements,
@@ -4792,6 +4840,16 @@ class GameViewModelTest : CoroutineTest() {
         /** A streak record worth posting, and not one any other fake reports. */
         const val LongestRun = 9
 
+        /**
+         * A week's worth of points, chosen not to collide with any lifetime
+         * total the fixtures produce — the two being confusable is the whole
+         * failure the weekly board is exposed to.
+         */
+        const val WeekSoFar = 12_345
+
+        /** An arbitrary instant standing in for one Game Center handed back. */
+        const val WindowStart = 1_757_376_000_000L
+
         /** Mirrors `ProgressionSkipsPerDay.default`. */
         const val DefaultSkipsPerDay = 3
 
@@ -5040,6 +5098,25 @@ class GameViewModelTest : CoroutineTest() {
         }
     }
 
+    /**
+     * A ledger that answers the same number for every window, and records which
+     * windows it was asked about. [broken] is the disk failing under the lambda.
+     */
+    private class FixedScoreLedger(
+        private val since: Int = WeekSoFar,
+        private val broken: Boolean = false,
+    ) : ScoreLedger {
+        val asked = mutableListOf<Long>()
+
+        override suspend fun bank(points: Int) = Unit
+
+        override suspend fun bankedSince(startMillis: Long): Int {
+            asked += startMillis
+            if (broken) error("the ledger is gone")
+            return since
+        }
+    }
+
     /** A streak repository that cannot answer, so the clear has to cope. */
     private class BrokenStreak : StreakRepository {
         override fun observe(): Flow<StreakSummary> = emptyFlow()
@@ -5055,10 +5132,21 @@ class GameViewModelTest : CoroutineTest() {
     private class RecordingLeaderboards : Leaderboards {
         val submitted = mutableListOf<Pair<Leaderboard, Long>>()
 
+        /**
+         * The recurring boards, held unresolved. A windowed submission is a
+         * question rather than a number until the platform names a window, and
+         * the test is the thing standing in for the platform here.
+         */
+        val windowed = mutableListOf<Pair<Leaderboard, WindowedScore>>()
+
         override val isOfferable: StateFlow<Boolean> = MutableStateFlow(false)
 
         override fun submit(board: Leaderboard, value: Long) {
             submitted += board to value
+        }
+
+        override fun submitWindowed(board: Leaderboard, points: WindowedScore) {
+            windowed += board to points
         }
 
         override fun openDashboard(board: Leaderboard?) = Unit

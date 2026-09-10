@@ -91,6 +91,7 @@ class AppDatabaseMigrationTest {
             "achievement_fact",
             "achievement_unlock",
             "play_day",
+            "score_event",
         ).forEach {
             assertTrue(it in tables, "$it is missing after the upgrade; found $tables")
         }
@@ -132,7 +133,7 @@ class AppDatabaseMigrationTest {
         )
         // The versions it is allowed to drop are template history no install has
         // ever run. Anything from FIRST_PLAYER_DATA_VERSION up holds a save.
-        listOf("6", "7", "8").forEach {
+        listOf("6", "7", "8", "9", "10").forEach {
             assertTrue(
                 !Regex("""PRE_GAME_SCHEMA_VERSIONS\s*=\s*intArrayOf\([^)]*\b$it\b""").containsMatchIn(provider),
                 "version $it holds player data and must never be droppable",
@@ -165,7 +166,7 @@ class AppDatabaseMigrationTest {
     /**
      * Runs every migration `AppDatabase` declares, in order.
      *
-     * Listed rather than discovered, so adding version 9 without a migration
+     * Listed rather than discovered, so adding version 11 without a migration
      * fails this file rather than passing quietly — which is the whole failure
      * mode being guarded against.
      */
@@ -174,6 +175,7 @@ class AppDatabaseMigrationTest {
             AppDatabase_AutoMigration_6_7_Impl(),
             AppDatabase_AutoMigration_7_8_Impl(),
             AppDatabase_AutoMigration_8_9_Impl(),
+            AppDatabase_AutoMigration_9_10_Impl(),
         )
         // Checked against the *exported schemas*, which Room writes on every
         // build, rather than against a constant in this file. The first version

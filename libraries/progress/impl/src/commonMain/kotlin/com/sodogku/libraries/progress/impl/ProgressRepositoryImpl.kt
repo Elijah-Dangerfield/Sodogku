@@ -3,6 +3,7 @@ package com.sodogku.libraries.progress.impl
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
 import com.sodogku.libraries.progress.ProgressRepository
+import com.sodogku.libraries.progress.ScoreLedger
 import com.sodogku.libraries.progress.db.LevelProgressDao
 import com.sodogku.libraries.progress.db.LevelProgressEntity
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +37,7 @@ import kotlin.time.ExperimentalTime
 class ProgressRepositoryImpl(
     private val dao: LevelProgressDao,
     private val clock: Clock,
+    private val ledger: ScoreLedger,
 ) : ProgressRepository {
 
     private val writes = Mutex()
@@ -82,7 +84,13 @@ class ProgressRepositoryImpl(
      */
     override suspend fun onCompleted(levelId: Int, score: Int, paws: Int, timeMs: Long) {
         val now = clock.now().toEpochMilliseconds()
+        // Captured out of the transform rather than read back afterwards,
+        // because the number wanted is the difference the write made and only
+        // the transform sees both sides of it. A replay that failed to beat the
+        // old best gives a negative, which the ledger declines to record.
+        var gained = 0
         update(levelId) { current ->
+            gained = score - current.bestScore
             current.copy(
                 state = current.state.orBetter(LevelState.Completed),
                 bestScore = maxOf(current.bestScore, score),
@@ -92,6 +100,7 @@ class ProgressRepositoryImpl(
                 lastPlayedAt = now,
             )
         }
+        ledger.bank(gained)
         unlock(levelId + 1)
     }
 

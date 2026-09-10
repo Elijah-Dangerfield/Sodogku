@@ -195,20 +195,6 @@ finished board counts. Sharing was removed entirely and SPEC still describes it.
 Where a decision was genuinely reversed rather than merely restated, the
 reversal belongs in `decisions.md` before SPEC goes, or the reasoning dies with
 the file.
-## SD-23 [P2] — A weekly score board, so a newcomer can win something
-
-**Ask:** `Leaderboard.kt` names this itself: an all-time score board is
-unwinnable for anyone who installed today, and the standard answer is a rolling
-window everyone starts level in. Game Center supports recurring boards natively.
-
-**Done when:** A weekly board exists and is submitted to, and it resets without
-anything on the device having to know it did.
-
-**Hints:** The blocker is upstream and small: `:libraries:progress` folds a
-lifetime total and there is no "points banked since a date". That addition
-first, then one entry in the `Leaderboard` enum. Do not use a recurring board
-for the daily challenge, for the local-midnight reason already written down
-there.
 ## SD-25 [P2] — Custom quick actions on the iOS home-screen long press
 
 **Ask:** Owner, 2026-09-09: *"on iOS how can I edit the options shown on the hold
@@ -432,7 +418,6 @@ Weigh this against what it costs. A UI test tier that nobody trusts is worse
 than none, so the bar is that it runs in CI, does not flake, and fails for a real
 reason. If the first two tests cannot meet that, say so and close this rather
 than leaving a tier half built.
-
 ## SD-35 [P2] — Remote config offers a targeting axis that can never match
 
 **Found by:** the SD-32 agent, 2026-09-10, while clearing account-era leftovers.
@@ -454,7 +439,6 @@ candidate, and is what every other targeting decision already uses).
 would make config resolution depend on an identifier the privacy policy
 describes as device-scoped, which is a policy question rather than a code one.
 Touches `:apps:admin` and possibly a migration.
-
 ## SD-36 [P2] — `docs/store/data-safety.md` answers against code that no longer exists
 
 **Found by:** the SD-32 agent, 2026-09-10.
@@ -473,7 +457,6 @@ before use.
 this is about the next time rather than this time. Decide first whether the file
 is worth keeping at all: if the answer is "re-derive it when asked", a two-line
 note beats a stale nine-item table.
-
 ## SD-37 [P2] — `ConfigValuesAreReadTest` walks directories Gradle is writing
 
 **Found by:** the SD-32 agent, 2026-09-10, after it failed once and passed on

@@ -2,12 +2,12 @@ package com.sodogku.libraries.leaderboards
 
 /**
  * Every board this game keeps, and the id it is filed under in the store's
- * console. Two, deliberately.
+ * console. Three, deliberately.
  *
  * A leaderboard is a shared room, and splitting a small player base across many
  * rooms empties all of them. So the test each candidate had to pass was not
  * "could this be a leaderboard" but "would a stranger's name be next to yours
- * on it in week one". Two survived:
+ * on it in week one". Three survived:
  *
  * - **[LifetimeScore]** is the headline. It already exists as one number folded
  *   out of every board the player has finished (`LifetimeScore.banked`), it only
@@ -16,6 +16,9 @@ package com.sodogku.libraries.leaderboards
  * - **[LongestStreak]** measures the other axis. Score rewards volume, streak
  *   rewards turning up, and a player who cannot win the first can plausibly win
  *   the second.
+ * - **[WeeklyScore]** is the one anybody can win. The two above are records, and
+ *   a record is a wall a newcomer looks at; a week is short enough that turning
+ *   up beats having been here since launch.
  *
  * ## What was rejected, and why it stays rejected
  *
@@ -34,12 +37,27 @@ package com.sodogku.libraries.leaderboards
  * **Total paws.** A monotone function of score. Two boards ranking the same
  * players in nearly the same order is one board and one distraction.
  *
- * **A weekly score board** is the real gap. An all-time score board is
- * unwinnable for a newcomer, and the standard answer is a rolling window that
- * everyone starts level in. Game Center supports exactly that natively, but it
- * needs "points earned since a date", and `:libraries:progress` folds a lifetime
- * total rather than a windowed one. That is a small addition there and a
- * one-entry addition here, in that order.
+ * ## How the weekly one differs, and why that is the platform's problem
+ *
+ * [WeeklyScore] is the only **recurring** board here, and the only one whose
+ * value is not a running total of everything. Two things follow from that, and
+ * both are load bearing.
+ *
+ * **Nothing on the device knows when the week turns.** Game Center is told the
+ * start, the duration and the repeat interval in App Store Connect, and it
+ * files a submission into whichever occurrence is open when it arrives. There
+ * is no local week number, no stored "current window" and nothing to reset, so
+ * there is nothing to be wrong after a reboot, a time-zone change or a clock
+ * the player set by hand.
+ *
+ * **The value is points banked inside that window, not the lifetime total.** A
+ * recurring board keeps the *best single submission* it received during an
+ * occurrence; it does not add them up. Sending the lifetime total would rank
+ * everyone by lifetime total under a weekly heading, which is the all-time board
+ * again with a shorter memory. So the number sent is
+ * `ScoreLedger.bankedSince(windowStart)`, and the window start is asked of the
+ * platform ([GameServices.currentWindowStart]) rather than worked out here —
+ * the daily above is what happens when a client invents a window.
  *
  * ## The ids
  *
@@ -60,4 +78,15 @@ enum class Leaderboard(val id: String) {
 
     /** The longest run of consecutive dailies the player has ever finished. */
     LongestStreak("com.sodogku.leaderboard.longest_streak"),
+
+    /**
+     * Points banked inside the window Game Center currently has open, campaign
+     * and daily together.
+     *
+     * The only entry here backed by a **recurring** board in App Store Connect,
+     * and the only one submitted through [Leaderboards.submitWindowed]. Both of
+     * those are the same fact: the value depends on when the window opened, and
+     * only the platform knows that.
+     */
+    WeeklyScore("com.sodogku.leaderboard.weekly_score"),
 }

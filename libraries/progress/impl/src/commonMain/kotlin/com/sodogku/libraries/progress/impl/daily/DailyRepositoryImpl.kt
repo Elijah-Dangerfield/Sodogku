@@ -12,6 +12,7 @@ import com.sodogku.libraries.config.values.DailyRestoreDaysPerMonth
 import com.sodogku.libraries.config.values.DailyRestoreMaxDays
 import com.sodogku.libraries.config.values.FeatureDailyChallenge
 import com.sodogku.libraries.levels.LevelPacks
+import com.sodogku.libraries.progress.ScoreLedger
 import com.sodogku.libraries.progress.daily.DailyOutcome
 import com.sodogku.libraries.progress.daily.DailyRepository
 import com.sodogku.libraries.progress.daily.DailyResult
@@ -55,6 +56,7 @@ import kotlin.time.ExperimentalTime
 class DailyRepositoryImpl(
     private val dao: DailyResultDao,
     private val clock: Clock,
+    private val ledger: ScoreLedger,
     private val timeZone: DeviceTimeZone,
     private val adGate: AdGate,
     private val entitlements: Entitlements,
@@ -131,7 +133,7 @@ class DailyRepositoryImpl(
         paws: Int,
         timeMs: Long,
     ) {
-        dao.insertIfAbsent(
+        val inserted = dao.insertIfAbsent(
             DailyResultEntity(
                 date = date.toString(),
                 levelIndex = packIndexFor(date),
@@ -140,7 +142,12 @@ class DailyRepositoryImpl(
                 paws = paws,
                 timeMs = timeMs,
             )
-        )
+        ) != IGNORED
+        // Only what the table actually took. `insertIfAbsent` is where the
+        // one-attempt-per-day rule lives, so a second finish for the same date
+        // changes nothing on disk and must bank nothing either — otherwise the
+        // rule holds for the daily's own score and leaks for the leaderboard's.
+        if (inserted) ledger.bank(score)
     }
 
     private fun statusOn(day: LocalDate, results: Map<LocalDate, DailyResult>): DailyStatus {
@@ -181,6 +188,9 @@ class DailyRepositoryImpl(
     private fun packIndexFor(date: LocalDate): Int =
         LevelPacks.dailyIndexFor(date.toEpochDays() + poolOffset())
 }
+
+/** What Room's `OnConflictStrategy.IGNORE` returns for a row it did not write. */
+private const val IGNORED = -1L
 
 /**
  * A row whose date or outcome no longer parses is dropped rather than guessed at.

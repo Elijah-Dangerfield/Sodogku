@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import me.tatarka.inject.annotations.Inject
+import platform.Foundation.NSDate
 import platform.Foundation.NSError
+import platform.Foundation.timeIntervalSince1970
 import platform.Foundation.NSOperationQueue
 import platform.GameKit.GKGameCenterControllerDelegateProtocol
 import platform.GameKit.GKGameCenterViewController
@@ -131,6 +133,40 @@ class GameCenterServices : GameServices {
             .getOrDefault(SubmitResult.Failed)
     }
 
+    /**
+     * `GKLeaderboard.startDate` is the instant the occurrence now accepting
+     * scores opened, and it is the only thing this app ever learns about the
+     * week. Fetched per submission and not held: an occurrence rolls on Apple's
+     * clock, so a cached start would be right until the one moment it mattered.
+     *
+     * `null` covers more than an error. A classic board reports no start date at
+     * all, so a board mistyped as Classic in App Store Connect ends up sending
+     * nothing rather than sending a number measured against a window that does
+     * not exist.
+     */
+    override suspend fun currentWindowStart(leaderboardId: String): Long? {
+        if (!GKLocalPlayer.local.authenticated) return null
+
+        return Catching {
+            suspendCancellableCoroutine<Long?> { continuation ->
+                GKLeaderboard.loadLeaderboardsWithIDs(listOf(leaderboardId)) { boards, error ->
+                    if (!continuation.isActive) return@loadLeaderboardsWithIDs
+                    if (error != null) {
+                        logger.w { "Game Center would not describe $leaderboardId: ${error.localizedDescription}" }
+                        continuation.resume(null)
+                        return@loadLeaderboardsWithIDs
+                    }
+                    val startDate: NSDate? = boards
+                        ?.filterIsInstance<GKLeaderboard>()
+                        ?.firstOrNull()
+                        ?.startDate
+                    continuation.resume(startDate?.epochMillis())
+                }
+            }
+        }.logOnFailure { "Game Center threw describing $leaderboardId" }
+            .getOrNull()
+    }
+
     override suspend fun presentDashboard(leaderboardId: String?) {
         withContext(Dispatchers.Main) {
             Catching { present(leaderboardId) }
@@ -204,6 +240,9 @@ class GameCenterServices : GameServices {
         return top
     }
 }
+
+/** `NSDate` counts in seconds and the rest of the app counts in milliseconds. */
+private fun NSDate.epochMillis(): Long = (timeIntervalSince1970 * 1_000).toLong()
 
 private class DismissingDelegate : NSObject(), GKGameCenterControllerDelegateProtocol {
     override fun gameCenterViewControllerDidFinish(

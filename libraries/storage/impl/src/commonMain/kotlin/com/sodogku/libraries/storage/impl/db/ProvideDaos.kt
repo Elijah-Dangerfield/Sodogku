@@ -4,6 +4,7 @@ import com.sodogku.libraries.achievements.db.AchievementDao
 import com.sodogku.libraries.progress.db.DailyResultDao
 import com.sodogku.libraries.progress.db.LevelProgressDao
 import com.sodogku.libraries.progress.db.PlayDayDao
+import com.sodogku.libraries.progress.db.ScoreEventDao
 import com.sodogku.libraries.sodogku.storage.db.ClearableDao
 import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataDao
 import me.tatarka.inject.annotations.Inject
@@ -46,6 +47,19 @@ class ProvideLevelProgressDao @Inject constructor(
 class ProvideDailyResultDao @Inject constructor(
     provider: AppDatabaseProvider
 ) : DailyResultDao by provider.database.dailyResultDao()
+
+/**
+ * The one table here that could be cleared without costing anybody anything,
+ * and it still is not in the [ClearableDao] set — that set is about a user
+ * changing, and there is no user. It prunes itself instead
+ * (`ScoreLedger.RETENTION_MILLIS`), which is the honest way to bound a table
+ * nothing else is allowed to truncate.
+ */
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = ScoreEventDao::class)
+class ProvideScoreEventDao @Inject constructor(
+    provider: AppDatabaseProvider
+) : ScoreEventDao by provider.database.scoreEventDao()
 
 /**
  * Same reasoning again: the fact log *is* the achievement progress, since every

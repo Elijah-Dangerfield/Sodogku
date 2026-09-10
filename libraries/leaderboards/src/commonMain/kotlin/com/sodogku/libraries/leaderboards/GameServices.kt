@@ -87,6 +87,25 @@ interface GameServices {
     suspend fun submit(leaderboardId: String, value: Long): SubmitResult
 
     /**
+     * When the window [leaderboardId] is currently accepting scores into opened,
+     * as epoch millis, or `null` when the platform will not say.
+     *
+     * This is the whole of the recurring-board design. A weekly board needs a
+     * value scoped to the week, the week is defined in App Store Connect, and
+     * this is the app asking rather than guessing. Nothing is cached: the answer
+     * is only used to build one submission, and a stale one would attribute a
+     * score to a window that has already closed. That is a network round trip
+     * per submission, alongside the submission's own.
+     *
+     * `null` is the answer for a classic board, for a signed-out player, for
+     * Android, and for any failure. Every one of them ends the same way — the
+     * value is not computed and nothing is sent — which keeps this on the right
+     * side of the fail-open rule despite being the one call here that returns
+     * something.
+     */
+    suspend fun currentWindowStart(leaderboardId: String): Long?
+
+    /**
      * Shows the platform's own leaderboard screen, focused on [leaderboardId]
      * when one is given.
      *

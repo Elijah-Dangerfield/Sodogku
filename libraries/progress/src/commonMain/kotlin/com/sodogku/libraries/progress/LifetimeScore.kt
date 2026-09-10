@@ -33,6 +33,21 @@ object LifetimeScore {
         dailies.firstOrNull { it.date == date }?.score ?: 0
 
     /**
+     * Everything banked at or after [startMillis], out of the [ScoreLedger].
+     *
+     * The boundary is inclusive, and it has to be: [startMillis] is the instant
+     * a leaderboard window opened, and a point banked in that instant belongs to
+     * the window that opened, not the one that closed.
+     *
+     * A separate fold from [banked] rather than a filtered version of it,
+     * because it sums a different thing. [banked] adds up bests; this adds up
+     * increments, and the two agree only for a player who has never replayed a
+     * level.
+     */
+    fun bankedSince(events: List<ScoreEvent>, startMillis: Long): Int =
+        events.filter { it.atMillis >= startMillis }.sumOf { it.points }
+
+    /**
      * The number to show while a board is open: everything *else* the player has
      * banked, plus the better of what this board already held and what the
      * attempt on screen has earned so far.

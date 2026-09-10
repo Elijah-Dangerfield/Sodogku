@@ -29,6 +29,8 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTime::class)
 class ProgressRepositoryImplTest : CoroutineTest() {
 
+    private val ledger = FakeScoreLedger()
+
     @Test
     fun untouchedLevel_isLocked_exceptTheFirstOne() = runUnitTest {
         val repo = repository()
@@ -220,8 +222,59 @@ class ProgressRepositoryImplTest : CoroutineTest() {
         assertEquals(LevelRecord.unplayed(1), repo.record(1))
     }
 
+    @Test
+    fun aFirstClearBanksEveryPointOfIt() = runUnitTest {
+        val repo = repository()
+
+        repo.onCompleted(levelId = 1, score = 900, paws = 3, timeMs = 40_000)
+
+        assertEquals(listOf(900), ledger.calls)
+    }
+
+    @Test
+    fun aBetterReplayBanksTheDifferenceAndNotTheNewBest() = runUnitTest {
+        // The rule the weekly board stands on. Level 1 is worth 900 and always
+        // has been; today's replay earned 300 and only 300 may reach the week.
+        // Banking 1,200 here is how a player farms one easy level into first
+        // place, and it is indistinguishable from correct on the level record.
+        val repo = repository()
+
+        repo.onCompleted(levelId = 1, score = 900, paws = 3, timeMs = 40_000)
+        repo.onCompleted(levelId = 1, score = 1_200, paws = 3, timeMs = 39_000)
+
+        assertEquals(listOf(900, 300), ledger.calls)
+    }
+
+    @Test
+    fun aWorseReplayOffersTheLedgerNothingItWouldTake() = runUnitTest {
+        val repo = repository()
+
+        repo.onCompleted(levelId = 1, score = 900, paws = 3, timeMs = 40_000)
+        repo.onCompleted(levelId = 1, score = 120, paws = 1, timeMs = 95_000)
+
+        assertEquals(
+            listOf(900, -780),
+            ledger.calls,
+            "a replay 780 short of the best is a loss, and `ScoreLedger.bank` declines it",
+        )
+    }
+
+    @Test
+    fun openingTheNextLevelBanksNothing() = runUnitTest {
+        // `onCompleted` unlocks level 2 through the same write path, and an
+        // unlock is not an earning. A ledger fed by every write would give the
+        // player a free entry for a level they have not played.
+        val repo = repository()
+
+        repo.onCompleted(levelId = 1, score = 900, paws = 3, timeMs = 40_000)
+        repo.onSkipped(levelId = 2)
+        repo.onAttemptStarted(levelId = 3)
+
+        assertEquals(listOf(900), ledger.calls)
+    }
+
     private fun repository(clock: Clock = MutableClock(atMs = 1_000L)) =
-        ProgressRepositoryImpl(FakeLevelProgressDao(), clock)
+        ProgressRepositoryImpl(FakeLevelProgressDao(), clock, ledger)
 
     private suspend fun ProgressRepositoryImpl.attemptsOf(levelId: Int): Int = record(levelId).attempts
 }

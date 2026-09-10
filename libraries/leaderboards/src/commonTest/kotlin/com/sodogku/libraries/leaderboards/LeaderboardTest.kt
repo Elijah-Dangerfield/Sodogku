@@ -19,13 +19,13 @@ import kotlin.test.assertTrue
 class LeaderboardTest {
 
     @Test
-    fun thereAreExactlyTwoBoards() {
-        assertEquals(2, Leaderboard.entries.size)
+    fun thereAreExactlyThreeBoards() {
+        assertEquals(3, Leaderboard.entries.size)
     }
 
     @Test
     fun everyBoardHasAnId() {
-        assertEquals(2, Leaderboard.entries.size)
+        assertEquals(3, Leaderboard.entries.size)
         Leaderboard.entries.forEach { board ->
             assertTrue(board.id.isNotBlank(), "${board.name} has no leaderboard id")
         }
@@ -33,10 +33,19 @@ class LeaderboardTest {
 
     @Test
     fun noTwoBoardsShareAnId() {
-        assertEquals(2, Leaderboard.entries.size)
+        assertEquals(3, Leaderboard.entries.size)
         assertEquals(
             Leaderboard.entries.size,
             Leaderboard.entries.map { it.id }.toSet().size,
         )
+    }
+
+    @Test
+    fun theWeeklyBoardIsNotTheLifetimeBoardUnderAnotherName() {
+        // A copied id would file every weekly submission into the all-time
+        // board, where it would be dropped as no improvement and leave the
+        // weekly board empty. The test above catches the duplicate; this one
+        // says which pair it would be, because that is the copy-paste available.
+        assertTrue(Leaderboard.WeeklyScore.id != Leaderboard.LifetimeScore.id)
     }
 }

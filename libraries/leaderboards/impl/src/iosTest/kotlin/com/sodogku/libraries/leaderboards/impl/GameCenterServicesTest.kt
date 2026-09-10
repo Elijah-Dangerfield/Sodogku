@@ -5,6 +5,7 @@ import com.sodogku.libraries.leaderboards.SubmitResult
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * The only test that can execute `GameCenterServices` at all, and it is
@@ -39,5 +40,15 @@ class GameCenterServicesTest {
         val result = GameCenterServices().submit("com.sodogku.leaderboard.lifetime_score", 4_200L)
 
         assertEquals(SubmitResult.NotAuthenticated, result)
+    }
+
+    @Test
+    fun theWindowIsUnknowableWithNobodySignedIn() = runTest {
+        // Same fail-open path, and the one that keeps the weekly board silent
+        // rather than wrong: with no window there is no value to compute, so the
+        // layer above never asks for one.
+        val start = GameCenterServices().currentWindowStart("com.sodogku.leaderboard.weekly_score")
+
+        assertNull(start)
     }
 }

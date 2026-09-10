@@ -128,9 +128,13 @@ different identifiers. `docs/SPEC.md:1485` says otherwise and is stale.
   | Lifetime Score | `com.sodogku.leaderboard.lifetime_score` | Integer | High to Low | from 0 |
   | Longest Streak | `com.sodogku.leaderboard.longest_streak` | Integer | High to Low | 0 to ~3650 |
 
-  **The IDs have to match exactly** (`libraries/leaderboards/.../Leaderboard.kt:59,62`).
+  **The IDs have to match exactly** (`libraries/leaderboards/.../Leaderboard.kt`).
   A mismatch fails silently and looks like a board nobody is on. Each needs a
   localisation and an image.
+
+  There is a third board, `com.sodogku.leaderboard.weekly_score`, and it is
+  **Recurring** rather than Classic. It has a schedule to fill in and its own
+  set of ways to go wrong, so it is item 15 rather than a fourth row here.
 
 - A **non-consumable** with product id `sodogku_pro` (see item 7).
 - App Privacy questionnaire, age rating, screenshots.
@@ -468,6 +472,60 @@ overrides it, so even a deployed server is unreachable by the client.
   from identity work that was deleted, and nothing enables it. Removing an
   entitlement is safe where adding one is not, but it deserves a deliberate
   decision rather than a drive-by removal.
+
+---
+
+## 15. A third Game Center leaderboard, this one recurring weekly
+
+The app submits to a weekly board as of this change, and the board does not
+exist yet. Nothing breaks without it: the submission goes out, Game Center
+drops it, and no error appears anywhere. It is worth doing because an all time
+score board is unwinnable for anyone who installed today, and a week is short
+enough that turning up beats having been here since launch.
+
+This one is **not** like the two Classic boards in item 4. It has a schedule,
+and the schedule is the whole feature: Game Center resets it, and nothing in
+the app knows or needs to know when that happens.
+
+App Store Connect, in the app record, sidebar **Game Center**, then **Add
+Leaderboard**:
+
+1. Choose **Recurring Leaderboard**, not Classic. This is the only choice on
+   the page that cannot be corrected later without deleting the board, and
+   getting it wrong has a distinctive symptom: the app sends *nothing at all*
+   rather than sending something wrong, because a Classic board reports no
+   start date and the app refuses to guess one.
+2. **Leaderboard Reference Name:** `Weekly Score`. Internal only, never shown.
+3. **Leaderboard ID:** `com.sodogku.leaderboard.weekly_score`
+
+   Typed exactly, no trailing space. It is matched by string against
+   `libraries/leaderboards/src/commonMain/kotlin/com/sodogku/libraries/leaderboards/Leaderboard.kt`.
+   A mismatch fails silently and looks like a board nobody is on.
+4. **Recurrence.** Three fields, and they are easy to read as one:
+   - **Start Date and Time:** a Monday at 00:00 in whichever time zone the page
+     offers. The exact instant does not matter to the app, only that it is in
+     the future when you save.
+   - **Duration:** 7 days. This is how long an occurrence accepts scores.
+   - **Restarts / repeat interval:** every 7 days. This is how often a new
+     occurrence begins.
+
+   Set both to 7 days so one week ends as the next begins. Apple will not
+   accept a recurrence longer than 30 days, and occurrences are not allowed to
+   overlap, so the duration can never exceed the interval.
+5. **Score Format:** Integer. **Sort Order:** High to Low. **Score Range:** from
+   0, no upper bound needed.
+6. **Score Submission Type:** **Best Score**, not Most Recent Score. The app
+   sends a running total for the week that climbs as the player plays, so Best
+   Score keeps the end of week figure. Most Recent Score would let a bad read
+   overwrite a good one.
+7. Add a **localization**: a player facing name (`This Week`), a score format,
+   and an image. Same requirements as the two boards in item 4.
+8. **Submit it for review** with the next build. Leaderboards are reviewed
+   separately from the app and players cannot see one until it is approved.
+
+Nothing else changes. The app has one Leaderboards row in Settings and it opens
+the Game Center dashboard without naming a board, so the new board appears in
+that list on its own once it is live.
 
 ---
 

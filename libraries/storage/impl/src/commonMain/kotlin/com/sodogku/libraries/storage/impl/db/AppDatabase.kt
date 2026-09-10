@@ -15,6 +15,8 @@ import com.sodogku.libraries.progress.db.LevelProgressDao
 import com.sodogku.libraries.progress.db.PlayDayDao
 import com.sodogku.libraries.progress.db.PlayDayEntity
 import com.sodogku.libraries.progress.db.LevelProgressEntity
+import com.sodogku.libraries.progress.db.ScoreEventDao
+import com.sodogku.libraries.progress.db.ScoreEventEntity
 import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataDao
 import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataEntity
 
@@ -23,11 +25,12 @@ import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataEntity
         ExampleUserDataEntity::class,
         LevelProgressEntity::class,
         DailyResultEntity::class,
+        ScoreEventEntity::class,
         AchievementFactEntity::class,
         AchievementUnlockEntity::class,
         PlayDayEntity::class,
     ],
-    version = 9,
+    version = 10,
     /**
      * Every bump from [FIRST_PLAYER_DATA_VERSION] on has to be listed here.
      *
@@ -36,14 +39,15 @@ import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataEntity
      * their phone. A destructive fallback is a silent, unrecoverable wipe on
      * the next release that happens to add a column.
      *
-     * All three additions so far are new tables, which Room can migrate on its
-     * own. A change it cannot — a renamed or retyped column — will fail the
-     * build here rather than at runtime, which is the point.
+     * Every addition so far is a new table, which Room can migrate on its own.
+     * A change it cannot — a renamed or retyped column — will fail the build
+     * here rather than at runtime, which is the point.
      */
     autoMigrations = [
         AutoMigration(from = 6, to = 7),
         AutoMigration(from = 7, to = 8),
         AutoMigration(from = 8, to = 9),
+        AutoMigration(from = 9, to = 10),
     ],
     exportSchema = true
 )
@@ -53,6 +57,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun exampleUserDataDao(): ExampleUserDataDao
     abstract fun levelProgressDao(): LevelProgressDao
     abstract fun dailyResultDao(): DailyResultDao
+    abstract fun scoreEventDao(): ScoreEventDao
     abstract fun achievementDao(): AchievementDao
     abstract fun playDayDao(): PlayDayDao
 

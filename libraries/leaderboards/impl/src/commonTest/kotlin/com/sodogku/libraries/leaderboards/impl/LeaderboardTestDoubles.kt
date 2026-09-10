@@ -38,6 +38,16 @@ class FakeGameServices(
     /** Models a platform that throws rather than returning, which must not escape. */
     var throwOnSubmit: Boolean = false
 
+    /**
+     * The window every recurring board is currently in, as the platform would
+     * report it. `null` is a real answer and the default one, because that is
+     * what a classic board, a signed-out player and Android all say.
+     */
+    var windowStart: Long? = null
+
+    /** Every board asked about its window, so a test can prove it was asked once. */
+    val windowQueries = mutableListOf<String>()
+
     fun becomes(next: GameServicesStatus) {
         state.value = next
     }
@@ -50,6 +60,11 @@ class FakeGameServices(
         submissions += leaderboardId to value
         if (throwOnSubmit) error("Game Center exploded")
         return result
+    }
+
+    override suspend fun currentWindowStart(leaderboardId: String): Long? {
+        windowQueries += leaderboardId
+        return windowStart
     }
 
     override suspend fun presentDashboard(leaderboardId: String?) {

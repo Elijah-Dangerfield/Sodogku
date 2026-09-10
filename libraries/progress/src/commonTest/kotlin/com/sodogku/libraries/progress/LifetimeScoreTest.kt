@@ -77,6 +77,49 @@ class LifetimeScoreTest {
         assertEquals(0, LifetimeScore.bankedForDaily(dailies, date = date(9)))
     }
 
+    @Test
+    fun onlyWhatWasBankedInsideTheWindowCounts() {
+        // The whole weekly board in one assertion. The player is worth 10,000
+        // all told and 900 of it landed this week, and it is the 900 that is
+        // submitted — a board fed the lifetime total would rank a newcomer
+        // against six months of somebody else's play.
+        val ledger = listOf(
+            ScoreEvent(atMillis = MONDAY - 1, points = 9_100),
+            ScoreEvent(atMillis = MONDAY + 1, points = 400),
+            ScoreEvent(atMillis = MONDAY + 2, points = 500),
+        )
+
+        assertEquals(900, LifetimeScore.bankedSince(ledger, MONDAY))
+    }
+
+    @Test
+    fun aPointBankedInTheInstantTheWindowOpenedIsInsideIt() {
+        // The boundary, and the reason it is inclusive rather than a matter of
+        // taste: Game Center hands back the instant the window *opened*, so a
+        // score stamped with that instant belongs to the window that opened and
+        // not to the one that closed. An exclusive test loses it from both.
+        val ledger = listOf(ScoreEvent(atMillis = MONDAY, points = 750))
+
+        assertEquals(750, LifetimeScore.bankedSince(ledger, MONDAY))
+    }
+
+    @Test
+    fun aPointBankedTheMillisecondBeforeTheWindowIsOutsideIt() {
+        val ledger = listOf(ScoreEvent(atMillis = MONDAY - 1, points = 750))
+
+        assertEquals(0, LifetimeScore.bankedSince(ledger, MONDAY))
+    }
+
+    @Test
+    fun aPlayerWhoHasNotPlayedThisWeekScoresZero() {
+        // Not a redundant case: zero is the value `RealLeaderboards` refuses to
+        // send, so a fold that returned the lifetime total for an idle week
+        // would put a stale number on the board instead of leaving it alone.
+        val ledger = listOf(ScoreEvent(atMillis = MONDAY - 100, points = 9_100))
+
+        assertEquals(0, LifetimeScore.bankedSince(ledger, MONDAY))
+    }
+
     private fun cleared(levelId: Int, score: Int): LevelRecord = LevelRecord(
         levelId = levelId,
         state = LevelState.Completed,
@@ -98,4 +141,9 @@ class LifetimeScoreTest {
     )
 
     private fun date(dayOfMonth: Int): LocalDate = LocalDate(2026, 9, dayOfMonth)
+
+    private companion object {
+        /** An arbitrary instant standing in for one Game Center handed back. */
+        const val MONDAY = 1_757_376_000_000L
+    }
 }

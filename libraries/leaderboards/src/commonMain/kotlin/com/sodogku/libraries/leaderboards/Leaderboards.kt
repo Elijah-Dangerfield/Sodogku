@@ -50,11 +50,39 @@ interface Leaderboards {
     fun submit(board: Leaderboard, value: Long)
 
     /**
+     * The same thing for a board whose window the platform owns.
+     *
+     * A recurring board keeps the best submission it saw during the occurrence
+     * that was open when it arrived, so the value has to be scoped to that
+     * occurrence and the caller has no way to know when it began. Hence the
+     * lambda: this asks the platform for the window, hands the start to
+     * [points], and sends what comes back.
+     *
+     * [points] may be called late, more than once, or never — never being the
+     * normal case on Android and for a signed-out player, because a window that
+     * cannot be established is a submission that does not happen. Write it as a
+     * fresh read rather than a captured number; if it is called a second time,
+     * a second answer is the right answer.
+     */
+    fun submitWindowed(board: Leaderboard, points: WindowedScore)
+
+    /**
      * Opens the platform's leaderboard UI, focused on [board] when one is given.
      * Only ever in response to a player action: this is the one call that can
      * put something on screen.
      */
     fun openDashboard(board: Leaderboard? = null)
+}
+
+/**
+ * How many points the player has banked since [windowStartMillis].
+ *
+ * A function rather than a number because the number cannot be worked out until
+ * the platform has said when the window opened, and that answer arrives over the
+ * network some time after the board was finished.
+ */
+fun interface WindowedScore {
+    suspend fun bankedSince(windowStartMillis: Long): Long
 }
 
 /**
@@ -75,6 +103,9 @@ class NoLeaderboards : Leaderboards {
     override val isOfferable: StateFlow<Boolean> = offerable.asStateFlow()
 
     override fun submit(board: Leaderboard, value: Long) = Unit
+
+    /** [points] is never called: there is no window and so no value to want. */
+    override fun submitWindowed(board: Leaderboard, points: WindowedScore) = Unit
 
     override fun openDashboard(board: Leaderboard?) = Unit
 }

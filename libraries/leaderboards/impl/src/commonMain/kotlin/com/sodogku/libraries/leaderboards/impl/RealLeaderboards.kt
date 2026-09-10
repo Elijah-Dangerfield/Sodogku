@@ -12,6 +12,7 @@ import com.sodogku.libraries.leaderboards.Leaderboard
 import com.sodogku.libraries.leaderboards.Leaderboards
 import com.sodogku.libraries.leaderboards.NoLeaderboards
 import com.sodogku.libraries.leaderboards.SubmitResult
+import com.sodogku.libraries.leaderboards.WindowedScore
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -51,6 +52,20 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * without this the app would spend a network call per level to tell Game Center
  * a number it already has.
  *
+ * ## The recurring board
+ *
+ * [submitWindowed] holds a lambda where [submit] holds a number, and the reason
+ * is that its number does not exist yet: it is points banked since the window
+ * opened, and the platform is the only thing that knows when that was. So the
+ * question is held, the platform is asked at flush time, and the answer is
+ * priced then. That also makes the held value self-correcting — a hold that
+ * survives into a new window is answered against the new window, not the old
+ * one.
+ *
+ * Everything the device knows about the week is that one epoch stamp, fetched
+ * per submission and never stored. There is no week number here, no reset and
+ * nothing to be stale.
+ *
  * ## Failure
  *
  * Every exit is silent. A refusal, an error, an exception out of the platform
@@ -73,14 +88,32 @@ class RealLeaderboards(
 
     private val logger = KLog.withTag("Leaderboards")
 
-    /** Guards [pending] and [submitted], which are read-modify-write from several coroutines. */
+    /** Guards all four maps below, which are read-modify-write from several coroutines. */
     private val lock = Mutex()
 
     /** The best value per board that has not been accepted yet. At most one entry per board. */
     private val pending = mutableMapOf<Leaderboard, Long>()
 
+    /**
+     * The same slot for recurring boards, holding the *question* rather than an
+     * answer. A windowed value cannot be worked out until the platform says when
+     * the window opened, and it declines to say while nobody is signed in — the
+     * exact state the holding exists for.
+     */
+    private val pendingWindowed = mutableMapOf<Leaderboard, WindowedScore>()
+
     /** The best value per board the platform has accepted this process. */
     private val submitted = mutableMapOf<Leaderboard, Long>()
+
+    /**
+     * Which window each entry in [submitted] was accepted into, for the boards
+     * that have one.
+     *
+     * Without this the improvement filter outlives the window it was measured
+     * in: a player who banked 9,000 on Sunday and 400 on Monday would have the
+     * 400 dropped as "no better", and the new week would show them a blank.
+     */
+    private val windows = mutableMapOf<Leaderboard, Long>()
 
     override val isOfferable: StateFlow<Boolean> = services.status
         .map { it == GameServicesStatus.Authenticated || it == GameServicesStatus.SignInRequired }
@@ -102,6 +135,13 @@ class RealLeaderboards(
 
     override fun submit(board: Leaderboard, value: Long) {
         appScope.launch { record(board, value) }
+    }
+
+    override fun submitWindowed(board: Leaderboard, points: WindowedScore) {
+        appScope.launch {
+            lock.withLock { pendingWindowed[board] = points }
+            flush()
+        }
     }
 
     override fun openDashboard(board: Leaderboard?) {
@@ -134,30 +174,67 @@ class RealLeaderboards(
         // Nothing on a screen is waiting on this, and the alternative is two
         // concurrent flushes sending the same value twice.
         lock.withLock {
-            pending.toMap().forEach { (board, value) -> send(board, value) }
+            pending.toMap().forEach { (board, value) ->
+                if (send(board, value)) pending.remove(board)
+            }
+            pendingWindowed.toMap().forEach { (board, points) -> sendWindowed(board, points) }
         }
     }
 
-    private suspend fun send(board: Leaderboard, value: Long) {
+    /**
+     * Resolve the window, then price the board against it, then send. In that
+     * order, and all of it here rather than at the call site, because each step
+     * is a place the platform can decline and every decline has to end the same
+     * way: held, silent, tried again on the next board.
+     */
+    private suspend fun sendWindowed(board: Leaderboard, points: WindowedScore) {
+        val windowStart = Catching { services.currentWindowStart(board.id) }
+            .logOnFailure { "Could not read the leaderboard window for ${board.id}" }
+            .getOrNull()
+            ?: return
+
+        // A new window is a clean sheet, and the thing that has to be forgotten
+        // is what the *platform* accepted, not what we are holding: the held
+        // question has not been asked yet and will be answered against the new
+        // window below.
+        if (windows[board] != windowStart) {
+            windows[board] = windowStart
+            submitted.remove(board)
+        }
+
+        val value = Catching { points.bankedSince(windowStart) }
+            .logOnFailure { "Could not price ${board.id} against its window" }
+            .getOrNull()
+            ?: return
+
+        if (value <= submitted.bestFor(board)) {
+            pendingWindowed.remove(board)
+            return
+        }
+        if (send(board, value)) pendingWindowed.remove(board)
+    }
+
+    /** True when the platform took it, which is the only thing worth forgetting a hold for. */
+    private suspend fun send(board: Leaderboard, value: Long): Boolean {
         val result = Catching { services.submit(board.id, value) }
             .logOnFailure { "Leaderboard submit threw for ${board.id}" }
             .getOrDefault(SubmitResult.Failed)
 
         if (result != SubmitResult.Submitted) {
             logger.d { "Leaderboard ${board.name} not submitted ($result); holding $value" }
-            return
+            return false
         }
 
-        // Both writes can be plain rather than a max, because flush holds the
-        // lock across the whole network call: nothing can have raised either
-        // map since this value was read out of it.
+        // A plain write rather than a max, because flush holds the lock across
+        // the whole network call: nothing can have raised this since the value
+        // was read out of it.
         submitted[board] = value
-        pending.remove(board)
         logger.logEvent(
             "leaderboard.submitted",
             "board" to board.name,
             "value" to value,
         )
+        return true
     }
 
     private fun Map<Leaderboard, Long>.bestFor(board: Leaderboard): Long = this[board] ?: 0L

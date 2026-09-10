@@ -53,6 +53,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
 import com.sodogku.libraries.progress.ProgressRepository
+import com.sodogku.libraries.progress.ScoreLedger
 import com.sodogku.libraries.progress.streak.StreakPrompt
 import com.sodogku.libraries.progress.streak.StreakRepository
 import com.sodogku.libraries.progress.SkipRepository
@@ -149,6 +150,13 @@ class GameViewModel(
     private val clock: TimeSource.WithComparableMarks,
     private val appCache: AppCache,
     private val progress: ProgressRepository,
+    /**
+     * Read only for the weekly board, and only from inside the lambda handed to
+     * `Leaderboards.submitWindowed`. Nothing on this screen shows a windowed
+     * number, so a failure to read it costs a leaderboard entry and nothing the
+     * player can see.
+     */
+    private val scoreLedger: ScoreLedger,
     /** The daily skip allowance, the ad behind it, and the write. */
     private val skips: SkipRepository,
     private val daily: DailyRepository,
@@ -1654,11 +1662,11 @@ class GameViewModel(
     }
 
     /**
-     * Hands the two boards their numbers, on every clear.
+     * Hands the three boards their numbers, on every clear.
      *
-     * Both are **totals**, not increments: the platform keeps the best it has
-     * seen, so sending the same number after a replay that banked nothing is a
-     * no-op rather than a double count. That is what makes "call this after
+     * The first two are **totals**, not increments: the platform keeps the best
+     * it has seen, so sending the same number after a replay that banked nothing
+     * is a no-op rather than a double count. That is what makes "call this after
      * every board" the whole of the integration.
      *
      * [lifetimeScore] is passed in because it is only knowable from inside the
@@ -1666,12 +1674,25 @@ class GameViewModel(
      * it is not on the board's state at all — [GameState.dailyStreak] is the
      * *current* run, which is a smaller number and the wrong one.
      *
-     * Nothing branches on either call and nothing waits for one. A player who is
-     * signed out, offline, or on Android gets a game that behaves identically;
-     * the only thing this can be seen to do is fail to change anything.
+     * The weekly board is the odd one and is sent as a lambda rather than a
+     * number, because the number depends on when Game Center's current week
+     * opened and only Game Center knows that. The lambda may run later than this
+     * method, or never. Reading the ledger inside it rather than before is what
+     * makes a late run correct rather than stale.
+     *
+     * Nothing branches on any of the three and nothing waits for one. A player
+     * who is signed out, offline, or on Android gets a game that behaves
+     * identically; the only thing this can be seen to do is fail to change
+     * anything.
      */
     private suspend fun postToLeaderboards(lifetimeScore: Int) {
         leaderboards.submit(Leaderboard.LifetimeScore, lifetimeScore.toLong())
+        leaderboards.submitWindowed(Leaderboard.WeeklyScore) { windowStart ->
+            Catching { scoreLedger.bankedSince(windowStart) }
+                .logOnFailure { "Failed to read the points banked this week" }
+                .getOrDefault(0)
+                .toLong()
+        }
         // Read on a campaign clear too, cheaply and deliberately. A streak
         // restored between two dailies raises the record without a daily being
         // played, and every clear is a chance to notice.

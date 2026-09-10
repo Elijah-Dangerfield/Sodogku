@@ -26,6 +26,13 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * [submit], and `getLeaderboardIntent` answers [presentDashboard]. What it does
  * need is a second id per board, because Play mints its own, and `Leaderboard`
  * says where that goes.
+ *
+ * [currentWindowStart] is the one that will not port straight across. Play has
+ * no recurring boards; it buckets a single board into daily, weekly and all-time
+ * spans by submission time, so the weekly value there is the same number the
+ * lifetime board already gets and the window question does not arise. Answering
+ * `null` and letting the layer above drop the windowed submission is closer to
+ * right than inventing a start date would be.
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
@@ -40,6 +47,13 @@ class NoGameServices : GameServices {
 
     override suspend fun submit(leaderboardId: String, value: Long): SubmitResult =
         SubmitResult.NotAuthenticated
+
+    /**
+     * No platform, so no window, so nothing above ever asks a windowed board for
+     * a value. That is what keeps the score ledger unread on Android rather than
+     * read and thrown away.
+     */
+    override suspend fun currentWindowStart(leaderboardId: String): Long? = null
 
     override suspend fun presentDashboard(leaderboardId: String?) = Unit
 }

@@ -9,6 +9,7 @@ import com.sodogku.libraries.flowroutines.testing.CoroutineTest
 import com.sodogku.libraries.leaderboards.Leaderboard
 import com.sodogku.libraries.leaderboards.Leaderboards
 import com.sodogku.libraries.leaderboards.NoLeaderboards
+import com.sodogku.libraries.leaderboards.WindowedScore
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
 import kotlin.test.Test
@@ -263,9 +264,9 @@ class SettingsViewModelTest : CoroutineTest() {
      * A [Leaderboards] that says it is offerable and records the one call this
      * screen can make.
      *
-     * Not a mock of the whole interface: `submit` is a no-op here on purpose,
-     * because Settings has no business submitting a score and a double that
-     * recorded it would let a test pass that should not exist.
+     * Not a mock of the whole interface: both submit paths are no-ops here on
+     * purpose, because Settings has no business submitting a score and a double
+     * that recorded one would let a test pass that should not exist.
      */
     private class OfferedLeaderboards : Leaderboards {
         private val offerable = MutableStateFlow(true)
@@ -274,6 +275,7 @@ class SettingsViewModelTest : CoroutineTest() {
             private set
 
         override fun submit(board: Leaderboard, value: Long) = Unit
+        override fun submitWindowed(board: Leaderboard, points: WindowedScore) = Unit
         override fun openDashboard(board: Leaderboard?) {
             opened++
         }

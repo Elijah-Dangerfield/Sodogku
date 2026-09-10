@@ -20,6 +20,7 @@ import com.sodogku.libraries.progress.daily.DeviceTimeZone
 import com.sodogku.libraries.progress.daily.FreezeResult
 import com.sodogku.libraries.progress.daily.RestoreResult
 import com.sodogku.libraries.progress.db.DailyResultDao
+import com.sodogku.libraries.progress.impl.FakeScoreLedger
 import com.sodogku.libraries.progress.db.DailyResultEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,6 +64,7 @@ import kotlin.time.Instant
 class DailyRepositoryImplTest : CoroutineTest() {
 
     private val dao = FakeDailyResultDao()
+    private val ledger = FakeScoreLedger()
     private val adGate = FakeAdGate()
     private val clock = MovableClock(Instant.parse("2026-09-07T20:00:00Z"))
     private var zone: TimeZone = TimeZone.UTC
@@ -124,6 +126,34 @@ class DailyRepositoryImplTest : CoroutineTest() {
         assertEquals(2, status.result?.paws)
         assertTrue(!status.playable)
         assertEquals(1, repo.history().size, "and there is only ever one row per day")
+    }
+
+    @Test
+    fun aCompletedDailyBanksItsScoreOnce() = runUnitTest {
+        // The one-attempt rule reaching the ledger. The second call changes
+        // nothing on disk, so it must earn nothing either — otherwise a player
+        // who taps finish twice buys a second week's worth of points.
+        val repo = repository()
+        val today = repo.status().date
+
+        repo.onCompleted(today, score = 900, paws = 2, timeMs = 60_000)
+        repo.onCompleted(today, score = 9_999, paws = 3, timeMs = 30_000)
+
+        assertEquals(listOf(900), ledger.calls)
+    }
+
+    @Test
+    fun aFrozenDayEarnsNothing() = runUnitTest {
+        // A freeze bridges a gap the player did not play. It writes a row like
+        // any other outcome, and the row is worth zero.
+        val repo = repository()
+        clock.set(Instant.parse("2026-09-05T20:00:00Z"))
+        repo.onCompleted(repo.status().date, score = 500, paws = 2, timeMs = 60_000)
+        clock.set(Instant.parse("2026-09-07T20:00:00Z"))
+
+        assertTrue(repo.useFreeze() is FreezeResult.Applied)
+
+        assertEquals(listOf(500, 0), ledger.calls, "the freeze offered nothing, not something small")
     }
 
     @Test
@@ -647,6 +677,7 @@ class DailyRepositoryImplTest : CoroutineTest() {
         return DailyRepositoryImpl(
             dao = dao,
             clock = clock,
+            ledger = ledger,
             timeZone = DeviceTimeZone { zone },
             adGate = adGate,
             entitlements = FakeEntitlements(isPro),
