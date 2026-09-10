@@ -155,3 +155,20 @@ build it, which is why it is here and not in the queue.
 **Done when:** pulling the network mid-ad on iOS still lands the reward, and only
 a deliberate dismissal withholds it.
 
+
+## SD-53 [P2] — One owner directive arrived with no message on it
+
+**Found by:** the 2026-09-10 sweep of `feedback_kind:owner_directive`.
+
+Sentry SODOGKU-4, filed 2026-09-09 on `0829933`, has every tag a report should
+have and no `feedback_message` in its extra data at all. Nine other directives
+from the same period all carry theirs, so this is one lost report rather than a
+broken pipeline.
+
+It predates the fix in `4aef85e` that put the typed message on the carrier event,
+so the likeliest reading is simply that it is older than the code that captures
+it properly. Filed rather than chased because there is nothing to read: whatever
+the owner typed is gone and only they know what it was.
+
+**Worth a look only if it happens again** on a build from 2026-09-10 or later. If
+it does, it is a live capture bug and belongs in `todos.md`, not here.

@@ -278,6 +278,17 @@ tearing down. **Presenting the shake dialog again is what un-stuck it**, which i
 what a controller re-entering the appeared state would do, and is hard to explain
 any other way.
 
+**UPDATE 2026-09-10, third pass. There is a reproduction now, see SD-48.** A
+separate report carries the transaction `GADFullScreenAdViewController`, so the
+same dead-controls symptom happened after a rewarded ad. That is the only native
+modal this app presents, and unlike the shake dialog it can be triggered on
+demand. Do SD-48 before spending any more time on the theory below.
+
+What the ad has in common with the original report is not the dialog, it is that
+something took over the screen and the app did not fully come back. A keyboard in
+its own window, a full-screen ad view controller, a floating-window destination.
+One bug with three ways in is a better reading of the evidence than three bugs.
+
 **Start here:** what the feedback panel and the shake dialog do to the hosting
 `UIViewController`, whether either presents over the Compose host, and whether
 an appearance transition can be interrupted by the keyboard dismissing under it.
@@ -743,3 +754,178 @@ the policy already describes.
 
 **Hints:** `Telemetry.kt`, `AppTelemetry.kt`, `FeedbackRepository.kt`. No Swift caller:
 `grep setUser apps/ios` is empty. Filed by the SD-6 telemetry review, 2026-09-10.
+
+## SD-47 [P1] — Five paws looks unreachable on a run that deserves it
+
+**Ask:** Owner, 2026-09-10, two reports ninety seconds apart on `GameRoute`:
+*"I don't know how I possibly could've earned five paws. I did this in five
+seconds with no mistakes"* and *"yeah, I am crushing these puzzles, but still not
+getting five paws."*
+
+Both were filed on `f182418`, which is after `f42d76d` took the ladder from
+three paws to five. So this is the new top rung, not the old one, and a clean
+five-second solve is not reaching it.
+
+**This is the failure mode `ScoringConfig`'s own KDoc warns about, twice.** Once
+at the bottom, where gentle multipliers left the worst completed run at 63% of
+par and one paw was unreachable. Once at the top, where a flat `speedWindowMs`
+pinned the speed multiplier at 1.0 on every board above 6x6, so a clean run
+scored a fixed 73% of par however fast it was played and the third paw at 0.85
+could not be earned. Going from two thresholds to four halves the gaps between
+them, which is exactly when a compressed range stops being survivable.
+
+**Done when:** a perfect run, meaning every placement correct, no strikes, no
+boosters and fast for the board being played, earns five paws on every grid size
+in the campaign, and the five rungs are reachable in proportions somebody has
+looked at rather than assumed.
+
+**Hints:** Measure before touching a number. Sweep every grid size and a range of
+play speeds through `Scoring`, report what fraction of par each run lands at, and
+put the table in the commit. `twoPawFraction` 0.60, `threePawFraction` 0.70,
+`fourPawFraction` 0.78 and `fivePawFraction` 0.85 are four fractions of par
+inside a 25-point band, so check whether the achievable range is even wide enough
+to hold four cuts before deciding the cuts are in the wrong place. If it is not,
+the answer is the multipliers, not the thresholds.
+
+`Scoring.parScore` prices speed at the maximum, so what "100% of par" means is
+itself part of the question. The three `Stat.BestScore` achievements derive from
+`parScore` and must stay reachable. Provenance: Sentry SODOGKU-B and SODOGKU-C,
+session `fd9affc0`, 2026-09-10.
+
+## SD-48 [P1] — A rewarded ad is a way to reproduce SD-26
+
+**Ask:** Owner, 2026-09-10, on `GameRoute`: *"both the levels button and the start
+over button are not doing anything right now."*
+
+**The tag on that report is the whole point.** Sentry recorded the transaction as
+`GADFullScreenAdViewController`, so a rewarded ad had been presented over the app
+when the buttons went dead. A minute earlier the same session reported *"I just
+clicked on Level levels, but it did nothing."*
+
+SD-26 is the same symptom from a different session, where the trigger looked like
+the feedback panel and the shake dialog instead. What those have in common is
+that something took over the screen and the app did not fully come back:
+a `GADFullScreenAdViewController` presented over the Compose host, a keyboard in
+its own window, a floating-window destination. That is one bug with three ways
+in, and the ad is the one an owner can trigger on demand.
+
+**Do this before anything else on SD-26.** It has been open as a P0 with no
+reproduction, and a reproduction is worth more than another theory.
+
+**Done when:** watching a rewarded ad to completion and returning to the board
+leaves every control working, and there is a test or a log line that would have
+caught it.
+
+**Hints:** `apps/ios/iosApp/Platform/AdNetwork.swift:106` finds the root view
+controller through `connectedScenes.keyWindow.rootViewController` and presents
+from it. Check what that does to the Compose host's appearance callbacks and
+therefore to `LocalLifecycleOwner`, and check whether the host reliably returns
+to STARTED after the ad is dismissed. Note the ad is the only native modal this
+app presents, which is why it is the cleanest of the three ways in.
+
+The navigation queue watchdog added on 2026-09-10 will log an error naming the
+host lifecycle state and every back stack entry's state while this is happening.
+Reproduce it with logs attached and the answer is in the report.
+
+Provenance: Sentry SODOGKU-A and SODOGKU-9, session `95dd30d1`, 2026-09-10.
+
+## SD-49 [P1] — Losing a board dead-ends, and giving up on the daily dead-ends harder
+
+**Ask:** Owner, 2026-09-10, twice. On the fail dialog: *"I'm also not really sure
+that we should have levels as an option on this dialogue. It seems kind of stupid.
+Maybe similar to the success page that we have we should have a failure page.
+Maybe the user should be able to restart from zero on this puzzle."* And on the
+daily: *"I gave up on today's board and when I revisited it it just shows me this.
+We might need to rethink what giving up means. I don't think the user should be
+able to give up. I don't know if there should be a total failure state. I think
+you should probably always be able to just start from the beginning."*
+
+Two reports, one shape. The win path got a sheet that reports the run as facts.
+The lose path got a dialog with a Levels button on it, and the daily's give-up
+path got a screen that says the day is over and offers nothing.
+
+**Done when:** losing a board lands on something with the same weight as the win
+sheet, restarting from zero is always available, and giving up on the daily is
+either not offered or is not permanent.
+
+**Hints:** `GameOutcomeSheets.kt` holds the win sheet and is the register to
+match: facts, not commiseration. The daily's terminal states are
+`DailyOutcome`, and "gave up" being permanent is a deliberate old decision, so
+reversing it belongs in `decisions.md` with the reason. Check what a restart does
+to `daily_result` and to the streak before allowing one: the streak now folds
+over `play_day` and counts any finished board, so a daily restart is no longer
+the same question it was.
+
+Provenance: Sentry SODOGKU-9 and SODOGKU-5, session `95dd30d1`, 2026-09-10.
+
+## SD-50 [P2] — The achievements page does not look like the rest of the app
+
+**Ask:** Owner, 2026-09-10, on `AchievementsRoute`: *"The UI of the achievements
+page honestly isn't really in line with what we're going for. Let's see if we can
+make this a little bit more in line with the rest of the app. Think Duolingo."*
+
+**Done when:** the page reads as the same app as the streak page and the win
+sheet.
+
+**Hints:** The streak work landed the vocabulary this should borrow:
+`StreakHero`, `StatPills`, `OutlinedText` and the count-up-then-thump idiom. The
+Duolingo reference is about weight and celebration, so the thing to copy is that
+a locked achievement still looks like something worth having and an unlock is an
+event rather than a row changing color. Use design-system components; a screen
+built out of raw values will fail `NoRawDesignValues`.
+
+Provenance: Sentry SODOGKU-8, session `95dd30d1`, 2026-09-10.
+
+## SD-51 [P2] — Nothing tells a player the missing starting dog is deliberate
+
+**Ask:** Owner, 2026-09-10: *"we pretty quickly start giving us those puzzles that
+don't have a starting dog... maybe the first time that they see one we should let
+them know that there's no starting dog on purpose and that they should be able to
+deduce it. Like maybe a little tool tip or something."*
+
+**Half of this shipped.** SD-12 moved the free dog from one absolute level id to a
+position inside each grid-size band, so it now comes back at every new board size
+instead of ending inside the 5x5 band. The frequency complaint is answered.
+
+**What is left is the sentence.** The first board a player opens with no dog on it
+looks like a board that failed to load, and nothing says otherwise.
+
+**Done when:** the first campaign board a player opens without a starting dog says
+so once, and never again.
+
+**Hints:** `CoachMark` and `AnchoredCard` are the existing tooltip surface and the
+tutorial already drives them. "Once, ever" is a flag in `AppCache`, next to the
+other one-time prompts. Say it without saying where a dog goes, the way the sniff
+reason copy does. It has to be dismissible and must not fire on the rehearsal
+board, which always has a dog.
+
+Provenance: Sentry SODOGKU-7, session `95dd30d1`, 2026-09-10.
+
+## SD-52 [P2] — The timer is small and the boosters barely ask
+
+**Ask:** Owner, 2026-09-10: *"let's make the timer text just slightly bigger and
+let's make the pulsing of those buttons on the bottom a little bit more
+noticeable. Like I wanna see them with the icon shaking in the middle a little
+bit more. And I honestly haven't been seeing them that much. We probably need a
+better algorithm for deciding when they should pulse."*
+
+Three things, and the third is the real one. The first two are a size and an
+amplitude. The third says the prompt is not firing when a player is actually
+stuck, which is the only thing it exists for.
+
+**Done when:** the clock is legible at a glance, a pulsing booster reads as asking
+to be pressed, and the rule that decides when to pulse has been checked against
+what being stuck actually looks like rather than tuned by feel.
+
+**Hints:** `StruggleDetector` owns the decision and is the part worth measuring.
+Write down what it currently keys on before changing it, then say what it should
+key on. Time on the board without a placement is the obvious signal and it is not
+the only one: a run of wrong guesses, or a long pause after a strike, are both
+stuck in a way a stopwatch alone misses.
+
+The clock is `elapsedLabel` drawn in `BoardClock`, which now also carries the
+time-to-beat caption from SD-17, so a size change has to leave room for both. The
+pulse is `Modifier.pulsate`; read `Animatable.value` inside `graphicsLayer` and
+not in composition or `AnimatedStateReadInComposition` fails the build.
+
+Provenance: Sentry SODOGKU-6, session `95dd30d1`, 2026-09-10.
