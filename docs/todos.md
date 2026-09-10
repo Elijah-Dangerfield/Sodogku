@@ -228,39 +228,6 @@ for the reason in `proposals.md`. Meowdoku's own reviewers say its boards start
 repeating around every 100, so this is a place where we can be better rather
 than merely bigger.
 
-## SD-14 [P1] — Delete the sharing feature
-
-**Ask:** Owner, 2026-09-09: *"honestly id say lets remove the sharing feature"*.
-
-Supersedes the earlier version of this item, which was going to narrow sharing
-to the daily and drop the emoji grid. Narrowing a feature nobody asked for is
-still carrying it.
-
-**Done when:** `:libraries:sharing` and `:libraries:sharing:impl` are gone from
-`settings.gradle.kts` and from every `build.gradle.kts` that depends on them, no
-win sheet has a share control, and nothing left in the tree mentions
-`ShareResult`, `ShareText`, `ShareLauncher` or `ShareSheet`.
-
-**Hints:** The blast radius, from a dependency grep:
-
-- `libraries/sharing/**` and `libraries/sharing/impl/**` (the modules)
-- `libraries/ui/.../system/ShareSheet.kt` and
-  `libraries/ui/.../components/feedback/ShareButton.kt`
-- `features/game/impl/.../GameOutcomeSheets.kt` (the call site) and
-  `GameContract.kt`
-- `settings.gradle.kts`, `features/game/impl/build.gradle.kts`,
-  `libraries/ui/build.gradle.kts`, `apps/compose/build.gradle.kts`,
-  `apps/compose/.../AppComponent.kt`
-
-Two tests exist only for this and go with it: `ShareTextTest`,
-`WinSheetShareTest`. Check the shared `strings.xml` for orphaned `share_*` keys
-once the code is gone; `UserFacingCopyStyleTest` will not catch a string nobody
-reads.
-
-The platform launchers (`AndroidShareLauncher`, `IosShareLauncher`) are the only
-part worth a second thought before deleting: confirm nothing else uses the
-system share sheet, then remove them too.
-
 ## SD-15 [P1] — Say the daily is waiting, on the button that opens it
 
 **Ask:** Owner, 2026-09-09: a badge on the menu icon while today's daily exists
@@ -684,3 +651,30 @@ manifest and iOS `Info.plist`.
 
 **Done when:** the guard is added, the log attachment is either disclosed on the
 feedback screen or switchable, and no KDoc in the tree describes accounts.
+
+## SD-31 [P2] — `DatabaseSchemaTest.migrationsCreateAppConfigTable` has been failing
+
+**Found by:** the agent removing the sharing feature, 2026-09-10, while running
+`:apps:server:test`. Confirmed pre-existing by stashing that work and re-running:
+it fails either way.
+
+The test asserts `app_config_values` is empty after the migrations run.
+`V4__app_config.sql:26-28` seeds three `upgrade.*` rows, so it cannot be. The
+migration has not changed since the commit that generated it, so the test has
+presumably never passed against the seeded version.
+
+**Why nobody noticed:** the server has its own Gradle task and its own CI job.
+The command used all session to verify client work is
+`:apps:compose:compileDebugKotlinAndroid :apps:compose:compileKotlinIosSimulatorArm64 testDebugUnitTest detekt`,
+and none of those four reach `:apps:server:test`. CI does run it, so this is
+presumably red on main and has been.
+
+**Done when:** either the test expects the seeded rows, or the migration stops
+seeding them and something else supplies the defaults. Decide which is right
+rather than making the assertion match: those three rows are the maintenance
+kill switch, so whether they belong in a migration is a real question.
+
+**Hints:** `apps/server/src/test/.../DatabaseSchemaTest.kt`,
+`apps/server/src/main/resources/db/migration/V4__app_config.sql`. Check the last
+green CI run for `Server tests` before assuming; if it is green there, the
+difference is the local testcontainers Postgres and that is the actual bug.

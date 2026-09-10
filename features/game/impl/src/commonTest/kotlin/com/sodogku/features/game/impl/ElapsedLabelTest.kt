@@ -8,10 +8,9 @@ import kotlin.test.assertNull
  * The one clock the game shows a player, covering the two things it decides:
  * whether there is a time worth showing at all, and what shape it takes.
  *
- * The shape itself belongs to `ShareText.duration` and is tested there against
- * every branch (seconds, minutes, the run that crosses an hour). What is tested
- * here is that this reads the same formatter rather than a second copy of it,
- * and the null, which is this function's own answer and nobody else's.
+ * Every branch of the shape is covered here (minutes and seconds, and the run
+ * that crosses an hour) along with the null, which is the answer that keeps an
+ * unplayed board from reading as a run that took no time.
  */
 class ElapsedLabelTest {
 
@@ -37,8 +36,8 @@ class ElapsedLabelTest {
 
     @Test
     fun aRunPastAnHourKeepsTheHours() {
-        // The shape the share card prints, so a player who solved a board over
-        // a lunch break reads the same time on the sheet and in the post.
+        // Rare, but a board left open over a lunch break produces one, and
+        // "62:03" is a worse answer than an hours field.
         assertEquals("1:02:03", elapsedLabel(3_723_000L))
     }
 }

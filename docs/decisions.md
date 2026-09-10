@@ -6,6 +6,53 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-10 — Sharing is deleted, and the flag with it
+
+The owner, asked whether the share text should drop the emoji grid and be
+limited to the daily: *"honestly id say lets remove the sharing feature"*. The
+queued item (SD-14) had been written as a narrowing. It was rewritten as a
+deletion first, because narrowing a feature nobody asked for is still carrying
+it.
+
+### What went
+
+`:libraries:sharing` and `:libraries:sharing:impl` (`ShareText`, `ShareResult`,
+`ShareLauncher`, and the Android `ACTION_SEND` and iOS `UIActivityViewController`
+launchers), `ShareButton` and `ShareSheet.kt` from the design system, the win
+sheet's call site, the `share_*` strings, and both tests that existed only for
+this (`ShareTextTest`, `WinSheetShareTest`).
+
+### The two things that were not just deletions
+
+**`ShareText.duration` had a second caller.** The win sheet and the level pane
+render their clock through `elapsedLabel`, which delegated to it precisely so a
+shared run could not disagree with the sheet it was shared from. With the share
+gone the reason is gone, but the formatter is not: it now lives beside
+`elapsedLabel` in `GameContract.kt`, which is its only caller.
+`ElapsedLabelTest` already covered every branch and is now the only thing that
+does.
+
+**`features.sharing` went too.** Nothing reads it once `ShareButton` is gone, so
+what was left was a kill switch in the admin console for a feature that does not
+exist, which is worse than dead code: an operator can toggle it and watch
+nothing happen. That meant the config value, the shipped fallback map, the
+manifest registry entry the server type-checks against, and the two tests that
+used the path as their example of a `features.*` key. The alternative, leaving
+the flag as a harmless no-op, was rejected on the grounds that a live operations
+surface should not offer controls that do nothing.
+
+### What was deliberately left
+
+The dated entries below this one still describe sharing as shipped, including
+the 2026-09-07 pair on the composition local and on the share not being able to
+leak the answer. This log is append-only and says so, and those decisions were
+true when they were made. SPEC 9 is a different case and was corrected in place:
+it is the living specification, so it now records the removal rather than the
+feature. Its number is kept, because `SPEC <n>` references are scattered through
+the code and renumbering to close a gap would break all of them.
+
+---
+
 ## 2026-09-08 — Ads narrow to consumables, and a failed ad shows Pro instead of nothing
 
 Two punch-list items that turned out to be the same conversation. The owner:

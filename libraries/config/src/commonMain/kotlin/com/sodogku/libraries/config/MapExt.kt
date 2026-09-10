@@ -31,7 +31,7 @@ fun <T : Any> Map<String, *>.getValueRecursive(path: List<String>, clazz: KClass
                 String::class -> rawValue.toString() as? T
                 // Not `toBoolean()`. That maps *everything* that is not "true"
                 // to `false`, so a string written to `ads.enabled` or
-                // `features.sharing` would turn the feature off on every device
+                // `features.boosters` would turn the feature off on every device
                 // that fetched it — silently, and without falling back to the
                 // declared default. Every monetization key in SPEC 4.2 is
                 // supposed to fail open, and this was the one place that could

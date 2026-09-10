@@ -23,9 +23,6 @@ import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.game.PawRating
 import com.sodogku.libraries.ui.components.game.ScoreCounter
 import com.sodogku.libraries.ui.components.game.ScorePawBurst
-import com.sodogku.libraries.sharing.ShareLabels
-import com.sodogku.libraries.sharing.ShareResult
-import com.sodogku.libraries.ui.components.feedback.ShareButton
 import com.sodogku.libraries.ui.components.game.LevelRewardChip
 import com.sodogku.libraries.ui.components.game.RewardBadge
 import com.sodogku.libraries.ui.components.game.Stat
@@ -74,11 +71,6 @@ import sodogku.libraries.resources.generated.resources.game_verdict_flawless
 import sodogku.libraries.resources.generated.resources.game_verdict_scraped
 import sodogku.libraries.resources.generated.resources.game_verdict_sharp
 import sodogku.libraries.resources.generated.resources.game_won_title
-import sodogku.libraries.resources.generated.resources.share_footer
-import sodogku.libraries.resources.generated.resources.share_streak
-import sodogku.libraries.resources.generated.resources.share_title_daily
-import sodogku.libraries.resources.generated.resources.share_title_daily_plain
-import sodogku.libraries.resources.generated.resources.share_title_level
 
 /**
  * The end of an attempt.
@@ -180,41 +172,6 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
                 color = AppTheme.colors.textSecondary,
             )
         }
-        // Above the CTA, not beside it: sharing is what a player *might* do,
-        // Next level is what they will do.
-        val level = state.level
-        if (level != null) {
-            ShareButton(
-                result = ShareResult(
-                    size = level.size,
-                    // The region layout, never the placements. `ShareResult` has
-                    // nowhere to put a solution, which is what makes "no
-                    // spoilers" a property of the type rather than of care taken
-                    // here.
-                    regions = level.board.regions.toList(),
-                    timeMs = state.elapsedMs,
-                    score = state.attemptScore,
-                    paws = state.paws,
-                    // What this run did not spend, not what the player holds.
-                    // Bones are one global count now, so a refill mid-board
-                    // would otherwise share three intact bones after a clear
-                    // that cost three.
-                    bonesRemaining = state.bonesUnspent,
-                ),
-                labels = ShareLabels(
-                    title = shareTitle(state, level.id),
-                    // Only the daily has a streak, and "0 day streak" under a
-                    // campaign clear is worse than no line at all.
-                    streak = if (state.isDaily && state.dailyStreak > 0) {
-                        stringResource(Res.string.share_streak, state.dailyStreak)
-                    } else {
-                        null
-                    },
-                    footer = stringResource(Res.string.share_footer),
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
         // There is no next daily, so the daily's win sheet leads back rather than
         // offering tomorrow.
         if (state.isDaily) {
@@ -260,18 +217,6 @@ internal fun verdictTitle(standing: Standing?): StringResource = when (standing)
     Standing.Sharp -> Res.string.game_verdict_sharp
     Standing.Flawless -> Res.string.game_verdict_flawless
     Standing.Solid, null -> Res.string.game_won_title
-}
-
-/** "Sodogku Daily · Sep 8" or "Sodogku · Level 137". */
-@Composable
-private fun shareTitle(state: GameState, levelId: Int): String {
-    if (!state.isDaily) return stringResource(Res.string.share_title_level, levelId)
-    val date = state.daily?.date ?: return stringResource(Res.string.share_title_daily_plain)
-    return stringResource(
-        Res.string.share_title_daily,
-        stringResource(MonthNames[date.month.number - 1]),
-        date.day,
-    )
 }
 
 @Composable

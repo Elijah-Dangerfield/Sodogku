@@ -42,7 +42,7 @@ class DangerousValuesTest {
     fun takingSomethingAwayFromEveryPlayerWarns() {
         assertNotNull(dangerousWarning("ads.enabled", "false"))
         assertNotNull(dangerousWarning("daily.enabled", "false"))
-        assertNotNull(dangerousWarning("features.sharing", "false"))
+        assertNotNull(dangerousWarning("features.achievements", "false"))
         assertNotNull(dangerousWarning("features.dailyChallenge", "false"))
     }
 
@@ -61,7 +61,7 @@ class DangerousValuesTest {
         assertNull(dangerousWarning("ads.rewardedPlacements", """{"continue_level": true}"""))
         assertNull(dangerousWarning("ads.enabled", "true"))
         assertNull(dangerousWarning("daily.enabled", "true"))
-        assertNull(dangerousWarning("features.sharing", "true"))
+        assertNull(dangerousWarning("features.achievements", "true"))
     }
 
     @Test

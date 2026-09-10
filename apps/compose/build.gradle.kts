@@ -102,8 +102,6 @@ kotlin {
             implementation(projects.libraries.progress.impl)
             implementation(projects.libraries.achievements)
             implementation(projects.libraries.achievements.impl)
-            implementation(projects.libraries.sharing)
-            implementation(projects.libraries.sharing.impl)
             // The impl is what turns leaderboards on: `RealLeaderboards`
             // declares `replaces = [NoLeaderboards::class]`, so without this
             // line the graph silently keeps the no-op and every submission

@@ -643,7 +643,7 @@ of them, and nothing happened. That list is now **19**. What was wired:
 - **`boosters.startingSniffs`, `boosters.startingTreats`, `boosters.refillTo`.** The first two
   needed `AppData.sniffs`/`treats` to become nullable first: a record defaulting to 3 is
   indistinguishable from a player who spent down to 3, so the config value could never win.
-- **`features.achievements`, `features.sharing`, `features.boosters`**, each read at the point the
+- **`features.achievements`, `features.boosters`**, each read at the point the
   feature draws itself rather than resolved into a field.
 
 **What is still inert, and why it is not a call site somebody missed.** Twelve of the nineteen name

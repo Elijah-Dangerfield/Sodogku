@@ -61,7 +61,6 @@
 
   { "path": "features.dailyChallenge", "type": "boolean", "default": true, "description": "The Daily Challenge tab and map card." },
   { "path": "features.achievements", "type": "boolean", "default": true, "description": "Achievements screen and its unlock toasts." },
-  { "path": "features.sharing", "type": "boolean", "default": true, "description": "Share sheet and the rendered result card." },
   { "path": "features.boosters", "type": "boolean", "default": true, "description": "The Sniff and Treat bar on the board." },
 
   { "path": "telemetry.appEventsEnabled", "type": "boolean", "default": true, "description": "Kill switch for shipping app events to Grafana Cloud." },

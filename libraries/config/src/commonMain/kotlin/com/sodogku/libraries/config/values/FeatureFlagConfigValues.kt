@@ -41,19 +41,6 @@ class FeatureAchievements(appConfigMap: AppConfigMap) : FlagConfigValue(appConfi
 }
 
 /**
- * Share sheet and the rendered result card. Worth its own switch because sharing
- * is the one feature that puts our artwork on someone else's timeline.
- */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class FeatureSharing(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
-    override val name = "Feature: sharing"
-    override val path = "features.sharing"
-    override val default = true
-}
-
-/**
  * The Sniff and Treat bar on the board. Off hides the buttons and the economy
  * with them; bones and the three-strike rule are game rules, not a feature, and
  * are unaffected.
@@ -71,6 +58,5 @@ class FeatureBoosters(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap
 fun featureFlagConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>> = listOf(
     FeatureDailyChallenge(appConfigMap),
     FeatureAchievements(appConfigMap),
-    FeatureSharing(appConfigMap),
     FeatureBoosters(appConfigMap),
 )

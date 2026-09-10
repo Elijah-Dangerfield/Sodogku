@@ -29,9 +29,9 @@ import kotlin.test.assertTrue
  *
  * What that cost, concretely: the client resolves a boolean through
  * `rawValue.toString().toBoolean()`, and **`"banana".toBoolean()` is `false`**.
- * A mistyped string on `daily.enabled` or `features.sharing` does not fall back
- * to the shipped default and does not log — it turns the feature off on every
- * device that fetches it. Numeric keys are luckier (an unparseable number
+ * A mistyped string on `daily.enabled` or `features.achievements` does not fall
+ * back to the shipped default and does not log — it turns the feature off on
+ * every device that fetches it. Numeric keys are luckier (an unparseable number
  * resolves to null and falls back to the default), which is why the boolean case
  * gets its own test.
  */
@@ -47,7 +47,7 @@ class ShippedConfigSchemaTest {
         val booleans = pathsOfType("boolean")
 
         assertTrue(
-            booleans.containsAll(listOf("ads.enabled", "daily.enabled", "features.sharing")),
+            booleans.containsAll(listOf("ads.enabled", "daily.enabled", "features.achievements")),
             "The registry has no entry for the kill switches this test exists to protect: $booleans",
         )
         booleans.forEach { path ->

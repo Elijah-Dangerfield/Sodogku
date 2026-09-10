@@ -111,8 +111,6 @@ include(":libraries:progress")
 include(":libraries:progress:impl")
 include(":libraries:puzzle")
 include(":libraries:scoring")
-include(":libraries:sharing")
-include(":libraries:sharing:impl")
 include(":features:achievements")
 include(":features:achievements:impl")
 // The streak page and the one-off intention moment. Its copy lives in its own

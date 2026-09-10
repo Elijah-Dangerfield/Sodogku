@@ -143,7 +143,6 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
     "features" to mapOf(
         "dailyChallenge" to true,
         "achievements" to true,
-        "sharing" to true,
         "boosters" to true,
     ),
     "telemetry" to mapOf(

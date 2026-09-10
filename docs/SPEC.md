@@ -139,7 +139,7 @@ banked = earned × (1 - scoring.boosterPenaltyRate) ^ (sniffs + treats spent thi
 At the default 0.15 one sniff banks 85% of the run and two bank 72%. Multiplicative rather than a
 flat deduction, so nothing can drive a score negative, the cost is the same wherever in the
 attempt the help was taken, and it scales with the board. The banked number is what the record,
-the win sheet, the share text, the achievement log and `game.level_completed` all carry.
+the win sheet, the achievement log and `game.level_completed` all carry.
 
 **Boosters do not move the paw rating.** Paws are measured on what the run earned before the
 cost. Because the cost is a multiplier and the thresholds are fractions of par, that is the same
@@ -397,7 +397,6 @@ in the genre and it costs almost nothing given a bundled pack.
   campaign level underneath is still there on back. While the daily is the board on screen, the
   header shows the streak where the level number usually sits — a daily's id is a position in a
   730-board pool and reads as a campaign level nobody has reached.
-- **Sharing.** The daily is what people share, because everyone had the same board.
 
 `daily.enabled` is a remote config kill switch, and `features.dailyChallenge` is the rollout flag.
 The card reads both — either one off closes it — so neither is a control that nothing listens to.
@@ -580,8 +579,8 @@ modes (absent, malformed, partial, unsatisfiable) are pinned.
 
 **Feature flags**
 
-`features.dailyChallenge`, `features.achievements`, `features.sharing`, `features.boosters`. One
-per shippable-but-hideable feature, so anything can be dark-launched.
+`features.dailyChallenge`, `features.achievements`, `features.boosters`. One per
+shippable-but-hideable feature, so anything can be dark-launched.
 
 ### 4.4 What stays in the binary, and why
 
@@ -884,45 +883,15 @@ entrance, back-press dismissal and full-window scrim by default.
 
 ---
 
-## 9. Sharing
+## 9. Sharing (removed)
 
-Wordle-style, and the daily is the version people will actually share, because everyone had the
-same board.
+Removed 2026-09-10. The owner's call: "honestly id say lets remove the sharing
+feature". `:libraries:sharing`, its two platform launchers, `ShareButton`,
+`LocalShareSheet` and the `features.sharing` flag are all gone, along with the
+`share.tapped` event and the `share_*` strings.
 
-```
-Sodogku Daily · Sep 8
-⏱ 1:42   🏆 14,820   🐾🐾🐾   🦴🦴
-
-🟥🟥🟧🟧🟨🟨🟩
-🟥🟦🟦🟧🟨🟩🟩
-...
-
-sodogku.app
-```
-
-The bones the player finished with are on the stats line next to the paws — surviving a 10x10 with
-all three is the brag the number exists for. The streak line only appears for the daily.
-
-**The grid is the region layout, and the text generator is never given the solution.** No-spoilers
-is a property of `ShareResult`'s signature rather than of anyone's care at the call site: two
-players who solved the same board produce byte-identical text, and so does a player who has not
-solved it. Every cell of a region renders as the same square, including the one the dog was on.
-
-Unicode has exactly nine coloured-or-neutral square emoji and the top band needs ten regions, so
-region 10 is `🔲`. It is the closest pair in the set; on a 10x10 a share reads slightly worse than
-a screenshot, which is the price of the format working at all.
-
-Every word in a share — the title, the streak line, the footer — is passed in by the UI from
-`:libraries:resources`, already formatted for the locale. `:libraries:sharing` owns the layout,
-the emoji and the numbers, and holds no English and no date formatting of its own.
-
-Share from the win sheet, the daily card, and a level-map long-press. `share.tapped` is worth
-watching closely, it is the cheapest organic growth channel the app has.
-
-Because every word is passed in, the only thing in the app that can *build* a share is a composable
-— `stringResource` is the only way to resolve them. So the platform launcher reaches screens as
-`LocalShareSheet` rather than as a ViewModel dependency, and the design system's `ShareButton` owns
-the formatting: a screen supplies the board and what to call it, and nothing else.
+The number is kept so the sections after it, and the `SPEC <n>` references in
+the code, still point where they did. See `decisions.md` for the reasoning.
 
 ---
 
@@ -1040,8 +1009,6 @@ libraries/
   ads/           + impl    AdGate; AdMob Android, AdMob iOS via Swift
   billing/       + impl    Entitlements; Play Billing / StoreKit 2
   achievements/  + impl    Pure fold + catalog; Room-backed fact log
-  sharing/                 Pure Kotlin. The share text. Zero deps, and no way
-                           to be handed a solution.
   legal/         + impl    Document versions + acceptance gate
 tools/
   level-generator          JVM CLI, depends on :libraries:puzzle
@@ -1063,7 +1030,7 @@ State  = board, placedDogs, autoMarks, manualMarks, livesRemaining, score, combo
 Action = CellTapped, CellLongPressed, SniffUsed, TreatUsed, Restart, Continue,
          Skip, Pause, Resume, TimerTick
 Event  = ShowRewardedAd(placement), NavigateNext, ShowPaywall,
-         PlaySound, Haptic, ShowShareSheet, FloatPoints(cell, points, praise)
+         PlaySound, Haptic, FloatPoints(cell, points, praise)
 ```
 
 Timer runs off a monotonic clock and pauses on background, so a backgrounded app cannot silently
@@ -1176,7 +1143,6 @@ Aggregate into the completion event.
 | `iap.purchase_result` | `outcome`, `error_kind` |
 | `iap.restore_result` | `outcome` |
 | `achievement.unlocked` | `achievement_id`, `level_id` |
-| `share.tapped` | `mode`, `level_id`, `paws` |
 | `tutorial.step_viewed` / `tutorial.completed` / `tutorial.skipped` | `step` |
 | `legal.terms_prompt_shown` / `legal.terms_accepted` | `terms_version`, `blocking` |
 
@@ -1497,7 +1463,7 @@ moderate difficulty so it stays a 3-to-5-minute daily habit rather than a wall.
 - [ ] Grafana Cloud OTLP endpoint and token.
 - [ ] Fly app name and org.
 - [ ] Support email.
-- [ ] Domain, for the share footer and privacy pages.
+- [ ] Domain, for the privacy pages.
 
 #### Monetization, and exactly where each value goes
 

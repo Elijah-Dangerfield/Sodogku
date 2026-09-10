@@ -220,8 +220,8 @@ SPEC 2 calls the strongest retention mechanic in the genre and it is the only lo
 earning after the campaign is spent. The most engaged player the app has is the one who most needs
 to be told the daily exists, and today they are the one the app says goodbye to.
 
-The components already exist in the file: `OutcomeLayout`, `Dog(pose = DogPose.Solved)`,
-`PawRating` and `ShareButton` are all imported. The campaign total folds out of
+The components already exist in the file: `OutcomeLayout`, `Dog(pose = DogPose.Solved)`
+and `PawRating` are all imported. The campaign total folds out of
 `ProgressRepository.all()`, which the drawer already reads.
 
 **The case against.** Nobody knows how many players see this screen, and the honest prior in this

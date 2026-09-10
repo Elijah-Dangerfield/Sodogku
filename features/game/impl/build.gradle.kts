@@ -29,7 +29,6 @@ kotlin {
             implementation(projects.features.settings)
             // The two streak ceremonies are navigated to from the win path.
             implementation(projects.features.streak)
-            implementation(projects.libraries.sharing)
             implementation(projects.libraries.scoring)
             // Submitted to on every clear and never read back. `NoLeaderboards`
             // is the binding everywhere except iOS with Game Center, so this is

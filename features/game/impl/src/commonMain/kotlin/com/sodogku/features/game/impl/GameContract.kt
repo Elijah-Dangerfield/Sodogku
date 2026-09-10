@@ -17,7 +17,6 @@ import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.NearMiss
 import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.scoring.Standing
-import com.sodogku.libraries.sharing.ShareText
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 
@@ -844,15 +843,33 @@ sealed interface GameAction {
 internal const val TickMillis = 1_000L
 
 /**
- * A finished run as `m:ss`, or null when there is no run to show.
+ * A finished run as `m:ss`, or `h:mm:ss` for the rare one that crosses an hour,
+ * or null when there is no run to show.
  *
- * One formatter for the win sheet and the level pane, and the same one the share
- * card prints, so the time a player reads on the sheet is the time they post.
+ * One formatter for the win sheet and the level pane, so a time cannot read two
+ * ways depending on which of them a player is looking at.
  *
  * Null rather than "0:00" for a board with no time on it. An unplayed level, a
  * day that was given up on and a record written before times were kept all hold
  * zero, and a clock reading nought reads as a run that took no time rather than
  * as one that never happened.
  */
-internal fun elapsedLabel(millis: Long): String? =
-    if (millis <= 0L) null else ShareText.duration(millis)
+internal fun elapsedLabel(millis: Long): String? {
+    if (millis <= 0L) return null
+    val total = millis / MillisPerSecond
+    val seconds = total % SecondsPerMinute
+    val minutes = (total / SecondsPerMinute) % MinutesPerHour
+    val hours = total / SecondsPerHour
+    return if (hours > 0) {
+        "$hours:${minutes.padded()}:${seconds.padded()}"
+    } else {
+        "$minutes:${seconds.padded()}"
+    }
+}
+
+private fun Long.padded(): String = toString().padStart(2, '0')
+
+private const val MillisPerSecond = 1_000L
+private const val SecondsPerMinute = 60L
+private const val MinutesPerHour = 60L
+private const val SecondsPerHour = 3_600L
