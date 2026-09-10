@@ -61,6 +61,7 @@ import com.sodogku.libraries.puzzle.autoMarkedCells
 import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
+import com.sodogku.libraries.scoring.nearMiss
 import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.scoring.standingFor
 import com.sodogku.libraries.sodogku.AppCache
@@ -1521,6 +1522,16 @@ class GameViewModel(
             livesRemaining = bonesUnspent,
             config = scoring,
         )
+        // Against the *scored* total, not the banked one. The booster penalty
+        // comes off afterwards, so a player told they were forty points short
+        // and who then plays a clean run without boosters is told the truth.
+        val nearMiss = Scoring.nearMiss(
+            finished.total,
+            level.size,
+            level.difficulty,
+            completed = true,
+            config = scoring,
+        )
         val boostersUsed = sniffsUsed + treatsUsed
         val banked = Scoring.afterBoosters(finished.total, boostersUsed, scoring.boosterPenaltyRate)
         val duration = elapsedMs()
@@ -1600,6 +1611,7 @@ class GameViewModel(
                 dailyStreak = streakDays,
                 treatAwarded = reward,
                 standing = standing,
+                nearMiss = nearMiss,
             )
             lifetime = won.lifetimeScore
             won

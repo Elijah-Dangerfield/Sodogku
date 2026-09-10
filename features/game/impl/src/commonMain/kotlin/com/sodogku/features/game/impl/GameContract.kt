@@ -14,6 +14,7 @@ import com.sodogku.libraries.puzzle.Solution
 import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
+import com.sodogku.libraries.scoring.NearMiss
 import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.scoring.Standing
 import com.sodogku.libraries.sharing.ShareText
@@ -154,6 +155,13 @@ data class GameState(
      */
     val boosterPenaltyRate: Double = 0.0,
     val paws: Int = 0,
+
+    /**
+     * How close this run came to another paw, or null when there is nothing
+     * honest to say. Resolved when the run is scored, not in the sheet, because
+     * it needs the config the attempt was actually scored against.
+     */
+    val nearMiss: NearMiss? = null,
     val elapsedMs: Long = 0,
     val sniffs: Int = 0,
     val treats: Int = 0,

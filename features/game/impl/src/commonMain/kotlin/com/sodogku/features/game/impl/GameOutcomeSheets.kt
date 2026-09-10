@@ -28,6 +28,8 @@ import com.sodogku.libraries.sharing.ShareResult
 import com.sodogku.libraries.ui.components.feedback.ShareButton
 import com.sodogku.libraries.ui.components.game.LevelRewardChip
 import com.sodogku.libraries.ui.components.game.RewardBadge
+import com.sodogku.libraries.ui.components.game.Stat
+import com.sodogku.libraries.ui.components.game.StatPills
 import com.sodogku.libraries.scoring.Standing
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.system.AppTheme
@@ -56,6 +58,13 @@ import sodogku.libraries.resources.generated.resources.game_next_level
 import sodogku.libraries.resources.generated.resources.game_watch_ad_badge
 import sodogku.libraries.resources.generated.resources.game_refill_bones
 import sodogku.libraries.resources.generated.resources.game_retry
+import sodogku.libraries.resources.generated.resources.game_near_miss
+import sodogku.libraries.resources.generated.resources.game_stat_mistakes
+import sodogku.libraries.resources.generated.resources.game_stat_mistakes_spoken
+import sodogku.libraries.resources.generated.resources.game_stat_score
+import sodogku.libraries.resources.generated.resources.game_stat_score_spoken
+import sodogku.libraries.resources.generated.resources.game_stat_time
+import sodogku.libraries.resources.generated.resources.game_stat_time_spoken
 import sodogku.libraries.resources.generated.resources.game_reward_earned_treat
 import sodogku.libraries.resources.generated.resources.game_skip_level
 import sodogku.libraries.resources.generated.resources.game_skip_none_left
@@ -129,13 +138,29 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
             )
             ScorePawBurst()
         }
-        // Under the score, quietly. The time is the thing a player compares
-        // against themselves later; it is not what the sheet is for.
-        elapsedLabel(state.elapsedMs)?.let { time ->
+        // The facts, as a row rather than as more lines.
+        //
+        // Time used to be a sentence under the score and mistakes were not shown
+        // at all. Both are measurements of the run and neither is worth a line of
+        // prose: a stack asks to be read one item at a time, a row is scanned in
+        // one look. Same facts, a fraction of the attention, on a sheet whose
+        // standing note is that it is far too much text.
+        StatPills(stats = winStats(state))
+
+        // Only when it is true and only when it is close. See `nearMiss`: the
+        // gap is in points rather than in seconds, because score is time *and*
+        // combo *and* mistakes, and "five seconds faster" is a promise the
+        // scoring cannot keep.
+        state.nearMiss?.let { miss ->
             Text(
-                text = stringResource(Res.string.game_time_taken, time),
-                typography = AppTheme.typography.Body.B600,
+                text = stringResource(
+                    Res.string.game_near_miss,
+                    miss.pointsShort,
+                    miss.nextPaw,
+                ),
+                typography = AppTheme.typography.Body.B500,
                 color = AppTheme.colors.textSecondary,
+                textAlign = TextAlign.Center,
             )
         }
         // The same chip the level pane promised, so the payout is recognisably
@@ -553,4 +578,51 @@ private fun LostSheetWithSkipPreview() {
             onAction = {},
         )
     }
+}
+
+/**
+ * The four measurements of a finished run.
+ *
+ * Score first because it is what the sheet is about, then the two a player
+ * compares against themselves, then mistakes. Mistakes last and in the danger
+ * colour: it is the only one where a smaller number is better, and putting it
+ * anywhere else in the row invites reading it as another thing that went well.
+ *
+ * Paws are not a pill. They have their own row above, drawn as paws, and a
+ * pill saying "4/5" beside the picture of four paws is the same fact twice.
+ */
+@Composable
+private fun winStats(state: GameState): List<Stat> = buildList {
+    add(
+        Stat(
+            caption = stringResource(Res.string.game_stat_score),
+            value = state.attemptScore.toString(),
+            tint = AppTheme.colors.accentPrimary.color,
+            spoken = stringResource(Res.string.game_stat_score_spoken, state.attemptScore),
+        ),
+    )
+    elapsedLabel(state.elapsedMs)?.let { time ->
+        add(
+            Stat(
+                caption = stringResource(Res.string.game_stat_time),
+                value = time,
+                tint = AppTheme.colors.accentSecondary.color,
+                spoken = stringResource(Res.string.game_stat_time_spoken, time),
+            ),
+        )
+    }
+    add(
+        Stat(
+            caption = stringResource(Res.string.game_stat_mistakes),
+            value = state.strikesThisAttempt.toString(),
+            // Green on a clean sheet. A zero in the danger colour reads as a
+            // warning about the one number that means nothing went wrong.
+            tint = if (state.strikesThisAttempt == 0) {
+                AppTheme.colors.status.okay.color
+            } else {
+                AppTheme.colors.danger.color
+            },
+            spoken = stringResource(Res.string.game_stat_mistakes_spoken, state.strikesThisAttempt),
+        ),
+    )
 }

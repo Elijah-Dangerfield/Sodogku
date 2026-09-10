@@ -89,6 +89,22 @@
     <string name="shake_report">Report a bug</string>
     <string name="shake_dismiss">Dismiss</string>
     <string name="game_watch_ad_badge">Plays an ad</string>
+
+    <!-- The row of facts on the win sheet. Captions are one word because they
+         sit above the number in a narrow pill; the spoken forms are whole
+         phrases, because a screen reader reading "SCORE" and "342" as two
+         separate labels is worse than either. -->
+    <string name="game_stat_score">Score</string>
+    <string name="game_stat_score_spoken">%1$d points</string>
+    <string name="game_stat_time">Time</string>
+    <string name="game_stat_time_spoken">Finished in %1$s</string>
+    <string name="game_stat_mistakes">Mistakes</string>
+    <string name="game_stat_mistakes_spoken">%1$d mistakes</string>
+
+    <!-- Shown only when the gap is small. Points rather than seconds: score is
+         time and combo and mistakes together, so telling somebody how much
+         faster to go is a promise the scoring cannot keep. -->
+    <string name="game_near_miss">%1$d more points would have earned a %2$d paw run.</string>
     <string name="game_skip_level">Skip this level</string>
     <string name="game_skip_remaining">%1$d skips left today</string>
     <string name="game_skip_none_left">No skips left today</string>
