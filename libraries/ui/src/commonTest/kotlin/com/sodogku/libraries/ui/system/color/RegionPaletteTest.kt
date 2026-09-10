@@ -2,7 +2,9 @@ package com.sodogku.libraries.ui.system.color
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import com.sodogku.libraries.puzzle.Board
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -89,11 +91,46 @@ class RegionPaletteTest {
         assertTrue(span >= LuminanceSpanFloor, "the fills span only $span of luminance")
     }
 
-    /** Out-of-range regions wrap rather than throwing on the board screen. */
+    /**
+     * An out-of-range region throws rather than wrapping.
+     *
+     * The reversal is the point. Wrapping drew region 10 in region 0's pink on
+     * a board whose only rule is one dog per colour, and it did it without a
+     * frame of complaint. See [RegionPalette.get].
+     */
     @Test
-    fun regionIndicesWrapInBothDirections() {
-        assertEquals(RegionPalette.styles[0], RegionPalette[RegionPalette.size])
-        assertEquals(RegionPalette.styles[RegionPalette.size - 1], RegionPalette[-1])
+    fun aRegionThePaletteHasNoColourForThrows() {
+        assertFailsWith<IllegalArgumentException> { RegionPalette[RegionPalette.size] }
+        assertFailsWith<IllegalArgumentException> { RegionPalette[-1] }
+    }
+
+    /**
+     * The check that actually stops an eleventh region reaching a screen.
+     *
+     * The palette lives in the design system and `MAX_SIZE` lives in the puzzle
+     * engine, and nothing joined them: raising the cap to eleven would compile,
+     * generate, verify and ship, and fail for the first time on a player's
+     * board. Now it fails here, one build earlier, on a line that says what to
+     * do about it.
+     */
+    @Test
+    fun thereIsAColourAndAGlyphForEveryRegionABoardCanHave() {
+        assertEquals(
+            Board.MAX_SIZE,
+            RegionPalette.size,
+            "a ${Board.MAX_SIZE}x${Board.MAX_SIZE} board has ${Board.MAX_SIZE} regions and the " +
+                "palette holds ${RegionPalette.size} colours. Both lists move together or neither does",
+        )
+        assertEquals(
+            RegionPalette.size,
+            RegionGlyph.entries.size,
+            "colourblind mode identifies a region by its glyph, so one per colour or the mode lies",
+        )
+        assertEquals(
+            RegionPalette.size,
+            RegionPalette.styles.map { it.glyph }.toSet().size,
+            "two regions share a glyph, which is two regions with one identity",
+        )
     }
 
     private fun Color.opaque() = copy(alpha = 1f)

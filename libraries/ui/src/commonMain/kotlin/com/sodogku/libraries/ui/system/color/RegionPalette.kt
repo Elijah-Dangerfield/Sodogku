@@ -76,6 +76,11 @@ data class RegionStyle(
  *
  * Deliberately no X or cross: that reads as the player's own "no dog here"
  * mark, and a region whose identity looks like a move would be cruel.
+ *
+ * There is one of these per entry in [RegionPalette.styles] and that is checked
+ * rather than maintained by hand — a glyph list that fell one short would put
+ * the same silhouette on two regions in the one mode where the silhouette *is*
+ * the region.
  */
 enum class RegionGlyph {
     Circle,
@@ -117,11 +122,33 @@ object RegionPalette {
     val size: Int get() = styles.size
 
     /**
-     * The style for [region]. Wraps rather than throwing: a board with more
-     * regions than the palette has colours is a content bug, and a wrapped
-     * colour is a far better failure than a crash on the board screen.
+     * The style for [region], which must be one this palette has.
+     *
+     * This used to wrap with `mod`, on the argument that a board with more
+     * regions than the palette has colours is a content bug and a wrapped
+     * colour beats a crash on the board screen. That reasoning is wrong, and it
+     * is worth saying why rather than only reversing it.
+     *
+     * The whole rule set is one dog per colour. An eleventh region drawn in
+     * region 0's pink is not a cosmetic defect: it is two regions the player
+     * cannot tell apart on a board where telling them apart *is* the puzzle,
+     * and it renders without a single frame of complaint. A crash would at
+     * least be reported. Silently unsolvable would be reported as "I'm stuck".
+     *
+     * Nothing shipped can reach this. `Board` caps at `MAX_SIZE`, regions are
+     * exactly N on an NxN board, and `LevelPackVerificationTest` checks the
+     * count on every level in the binary. So the throw is a development-time
+     * assertion about a palette that has fallen behind the board, and the test
+     * that ties this palette's length to `Board.MAX_SIZE` is what actually
+     * catches it, one build before anybody draws anything.
      */
-    operator fun get(region: Int): RegionStyle = styles[region.mod(styles.size)]
+    operator fun get(region: Int): RegionStyle {
+        require(region in styles.indices) {
+            "No colour for region $region: the palette holds ${styles.size}, and a board with " +
+                "more regions than that has no legible rendering at all"
+        }
+        return styles[region]
+    }
 }
 
 /**

@@ -37,5 +37,14 @@ kotlin {
             api(libs.compottie.lite)
             api(libs.compottie.network)
         }
+
+        commonTest.dependencies {
+            // Test-only, and deliberately not a production dependency. The
+            // design system does not know what a puzzle is; what it needs to
+            // know is that its region palette is at least as long as the
+            // biggest board the engine will hand it, and that is an assertion
+            // rather than a call.
+            implementation(projects.libraries.puzzle)
+        }
     }
 }

@@ -12,6 +12,8 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.stateDescription
+import com.sodogku.libraries.ui.system.color.RegionPalette
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.board_action_clear
@@ -90,6 +92,22 @@ data class BoardCellLabels(
     val placeAction: String,
 ) {
 
+    init {
+        // The two string sets, the fills and the glyphs are four lists that
+        // have to be the same length and are maintained in four different
+        // places: `strings.xml`, `strings.xml` again, `RegionPalette.styles`
+        // and `RegionGlyph`. Nothing joined them up, so adding an eleventh
+        // colour without an eleventh `board_region_*` would have left region 10
+        // announced by region 0's name, silently, in the one mode where the
+        // announcement is all the player has.
+        require(regions.size == RegionPalette.size) {
+            "The board has ${RegionPalette.size} regions and ${regions.size} names for them"
+        }
+        require(glyphs.size == RegionPalette.size) {
+            "The board has ${RegionPalette.size} regions and ${glyphs.size} glyph names for them"
+        }
+    }
+
     /**
      * Which square this is: where it sits, and which region it belongs to.
      *
@@ -104,10 +122,20 @@ data class BoardCellLabels(
      * [row] and [column] arrive zero-based, because that is what the board
      * counts in, and come out one-based, because that is what a person counts
      * in. This is the only place in the app the two conventions meet.
+     *
+     * [region] must be a region that has a name. This used to wrap with `mod`,
+     * matching what `RegionPalette.get` did, and both have stopped: a region
+     * announced by another region's name is a screen-reader player told two
+     * different colours are the same one, which is not a smaller failure than a
+     * crash. It is the same failure, reported by nobody. See
+     * [RegionPalette.get].
      */
     fun describe(row: Int, column: Int, region: Int, colorblind: Boolean): String {
         val names = if (colorblind) glyphs else regions
-        return cellFormat.fill(row + 1, column + 1, names[region.mod(names.size)])
+        require(region in names.indices) {
+            "No name for region $region: the board speaks ${names.size} of them"
+        }
+        return cellFormat.fill(row + 1, column + 1, names[region])
     }
 
     /** What is on the square. */
@@ -185,33 +213,48 @@ private fun String.placeholderAt(start: Int): Placeholder? {
  */
 val LocalBoardCellLabels = staticCompositionLocalOf<BoardCellLabels?> { null }
 
+/**
+ * One `board_region_*` per region, in region order.
+ *
+ * A list of resources rather than ten `stringResource` calls written out inside
+ * the composable, so the *number* of them is a value a plain unit test can
+ * count. It was ten calls, `RegionPalette` was ten colours, and nothing joined
+ * the two: an eleventh colour with no eleventh string would have compiled, and
+ * region 10 would have been announced as region 0 to the only player who cannot
+ * see that it is not.
+ */
+internal val RegionNameResources: List<StringResource> = listOf(
+    Res.string.board_region_0,
+    Res.string.board_region_1,
+    Res.string.board_region_2,
+    Res.string.board_region_3,
+    Res.string.board_region_4,
+    Res.string.board_region_5,
+    Res.string.board_region_6,
+    Res.string.board_region_7,
+    Res.string.board_region_8,
+    Res.string.board_region_9,
+)
+
+/** One `board_glyph_*` per region, in the same order and under the same rule. */
+internal val GlyphNameResources: List<StringResource> = listOf(
+    Res.string.board_glyph_0,
+    Res.string.board_glyph_1,
+    Res.string.board_glyph_2,
+    Res.string.board_glyph_3,
+    Res.string.board_glyph_4,
+    Res.string.board_glyph_5,
+    Res.string.board_glyph_6,
+    Res.string.board_glyph_7,
+    Res.string.board_glyph_8,
+    Res.string.board_glyph_9,
+)
+
 /** Resolves the board's spoken vocabulary. [BoardSurface] does this for you. */
 @Composable
 fun rememberBoardCellLabels(): BoardCellLabels {
-    val regions = listOf(
-        stringResource(Res.string.board_region_0),
-        stringResource(Res.string.board_region_1),
-        stringResource(Res.string.board_region_2),
-        stringResource(Res.string.board_region_3),
-        stringResource(Res.string.board_region_4),
-        stringResource(Res.string.board_region_5),
-        stringResource(Res.string.board_region_6),
-        stringResource(Res.string.board_region_7),
-        stringResource(Res.string.board_region_8),
-        stringResource(Res.string.board_region_9),
-    )
-    val glyphs = listOf(
-        stringResource(Res.string.board_glyph_0),
-        stringResource(Res.string.board_glyph_1),
-        stringResource(Res.string.board_glyph_2),
-        stringResource(Res.string.board_glyph_3),
-        stringResource(Res.string.board_glyph_4),
-        stringResource(Res.string.board_glyph_5),
-        stringResource(Res.string.board_glyph_6),
-        stringResource(Res.string.board_glyph_7),
-        stringResource(Res.string.board_glyph_8),
-        stringResource(Res.string.board_glyph_9),
-    )
+    val regions = RegionNameResources.map { stringResource(it) }
+    val glyphs = GlyphNameResources.map { stringResource(it) }
     val empty = stringResource(Res.string.board_cell_empty)
     val marked = stringResource(Res.string.board_cell_marked)
     val proposed = stringResource(Res.string.board_cell_proposed)

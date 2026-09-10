@@ -3,6 +3,7 @@ package com.sodogku.libraries.ui.components.board
 import com.sodogku.libraries.ui.system.color.RegionPalette
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -32,21 +33,59 @@ class BoardCellLabelsTest {
     }
 
     /**
-     * `RegionPalette` wraps rather than throwing on an out-of-range region,
-     * because a board with more regions than the palette has colours is a
-     * content bug and a crash on the board screen is a worse answer. The label
-     * has to survive the same input the fill does, or colourblind mode is the
-     * one mode that crashes.
+     * A region with no name throws, the same way a region with no colour does.
+     *
+     * This test used to assert the opposite. The old rule was that wrapping
+     * beats crashing on the board screen, and it is wrong in exactly the place
+     * it sounds most reasonable: a wrapped label tells a screen-reader player
+     * that two different regions are the same one, on a board whose only rule
+     * is one dog per region. Nobody files that. They file "I'm stuck".
      */
     @Test
-    fun regionIndicesWrapTheSameWayTheFillsDo() {
+    fun aRegionWithNoNameThrowsRatherThanBorrowingAnother() {
+        assertFailsWith<IllegalArgumentException> {
+            labels.describe(0, 0, RegionPalette.size, colorblind = false)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            labels.describe(0, 0, RegionPalette.size, colorblind = true)
+        }
+        assertFailsWith<IllegalArgumentException> { labels.describe(0, 0, -1, colorblind = false) }
+    }
+
+    /**
+     * The two `board_region_*` / `board_glyph_*` sets are hand-maintained lists
+     * in `strings.xml` and nothing tied their length to the number of regions a
+     * board can have. An eleventh colour without an eleventh name used to mean
+     * region 10 announced as region 0, silently.
+     */
+    @Test
+    fun aLabelSetShortOfARegionIsRefusedOnTheSpot() {
+        assertFailsWith<IllegalArgumentException> { labels.copy(regions = labels.regions.dropLast(1)) }
+        assertFailsWith<IllegalArgumentException> { labels.copy(glyphs = labels.glyphs.dropLast(1)) }
+    }
+
+    /**
+     * The same rule against the strings the app actually ships, rather than
+     * against the fixture above. The check in the constructor only fires once
+     * something builds a set; this one fires on the set `rememberBoardCellLabels`
+     * is going to build, without a composition to run it in.
+     */
+    @Test
+    fun theShippedStringSetsHaveOneEntryPerRegion() {
+        assertEquals(RegionPalette.size, RegionNameResources.size, "board_region_* is the wrong length")
+        assertEquals(RegionPalette.size, GlyphNameResources.size, "board_glyph_* is the wrong length")
+        // By key, because two reads of the same `Res.string.x` are two objects.
+        // A copy-paste that names the same string twice leaves two regions
+        // sharing a word and the list still the right length.
         assertEquals(
-            labels.describe(0, 0, 0, colorblind = false),
-            labels.describe(0, 0, RegionPalette.size, colorblind = false),
+            RegionNameResources.size,
+            RegionNameResources.map { it.key }.toSet().size,
+            "two regions are announced by the same string",
         )
         assertEquals(
-            labels.describe(0, 0, RegionPalette.size - 1, colorblind = false),
-            labels.describe(0, 0, -1, colorblind = false),
+            GlyphNameResources.size,
+            GlyphNameResources.map { it.key }.toSet().size,
+            "two glyphs are announced by the same string",
         )
     }
 
