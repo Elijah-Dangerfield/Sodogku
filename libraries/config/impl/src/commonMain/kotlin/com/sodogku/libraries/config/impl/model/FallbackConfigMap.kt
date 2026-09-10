@@ -80,6 +80,7 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
         "skipsPerDay" to 3,
         "skipAfterFailedAttempts" to 2,
         "lookaheadCount" to 5,
+        "starterDogLevelsPerBand" to 3,
     ),
     "boosters" to mapOf(
         "startingSniffs" to 3,

@@ -115,6 +115,43 @@ object LevelCurve {
     }
 
     /**
+     * How far into its band [levelId] sits, counting from zero, or null when no
+     * campaign band contains it.
+     *
+     * Null rather than a clamp for an id off either end of the curve. Every
+     * caller here is asking "is this one of the opening levels of a size", and a
+     * clamp would answer yes for level 0 and for a level past the end of the
+     * pack, which are both nonsense rather than edges.
+     */
+    fun positionInBand(levelId: Int): Int? {
+        var firstInBand = 1
+        campaign.forEach { band ->
+            if (levelId in firstInBand until firstInBand + band.count) return levelId - firstInBand
+            firstInBand += band.count
+        }
+        return null
+    }
+
+    /**
+     * Whether campaign level [levelId] opens with one dog already placed.
+     *
+     * Position in a band rather than an absolute id, because what the free dog
+     * is for is the auto-mark cascade, and the cascade is worth watching again
+     * every time the grid grows. Keyed on one number it ran out inside the 5x5
+     * band and never came back for a player's first 7x7 or first 10x10, which
+     * are the boards where it says the most.
+     *
+     * [levelsPerBand] is `progression.starterDogLevelsPerBand`. Zero or less
+     * hands out none, which is how the whole head start is switched off from
+     * the console without shipping a build.
+     */
+    fun opensWithStarterDog(levelId: Int, levelsPerBand: Int): Boolean {
+        if (levelsPerBand <= 0) return false
+        val position = positionInBand(levelId) ?: return false
+        return position < levelsPerBand
+    }
+
+    /**
      * Every daily level's declared shape, in no particular order — the daily
      * pool is shuffled after generation, so only the multiset is meaningful.
      */

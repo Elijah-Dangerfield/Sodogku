@@ -183,14 +183,18 @@ and when the first step is a `Place` the UI falls back to today's generic line. 
 
 **Config or binary.** Binary: the technique names are copy and the filter is logic. One new key
 falls out of reading this code, though, and it is not really about this proposal:
-`SniffRevealLimit = 4` and `StarterDogThroughLevel = 25` are compile-time constants in
-`GameViewModel`, and both are exactly the "threshold or cap" the SPEC 4.1 rule puts in config
+`SniffRevealLimit = 4` and `StarterDogThroughLevel = 25` were compile-time constants in
+`GameViewModel`, and both were exactly the "threshold or cap" the SPEC 4.1 rule puts in config
 next to `boosters.refillTo` and `progression.lookaheadCount`.
 
 | Key | Default | What it does |
 |---|---|---|
 | `boosters.sniffRevealCells` | 4 | Squares one sniff lights up. |
-| `progression.starterDogThroughLevel` | 25 | Last level that opens with a free dog placed. |
+
+The starter dog half of that shipped as SD-12, and not in the shape proposed here. A single
+"last level with a free dog" number is what the bug was: it ran out inside the 5x5 band and never
+returned for a player's first 7x7. The key is `progression.starterDogLevelsPerBand`, default 3,
+counted from the start of each `LevelCurve` band.
 
 `DoubleTapWindowMs = 320` is deliberately **not** on that list. It is a number, but a console
 write of 3000 there would break the core gesture on every device that fetched it, and the fail-open

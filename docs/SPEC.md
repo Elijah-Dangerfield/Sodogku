@@ -526,6 +526,7 @@ which is why `apps/admin/config-manifest-registry.json` must list **every** decl
 | `progression.skipsPerDay` | 3 |
 | `progression.skipAfterFailedAttempts` | 2 |
 | `progression.lookaheadCount` | 5 |
+| `progression.starterDogLevelsPerBand` | 3 |
 | `boosters.startingSniffs` | 3 |
 | `boosters.startingTreats` | 3 |
 | `boosters.treatSchedule` | 3 from L1, 6 from L21, 12 from L61, 25 from L151 |

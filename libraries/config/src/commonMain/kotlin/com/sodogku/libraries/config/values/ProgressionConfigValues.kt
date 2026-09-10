@@ -56,6 +56,34 @@ class ProgressionLookaheadCount(appConfigMap: AppConfigMap) : IntConfigValue(app
 }
 
 /**
+ * How many levels at the start of each grid-size band open with one dog already
+ * placed.
+ *
+ * Per band, not per campaign. The free dog is a teaching aid — it fires the
+ * auto-mark cascade before the player has reasoned about anything — and every
+ * band change is a bigger grid, so the lesson is worth repeating at each new
+ * size rather than spent entirely on the 4x4s.
+ *
+ * Three, because the shortest band in `LevelCurve.campaign` is ten levels: a
+ * flat count is already at its most generous where the bands are shortest,
+ * which is the opening 4x4 run, and it never covers more than a third of any
+ * band. It is also enough repetition for the cascade to read as a rule rather
+ * than as something that happened once. Across the seven campaign bands that is
+ * 21 free dogs where the old fixed cap of 25 gave 25, so this spreads the head
+ * start out rather than widening it.
+ *
+ * Zero or less hands out none.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class ProgressionStarterDogLevelsPerBand(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Starter dog levels per band"
+    override val path = "progression.starterDogLevelsPerBand"
+    override val default = 3
+}
+
+/**
  * Sniffs a brand-new player starts with. Three matches the bone count and the
  * refill size: the three consumables deliberately share one shape, because three
  * different economies would be three things to learn before the puzzle.
@@ -163,6 +191,7 @@ fun progressionConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>
     ProgressionSkipsPerDay(appConfigMap),
     ProgressionSkipAfterFailedAttempts(appConfigMap),
     ProgressionLookaheadCount(appConfigMap),
+    ProgressionStarterDogLevelsPerBand(appConfigMap),
     BoostersStartingSniffs(appConfigMap),
     BoostersStartingTreats(appConfigMap),
     BoostersTreatSchedule(appConfigMap),

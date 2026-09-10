@@ -122,21 +122,6 @@ Two things that are not true of Game Center: Play Games sign-in can fail for a
 player who has never opted into a Games profile, which is a normal state and not
 an error, and the console needs the boards created and published before a
 submission is anything but a silent no-op.
-## SD-12 [P1] — The starter dog leaves too early
-
-**Ask:** Owner, 2026-09-09: "I feel like we remove the starting dog too soon."
-`StarterDogThroughLevel = 25` is a hardcoded constant, so the head start ends
-inside the 5x5 band and never comes back for a player's first 7x7, 8x8, 9x9 or
-10x10, which are the boards where the auto-mark cascade is most worth watching.
-
-**Done when:** The free dog is granted by position within a band rather than by
-one absolute level id, so the first levels of every new grid size open with one
-placed, and the number is remote config rather than a constant.
-
-**Hints:** `features/game/impl/.../GameViewModel.kt:2577`. `LevelCurve` knows
-the bands. It scores nothing, so widening it cannot inflate an early best, and
-that property has to survive the change. Config key belongs under
-`progression.*`.
 ## SD-13 [P1] — 500 levels is not a campaign
 
 **Ask:** Meowdoku reviewers report being at level 1912 and past 1000. Ours ends
@@ -427,36 +412,6 @@ do to the hosting `UIViewController` and therefore to the lifecycle owner.
 
 Reproduce with the log lines above rather than by guessing: `Enqueuing
 navigation` with no visible result is the signature.
-## SD-29 [P1] — The `install_id` tag is set opportunistically, and the privacy policy now leans on it
-
-**Found by:** the agent that rewrote the legal pages, 2026-09-10.
-
-`pages/privacy.html` now routes deletion requests through the in-app feedback
-form, on the grounds that a feedback report reaches Sentry tagged with
-`install_id` while an email cannot be matched to anything. That is the answer
-Play's "can users request deletion" question is being given.
-
-The tag is not guaranteed. `SessionTelemetryBinder.kt:55` does
-`installIdProvider.current()?.let { telemetry.setInstallId(it) }`, and `current()`
-is nullable because the id comes from an async `AppCache` read. A report filed in
-the first seconds after a cold start can arrive untagged, silently, and there is
-nothing in the report to say the tag is missing rather than absent by design.
-
-Rare in practice and load-bearing in policy, which is the combination worth
-fixing rather than accepting.
-
-**Done when:** every feedback report carries an `install_id`, or the report
-carries an explicit marker saying the id was not available so a triager can tell
-the two apart.
-
-**Hints:** Two shapes. Either await the id before capturing feedback (it is one
-cache read and the capture is already suspending), or set the tag from
-`captureUserFeedback` itself rather than relying on a scope set at boot. The
-second is closer to where it is needed and does not make cold boot wait on
-anything.
-
-`libraries/sodogku/impl/.../SessionTelemetryBinder.kt`,
-`libraries/sodogku/impl/.../AppTelemetry.kt` (`setInstallId`, `captureUserFeedback`).
 ## SD-32 [P1] — The app still ships a Supabase anon key, and a pile of account machinery nothing calls
 
 **Found by:** the SD-30 agent, 2026-09-10, while clearing account-era leftovers.

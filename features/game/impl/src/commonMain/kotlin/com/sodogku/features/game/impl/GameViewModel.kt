@@ -23,12 +23,14 @@ import com.sodogku.libraries.config.values.BoostersTreatSchedule
 import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.FeatureBoosters
 import com.sodogku.libraries.config.values.ProgressionSkipAfterFailedAttempts
+import com.sodogku.libraries.config.values.ProgressionStarterDogLevelsPerBand
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.logging.KLog
 import com.sodogku.libraries.core.logging.logEvent
 import com.sodogku.libraries.flowroutines.SEAViewModel
 import com.sodogku.libraries.flowroutines.collectIn
+import com.sodogku.libraries.levels.LevelCurve
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
 import com.sodogku.libraries.achievements.Achievement
@@ -173,6 +175,12 @@ class GameViewModel(
     private val proSniffsPerAttempt: BoostersProSniffsPerAttempt,
     private val proTreatsPerAttempt: BoostersProTreatsPerAttempt,
     private val skipAfterFailedAttempts: ProgressionSkipAfterFailedAttempts,
+    /**
+     * How deep into a grid-size band the free opening dog reaches. Read at every
+     * board open rather than held, so a retune lands on the next level rather
+     * than the next launch.
+     */
+    private val starterDogLevelsPerBand: ProgressionStarterDogLevelsPerBand,
     private val achievementsEnabled: FeatureAchievements,
     private val boostersEnabled: FeatureBoosters,
     /**
@@ -768,7 +776,15 @@ class GameViewModel(
         // A resumed board already has whatever the starter dog gave it, and
         // re-granting it would place a second dog in row 0. The rehearsal board
         // always gets one — every rule lesson is read off it.
-        val giveStarter = resume == null && (rehearsal || level.id <= StarterDogThroughLevel)
+        //
+        // The daily is excluded because the rule is a position on the campaign
+        // curve, and the two packs share a number line: daily 3 is a shuffled
+        // 6x6 that happens to carry a low id, not the third level of a band.
+        val giveStarter = resume == null && when {
+            rehearsal -> true
+            isDaily -> false
+            else -> LevelCurve.opensWithStarterDog(level.id, starterDogLevelsPerBand())
+        }
         val opening = when {
             resume != null -> Solution(resume.placements.toIntArray())
             giveStarter -> Solution.empty(level.size).withPlacement(starterRow, level.solution[starterRow])
@@ -2630,9 +2646,6 @@ class GameViewModel(
     private companion object {
         /** What a campaign attempt reports for a number only the daily has. */
         const val NoStreak = 0
-
-        /** Levels that open with one dog already placed, as a teaching aid. */
-        const val StarterDogThroughLevel = 25
 
         /** How many squares one sniff rules out. Enough to unstick, not to solve. */
         const val SniffRevealLimit = 4

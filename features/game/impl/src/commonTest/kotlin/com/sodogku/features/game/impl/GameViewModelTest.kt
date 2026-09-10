@@ -19,6 +19,7 @@ import com.sodogku.libraries.config.values.asFallbackConfig
 import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.FeatureBoosters
 import com.sodogku.libraries.config.values.ProgressionSkipAfterFailedAttempts
+import com.sodogku.libraries.config.values.ProgressionStarterDogLevelsPerBand
 import com.sodogku.libraries.config.values.ScoringBasePerPlacement
 import com.sodogku.libraries.config.values.ScoringBoosterPenaltyRate
 import com.sodogku.libraries.config.values.ScoringComboMax
@@ -1598,6 +1599,124 @@ class GameViewModelTest : CoroutineTest() {
 
         assertEquals(0, vm.state.dogsPlaced)
         assertEquals(null, vm.state.starterDogCell)
+    }
+
+    @Test
+    fun theFirstLevelsOfEveryGridSizeOpenWithADogPlaced() = runUnitTest {
+        // The point of the change: the dog used to run out at level 25, inside
+        // the 5x5s, so a player's first 7x7 and first 10x10 — the boards where
+        // the auto-mark cascade is worth the most — never opened with one.
+        BandFirstLevels.forEach { levelId ->
+            val vm = viewModel(levelId = levelId, cache = taughtCache())
+
+            assertEquals(1, vm.state.dogsPlaced, "level $levelId opens a band")
+            assertNotNull(vm.state.starterDogCell, "level $levelId opens a band")
+        }
+    }
+
+    @Test
+    fun theDogIsGoneOnceABandIsUnderway() = runUnitTest {
+        BandFirstLevels.forEach { levelId ->
+            val past = levelId + DefaultStarterDogLevelsPerBand
+            val vm = viewModel(levelId = past, cache = taughtCache())
+
+            assertEquals(0, vm.state.dogsPlaced, "level $past is past the window")
+            assertEquals(null, vm.state.starterDogCell, "level $past is past the window")
+        }
+    }
+
+    @Test
+    fun theBandWindowIsRemoteConfig() = runUnitTest {
+        val narrowed = configOf("progression.starterDogLevelsPerBand" to 1)
+
+        assertNotNull(
+            viewModel(levelId = FirstSevenBySeven, cache = taughtCache(), config = narrowed).state.starterDogCell,
+        )
+        assertEquals(
+            null,
+            viewModel(levelId = FirstSevenBySeven + 1, cache = taughtCache(), config = narrowed).state.starterDogCell,
+            "one level per band means one, not two",
+        )
+        assertEquals(
+            null,
+            viewModel(
+                levelId = FirstSevenBySeven,
+                cache = taughtCache(),
+                config = configOf("progression.starterDogLevelsPerBand" to 0),
+            ).state.starterDogCell,
+            "zero switches the head start off entirely",
+        )
+    }
+
+    @Test
+    fun theBandWindowIsRereadOnEveryBoard() = runUnitTest {
+        // A retry is a fresh board open, so a value read once at construction
+        // would keep handing out a dog the console has already withdrawn.
+        val config = SwitchableStarterDog(levelsPerBand = DefaultStarterDogLevelsPerBand)
+        val vm = viewModel(levelId = FirstSevenBySeven, cache = taughtCache(), config = config)
+        assertNotNull(vm.state.starterDogCell)
+
+        config.levelsPerBand = 0
+        vm.takeAction(GameAction.Retry)
+        settle()
+
+        assertEquals(null, vm.state.starterDogCell, "the next board reads the config again")
+    }
+
+    @Test
+    fun theDailyNeverOpensWithAFreeDog() = runUnitTest {
+        // The packs share a number line. Daily 2 is a shuffled 6x6 that happens
+        // to carry a low id, not the second level of the 4x4 band.
+        val vm = viewModel(
+            levelId = LowDailyLevel,
+            isDaily = true,
+            daily = FakeDaily(levelId = LowDailyLevel),
+            cache = taughtCache(),
+        )
+
+        assertEquals(0, vm.state.dogsPlaced)
+        assertEquals(null, vm.state.starterDogCell)
+    }
+
+    @Test
+    fun theFreeDogIsWorthNoPoints() = runUnitTest {
+        val vm = viewModel(levelId = FirstTenByTen, cache = taughtCache())
+
+        assertEquals(1, vm.state.dogsPlaced)
+        assertEquals(0, vm.state.score.total, "a gift must not inflate an early best score")
+        assertEquals(0, vm.state.score.placements, "and it must not count toward the combo either")
+        assertEquals(0, vm.state.score.combo)
+    }
+
+    @Test
+    fun aFreeDogCannotBeatTheSameClearWithoutOne() = runUnitTest {
+        // The property the widening had to preserve. Two players clear a
+        // player's first 10x10 the same way; the one who was given a dog must
+        // not post the better number for it.
+        val assisted = InMemoryProgress()
+        val withDog = viewModel(levelId = FirstTenByTen, cache = taughtCache(), progress = assisted)
+        assertEquals(1, withDog.state.dogsPlaced, "the fixture never got its free dog")
+        solveCurrent(withDog)
+
+        val unassisted = InMemoryProgress()
+        val withoutDog = viewModel(
+            levelId = FirstTenByTen,
+            cache = taughtCache(),
+            progress = unassisted,
+            config = configOf("progression.starterDogLevelsPerBand" to 0),
+        )
+        assertEquals(0, withoutDog.state.dogsPlaced, "the fixture was given a dog it should not have")
+        solveCurrent(withoutDog)
+
+        assertTrue(
+            withDog.state.score.total < withoutDog.state.score.total,
+            "the assisted run scored ${withDog.state.score.total} against " +
+                "${withoutDog.state.score.total}, so the free dog was worth points",
+        )
+        assertTrue(
+            assisted.record(FirstTenByTen).bestScore < unassisted.record(FirstTenByTen).bestScore,
+            "the assisted run banked the better best score",
+        )
     }
 
     @Test
@@ -4066,6 +4185,18 @@ class GameViewModelTest : CoroutineTest() {
         timeMs = 90_000,
     )
 
+    /**
+     * `progression.starterDogLevelsPerBand`, changed under a running ViewModel.
+     *
+     * The tree is rebuilt on every read, which is what a config refresh looks
+     * like from the client's side: what the values resolve against is replaced,
+     * and nothing tells the screens about it.
+     */
+    private class SwitchableStarterDog(var levelsPerBand: Int) : AppConfigMap() {
+        override val map: Map<String, *>
+            get() = mapOf("progression" to mapOf("starterDogLevelsPerBand" to levelsPerBand))
+    }
+
     private fun viewModel(
         levelId: Int = PlainLevel,
         isDaily: Boolean = false,
@@ -4108,6 +4239,7 @@ class GameViewModelTest : CoroutineTest() {
         proSniffsPerAttempt = BoostersProSniffsPerAttempt(config),
         proTreatsPerAttempt = BoostersProTreatsPerAttempt(config),
         skipAfterFailedAttempts = ProgressionSkipAfterFailedAttempts(config),
+        starterDogLevelsPerBand = ProgressionStarterDogLevelsPerBand(config),
         achievementsEnabled = FeatureAchievements(config),
         boostersEnabled = FeatureBoosters(config),
         adsEnabled = AdsEnabled(config),
@@ -4352,6 +4484,28 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Inside the starter-dog band. */
         const val StarterDogLevel = 1
+
+        /** Mirrors `ProgressionStarterDogLevelsPerBand.default`. */
+        const val DefaultStarterDogLevelsPerBand = 3
+
+        /**
+         * The first level at each grid size, 4x4 through 10x10. Spelled out
+         * rather than summed off `LevelCurve.campaign`, so a re-curve that moved
+         * a boundary shows up here as a failure and not as agreement.
+         */
+        val BandFirstLevels = listOf(1, 11, 41, 101, 181, 281, 391)
+
+        /** The board a player's first 7x7 is, and the one the old rule missed. */
+        const val FirstSevenBySeven = 101
+
+        /** The biggest grid the campaign reaches, opening its band. */
+        const val FirstTenByTen = 391
+
+        /**
+         * A daily whose id also sits at the head of a campaign band, which is
+         * the only way to tell "position in a band" from "low level id".
+         */
+        const val LowDailyLevel = 2
 
         /** The level the rehearsal opens in front of, and hands back to. */
         const val FirstGuidedLevel = 1
