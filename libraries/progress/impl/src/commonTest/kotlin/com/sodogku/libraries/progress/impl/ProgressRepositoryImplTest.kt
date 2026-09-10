@@ -65,6 +65,26 @@ class ProgressRepositoryImplTest : CoroutineTest() {
     }
 
     @Test
+    fun onCompleted_aFasterReplayTakesTheClockAndLeavesTheScore() = runUnitTest {
+        // The two existing cases above move every metric the same way, so
+        // neither of them can tell "keeps the best of each" from "the better run
+        // takes the whole row". This one is the case the time-to-beat feature
+        // creates on purpose: a player chasing the clock rushes, takes strikes
+        // and leans on boosters, so the fast run is usually the low-scoring one.
+        // Letting it own the row would cost them a three-paw clear and knock
+        // their lifetime total down for beating their own time.
+        val repo = repository()
+
+        repo.onCompleted(levelId = 1, score = 900, paws = 3, timeMs = 95_000)
+        repo.onCompleted(levelId = 1, score = 120, paws = 1, timeMs = 40_000)
+
+        val record = repo.record(1)
+        assertEquals(900, record.bestScore, "beating the time is not a reason to lose the score")
+        assertEquals(3, record.bestPaws)
+        assertEquals(40_000, record.bestTimeMs, "the faster run still takes the clock")
+    }
+
+    @Test
     fun onCompleted_firstClearSetsBestTime_evenThoughZeroMeansNever() = runUnitTest {
         val repo = repository()
 

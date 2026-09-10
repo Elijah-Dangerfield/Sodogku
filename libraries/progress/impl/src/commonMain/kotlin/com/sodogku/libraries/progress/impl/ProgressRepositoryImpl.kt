@@ -66,6 +66,20 @@ class ProgressRepositoryImpl(
         }
     }
 
+    /**
+     * Every metric here is judged on its own, and a run that wins one of them
+     * does not take the others with it.
+     *
+     * Stated because the time-to-beat feature makes it a live question: a replay
+     * chased purely for the clock will usually bank *less*, since rushing costs
+     * strikes and leans on boosters. Letting the faster run own the whole row
+     * would mean a player who beat their time silently lost their three-paw
+     * clear and watched their lifetime total go down — `lifetimeScore` prices
+     * this board at [LevelRecord.bestScore], so overwriting it is money off the
+     * headline number. The record keeps the fast time and the high score, from
+     * different runs, and neither is a lie: they are both bests, which is what
+     * the type says they are.
+     */
     override suspend fun onCompleted(levelId: Int, score: Int, paws: Int, timeMs: Long) {
         val now = clock.now().toEpochMilliseconds()
         update(levelId) { current ->

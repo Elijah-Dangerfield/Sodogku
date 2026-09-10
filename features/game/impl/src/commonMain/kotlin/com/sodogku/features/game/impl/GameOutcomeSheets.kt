@@ -66,6 +66,7 @@ import sodogku.libraries.resources.generated.resources.game_reward_earned_treat
 import sodogku.libraries.resources.generated.resources.game_skip_level
 import sodogku.libraries.resources.generated.resources.game_skip_none_left
 import sodogku.libraries.resources.generated.resources.game_skip_remaining
+import sodogku.libraries.resources.generated.resources.game_time_new_best
 import sodogku.libraries.resources.generated.resources.game_time_taken
 import sodogku.libraries.resources.generated.resources.game_verdict_flawless
 import sodogku.libraries.resources.generated.resources.game_verdict_scraped
@@ -154,6 +155,23 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
                 color = AppTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
             )
+        }
+        // One more fact under the time, and only when the run beat the target
+        // the board was showing. The miss is deliberately silent here: the
+        // clock already said "Over 1:30" while the run was happening, and
+        // repeating it on the sheet would turn a clear into a telling-off.
+        //
+        // [GameState.targetTimeMs] is the best as it stood when the attempt
+        // opened, so this compares the run against the record it replaced
+        // rather than against itself.
+        if (state.beatBestTime) {
+            elapsedLabel(state.targetTimeMs)?.let { previous ->
+                Text(
+                    text = stringResource(Res.string.game_time_new_best, previous),
+                    typography = AppTheme.typography.Body.B600,
+                    color = AppTheme.colors.text,
+                )
+            }
         }
         // The same chip the level pane promised, so the payout is recognisably
         // the thing that was advertised rather than a number quietly going up
@@ -467,6 +485,23 @@ private fun WonSheetPreview() {
     PreviewContent {
         GameOutcomeSheet(
             state = GameState(phase = GamePhase.Won, paws = 3, standing = Standing.Flawless),
+            onAction = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun WonSheetNewBestPreview() {
+    PreviewContent {
+        GameOutcomeSheet(
+            state = GameState(
+                phase = GamePhase.Won,
+                paws = 3,
+                standing = Standing.Sharp,
+                elapsedMs = 78_000,
+                targetTimeMs = 90_000,
+            ),
             onAction = {},
         )
     }

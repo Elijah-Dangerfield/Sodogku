@@ -172,6 +172,27 @@ data class GameState(
      */
     val playStreak: Int = 0,
     val elapsedMs: Long = 0,
+
+    /**
+     * The time this run is chasing: this level's best, as it stood when the
+     * attempt opened. Zero is "nothing to chase" and draws nothing at all.
+     *
+     * **Fixed for the whole attempt, which is what keeps it on [GameState] at
+     * all.** The running clock is deliberately not here — see
+     * [GameViewModel.elapsed] — because a field that moves once a second
+     * recomposes the board with it. This one is written by `startAttempt` and
+     * never touched again, so the once-a-second comparison happens in the one
+     * composable that draws it.
+     *
+     * Read from the record *before* the clear is written, and it has to be: the
+     * win overwrites the row with this very run, so a target re-read afterwards
+     * would be the time the player just set and no run could ever beat it.
+     *
+     * Zero on the daily and on the rehearsal board. Neither has a level record
+     * to hold a best time, and the daily is one attempt per day, so there is no
+     * replay for a target to be about.
+     */
+    val targetTimeMs: Long = 0,
     val sniffs: Int = 0,
     val treats: Int = 0,
 
@@ -474,6 +495,24 @@ data class GameState(
             bankedForThisBoard = bankedForThisBoard,
             attemptScore = if (phase == GamePhase.Lost || isRehearsal) 0 else attemptScore,
         )
+
+    /**
+     * Whether the finished run came in under the time it was chasing.
+     *
+     * Gated on the phase as well as on the comparison, because [elapsedMs] only
+     * carries the run's duration once the run is over — mid-attempt it holds
+     * whatever the board was resumed from, and the live clock is on
+     * [GameViewModel.elapsed] instead. Without the gate this would read true for
+     * every board that had not yet reached its target, which is the opposite of
+     * what the name promises.
+     *
+     * False when there was no target, which is what makes a first clear quiet:
+     * [paceAgainst] answers [Pace.None] rather than [Pace.Inside] for a level
+     * with no best time, so nothing is claimed about a record that did not
+     * exist.
+     */
+    val beatBestTime: Boolean
+        get() = phase == GamePhase.Won && paceAgainst(elapsedMs, targetTimeMs) == Pace.Inside
 
     /**
      * Bones this attempt did not spend, which is what the share card draws.
@@ -900,3 +939,45 @@ private const val MillisPerSecond = 1_000L
 private const val SecondsPerMinute = 60L
 private const val MinutesPerHour = 60L
 private const val SecondsPerHour = 3_600L
+
+/**
+ * Where a run sits against the time it is chasing.
+ *
+ * The whole of the time-to-beat feature is this comparison, read from two
+ * places: the clock under the board asks it once a second about a run in
+ * progress, and the win sheet asks it once about a run that is over. One
+ * function so the two can never disagree about what "beat it" means.
+ */
+internal enum class Pace {
+    /**
+     * There is nothing to measure against, so nothing is shown. A first clear,
+     * the daily, the rehearsal board and a level that has only ever been failed
+     * all land here.
+     */
+    None,
+
+    /** Still inside the time to beat. On a finished run, this *is* the beat. */
+    Inside,
+
+    /** The clock has reached the time to beat, or gone past it. */
+    Past,
+}
+
+/**
+ * Reads [elapsedMs] against [bestMs], the level's best time as it stood when
+ * this attempt opened.
+ *
+ * **The tie is a miss.** Matching the record to the millisecond is not beating
+ * it, and `ProgressRepository` agrees: `bestTimeOf` keeps the lower of the two,
+ * so an equal run writes nothing. A `>` here would put "New best" on a sheet
+ * over a row that did not move.
+ *
+ * A [bestMs] of zero is "never cleared" rather than "cleared instantly" — the
+ * same reading [elapsedLabel] takes — so it is [None] and not a target every run
+ * in the game is already past.
+ */
+internal fun paceAgainst(elapsedMs: Long, bestMs: Long): Pace = when {
+    bestMs <= 0L -> Pace.None
+    elapsedMs < bestMs -> Pace.Inside
+    else -> Pace.Past
+}

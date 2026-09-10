@@ -87,6 +87,8 @@ import sodogku.libraries.resources.generated.resources.game_bones_remaining
 import sodogku.libraries.resources.generated.resources.game_bones_refill
 import sodogku.libraries.resources.generated.resources.game_booster_sniff
 import sodogku.libraries.resources.generated.resources.game_booster_treat
+import sodogku.libraries.resources.generated.resources.game_time_over_best
+import sodogku.libraries.resources.generated.resources.game_time_to_beat
 import kotlin.math.abs
 import kotlin.math.sin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -192,7 +194,7 @@ fun GameScreen(
             // Sat below the spacer it was pinned to the top of the booster row,
             // three quarters of the gap away from the thing it is timing, and
             // read as a label belonging to the buttons.
-            BoardClock(elapsed)
+            BoardClock(elapsed, targetMs = state.targetTimeMs)
 
             Spacer(modifier = Modifier.weight(SpaceBelowBoard))
 
@@ -853,16 +855,32 @@ private fun cellState(state: GameState, cell: Int, placed: Set<Int>): BoardCellS
 }
 
 /**
- * How long this attempt has taken, between the board and the boosters.
+ * How long this attempt has taken, between the board and the boosters, and the
+ * time it is chasing.
  *
  * Quiet on purpose. A timer is the one piece of chrome that can turn a puzzle
  * into a test, and nothing here is timed against a limit — the clock is scored
- * only as a bonus and shown mainly so a replay can be compared with the run
- * before it. Caption scale in the secondary ink is the smallest thing on the
- * screen that is still legible.
+ * only as a bonus, and the target beside it is the player's own previous run
+ * rather than anybody else's. Caption scale in the secondary ink is the
+ * smallest thing on the screen that is still legible.
+ *
+ * **The crossing is marked by the words, and the ink only agrees with them.**
+ * "To beat 1:30" becomes "Over 1:30" at the second the clock reaches the
+ * target, and stays that way for the rest of the run. No sound, no motion, no
+ * haptic and nothing that has to be dismissed: falling behind your own best on
+ * a puzzle is information, not an alarm, and this app's whole surface is calm.
+ * The ink goes from secondary to the page's primary brown rather than to a
+ * warning color — amber on cream is barely legible at caption size, and a red
+ * would be the klaxon this deliberately is not.
+ *
+ * **Derived, never fired.** The mark is a function of the clock and a target
+ * that does not move, so it cannot go off twice, cannot be missed by a player
+ * who was looking away, and is already correct on the first frame of a board
+ * resumed past its target — a one-shot event would have had to be replayed for
+ * that case and suppressed for the other.
  *
  * **Its own composable, collecting its own flow**, so the once-a-second change
- * invalidates one `Text` and not the screen above it.
+ * invalidates one `Row` and not the screen above it.
  *
  * Empty rather than absent before the first second, because [elapsedLabel] has
  * no answer for a run of no length and a `Text` that appears after one second
@@ -870,19 +888,39 @@ private fun cellState(state: GameState, cell: Int, placed: Set<Int>): BoardCellS
  * measures one line.
  */
 @Composable
-private fun BoardClock(elapsed: StateFlow<Long>, modifier: Modifier = Modifier) {
+private fun BoardClock(elapsed: StateFlow<Long>, targetMs: Long, modifier: Modifier = Modifier) {
     val millis by elapsed.collectAsState()
-    Text(
-        text = elapsedLabel(millis).orEmpty(),
-        // Caption scale still, but no longer at caption weight. Sitting right
-        // under the grid the clock has the board's whole width of cream behind
-        // it, and Normal at that size read as a stray number rather than as a
-        // reading; Medium is the least the type scale can do and still look
-        // deliberate.
-        typography = AppTheme.typography.Body.B500.Medium,
-        color = AppTheme.colors.textSecondary,
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Dimension.D400),
+        verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.padding(top = Dimension.D400),
-    )
+    ) {
+        Text(
+            text = elapsedLabel(millis).orEmpty(),
+            // Caption scale still, but no longer at caption weight. Sitting
+            // right under the grid the clock has the board's whole width of
+            // cream behind it, and Normal at that size read as a stray number
+            // rather than as a reading; Medium is the least the type scale can
+            // do and still look deliberate.
+            typography = AppTheme.typography.Body.B500.Medium,
+            color = AppTheme.colors.textSecondary,
+        )
+        // Nothing at all on a level with no best time. An empty state here
+        // would be the app asking a first-time player to compete with a blank,
+        // and a "To beat 0:00" would be a target every run is born past.
+        val target = elapsedLabel(targetMs)
+        if (target != null) {
+            val past = paceAgainst(millis, targetMs) == Pace.Past
+            Text(
+                text = stringResource(
+                    if (past) Res.string.game_time_over_best else Res.string.game_time_to_beat,
+                    target,
+                ),
+                typography = AppTheme.typography.Caption.C300,
+                color = if (past) AppTheme.colors.text else AppTheme.colors.textSecondary,
+            )
+        }
+    }
 }
 
 /**

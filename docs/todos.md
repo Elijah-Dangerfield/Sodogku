@@ -142,19 +142,6 @@ silent reassignment of everyone's history. Do not spend the daily pool on this,
 for the reason in `proposals.md`. Meowdoku's own reviewers say its boards start
 repeating around every 100, so this is a place where we can be better rather
 than merely bigger.
-## SD-17 [P2] — A time to beat on a replay
-
-**Ask:** Owner, 2026-09-09, on the ghost race: "I wouldn't wanna see my previous
-placements tho. I'd probably just wanna have a time to beat."
-
-**Done when:** Reopening a cleared level shows the best time for it, the running
-clock is measured against it, and the moment the run passes or misses it is
-marked. Offline, no identity, no server.
-
-**Hints:** `level_progress.best_time_ms` already exists and is already written.
-The whole feature is display plus one comparison, which is why it is the cheapest
-competitive thing on this list. Decide what a replay that beats the time does to
-`best_score`, which keeps the better of the two today.
 ## SD-20 [P2] — Boards past 10x10, with zoom and pan (spike)
 
 **Ask:** Owner brainstorm, 2026-09-09: "Maybe we could even make larger grid

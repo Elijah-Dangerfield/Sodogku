@@ -627,6 +627,23 @@
     <string name="game_time_taken">Solved in %1$s</string>
     <string name="levels_best_time">Best %1$s</string>
 
+    <!-- The time to beat, beside the clock on a level that has been cleared
+         before. A level with no best time shows neither of these rather than a
+         target of zero, so a first run is exactly as quiet as it was.
+         The second line replaces the first for the rest of the run once the
+         clock reaches the target, and that swap is the whole of the marking:
+         no sound, no motion, no dialog. The wording carries it on its own, so
+         a player who cannot separate the two inks still reads the change. -->
+    <string name="game_time_to_beat">To beat %1$s</string>
+    <string name="game_time_over_best">Over %1$s</string>
+
+    <!-- Under the clock on the win sheet, on a clear that came in faster than
+         the level's previous best. One more fact next to the run's own time,
+         and only on the good side of the comparison: the board already said so
+         while the run was going, and a sheet that told a player how far off
+         they were would be scolding them for a level they just finished. -->
+    <string name="game_time_new_best">New best, was %1$s</string>
+
     <!-- The trophy beside the gear on the board. The count in the second one is
          badges earned since the player last looked at the grid, so the button
          reads its own badge aloud rather than leaving a bare number floating

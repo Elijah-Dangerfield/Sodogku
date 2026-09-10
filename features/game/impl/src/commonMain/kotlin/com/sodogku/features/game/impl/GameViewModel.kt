@@ -844,6 +844,12 @@ class GameViewModel(
                     )
                 } ?: ScoreCard.Empty,
                 elapsedMs = resume?.elapsedMs ?: 0L,
+                // Off the snapshot taken above rather than off a live read, for
+                // the reason the snapshot exists: the clear rewrites this row
+                // with the run that is about to happen. A resumed board picks
+                // its target up again here, because the record is on disk and
+                // the snapshot is not the only thing that survived.
+                targetTimeMs = recordBeforeAttempt.bestTimeMs,
                 lifetimeBanked = banked.lifetime,
                 bankedForThisBoard = banked.thisBoard,
                 // A resumed attempt carries the boosters it already spent, so

@@ -1094,6 +1094,228 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(0L, vm.elapsed.value, "the new attempt inherited the last one's clock")
     }
 
+    // ---- SD-17: the time to beat on a replay. -------------------------------
+
+    @Test
+    fun reopeningAClearedLevelCarriesItsBestTimeAsTheTarget() = runUnitTest {
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 900, paws = 3, timeMs = PreviousBest)
+
+        val vm = viewModel(progress = progress)
+
+        assertEquals(PreviousBest, vm.state.targetTimeMs)
+    }
+
+    @Test
+    fun aLevelNobodyHasClearedShowsNoTargetAtAll() = runUnitTest {
+        // A first clear shows nothing rather than an empty state. The record
+        // holds zero, and zero on a level record means "never cleared" — a
+        // target of 0:00 would be one the player is already past on the first
+        // frame.
+        val progress = InMemoryProgress()
+        progress.onAttemptStarted(PlainLevel)
+
+        val vm = viewModel(progress = progress)
+
+        assertEquals(0L, vm.state.targetTimeMs)
+        assertEquals(Pace.None, paceAgainst(vm.elapsed.value, vm.state.targetTimeMs))
+    }
+
+    @Test
+    fun theDailyHasNoTimeToBeat() = runUnitTest {
+        // One attempt per day, so there is no replay for a target to be about,
+        // and the two packs share a number line: campaign 200's best time on
+        // daily 200's board would be a time set on a different puzzle.
+        val progress = InMemoryProgress()
+        progress.onCompleted(DailyLevel, score = 900, paws = 3, timeMs = PreviousBest)
+
+        val vm = viewModel(
+            levelId = DailyLevel,
+            isDaily = true,
+            progress = progress,
+            daily = FakeDaily(levelId = DailyLevel),
+        )
+
+        assertEquals(0L, vm.state.targetTimeMs)
+    }
+
+    @Test
+    fun movingToALevelWithNoBestTimeDropsTheTarget() = runUnitTest {
+        // `startAttempt` builds a fresh state rather than copying one, so this
+        // is a test that the new board *names* its target rather than inheriting
+        // the last one's. A stale target is the worst failure this feature has:
+        // the board would ask a player to beat a time set on another puzzle.
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 900, paws = 3, timeMs = PreviousBest)
+        val vm = viewModel(progress = progress)
+        assertEquals(PreviousBest, vm.state.targetTimeMs)
+
+        vm.takeAction(GameAction.GoToLevel(PlainLevel + 1))
+        settle()
+
+        assertEquals(PlainLevel + 1, vm.state.level?.id, "the fixture never left the first level")
+        assertEquals(0L, vm.state.targetTimeMs, "the target followed the player to a fresh level")
+    }
+
+    @Test
+    fun theClockCrossesTheTargetOnceAndStaysThere() = runUnitTest {
+        // The mark is derived from the clock rather than fired at the crossing,
+        // which is what makes "exactly once" a property of the type instead of
+        // a flag somebody has to reset. Read at three points across the run.
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 900, paws = 3, timeMs = PreviousBest)
+        val vm = viewModel(progress = progress)
+        val target = vm.state.targetTimeMs
+
+        assertEquals(Pace.Inside, paceAgainst(vm.elapsed.value, target))
+
+        clock += Thinking
+        vm.tick()
+        assertEquals(Pace.Inside, paceAgainst(vm.elapsed.value, target), "$Thinking is inside $target")
+
+        clock += Thinking + Thinking
+        vm.tick()
+        assertEquals(Pace.Past, paceAgainst(vm.elapsed.value, target))
+
+        clock += Thinking
+        vm.tick()
+        assertEquals(Pace.Past, paceAgainst(vm.elapsed.value, target), "the mark came back off")
+    }
+
+    @Test
+    fun anHourInAPocketIsNotChargedAgainstTheTarget() = runUnitTest {
+        // The clock the comparison reads is the same one the label draws, and
+        // that one stops when the app goes away. Without this a player who took
+        // a phone call would come back to a board that had missed a time they
+        // were comfortably inside.
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 900, paws = 3, timeMs = PreviousBest)
+        val lifecycle = HandDrivenAppEvents()
+        val vm = viewModel(progress = progress, lifecycle = lifecycle)
+
+        clock += Thinking
+        lifecycle.background()
+        settle()
+        clock += AnHourAway
+
+        // Read *while the app is away*, which is the half that a fold-on-resume
+        // gets right for free. A board left backgrounded is still ticking from
+        // the screen's point of view, and the target is what it would be
+        // measured against on the way back in.
+        vm.tick()
+        assertEquals(
+            Pace.Inside,
+            paceAgainst(vm.elapsed.value, vm.state.targetTimeMs),
+            "the hour was charged to the puzzle while the app was in a pocket",
+        )
+
+        lifecycle.foreground()
+        settle()
+        vm.tick()
+        assertEquals(Pace.Inside, paceAgainst(vm.elapsed.value, vm.state.targetTimeMs))
+    }
+
+    @Test
+    fun spendingABoosterDoesNotStopTheClockAgainstTheTarget() = runUnitTest {
+        // A decision, not an oversight: the time is what the run took, and the
+        // help it leaned on is already priced in the score. A booster that
+        // bought seconds would make the fastest route through a level "open the
+        // sniff prompt and think in it".
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 900, paws = 3, timeMs = PreviousBest)
+        val vm = viewModel(progress = progress)
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Sniff))
+        settle()
+        clock += Thinking + Thinking + Thinking
+        vm.takeAction(GameAction.DismissBoosterPrompt)
+        settle()
+        vm.tick()
+
+        assertEquals(Pace.Past, paceAgainst(vm.elapsed.value, vm.state.targetTimeMs))
+    }
+
+    @Test
+    fun aWinLeavesTheTargetOnTheTimeItReplaced() = runUnitTest {
+        // The win writes this very run to the record, so a target re-read after
+        // the write would be the time the player just set — and the sheet would
+        // compare the run against itself and never report a new best.
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 900, paws = 3, timeMs = PreviousBest)
+        val vm = viewModel(progress = progress)
+
+        clock += Thinking
+        solve(vm)
+
+        assertEquals(PreviousBest, vm.state.targetTimeMs)
+        assertTrue(
+            vm.state.beatBestTime,
+            "a $Thinking run beat a $PreviousBest best and the sheet was not told",
+        )
+    }
+
+    @Test
+    fun aRunThatMissedTheTargetIsNotToldItSetANewBest() = runUnitTest {
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 900, paws = 3, timeMs = PreviousBest)
+        val vm = viewModel(progress = progress)
+
+        clock += Thinking + Thinking + Thinking + Thinking
+        solve(vm)
+
+        assertFalse(vm.state.beatBestTime)
+    }
+
+    @Test
+    fun aFirstClearClaimsNoRecordItNeverHad() = runUnitTest {
+        // Nothing rather than an empty state, at the end of the run as well as
+        // during it. There was no time to beat, so "New best" would be the sheet
+        // reporting a comparison that never happened.
+        val vm = viewModel()
+
+        solve(vm)
+
+        assertEquals(GamePhase.Won, vm.state.phase)
+        assertFalse(vm.state.beatBestTime)
+    }
+
+    @Test
+    fun aBoardStillBeingPlayedHasBeatenNothingYet() = runUnitTest {
+        // `elapsedMs` on the state is not the live clock — mid-attempt it holds
+        // whatever the board was resumed from — so the comparison is only
+        // meaningful once the run is over.
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = 900, paws = 3, timeMs = PreviousBest)
+        val vm = viewModel(progress = progress)
+
+        clock += Thinking
+        vm.tick()
+
+        assertFalse(vm.state.beatBestTime, "an unfinished run was reported as a new best")
+    }
+
+    @Test
+    fun aSlowerReplayKeepsTheScoreItAlreadyBanked() = runUnitTest {
+        // What a beating replay does to `best_score`: nothing. Each metric on
+        // the record is judged on its own, so chasing the clock can lower the
+        // time without costing the player the score, the paws, or the slice of
+        // their lifetime total this board pays.
+        val progress = InMemoryProgress()
+        progress.onCompleted(PlainLevel, score = HighScore, paws = 3, timeMs = PreviousBest)
+        val vm = viewModel(progress = progress)
+
+        clock += Thinking
+        solve(vm)
+
+        val record = progress.record(PlainLevel)
+        assertTrue(
+            vm.state.attemptScore < HighScore,
+            "the fixture has to bank less than the record, or there is nothing to protect",
+        )
+        assertEquals(HighScore, record.bestScore)
+        assertEquals(vm.state.elapsedMs, record.bestTimeMs, "the faster run should still take the clock")
+    }
+
     @Test
     fun aSecondCommitOnASquareThatAlreadyCostABoneCostsNothing() = runUnitTest {
         // The mirror of the bug that started this review. That one was `commit`
@@ -4521,6 +4743,22 @@ class GameViewModelTest : CoroutineTest() {
 
         /** A player looking at the board. Real time, and it has to be counted. */
         val Thinking = 30.seconds
+
+        /**
+         * The time on the record when a time-to-beat test opens a board.
+         *
+         * Deliberately between one [Thinking] and three, so a fixture can land
+         * on either side of the target by spending seconds rather than by
+         * arithmetic nobody can read.
+         */
+        const val PreviousBest = 90_000L
+
+        /**
+         * A banked score no clean run of [PlainLevel] gets near, so a replay
+         * that scores less than the record is a fixture rather than a
+         * coincidence.
+         */
+        const val HighScore = 1_000_000
 
         /** Past `StruggleDetector`'s idle window, with room to spare. */
         val Staring = 12.seconds
