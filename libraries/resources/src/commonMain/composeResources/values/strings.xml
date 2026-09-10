@@ -110,6 +110,24 @@
     <string name="game_stat_mistakes">Mistakes</string>
     <string name="game_stat_mistakes_spoken">%1$d mistakes</string>
 
+    <!-- The end of the campaign, in the same register as the win sheet: the
+         run reported as facts. Two things it deliberately does not say. It does
+         not promise more levels, because the pack in the binary is all there
+         is and a player who came back for them would have been lied to. And it
+         does not congratulate at length; the numbers are the reward.
+
+         The levels pill counts clears rather than levels reached, so a player
+         who skipped a board sees a number below the total and can go back for
+         it. The body line names the daily because that is the only loop still
+         running, and it is only shown when the daily is actually switched on. -->
+    <string name="game_campaign_complete_title">That was the last level</string>
+    <string name="game_campaign_complete_body">The campaign ends here. The daily is still going, with a new board every day.</string>
+    <string name="game_stat_levels">Levels</string>
+    <string name="game_stat_levels_value">%1$d/%2$d</string>
+    <string name="game_stat_levels_spoken">%1$d of %2$d levels cleared</string>
+    <string name="game_stat_paws">Paws</string>
+    <string name="game_stat_paws_spoken">%1$d paws collected</string>
+
     <!-- Shown only when the gap is small. Points rather than seconds: score is
          time and combo and mistakes together, so telling somebody how much
          faster to go is a promise the scoring cannot keep. -->

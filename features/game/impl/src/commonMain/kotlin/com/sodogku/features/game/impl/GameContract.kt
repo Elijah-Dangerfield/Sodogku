@@ -90,6 +90,19 @@ data class GameState(
     val campaignComplete: Boolean = false,
 
     /**
+     * What the finished campaign added up to, or null if the records could not
+     * be read.
+     *
+     * Separate from [campaignComplete] rather than folded into it, because the
+     * two answer different questions and only one of them is allowed to fail.
+     * "Is the campaign over" is known from the level id alone; "what did it add
+     * up to" is a disk read. A single nullable field would mean a failed read
+     * took the ending away and dropped the player back on the path this whole
+     * change exists to close.
+     */
+    val campaignTotals: CampaignTotals? = null,
+
+    /**
      * Auto-marks the player has tapped away.
      *
      * Held as an exclusion rather than by removing them from [autoMarks],
@@ -466,6 +479,16 @@ data class GameState(
         get() = daily?.let { it.enabled && it.result == null } == true
 
     /**
+     * Whether there is a daily to send somebody to at all.
+     *
+     * Wider than [dailyWaiting] on purpose: a day already played still opens, on
+     * its result, and tomorrow's board still arrives. This asks only whether the
+     * feature is switched on, because `playDaily` refuses when it is not — and a
+     * control that refuses is a dead tap wherever it is offered.
+     */
+    val dailyOffered: Boolean get() = daily?.enabled == true
+
+    /**
      * What this attempt would bank: what it earned, less the boosters it spent.
      * The win sheet and the share text both show this rather than [score],
      * because it is the number that reaches the player's record.
@@ -650,6 +673,26 @@ data class SkipOffer(
 ) {
     val available: Boolean get() = remainingToday > 0
 }
+
+/**
+ * The whole campaign, as the three numbers the ending sheet reports.
+ *
+ * Folded out of `ProgressRepository.all()` at the moment the last level is
+ * cleared rather than counted along the way. A running total would be a fourth
+ * thing to keep in step with the records, and the records are already the only
+ * place a best score or a best paw count lives.
+ *
+ * [levelsCleared] counts clears and not levels reached, so it can come in under
+ * [levelsTotal]: a level moved past with a skip is a level the player still has
+ * waiting. Reporting the total in its place would tell somebody they had
+ * finished boards they never saw the end of.
+ */
+data class CampaignTotals(
+    val levelsCleared: Int,
+    val levelsTotal: Int,
+    val paws: Int,
+    val score: Int,
+)
 
 /**
  * What came of a streak save, freeze or restore. Every [FreezeResult] and every

@@ -2095,22 +2095,48 @@ class GameViewModel(
      */
     private suspend fun GameAction.nextLevel() {
         val current = state.level ?: return
+        // Clearing the last level used to close the app: `NavigateBack` pops the
+        // start destination, and the start destination is the board. The last
+        // thing a player who finished the campaign should get is the app
+        // disappearing, so the sheet stays up and changes what it says.
+        if (endsTheCampaign(current.id, isDaily)) {
+            val totals = campaignTotals()
+            logger.logEvent("game.campaign_completed", "level_id" to current.id)
+            updateState {
+                it.copy(campaignComplete = true, campaignTotals = totals, phase = GamePhase.Won)
+            }
+            return
+        }
         // There is no next daily. Tomorrow's board is tomorrow's.
         val next = if (isDaily) null else LevelPacks.campaign.byId(current.id + 1)
         if (next == null) {
-            // Clearing level 500 used to close the app: `NavigateBack` pops the
-            // start destination, and the start destination is the board. The
-            // last thing a player who finished the campaign should get is the
-            // home screen disappearing.
-            if (!isDaily && current.id >= LevelPacks.lastCampaignLevelId) {
-                updateState { it.copy(campaignComplete = true, phase = GamePhase.Won) }
-                return
-            }
             sendEvent(GameEvent.NavigateBack)
             return
         }
         attemptNumber = 1
         startAttempt(next, resume = savedBoardFor(next))
+    }
+
+    /**
+     * The three numbers the ending reports, or null if the records would not
+     * come off disk.
+     *
+     * Null rather than zeroes. A row of noughts under "That was the last level"
+     * is the sheet stating, in the app's own voice, that a player who cleared
+     * every board cleared none of them, and a missing row is a far quieter
+     * failure than a wrong one.
+     */
+    private suspend fun campaignTotals(): CampaignTotals? {
+        val records = Catching { progress.all() }
+            .logOnFailure { "Failed to read the campaign totals" }
+            .getOrNull()
+            ?: return null
+        return CampaignTotals(
+            levelsCleared = records.count { it.state == LevelState.Completed },
+            levelsTotal = LevelPacks.campaign.size,
+            paws = records.sumOf { it.bestPaws },
+            score = records.sumOf { it.bestScore },
+        )
     }
 
     /**
@@ -2690,6 +2716,23 @@ class GameViewModel(
         const val MillisPerSecond = 1_000L
     }
 }
+
+/**
+ * Whether clearing [levelId] is the end of the campaign.
+ *
+ * A named predicate rather than a condition inside `nextLevel`, because there
+ * are two ways to get it wrong and both are silent. Off by one and the ending
+ * either fires on the second-to-last level or never fires at all, which is the
+ * bug it was written to close. Drop [isDaily] and a daily board that happens to
+ * carry a high id ends the campaign for somebody who has not finished it — the
+ * two packs share a number line, so a daily id means nothing next to a campaign
+ * one.
+ *
+ * Greater-than-or-equal rather than equal, so a shorter pack shipped over a
+ * longer one cannot strand a player past the end with no ending at all.
+ */
+internal fun endsTheCampaign(levelId: Int, isDaily: Boolean): Boolean =
+    !isDaily && levelId >= LevelPacks.lastCampaignLevelId
 
 /**
  * A drag across the board, while it is happening.

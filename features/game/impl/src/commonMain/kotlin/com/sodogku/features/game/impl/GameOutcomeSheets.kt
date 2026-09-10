@@ -16,6 +16,7 @@ import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.button.ButtonSecondary
 import com.sodogku.libraries.progress.daily.DailyOutcome
 import com.sodogku.libraries.progress.daily.DailyResult
+import com.sodogku.libraries.progress.daily.DailyStatus
 import com.sodogku.libraries.ui.components.dialog.Dialog
 import com.sodogku.libraries.ui.components.dialog.ModalDialogDefaults
 import com.sodogku.libraries.ui.components.dog.Dog
@@ -34,6 +35,7 @@ import com.sodogku.system.Dimension
 import com.sodogku.system.Radii
 import com.sodogku.system.clip
 import kotlinx.datetime.LocalDate
+import kotlin.time.Duration.Companion.hours
 import kotlinx.datetime.number
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -48,7 +50,11 @@ import sodogku.libraries.resources.generated.resources.daily_forfeit_cta
 import sodogku.libraries.resources.generated.resources.daily_forfeit_note
 import sodogku.libraries.resources.generated.resources.daily_forfeit_title
 import sodogku.libraries.resources.generated.resources.daily_out_of_bones
+import sodogku.libraries.resources.generated.resources.daily_play
+import sodogku.libraries.resources.generated.resources.daily_review
 import sodogku.libraries.resources.generated.resources.daily_streak
+import sodogku.libraries.resources.generated.resources.game_campaign_complete_body
+import sodogku.libraries.resources.generated.resources.game_campaign_complete_title
 import sodogku.libraries.resources.generated.resources.game_back_to_levels
 import sodogku.libraries.resources.generated.resources.game_lost_title
 import sodogku.libraries.resources.generated.resources.game_next_level
@@ -56,8 +62,13 @@ import sodogku.libraries.resources.generated.resources.game_watch_ad_badge
 import sodogku.libraries.resources.generated.resources.game_refill_bones
 import sodogku.libraries.resources.generated.resources.game_retry
 import sodogku.libraries.resources.generated.resources.game_near_miss
+import sodogku.libraries.resources.generated.resources.game_stat_levels
+import sodogku.libraries.resources.generated.resources.game_stat_levels_spoken
+import sodogku.libraries.resources.generated.resources.game_stat_levels_value
 import sodogku.libraries.resources.generated.resources.game_stat_mistakes
 import sodogku.libraries.resources.generated.resources.game_stat_mistakes_spoken
+import sodogku.libraries.resources.generated.resources.game_stat_paws
+import sodogku.libraries.resources.generated.resources.game_stat_paws_spoken
 import sodogku.libraries.resources.generated.resources.game_stat_score
 import sodogku.libraries.resources.generated.resources.game_stat_score_spoken
 import sodogku.libraries.resources.generated.resources.game_stat_time
@@ -87,7 +98,12 @@ fun GameOutcomeSheet(
     modifier: Modifier = Modifier,
 ) {
     when (state.phase) {
-        GamePhase.Won -> WonSheet(state, onAction, modifier)
+        GamePhase.Won ->
+            if (state.campaignComplete) {
+                CampaignEndSheet(state, onAction, modifier)
+            } else {
+                WonSheet(state, onAction, modifier)
+            }
         GamePhase.Lost -> LostSheet(state, onAction, modifier)
         GamePhase.Recap -> DailyRecapSheet(state, onAction, modifier)
         GamePhase.Loading, GamePhase.Playing -> Unit
@@ -211,6 +227,87 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
                 if (state.adBeforeNextLevel) {
                     RewardBadge(modifier = Modifier.padding(start = Dimension.D300))
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The end of the campaign, which until now was the app closing.
+ *
+ * The last level's win sheet cannot be the ordinary one: its Next level button
+ * asks for a board that does not exist, and what that used to do is pop the
+ * start destination and take the app with it.
+ *
+ * So it reports the *campaign* the way the win sheet reports a run — as
+ * measurements rather than as a speech. Three numbers, no verdict, and nothing
+ * about what comes next except the one thing that genuinely does. What it will
+ * not say is that more levels are coming: the pack ships inside the binary, and
+ * an app that promises content it does not have has made an appointment it
+ * cannot keep.
+ *
+ * The last board's own score is deliberately not here. It is the least
+ * interesting number available at this moment, and the totals underneath it
+ * already contain it.
+ *
+ * The daily is the only loop still running once the campaign is spent, and it
+ * is what this sends the player to — but only when it is switched on. `PlayDaily`
+ * refuses on a killed daily and a button that quietly does nothing is worse on
+ * this sheet than on any other, because there is no other way off it. With the
+ * daily off, the level pane becomes the primary control instead.
+ *
+ * That pane, and not [GameAction.Leave]: leaving is the thing that closed the
+ * app. The drawer is drawn over this sheet, so picking a level to replay starts
+ * an attempt and the ending goes away with it.
+ */
+@Composable
+private fun CampaignEndSheet(state: GameState, onAction: (GameAction) -> Unit, modifier: Modifier) {
+    OutcomeLayout(modifier) {
+        Dog(pose = DogPose.Solved)
+        Text(
+            text = stringResource(Res.string.game_campaign_complete_title),
+            typography = AppTheme.typography.Heading.H700,
+            textAlign = TextAlign.Center,
+        )
+        // Absent rather than zeroed when the records would not read. See
+        // `GameState.campaignTotals`.
+        state.campaignTotals?.let { totals -> StatPills(stats = campaignStats(totals)) }
+        if (state.dailyOffered) {
+            Text(
+                text = stringResource(Res.string.game_campaign_complete_body),
+                typography = AppTheme.typography.Body.B500,
+                color = AppTheme.colors.textSecondary,
+                textAlign = TextAlign.Center,
+            )
+            ButtonPrimary(
+                onClick = { onAction(GameAction.PlayDaily) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                // The same two labels the drawer's card uses, and for the same
+                // reason: a day already played opens on its result, and a button
+                // saying Play would be offering a board that is gone.
+                Text(
+                    stringResource(
+                        if (state.daily?.playable == true) {
+                            Res.string.daily_play
+                        } else {
+                            Res.string.daily_review
+                        },
+                    ),
+                )
+            }
+            ButtonGhost(
+                onClick = { onAction(GameAction.LevelsOpened) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(Res.string.game_back_to_levels))
+            }
+        } else {
+            ButtonPrimary(
+                onClick = { onAction(GameAction.LevelsOpened) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(Res.string.game_back_to_levels))
             }
         }
     }
@@ -509,6 +606,49 @@ private fun WonSheetNewBestPreview() {
 
 @Preview
 @Composable
+private fun CampaignEndSheetPreview() {
+    PreviewContent {
+        GameOutcomeSheet(
+            state = GameState(
+                phase = GamePhase.Won,
+                campaignComplete = true,
+                campaignTotals = CampaignTotals(
+                    levelsCleared = 997,
+                    levelsTotal = 1_000,
+                    paws = 4_412,
+                    score = 812_340,
+                ),
+                daily = DailyStatus(
+                    date = LocalDate(2026, 9, 10),
+                    packIndex = 0,
+                    levelId = 1,
+                    result = null,
+                    streak = 12,
+                    freezeOffer = null,
+                    restoreOffer = null,
+                    resetsIn = PreviewDailyResetsIn,
+                    enabled = true,
+                ),
+            ),
+            onAction = {},
+        )
+    }
+}
+
+/** The ending with the daily switched off, which is the one-button version. */
+@Preview
+@Composable
+private fun CampaignEndSheetWithoutTheDailyPreview() {
+    PreviewContent {
+        GameOutcomeSheet(
+            state = GameState(phase = GamePhase.Won, campaignComplete = true),
+            onAction = {},
+        )
+    }
+}
+
+@Preview
+@Composable
 private fun LostSheetPreview() {
     PreviewContent {
         GameOutcomeSheet(state = GameState(phase = GamePhase.Lost), onAction = {})
@@ -561,6 +701,47 @@ private fun LostSheetWithSkipPreview() {
 }
 
 /**
+ * The three measurements of a finished campaign.
+ *
+ * Same row, same order of importance as [winStats]: what was done, then how
+ * well, then what it was worth. Levels lead because they are the fact the sheet
+ * is announcing, and they carry the total alongside them so a player who
+ * skipped a board can see there is one waiting.
+ *
+ * Nothing here is tinted for danger. There is no number on this row where
+ * smaller is better.
+ */
+@Composable
+private fun campaignStats(totals: CampaignTotals): List<Stat> = listOf(
+    Stat(
+        caption = stringResource(Res.string.game_stat_levels),
+        value = stringResource(
+            Res.string.game_stat_levels_value,
+            totals.levelsCleared,
+            totals.levelsTotal,
+        ),
+        tint = AppTheme.colors.accentPrimary.color,
+        spoken = stringResource(
+            Res.string.game_stat_levels_spoken,
+            totals.levelsCleared,
+            totals.levelsTotal,
+        ),
+    ),
+    Stat(
+        caption = stringResource(Res.string.game_stat_paws),
+        value = totals.paws.toString(),
+        tint = AppTheme.colors.accentSecondary.color,
+        spoken = stringResource(Res.string.game_stat_paws_spoken, totals.paws),
+    ),
+    Stat(
+        caption = stringResource(Res.string.game_stat_score),
+        value = totals.score.toString(),
+        tint = AppTheme.colors.status.okay.color,
+        spoken = stringResource(Res.string.game_stat_score_spoken, totals.score),
+    ),
+)
+
+/**
  * The four measurements of a finished run.
  *
  * Score first because it is what the sheet is about, then the two a player
@@ -606,3 +787,6 @@ private fun winStats(state: GameState): List<Stat> = buildList {
         ),
     )
 }
+
+/** Long enough that the preview's card never reads as about to roll over. */
+private val PreviewDailyResetsIn = 6.hours

@@ -2115,6 +2115,83 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(lastLevel, vm.state.unlockedThrough)
     }
 
+    /**
+     * The defect this whole branch exists for. `NavigateBack` pops the start
+     * destination, and on the campaign the start destination is the board, so
+     * the Next level button on the last level closed the app on the one player
+     * who had cleared everything in it.
+     */
+    @Test
+    fun clearingTheLastLevelEndsTheCampaignInsteadOfTheApp() = runUnitTest {
+        val vm = viewModel(levelId = LevelPacks.lastCampaignLevelId)
+        val events = eventsOf(vm)
+        solveCurrent(vm)
+
+        vm.takeAction(GameAction.NextLevel)
+        settle()
+
+        assertTrue(vm.state.campaignComplete, "the last level did not end the campaign")
+        assertEquals(GamePhase.Won, vm.state.phase, "the sheet has to stay up to say so")
+        assertTrue(
+            events.none { it == GameEvent.NavigateBack },
+            "the last level still walked the player out of the app",
+        )
+    }
+
+    @Test
+    fun theLevelBeforeTheLastStillOpensTheNextOne() = runUnitTest {
+        // The other half of the boundary. An ending one level early is a player
+        // told the campaign is over with a board still in it.
+        val vm = viewModel(levelId = LevelPacks.lastCampaignLevelId - 1)
+        solveCurrent(vm)
+
+        vm.takeAction(GameAction.NextLevel)
+        settle()
+
+        assertFalse(vm.state.campaignComplete, "the ending fired a level early")
+        assertEquals(LevelPacks.lastCampaignLevelId, vm.state.level?.id)
+    }
+
+    @Test
+    fun theEndingReportsWhatTheCampaignAddedUpTo() = runUnitTest {
+        val last = LevelPacks.lastCampaignLevelId
+        val progress = InMemoryProgress()
+        progress.onCompleted(1, score = 100, paws = 3, timeMs = 1_000)
+        progress.onCompleted(2, score = 250, paws = 5, timeMs = 1_000)
+        // Skipped rather than cleared, so the levels pill has something to be
+        // honest about: it counts clears, not levels reached.
+        progress.onSkipped(3)
+        val vm = viewModel(levelId = last, progress = progress)
+        solveCurrent(vm)
+
+        vm.takeAction(GameAction.NextLevel)
+        settle()
+
+        val finale = progress.record(last)
+        val totals = assertNotNull(vm.state.campaignTotals)
+        assertEquals(LevelPacks.campaign.size, totals.levelsTotal)
+        assertEquals(3, totals.levelsCleared, "levels 1, 2 and the last one — the skip is not a clear")
+        assertEquals(350 + finale.bestScore, totals.score)
+        assertEquals(8 + finale.bestPaws, totals.paws)
+    }
+
+    @Test
+    fun theEndingStillArrivesWhenTheRecordsWillNotRead() = runUnitTest {
+        // The totals are a disk read and the ending is not. A row of noughts
+        // would be worse than no row, and dropping back to `NavigateBack`
+        // because a query failed would be worse than either.
+        val vm = viewModel(levelId = LevelPacks.lastCampaignLevelId, progress = BrokenProgress())
+        val events = eventsOf(vm)
+        solveCurrent(vm)
+
+        vm.takeAction(GameAction.NextLevel)
+        settle()
+
+        assertTrue(vm.state.campaignComplete)
+        assertNull(vm.state.campaignTotals, "unreadable records must not become zeroes")
+        assertTrue(events.none { it == GameEvent.NavigateBack })
+    }
+
     @Test
     fun openingTheDrawerLoadsEveryLevelRecord() = runUnitTest {
         val progress = InMemoryProgress()
@@ -5209,6 +5286,17 @@ class GameViewModelTest : CoroutineTest() {
 
         private fun LevelState.orUnlocked(): LevelState =
             if (this == LevelState.Locked) LevelState.Unlocked else this
+    }
+
+    /**
+     * A progress store whose reads throw, for the paths that have to survive one.
+     *
+     * Writes are kept working rather than also throwing, so a test using this is
+     * about the read it names and not about a store that is broken in every
+     * direction at once.
+     */
+    private class BrokenProgress : ProgressRepository by InMemoryProgress() {
+        override suspend fun all(): List<LevelRecord> = error("the disk is not talking")
     }
 
     /**
