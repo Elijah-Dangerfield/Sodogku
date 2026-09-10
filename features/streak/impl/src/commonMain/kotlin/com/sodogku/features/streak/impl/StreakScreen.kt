@@ -20,6 +20,7 @@ import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.header.TopBar
 import com.sodogku.libraries.ui.components.streak.StreakCalendar
+import com.sodogku.libraries.ui.components.streak.StreakHero
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.screenContentPadding
 import com.sodogku.system.AppTheme
@@ -28,6 +29,7 @@ import com.sodogku.system.VerticalSpacerD300
 import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.system.VerticalSpacerD800
 import kotlinx.datetime.LocalDate
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.features.streak.impl.generated.resources.Res
@@ -37,6 +39,8 @@ import sodogku.features.streak.impl.generated.resources.streak_celebrate_title
 import sodogku.features.streak.impl.generated.resources.streak_current_days
 import sodogku.features.streak.impl.generated.resources.streak_current_none
 import sodogku.features.streak.impl.generated.resources.streak_empty_body
+import sodogku.features.streak.impl.generated.resources.streak_day_label
+import sodogku.features.streak.impl.generated.resources.streak_keep_it_today
 import sodogku.features.streak.impl.generated.resources.streak_longest
 import sodogku.features.streak.impl.generated.resources.streak_longest_none
 import sodogku.features.streak.impl.generated.resources.streak_off_body
@@ -89,26 +93,23 @@ private fun StreakBody(state: StreakState, modifier: Modifier = Modifier) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         VerticalSpacerD500()
 
-        // The dog reacts to the run rather than to the visit. A page that opens
-        // with a delighted dog on a streak of nought is the app congratulating
-        // somebody for nothing.
-        Dog(
-            pose = if (state.current > 0) DogPose.Solved else DogPose.Thinking,
-            size = Dimension.D1900,
+        // The same picture the commitment moment shows, and on a celebration the
+        // same performance: the number counts up from yesterday's run and lands
+        // with a thump.
+        //
+        // `countUpFrom` is null when the page was *opened* rather than triggered,
+        // which is the whole difference between the two ways in. A page you went
+        // looking for should not perform at you.
+        StreakHero(
+            streak = state.current,
+            week = state.days.toWeekStrip(),
+            dayLabel = pluralStringResource(Res.plurals.streak_day_label, state.current, state.current),
+            countUpFrom = (state.celebrating - 1).takeIf { state.celebrating > 0 },
         )
 
-        Text(
-            text = if (state.current > 0) {
-                stringResource(Res.string.streak_current_days, state.current)
-            } else {
-                stringResource(Res.string.streak_current_none)
-            },
-            typography = AppTheme.typography.Display.D900,
-            textAlign = TextAlign.Center,
-        )
-        VerticalSpacerD300()
+        VerticalSpacerD500()
 
-        // The record is second and quieter. It is the thing to beat, not the
+        // The record is quieter than the run. It is the thing to beat, not the
         // thing the page is about, and a run of 3 under a record of 90 read at
         // the same weight is a page that opens by saying you used to be better.
         Text(
@@ -124,12 +125,18 @@ private fun StreakBody(state: StreakState, modifier: Modifier = Modifier) {
         if (state.celebrating > 0) {
             VerticalSpacerD500()
             Text(
-                text = stringResource(Res.string.streak_celebrate_title, state.celebrating),
-                typography = AppTheme.typography.Heading.H700,
+                text = stringResource(Res.string.streak_celebrate_body),
+                typography = AppTheme.typography.Body.B500,
+                color = AppTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
             )
+        } else if (!state.playedToday && state.current > 0) {
+            // The one thing a status page can say that the calendar cannot: how
+            // long is left. Only when there is a run to lose and it has not been
+            // kept yet, because on any other day it is a countdown to nothing.
+            VerticalSpacerD500()
             Text(
-                text = stringResource(Res.string.streak_celebrate_body),
+                text = stringResource(Res.string.streak_keep_it_today, state.hoursLeftLabel),
                 typography = AppTheme.typography.Body.B500,
                 color = AppTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,

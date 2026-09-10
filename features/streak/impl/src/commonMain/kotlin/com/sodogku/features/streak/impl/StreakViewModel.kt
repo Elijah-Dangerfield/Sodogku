@@ -144,7 +144,31 @@ data class StreakState(
 
     /** Index into [days] of the single cell that animates, or null. */
     val fillingIndex: Int? = null,
-)
+) {
+
+    /**
+     * The countdown, rounded to whole hours, or minutes in the last one.
+     *
+     * Rounded *up* deliberately: "1 hour left" with fifty-nine minutes on the
+     * clock is a kinder lie than "0 hours left", and this is a nudge rather than
+     * a timer. Under an hour it switches to minutes, because that is the point
+     * at which the number stops being reassuring and starts being the message.
+     */
+    val hoursLeftLabel: String
+        get() {
+            val minutes = untilTomorrow.inWholeMinutes
+            return if (minutes < MinutesInHour) {
+                "$minutes min"
+            } else {
+                val hours = (minutes + MinutesInHour - 1) / MinutesInHour
+                "$hours hr"
+            }
+        }
+
+    private companion object {
+        const val MinutesInHour = 60L
+    }
+}
 
 /** The two `AppData` toggles the celebration has to obey. */
 data class PlaybackSettings(val haptics: Boolean, val reduceAnimations: Boolean)
