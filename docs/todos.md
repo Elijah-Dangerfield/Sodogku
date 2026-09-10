@@ -74,31 +74,35 @@ board. iOS has no equivalent, because racing an `async throws` whose cancellatio
 is opaque risks a leaked continuation, which fails worse than what it guards.
 Worth doing properly once someone can test it.
 
-## SD-2 [P1] — Nobody has read and owned the new privacy policy
+## SD-2 [P1] — Three decisions the privacy policy defers, and a terms page that says nothing about money
 
-**Ask:** `pages/privacy.html` was rewritten against the code in `1ec24e0` and is
-live. The false "no ad networks" claim is gone and every statement traces to a
-file. What is left is the half an agent cannot do: a person has to read it and
-accept it as their own.
+**Ask:** Owner, 2026-09-09: this is not owner-blocked, work it.
 
-**Done when:** The owner has read it end to end and said so.
+`pages/privacy.html` was rewritten against the code in `1ec24e0` and every
+statement traces to a file. What is left is not "somebody read it": it is three
+passages that punt, and a terms page with a hole in it.
 
-**Hints:** Three passages deserve a deliberate decision rather than a factual
-check.
+**Done when:**
 
-- **The opening line says the app is not released yet.** True today, false on
-  launch day, and nothing catches it. There is a `DELETE THIS ON LAUNCH DAY`
-  comment on the paragraph.
-- **The deletion paragraph** states plainly that the install identifier is the
-  only key on our records, that the app never shows it to the player, and that a
-  deletion request therefore cannot be matched to anything. That is honest and it
-  is also a product gap the page now commits us to closing. Play's Data safety
-  form asks the question directly.
-- **Analytics have an operator kill switch and no in-app opt-out.** The page says
-  so rather than implying a choice the player does not have.
+1. **The launch-day line is gone or cannot rot.** The opening says the app is not
+   released yet. True today, false on launch day, and nothing catches it. There is
+   a `DELETE THIS ON LAUNCH DAY` comment on it, which is a reminder rather than a
+   mechanism. Either rewrite the line so it is true either way, or make something
+   fail when it goes stale.
+2. **The deletion gap is closed or consciously accepted.** The page states that
+   the install identifier is the only key on our records and that the app never
+   shows it to the player, so a deletion request cannot be matched to anything.
+   That is honest, and Play's Data safety form asks the question directly. Either
+   surface the identifier somewhere a player can quote it, or write down why not.
+3. **`pages/terms.html` covers purchases and ads.** Nothing in it is false; it
+   simply does not mention that the app sells a subscription and serves ads. That
+   is a gap on the page a store links to.
 
-`pages/terms.html` was left alone. Nothing in it is false, but it says nothing
-about purchases or ads, which is a gap rather than an error.
+**Hints:** `pages/privacy.html`, `pages/terms.html`, and
+`docs/store/data-safety.md` as the factual input for both. The install
+identifier is in `libraries/networking/.../SessionIdProvider.kt`. Do not invent
+policy: where a decision is genuinely the owner's, write the options into
+`docs/OWNER-TODO.md` rather than picking one.
 
 ## SD-3 [P1] — A Settings toggle tells a screen reader "on" without saying what is on
 
@@ -171,33 +175,33 @@ Ask for a ranked list with a file:line and a concrete failure scenario for each,
 and require it to say which findings it verified versus which are hunches. Take
 nothing on trust: reviews from agents have been confidently wrong here before.
 
-## SD-7 [P1] — `docs/store/data-safety.md` is stale, and a store form gets filled from it
+## SD-7 [P1] — Re-derive `docs/store/data-safety.md` against the code
 
-**Ask:** Three of its findings no longer match the code. That file is the input
-for Play's Data safety form and Apple's App Privacy questionnaire, so a stale
-claim there becomes a false declaration to a store rather than just a wrong doc.
+**What the file is for**, since it is easy to mistake for a one-off: it is the
+derived answer sheet for *two* store forms, Play's **Data safety** and Apple's
+**App Privacy** nutrition label, with every row citing the file and mechanism
+that makes it true. It is also the factual input for `pages/privacy.html`.
 
-**Done when:** Every claim in it has been re-derived from the current code, and
-anything already fixed is marked fixed rather than left reading as outstanding.
+Both forms have to be **updated whenever what the app collects changes**, not
+filed once. So the file staying true is ongoing engineering work, and it is
+this item. Actually editing the store forms is the owner's, and is a bullet in
+`docs/OWNER-TODO.md` rather than a second todo here.
 
-**Hints:** Found while writing the new privacy policy (SD-2), and each one
-verified directly:
+**Ask:** Three of its findings no longer match the code. It was derived on
+2026-09-08 and the header names the three things most likely to invalidate it: a
+new `logEvent` attribute, a new SDK, and anything calling `Telemetry.setUser`.
+All three areas have moved since.
 
-- **§2.10 and §7.2** say `android.permission.CAMERA` is declared. It is not.
-  `apps/compose/src/androidMain/AndroidManifest.xml` declares no permissions at
-  all; the merged manifest's set comes entirely from bundled libraries.
-- **§7.1** says `allowBackup="true"` contradicts the Settings copy. It is
-  `android:allowBackup="false"` now, with the reasoning in a comment at
-  `AndroidManifest.xml:5-14`. That was the file's highest-value finding and it
-  is already done.
-- **§2.5** says `FeedbackRepositoryImpl` passes neither screenshots nor email.
-  It passes `screenshots: List<ByteArray>` and `includeLogs: Boolean` now
-  (`libraries/sodogku/src/commonMain/kotlin/com/sodogku/libraries/FeedbackRepository.kt:40-55`).
-  Email is still never passed, so that half stands.
+**Done when:** Every row is re-derived against the current tree, each still
+cites a file and a line that exists, and the header's date is updated. Where an
+answer changed, say so explicitly rather than silently editing the row, because
+the owner has to know which form fields to go and change.
 
-The new `pages/privacy.html` was written against the code rather than against
-this file, so it is the more trustworthy of the two. Reconcile toward it, and
-where they disagree, check the code rather than picking one.
+**Hints:** The file's own §1 explains the two facts that shape every answer (no
+accounts, `setUser` uncalled). Verify both are still true rather than assuming:
+`grep -rn "setUser(" --include=*.kt` should still return only the declaration
+and the implementation. Sentry was switched on since this was written, and the
+feedback path now attaches a session log and screenshots.
 
 <!--
 SD-9 through SD-23 came out of one sitting on 2026-09-09: a feature-by-feature
@@ -229,21 +233,6 @@ Two things that are not true of Game Center: Play Games sign-in can fail for a
 player who has never opted into a Games profile, which is a normal state and not
 an error, and the console needs the boards created and published before a
 submission is anything but a silent no-op.
-
-## SD-10 [P1] — The game makes no sound
-
-**Ask:** Haptics ship (`AppCache.hapticsEnabled`, `rememberHaptics`), audio does
-not exist anywhere: no clips, no player, no `soundEnabled`, and SPEC 11 still
-lists the Settings row as outstanding. Audio is one of the two things
-Meowdoku's reviewers praise unprompted, the other being its hint.
-
-**Done when:** Dog placed, strike, level win, praise sting, button tap and
-achievement unlock all play; a Settings row silences them; and nothing plays
-over the iOS silent switch.
-
-**Hints:** SPEC 20 lists the six clips under "Art and audio" and they are still
-unordered. Follow the haptics shape exactly: a flag in `AppCache`, a toggle in
-Settings, and playback at the screen rather than in the ViewModel.
 
 ## SD-11 [P1] — A sniff should say what proved it
 
@@ -297,21 +286,38 @@ for the reason in `proposals.md`. Meowdoku's own reviewers say its boards start
 repeating around every 100, so this is a place where we can be better rather
 than merely bigger.
 
-## SD-14 [P1] — Share the daily only, and without the grid
+## SD-14 [P1] — Delete the sharing feature
 
-**Ask:** Owner, 2026-09-09: only the daily should be shareable, and the text
-should not carry the region layout. Today `ShareButton` is on every win sheet
-and `ShareResult` carries `regions`.
+**Ask:** Owner, 2026-09-09: *"honestly id say lets remove the sharing feature"*.
 
-**Done when:** A campaign win has no share control, the daily's share text is
-the date, time, score, paws, bones and streak with no grid at all, and
-`ShareResult` has nowhere to put a layout.
+Supersedes the earlier version of this item, which was going to narrow sharing
+to the daily and drop the emoji grid. Narrowing a feature nobody asked for is
+still carrying it.
 
-**Hints:** `features/game/impl/.../GameOutcomeSheets.kt:162`,
-`libraries/sharing/.../ShareResult.kt`, `ShareText.kt`. Dropping the grid makes
-the no-spoilers property trivially true instead of carefully arranged, and it
-retires the `🔲` compromise for ten-region boards. Tests pin the emoji grid;
-they go with it.
+**Done when:** `:libraries:sharing` and `:libraries:sharing:impl` are gone from
+`settings.gradle.kts` and from every `build.gradle.kts` that depends on them, no
+win sheet has a share control, and nothing left in the tree mentions
+`ShareResult`, `ShareText`, `ShareLauncher` or `ShareSheet`.
+
+**Hints:** The blast radius, from a dependency grep:
+
+- `libraries/sharing/**` and `libraries/sharing/impl/**` (the modules)
+- `libraries/ui/.../system/ShareSheet.kt` and
+  `libraries/ui/.../components/feedback/ShareButton.kt`
+- `features/game/impl/.../GameOutcomeSheets.kt` (the call site) and
+  `GameContract.kt`
+- `settings.gradle.kts`, `features/game/impl/build.gradle.kts`,
+  `libraries/ui/build.gradle.kts`, `apps/compose/build.gradle.kts`,
+  `apps/compose/.../AppComponent.kt`
+
+Two tests exist only for this and go with it: `ShareTextTest`,
+`WinSheetShareTest`. Check the shared `strings.xml` for orphaned `share_*` keys
+once the code is gone; `UserFacingCopyStyleTest` will not catch a string nobody
+reads.
+
+The platform launchers (`AndroidShareLauncher`, `IosShareLauncher`) are the only
+part worth a second thought before deleting: confirm nothing else uses the
+system share sheet, then remove them too.
 
 ## SD-15 [P1] — Say the daily is waiting, on the button that opens it
 

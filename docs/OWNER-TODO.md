@@ -278,6 +278,25 @@ obtain each one.
 
 ---
 
+## 9b. Update the two store privacy forms when the answer sheet changes
+
+Small, recurring, and easy to forget because it feels like a one-off.
+
+`docs/store/data-safety.md` is the derived answer sheet for Play's **Data
+safety** form and Apple's **App Privacy** nutrition label. Both forms have to be
+updated whenever what the app collects changes; neither is filed once. Agents
+keep the file true (that is `SD-7` in `docs/todos.md`); only you can edit the
+forms.
+
+**So:** when a commit says a row in `data-safety.md` changed, go and change the
+matching field in both consoles. Play: Policy → App content → Data safety.
+Apple: App Store Connect → your app → App Privacy.
+
+Worth knowing which changes actually move a row, since most do not: a new SDK, a
+new `logEvent` attribute, and anything that starts calling `Telemetry.setUser`.
+
+---
+
 ## 10. Sentry
 
 **One command.** The project (`elijah-dangerfield` / `sodogku`) and its DSN
