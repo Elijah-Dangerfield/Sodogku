@@ -4,6 +4,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.navigation.NavGraphBuilder
 import com.sodogku.features.profile.BugReportRoute
 import com.sodogku.libraries.core.BuildInfo
+import com.sodogku.libraries.core.isTesterBuild
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.Router
 import com.sodogku.libraries.navigation.QaToolsRoute
@@ -72,7 +73,7 @@ class ShakeDialogEntryPoint(
                 // Debug-only: reuse the shake gesture to also open the
                 // WiretapKMP network inspector. Hidden in release (and the
                 // inspector itself is the noop there).
-                onOpenQaTools = if (BuildInfo.isDebug) {
+                onOpenQaTools = if (BuildInfo.isTesterBuild) {
                     {
                         router.goBack()
                         router.navigate(QaToolsRoute())

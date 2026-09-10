@@ -481,27 +481,6 @@ do to the hosting `UIViewController` and therefore to the lifecycle owner.
 Reproduce with the log lines above rather than by guessing: `Enqueuing
 navigation` with no visible result is the signature.
 
-## SD-27 [P2] — Replace the feedback drag handle with a movable FAB
-
-**Ask:** Owner, 2026-09-09: *"the drag handle to swipe in the feedback is kinda
-hard to grab. Mabye instead we have a floating, drag to move, small FAB that
-opens it as a full screen. And maybe in QA settings you can toggle to just not
-show it if you want."*
-
-**Done when:** A small FAB floats over the app, can be dragged anywhere and
-stays put, opens the feedback panel full screen, and can be switched off from QA
-settings. The edge-drag handle is gone.
-
-**Hints:** The panel is `apps/compose/.../devfeedback/DevFeedbackPanel.kt`. Three
-things worth getting right rather than discovering later: the FAB must not sit
-over the booster row or the board (which is the whole screen on a big grid), so
-"drag to move" is a requirement and not a nicety; it must not appear in release
-builds; and the toggle needs somewhere to persist, alongside whatever QA
-settings already use.
-
-Related: whether this FAB should also be the shake dialog's entry point, so
-there is one way into feedback rather than three.
-
 ## SD-28 [P2] — Decide what a streak freeze is, now that the streak is not the daily's
 
 **Ask:** Owner, 2026-09-09: *"We should have a todo to figure out streak freezes

@@ -5,8 +5,8 @@ description: Turn in-app feedback into TODO items. Scans Sentry for reports file
 
 # Feedback triage
 
-The app has a feedback panel (right-edge swipe or the edge handle, tester builds
-only) and a player-facing bug report. Both land in Sentry. This routine reads
+The app has a feedback panel (the floating feedback button, tester builds only)
+and a player-facing bug report. Both land in Sentry. This routine reads
 them and turns the actionable ones into `docs/todos.md` items that a worker
 routine can pick up later.
 

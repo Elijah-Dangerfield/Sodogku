@@ -1,5 +1,6 @@
 package com.sodogku.qa
 
+import com.sodogku.devfeedback.DevFeedbackFabCache
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.flowroutines.SEAViewModel
@@ -34,6 +35,7 @@ import kotlin.time.ExperimentalTime
 class QaToolsViewModel(
     private val playDays: PlayDayDao,
     private val streak: StreakRepository,
+    private val feedbackFab: DevFeedbackFabCache,
     private val clock: Clock,
     private val timeZone: DeviceTimeZone,
 ) : SEAViewModel<QaToolsState, QaToolsEvent, QaToolsAction>(
@@ -51,6 +53,9 @@ class QaToolsViewModel(
             is QaToolsAction.SeedStreak -> action.write { seed(action.days) }
             QaToolsAction.ClearPlayDays -> action.write { playDays.deleteAll() }
             QaToolsAction.ResetPrompts -> action.write { streak.reset() }
+            is QaToolsAction.ShowFeedbackFab -> action.write {
+                feedbackFab.update { it.copy(hidden = !action.shown) }
+            }
             QaToolsAction.Back -> sendEvent(QaToolsEvent.Back)
         }
     }
@@ -78,6 +83,10 @@ class QaToolsViewModel(
     private suspend fun QaToolsAction.refresh() {
         val summary = Catching { streak.summary() }.logOnFailure { "QA refresh failed" }.getOrNull()
         val days = Catching { playDays.all() }.getOrNull().orEmpty()
+        // Read rather than observed, because every write on this screen refreshes
+        // and the only other writer is the drag, which cannot happen while this
+        // screen is covering the button.
+        val fab = Catching { feedbackFab.get() }.getOrNull()
         updateState {
             it.copy(
                 loaded = true,
@@ -86,6 +95,7 @@ class QaToolsViewModel(
                 playedToday = summary?.playedToday == true,
                 daysRecorded = days.size,
                 today = today().toString(),
+                feedbackFabShown = fab?.hidden != true,
             )
         }
     }
@@ -100,6 +110,11 @@ data class QaToolsState(
     val playedToday: Boolean = false,
     val daysRecorded: Int = 0,
     val today: String = "",
+    /**
+     * Defaults to shown, which is what the cache defaults to. A false here
+     * before the read lands would blink the toggle off on every open.
+     */
+    val feedbackFabShown: Boolean = true,
 )
 
 sealed interface QaToolsEvent {
@@ -112,5 +127,6 @@ sealed interface QaToolsAction {
     data class SeedStreak(val days: Int) : QaToolsAction
     data object ClearPlayDays : QaToolsAction
     data object ResetPrompts : QaToolsAction
+    data class ShowFeedbackFab(val shown: Boolean) : QaToolsAction
     data object Back : QaToolsAction
 }

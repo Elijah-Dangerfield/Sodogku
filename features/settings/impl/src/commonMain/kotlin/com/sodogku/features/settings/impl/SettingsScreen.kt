@@ -61,6 +61,7 @@ import com.sodogku.libraries.ui.components.icon.Icon
 import com.sodogku.libraries.ui.components.icon.IconSize
 import com.sodogku.libraries.ui.components.icon.Icons
 import com.sodogku.libraries.core.BuildInfo
+import com.sodogku.libraries.core.isTesterBuild
 import com.sodogku.system.AppTheme
 
 /**
@@ -237,7 +238,7 @@ fun SettingsScreen(
             // Here as well as on the shake dialog because the two are reached
             // from different places. Shaking is what you do mid-board; this is
             // what you find when you are looking for it.
-            if (BuildInfo.isDebug) {
+            if (BuildInfo.isTesterBuild) {
                 VerticalSpacerD800()
 
                 ListSection(

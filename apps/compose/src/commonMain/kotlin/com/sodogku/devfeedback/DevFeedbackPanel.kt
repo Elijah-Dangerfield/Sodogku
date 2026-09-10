@@ -3,17 +3,12 @@ package com.sodogku.devfeedback
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,12 +43,19 @@ import com.sodogku.system.VerticalSpacerD700
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
- * The directive form, sliding in over whatever the owner was looking at.
+ * The directive form, covering whatever the owner was looking at.
  *
  * An overlay rather than a nav destination on purpose: it has to be reachable
  * from a dialog, a bottom sheet or mid-animation, and pushing a route would
  * both disturb the back stack it is meant to describe and change the very
  * screen the attached screenshot was taken of.
+ *
+ * Full screen rather than the inset panel it used to be. That panel left a strip
+ * of the app showing so it read as an overlay, which mattered when it slid in
+ * from the edge you had just dragged from; opened from a button that could be
+ * anywhere, the strip is only a place to lose a tap. Nothing is drawn under it,
+ * and `Surface` swallows pointer events, so the app underneath cannot be reached
+ * by accident while the form is up.
  */
 @Composable
 fun DevFeedbackPanel(
@@ -67,30 +69,11 @@ fun DevFeedbackPanel(
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(AppTheme.colors.backgroundOverlay.color)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onAction(DevFeedbackAction.Dismiss) },
-            )
-        }
-
-        AnimatedVisibility(
-            visible = state.isOpen,
-            modifier = Modifier.align(Alignment.CenterEnd),
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
-        ) {
             Surface(
                 color = AppTheme.colors.background,
                 contentColor = AppTheme.colors.onBackground,
-                radius = Radii.Default,
-                modifier = Modifier
-                    .fillMaxWidth(PANEL_WIDTH_FRACTION)
-                    .fillMaxHeight(),
+                radius = Radii.None,
+                modifier = Modifier.fillMaxSize(),
             ) {
                 if (state.sent) {
                     SentConfirmation(onAction)
@@ -272,9 +255,6 @@ private object Copy {
     const val SCREENSHOT_DESCRIPTION = "Attached screenshot"
     const val DONE_DESCRIPTION = "Done"
 }
-
-/** Leaves a strip of the underlying screen visible, so it still reads as an overlay. */
-private const val PANEL_WIDTH_FRACTION = 0.92f
 
 @Preview
 @Composable

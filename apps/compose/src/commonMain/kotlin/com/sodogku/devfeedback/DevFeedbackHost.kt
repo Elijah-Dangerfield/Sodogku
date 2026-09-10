@@ -1,46 +1,30 @@
 package com.sodogku.devfeedback
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import com.sodogku.libraries.core.BuildInfo
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.isTesterBuild
 import com.sodogku.libraries.core.logOnFailure
-import com.sodogku.system.AppTheme
-import com.sodogku.system.Dimension
 import kotlinx.coroutines.launch
 
 /**
  * Wraps the app so a tester can reach the directive form from any screen.
  *
- * Two triggers, one feature:
- *
- * - **Swipe in from the right edge.** What the owner asked for, and the only
- *   trigger on iOS, where the right edge is free (the system's interactive pop
- *   lives on the left).
- * - **A visible handle on the same edge.** Android gesture navigation claims
- *   both screen edges for system back, so a swipe from the bare edge there does
- *   not reach this at all: measured on the emulator, it exits the app. The
- *   handle sits inboard and calls `systemGestureExclusion`, so a tap or a drag
- *   starting on it works. It also stops the gesture from being a secret nobody
- *   remembers, on either platform.
+ * One trigger: a small button floating over everything, which can be dragged
+ * anywhere and stays where it is put. It replaced a handle pinned to the right
+ * edge, plus a swipe in from that edge — the handle was hard to grab, and on a
+ * big grid it sat on cells the player needed to tap. See [DevFeedbackFab] for
+ * why it has to move and how it avoids taking touches meant for the app.
  *
  * Everything below is gated on [isTesterBuild]: in a player's build the
  * wrapper adds one `Box` and nothing else: no pointer handler, no per-frame
@@ -49,6 +33,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun DevFeedbackHost(
     viewModel: DevFeedbackViewModel,
+    fabCache: DevFeedbackFabCache,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -78,11 +63,7 @@ fun DevFeedbackHost(
         }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .rightEdgeSwipe(enabled = true, onTriggered = ::open),
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -94,37 +75,49 @@ fun DevFeedbackHost(
             content()
         }
 
-        if (!state.isOpen) {
-            EdgeHandle(
-                onClick = ::open,
-                modifier = Modifier.align(Alignment.CenterEnd),
-            )
-        }
+        FabLayer(cache = fabCache, onClick = ::open)
 
+        // Last, so the panel covers the button rather than the other way round.
+        // Nothing hides the button while the form is open because nothing needs
+        // to: the panel is full screen and opaque.
         DevFeedbackPanel(state = state, onAction = viewModel::takeAction)
     }
 }
 
+/**
+ * The button's own state read, kept in a composable of its own.
+ *
+ * Deliberately not read in [DevFeedbackHost]: a state read there recomposes the
+ * host, and the host's content lambda is the entire app. Dropping the button in
+ * a new place would re-run the whole tree's composition for a position change
+ * nothing above this node cares about.
+ *
+ * Nothing is drawn until the first value arrives from disk. The alternative is
+ * to start at the default and jump once the read lands, which also flashes a
+ * button the owner has switched off.
+ */
 @Composable
-private fun EdgeHandle(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            // Sits a little in from the edge, and claims its own touches back
-            // from the OS. Both are needed: the inset alone loses to a phone
-            // with back sensitivity turned up, and the exclusion alone leaves
-            // the handle sharing a hairline with the system's own target.
-            .padding(end = Dimension.D500)
-            .width(Dimension.D300)
-            .height(Dimension.D1300)
-            .excludeFromSystemGestures()
-            .background(
-                color = AppTheme.colors.accentPrimary.color,
-                shape = RoundedCornerShape(Dimension.D200),
-            )
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = HANDLE_DESCRIPTION },
+private fun FabLayer(cache: DevFeedbackFabCache, onClick: () -> Unit) {
+    val stored by cache.updates.collectAsState(initial = null)
+    val settings = stored ?: return
+    if (settings.hidden) return
+
+    val scope = rememberCoroutineScope()
+    // Remembered so its identity is stable, because `pointerInput` is keyed on
+    // it: a fresh lambda each composition would tear down and rebuild the
+    // gesture detector, cancelling a drag in progress.
+    val onSettled: (FabPlacement) -> Unit = remember(cache, scope) {
+        { placement ->
+            scope.launch {
+                Catching { cache.update { it.withPlacement(placement) } }
+                    .logOnFailure { "Could not remember where the feedback button was put" }
+            }
+        }
+    }
+
+    DevFeedbackFab(
+        placement = settings.placement,
+        onSettled = onSettled,
+        onClick = onClick,
     )
 }
-
-/** What `scripts/dev/drive.py tap "Leave feedback"` looks for. */
-private const val HANDLE_DESCRIPTION = "Leave feedback"

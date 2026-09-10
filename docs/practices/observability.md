@@ -106,7 +106,7 @@ rides to Sentry as the searchable `feedback_kind` tag.
 
 | Tag | Who | Entry point | Treated as |
 | --- | --- | --- | --- |
-| `owner_directive` | the owner, from a tester build | right-edge handle or swipe | an instruction: filed without debate |
+| `owner_directive` | the owner, from a tester build | the floating feedback button | an instruction: filed without debate |
 | `bug_report` | a player | shake, or an error screen | a report: diagnosed, then filed |
 | `feedback` | a player | Settings → feedback | read, rarely actioned |
 
@@ -126,17 +126,27 @@ would share a title, no stacktrace, and therefore one giant issue.
 ### The tester entry point
 
 `DevFeedbackHost` wraps the app in `App.kt` and is a bare `Box` unless
-`BuildInfo.isTesterBuild` (debug, or TestFlight by receipt check). It offers:
+`BuildInfo.isTesterBuild` (debug, or TestFlight by receipt check). The trigger is
+a small button floating over the app: tap it to open the form, drag it to move
+it. Three things about it are decisions rather than details.
 
-- **A right-edge swipe.** The trigger the owner asked for, and the working one on
-  iOS, where the right edge is free.
-- **A visible handle on that edge.** Android gesture navigation claims both edges
-  for system back, and it claims them for *taps* as well as drags: a tap 41px
-  from the right edge backed the app out to the launcher instead of reaching the
-  control under it. The handle sits inboard and calls `systemGestureExclusion`,
-  which is what makes it reachable at all on Android. Measured on the emulator: a
-  swipe starting on the handle opens the panel, a swipe from the bare edge
-  beside it exits the app.
+- **It has to be draggable.** On a big grid the board is the whole screen, so any
+  fixed position is on top of cells the player needs. Its position is a fraction
+  of its travel rather than a pixel offset, kept in the `dev_feedback_fab` cache,
+  so it survives a relaunch and a rotation both.
+- **It only takes touches it is over.** The layer it lives in is a bare `Box`
+  with no pointer handler; the 48dp button carries the only `pointerInput`. This
+  replaced a right-edge swipe detector that watched every gesture on the screen
+  from the `Initial` pass in order to decide it was not interested.
+- **It still calls `systemGestureExclusion`.** Android gesture navigation claims
+  both screen edges for system back, and it claims them for *taps* as well as
+  drags: a tap 41px from the right edge backed the app out to the launcher
+  instead of reaching the control under it. Dragged flush against an edge, the
+  button is in that strip, so the exclusion travels with it.
+
+QA tools has a switch that hides it, for when even a movable button is in the
+way. The switch is on that screen and not on the button because the button is
+what you would be switching off.
 
 The panel is an overlay, not a nav destination, so it can open over a dialog or a
 sheet without disturbing the back stack it is meant to describe.

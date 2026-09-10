@@ -5,8 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.sodogku.libraries.ui.components.ListItem
+import com.sodogku.libraries.ui.components.ListItemAccessory
+import com.sodogku.libraries.core.BuildInfo
 import com.sodogku.libraries.ui.components.Screen
 import com.sodogku.libraries.ui.components.header.TopBar
 import com.sodogku.libraries.ui.components.button.ButtonSecondary
@@ -26,9 +31,12 @@ import com.sodogku.system.VerticalSpacerD500
  * `ShakeDialog` already does this for its network inspector button, for the same
  * reason.
  *
- * Streak tools only, for now. They are here because the streak is the one thing
- * in the app that cannot be tested by playing: it needs days to pass. Anything
- * else that becomes untestable-without-waiting belongs on this screen too.
+ * Mostly streak tools. They are here because the streak is the one thing in the
+ * app that cannot be tested by playing: it needs days to pass. Anything else
+ * that becomes untestable-without-waiting belongs on this screen too.
+ *
+ * The feedback switch is the exception, and it is here because this is the one
+ * screen a tester can reach without the button they are switching off.
  */
 @Composable
 fun QaToolsScreen(
@@ -41,9 +49,34 @@ fun QaToolsScreen(
         topBar = { TopBar(title = "QA tools", onNavigateBack = { onAction(QaToolsAction.Back) }) },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().screenContentPadding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .screenContentPadding(padding)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(Dimension.D400),
         ) {
+            Text(text = "Feedback", typography = AppTheme.typography.Heading.H600)
+
+            ListItem(
+                headlineText = "Floating feedback button",
+                supportingText = "Drag it anywhere. Tap it to file a directive.",
+                accessory = ListItemAccessory.Switch(
+                    checked = state.feedbackFabShown,
+                    onCheckedChange = { onAction(QaToolsAction.ShowFeedbackFab(it)) },
+                ),
+            )
+
+            VerticalSpacerD500()
+
+            // Debug only, while the Feedback section above is not.
+            //
+            // The feedback button shows on `isTesterBuild`, which is debug *or*
+            // TestFlight, so a TestFlight tester who wants it out of the way has
+            // to be able to reach the switch. Everything below wipes or forges
+            // streak history, which is not something to hand a tester with no
+            // way to undo it: their play days are the only copy there is.
+            if (!BuildInfo.isDebug) return@Column
+
             Text(text = "Streak", typography = AppTheme.typography.Heading.H600)
 
             Text(

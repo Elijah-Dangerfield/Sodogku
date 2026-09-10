@@ -158,7 +158,10 @@ fun App(appComponent: AppComponent) {
             // Outermost inside the theme so the panel draws over dialogs and
             // sheets too — the screen a report is about is often one of those.
             // A no-op wrapper in a player's build.
-            DevFeedbackHost(viewModel = appComponent.devFeedbackViewModel) {
+            DevFeedbackHost(
+                viewModel = appComponent.devFeedbackViewModel,
+                fabCache = appComponent.devFeedbackFabCache,
+            ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     // Stage 1: null until the async AppData read resolves — the
                     // platform splash (keyed on appViewModel.isReady) covers the
