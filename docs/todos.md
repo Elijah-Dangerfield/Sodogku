@@ -131,9 +131,25 @@ Two problems, and the second one is worse than the first.
 **Done when:** Finishing the last level lands on something that says so, and the
 shipped campaign is at least 1000 levels.
 
-**Do SD-20 first.** Whether the campaign grows past 10x10 changes what
-"1000 levels" is made of, and generating a thousand boards to one shape and then
-deciding the shape was wrong is the expensive order to do this in.
+**SD-20 is answered and it settles the shape.** See
+`docs/reference/large-boards-spike.md`. No new grid size: 4x4 through 10x10 only,
+no zoom, no pan. The measurements are decisive rather than close. The touch-target
+rule that was supposed to force zoom already broke at 8x8 three hundred levels
+ago, a 12x12 costs 22 times more generator time per shipped board, and the game's
+own rater says a 12x12 needs 25% more deductions for 44% more squares, which is a
+longer board rather than a harder one.
+
+So the surplus goes into **non-repetition**, not size. `Generator.canonicalKey`
+already dedups up to the eight symmetries and region renaming, so "our boards do
+not repeat" is a claim we can make and Meowdoku's own reviewers say it cannot.
+More 9x9 and 10x10 bands cost a couple of minutes of generation, which keeps the
+whole pack regenerable in one sitting and `LevelPackVerificationTest` cheap.
+
+**Also worth fixing while you are in here.** The spike found that
+`RegionPalette.get`, `BoardCellLabels.describe` and the `board_region_*` /
+`board_glyph_*` string sets all wrap silently with `mod` past ten. Harmless while
+`MAX_SIZE` is 10, but an eleventh region would draw in region 0's pink and be
+announced by region 0's name instead of failing loudly.
 
 **Hints:** The generator makes 1,230 boards in about 42 seconds, so content is
 cheap; verification is what costs. `LevelPacks.PACK_VERSION` exists because
@@ -142,24 +158,6 @@ silent reassignment of everyone's history. Do not spend the daily pool on this,
 for the reason in `proposals.md`. Meowdoku's own reviewers say its boards start
 repeating around every 100, so this is a place where we can be better rather
 than merely bigger.
-## SD-20 [P2] — Boards past 10x10, with zoom and pan (spike)
-
-**Ask:** Owner brainstorm, 2026-09-09: "Maybe we could even make larger grid
-sizes where you need to zoom in and pan?"
-
-**Blocks SD-13.** Extending the campaign to 1000 levels means deciding what
-those levels look like, so this answer comes first.
-
-**Done when:** There is a written answer with a recommendation, not a feature.
-
-**Hints:** Three things to price before any of it is built. The 44pt touch
-target rule against a 12x12 on a phone, which is what forces the zoom in the
-first place. Pan against the single-tap and double-tap gestures the entire game
-rests on, and against the coach marks that point at specific squares. And the
-generator, which converts 23 of 40 attempts to a unique board at 10x10 and gets
-worse from there. Also answer whether size adds difficulty at all: SPEC 1.7 says
-it does not, difficulty is deduction depth, and a 12x12 that falls to repeated
-last-candidate is a long board rather than a hard one.
 ## SD-22 [P2] — Write down what the game offers, and delete SPEC
 
 **Ask:** Owner, 2026-09-09: "It seems like it would be nice to have a wiki
