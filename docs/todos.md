@@ -378,11 +378,43 @@ the evidence that was missing. Owner reports being fully on the game screen at
 the time, so a phantom window from the bug-report dialog is the standing
 suspicion.
 
+**UPDATE 2026-09-10, second pass, and it narrows the search a long way.** The
+guess above about `ComposeUIViewController` pausing is probably wrong, and the
+code says why.
+
+A feature's screen state and its events are both collected against the
+**`NavBackStackEntry`** lifecycle, not the host's. `GameFeatureEntryPoint` sits
+inside `screen<GameRoute> { }`, so its `collectAsStateWithLifecycle()` and its
+`ObserveEvents` read a `LocalLifecycleOwner` that is the entry. An entry pinned
+below STARTED gives exactly the reported symptom and nothing else does: the board
+holds its last state and never redraws, its events are never delivered, and
+touches, logging and the shake detector all keep working, because those hang off
+the host.
+
+The shake detector is the evidence for this. `ShakeHandler.start`/`stop` are
+driven by a `LifecycleStartEffect` in `App.kt` on the **host** lifecycle. If the
+host had dropped below STARTED, the detector would have been stopped and the
+shake could not have been noticed at all. It was noticed, so the host was fine
+and something below it was not.
+
+Which points at `libraries/navigation/.../floatingwindow/`, our own
+`FloatingWindowNavigator` and `FloatingWindowHost`, because that is what hosts
+both the feedback sheet and the shake dialog and it is what completes a
+transition. An entry left in `transitionsInProgress` is held below its target
+state by `NavController`, and nothing ever completes it again. Note
+`FloatingWindowHost` only calls `onTransitionComplete` from a `DisposableEffect`
+in `visibleBackStack.forEach`, so an entry that leaves the visible list without
+disposing, or one that never enters it, is never completed.
+
 **Done when:** Opening the feedback panel, submitting, then triggering the shake
-dialog and dismissing it leaves navigation working. And, separately, an
-enqueued-but-undrained command cannot sit silently: either the router surfaces a
-queue that has not drained within a few seconds, or it stops gating the drain on
-STARTED.
+dialog and dismissing it leaves the board and navigation working.
+
+**The reporting half is done** (`NavigationQueueWatchdog`, 2026-09-10). A queue
+that has not moved for four seconds now logs an error carrying the host
+lifecycle state and every back stack entry with its own state, which is the
+reading nobody has ever taken. Reproduce it once and the log says which entry is
+pinned and at what state, which is the difference between looking at the host and
+looking at `FloatingWindowHost`.
 
 **Hints:** `libraries/navigation/impl/.../DelegatingRouter.kt` (`setNavController`,
 `clearNavController`, `enqueueNavigation`),

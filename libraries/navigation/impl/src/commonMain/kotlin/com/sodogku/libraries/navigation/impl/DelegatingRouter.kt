@@ -3,10 +3,8 @@ package com.sodogku.libraries.navigation.impl
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.coroutineScope
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import com.sodogku.libraries.core.logging.KLog
@@ -25,13 +23,11 @@ import com.sodogku.libraries.navigation.Router
 import com.sodogku.libraries.navigation.WebLinkLauncher
 import com.sodogku.libraries.navigation.NavigableWhileBlocked
 import com.sodogku.libraries.navigation.TrackableRoute
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -40,6 +36,7 @@ import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
+import kotlin.time.Duration.Companion.seconds
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = Router::class)
@@ -56,7 +53,43 @@ class DelegatingRouter(
     private var navController: NavHostController? = null
     private var processingJob: Job? = null
 
-    private var viewScope: CompletableDeferred<CoroutineScope> = CompletableDeferred()
+    private val watchdog = NavigationQueueWatchdog()
+
+    /**
+     * The lifecycle the drain is gated on, kept only so a stall report can say
+     * what state it was in. That is the fact SD-26 needs and cannot get from a
+     * log line after the fact.
+     */
+    private var gatingLifecycle: Lifecycle? = null
+
+    /**
+     * Set while something is waiting, so the watchdog poll is asleep on a flow
+     * rather than waking every second for the life of the app.
+     *
+     * This lives on the router and not inside [NavigationQueueWatchdog] because
+     * the watchdog is deliberately free of coroutines: everything it decides is
+     * a function of counts and elapsed time, which is what makes its rules
+     * assertions instead of scenarios.
+     */
+    private val queueHasWork = MutableStateFlow(false)
+
+    init {
+        // On the app scope, not the view scope, and that is the whole point. A
+        // watchdog gated on the same lifecycle as the thing it watches would go
+        // quiet in exactly the situation it exists to report.
+        appScope.launch {
+            while (true) {
+                queueHasWork.first { it }
+                delay(StallPollInterval)
+                watchdog.stall()?.let { stall ->
+                    // On main because the report reads the back stack, and a
+                    // NavController read from another thread is undefined.
+                    withContext(Dispatchers.Main.immediate) { reportStall(stall) }
+                }
+                queueHasWork.value = watchdog.isWaiting
+            }
+        }
+    }
 
     fun clearNavController(controller: NavHostController? = null) {
         if (navController === controller || controller == null) {
@@ -64,18 +97,17 @@ class DelegatingRouter(
             processingJob?.cancel()
             processingJob = null
             navController = null
-            viewScope = CompletableDeferred()
+            gatingLifecycle = null
         }
     }
 
     fun setNavController(
         controller: NavHostController,
         lifecycle: Lifecycle,
-        scope: CoroutineScope = lifecycle.coroutineScope,
     ) {
         logger.d { "Setting nav controller" }
-        viewScope.complete(scope)
         navController = controller
+        gatingLifecycle = lifecycle
         processingJob?.cancel()
         processingJob = appScope.launch {
             controller.awaitGraphAttachment()
@@ -83,7 +115,46 @@ class DelegatingRouter(
                 .receiveAsFlow()
                 .observeWithLifecycle(lifecycle = lifecycle, tag = "navigation queue") { command ->
                     command(controller)
+                    watchdog.drained()?.let { stuckFor ->
+                        logger.i { "Navigation queue is draining again after $stuckFor stuck" }
+                    }
+                    queueHasWork.value = watchdog.isWaiting
                 }
+        }
+    }
+
+    /**
+     * Says the queue has stopped moving, at error level so it reaches Sentry.
+     *
+     * The two lifecycle readings are the whole reason this is worth logging, and
+     * they answer different questions.
+     *
+     * The host's state says whether the drain here is gated shut. But a screen
+     * can go dead with the host at RESUMED, because a feature's screen state and
+     * its events are collected against its **`NavBackStackEntry`** lifecycle
+     * (`collectAsStateWithLifecycle` and `ObserveEvents` both read
+     * `LocalLifecycleOwner`, which inside a destination is the entry). An entry
+     * pinned below STARTED by a transition that never completed stops the board
+     * redrawing and stops its events being delivered, while touches, logging and
+     * the shake detector all carry on, because those hang off the host. That is
+     * the shape SD-26 was reported in and there has never been a reading of it.
+     *
+     * So the back stack goes in the report entry by entry. Which one is stuck,
+     * and at what state, is the difference between looking at the host and
+     * looking at `FloatingWindowHost`.
+     */
+    private fun reportStall(stall: NavigationQueueWatchdog.Stall) {
+        val host = gatingLifecycle?.currentState
+        val entries = navController
+            ?.currentBackStack
+            ?.value
+            ?.joinToString { entry ->
+                "${entry.destination.route?.substringAfterLast('.') ?: "?"}=${entry.lifecycle.currentState}"
+            }
+            ?: "controller absent"
+        logger.e {
+            "Navigation queue has not moved for ${stall.idle} with ${stall.depth} command(s) waiting. " +
+                "Host lifecycle is $host. Back stack: $entries"
         }
     }
 
@@ -134,11 +205,10 @@ class DelegatingRouter(
     fun Bind(navController: NavHostController) {
         logger.i { "Binding nav controller" }
         val lifecycleOwner = LocalLifecycleOwner.current
-        val coroutineScope = rememberCoroutineScope()
         val controllerKey = remember(navController) { navController }
 
         DisposableEffect(controllerKey, lifecycleOwner) {
-            setNavController(controllerKey, lifecycleOwner.lifecycle, coroutineScope)
+            setNavController(controllerKey, lifecycleOwner.lifecycle)
             onDispose { clearNavController(controllerKey) }
         }
     }
@@ -149,6 +219,12 @@ class DelegatingRouter(
         block: NavHostController.() -> Unit,
     ) {
         logger.d { "Enqueuing navigation: $description" }
+        // Counted before the send rather than after, because an unlimited
+        // channel's `trySend` cannot fail and a command counted after a send
+        // could be drained before it was ever counted, which would push the
+        // depth negative and retire the watchdog.
+        watchdog.enqueued()
+        queueHasWork.value = true
         navigationRequests.trySend {
             if (route != null && shouldBlockNavigation(route)) {
                 logger.w { "Blocked navigation '$description' because a blocking error is active" }
@@ -182,3 +258,13 @@ class DelegatingRouter(
         }
     }
 }
+
+/**
+ * How often the watchdog looks, while there is anything to look at.
+ *
+ * A poll rather than a scheduled deadline because a stall has no event to hang
+ * one off: the whole shape of the fault is that nothing happens. One wakeup a
+ * second, only while commands are outstanding, and none at all on an app that
+ * is navigating normally.
+ */
+private val StallPollInterval = 1.seconds
