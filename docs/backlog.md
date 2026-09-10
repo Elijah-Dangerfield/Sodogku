@@ -23,3 +23,135 @@ over the iOS silent switch.
 unordered. Follow the haptics shape exactly: a flag in `AppCache`, a toggle in
 Settings, and playback at the screen rather than in the ViewModel.
 
+## SD-18 [P2] — Golden Race: a periodic pack where one mistake ends the run
+
+**Ask:** Owner's design, 2026-09-09, taking the shape of Meowdoku's Golden Fish
+(added late August 2026: one error and the run is over). A pool of 100 to 200
+boards compiled every few weeks, not repeated in the campaign, entered from the
+side pane with a badge, one mistake ends the run, ranked on how far and how
+fast.
+
+**Done when:** A decision is written down first, then built. The mode itself is
+small; where the ranking lives is not.
+
+**Decision needed:** Game Center and Play Games can both host a recurring
+leaderboard that resets on a schedule, which covers ranking with no accounts and
+no server. What they cannot host is the content, and what nothing can host
+without a durable player identity is the Duolingo-style bracket the owner also
+raised: promotion and relegation need cohorts assigned and remembered somewhere.
+So this splits into (a) a local mode plus a platform recurring board, which can
+ship now, and (b) a served event with brackets, which is v2 and reopens the
+accounts question C0 closed. Pick (a) first and say so in `decisions.md`.
+
+**Hints:** Content delivery is SD-19. One mistake ending the run interacts with
+bones, which are one global count across the whole game: a race must not spend
+them, or a bad run costs a player the campaign too. Meowdoku's own players are
+angry about Golden Fish, and the complaint is that it changed the main loop
+underneath them rather than sitting beside it. Ours has to be opt-in.
+
+## SD-19 [P2] — Deliver level packs over the wire
+
+**Ask:** Owner, 2026-09-09: a way to add levels, remove levels, and reorder the
+campaign without a release. Today both packs are Kotlin source compiled into the
+binary (`CampaignPackData.kt`, `DailyPackData.kt`) and decoded lazily by
+`LevelPacks`, so every content change is an app update.
+
+**Done when:** The app can fetch a pack, verify it, and use it in place of the
+bundled one, and falls back to the bundled pack when the fetch fails, the device
+is offline, or verification does not pass.
+
+**Hints:** This does not break SPEC 3. Generation stays offline on a JVM;
+only delivery moves. SPEC 18 lists server-delivered packs as a v1 non-goal, so
+this is a deliberate reversal and belongs in `decisions.md`.
+
+Two hazards, both sharp. Progress is keyed on level id, so a pack that removes
+or reorders ids silently reassigns a player's completed levels;
+`PACK_VERSION` exists for exactly this and there is no migration behind it yet.
+And `LevelPackVerificationTest` is the only thing standing between an unsolvable
+board and a player, and it runs at build time, so a served pack needs the same
+uniqueness check before it is signed, not after it is downloaded.
+
+## SD-21 [P2] — Lockdown mode, where regions fade and the board reshuffles (spike)
+
+**Ask:** Owner brainstorm, 2026-09-09: lock a colour in by finding its dog, and
+if you do not, watch it fade to grey and the remaining tiles shuffle up into a
+new valid configuration. "The animation there would need to be sick."
+
+**Done when:** There is a written answer with a recommendation.
+
+**Hints:** The animation is not the hard part. Every board has exactly one
+solution, and that is the entire reason a tap can be answered right or wrong
+(SPEC 1.1). A reshuffle changes the answer underneath the player, so "wrong"
+stops being a fact about the puzzle. The only version that keeps the promise is
+a precomputed chain generated offline: board 2 is a valid unique board that
+agrees with every dog already locked on board 1. Price that in the generator
+before anybody designs the screen, because nothing is generated on device.
+
+The cheap cousin worth costing in the same pass: the fade as pure time pressure,
+with no reshuffle at all.
+
+## SD-28 [P2] — Decide what a streak freeze is, now that the streak is not the daily's
+
+**Ask:** Owner, 2026-09-09: *"We should have a todo to figure out streak freezes
+and how that will work later. Maybe thats another thing users and earn idk."*
+
+**Why this is now open rather than done.** Freezes already exist, but they were
+built for the *daily*: `DailyRepository` has `freeze` and `restore`, they are
+budgeted per month, and `DailyOutcome.Frozen`/`Restored` are rows in
+`daily_result`. The streak no longer reads any of that. It folds over `play_day`,
+where a day is either played or not, and `StreakDayState.Bridged` is currently a
+state nothing can produce.
+
+So there are two half-systems: a freeze that covers a missed *daily puzzle*, and
+a streak that does not care about the daily. Neither is wrong; they are just no
+longer the same feature.
+
+**The decision to make first**, before any code:
+
+- **What does a freeze cover?** Missing a day entirely is the only way to break a
+  streak now, so a freeze is a day you did not open the app. That is a different
+  product from "I opened the daily and lost", which is what the current freeze
+  was for.
+- **Where does one come from?** The owner's instinct is earning them. Options
+  worth weighing: a reward for a run length (7 days pays one), a level reward
+  alongside the Treat, an ad, or a Pro perk. Each implies a different cap.
+- **Is it spent or automatic?** Duolingo's is bought in advance and spent
+  silently on the missed day, which is why it feels like insurance rather than a
+  refund. Spending it after the fact turns a broken streak into a shop prompt at
+  the worst moment.
+
+**Done when:** A missed day can be covered, the calendar draws it as
+`StreakDayState.Bridged` (the state already exists and is already styled), and
+`playStreakOn` walks through it without counting it. That last part matters:
+`DailyStreak.streakOn` already had this shape, where a bridged day continues the
+run without adding to it, and the new fold deliberately does not.
+
+**Hints:** `libraries/progress/impl/.../streak/PlayStreak.kt` is the fold and is
+a pure function of a set of dates, so covering a day is a matter of what goes
+into that set, or a second set walked alongside it. The daily's own freeze
+budgeting in `DailyRepositoryImpl` is worth reading before designing this, and
+worth deciding whether it survives: two separate freeze economies would be one
+too many.
+
+Not urgent. A streak with no freeze is a working streak, and shipping the wrong
+freeze is harder to undo than shipping none.
+
+## SD-33 [P2] — An iOS ad has no timeout, so a wedged SDK freezes the board
+
+**Was part of SD-1**, which was removed from the queue because its verification
+half is owner work (`OWNER-TODO.md` item 11). This half is not verification. It
+is a real hole in the fail-open rule.
+
+Android wraps its load and consent calls in `withTimeoutOrNull`, so an SDK that
+never answers becomes a free reward. iOS has no equivalent, so the same wedge
+leaves the player looking at a board that will not move.
+
+**Not fixed rather than fixed badly.** Racing an `async throws` whose
+cancellation is opaque risks a leaked continuation, which fails worse than what
+it guards. Doing it properly means an explicit continuation the timeout can
+resume exactly once, and it wants somebody who can watch a real ad while they
+build it, which is why it is here and not in the queue.
+
+**Done when:** pulling the network mid-ad on iOS still lands the reward, and only
+a deliberate dismissal withholds it.
+

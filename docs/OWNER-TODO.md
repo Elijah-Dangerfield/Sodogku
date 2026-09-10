@@ -396,6 +396,12 @@ tapped**. Every iOS gesture so far is unverified, including the feedback
 panel's swipe and anything behind a Game Center sign-in. It also blocks the
 6.9" screenshots in item 4.
 
+It also blocks the one thing about ads that actually matters to a player:
+nobody has watched a rewarded ad on iOS and seen the bones arrive afterwards.
+The SDK work is done and `xcodebuild` is green, so this is the last unproven
+step. Worth pulling the network mid-ad while you are there, because the reward
+is supposed to land anyway and on iOS that is currently untested.
+
 ---
 
 ## 12. Grafana Cloud, for product analytics

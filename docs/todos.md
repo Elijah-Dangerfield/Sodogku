@@ -49,31 +49,6 @@ annoying.
 ## Items
 
 <!-- Newest at the bottom. -->
-
-## SD-1 [P2] — Nobody has watched a rewarded ad on iOS
-
-**Ask:** The SDK work is done (`b1d5905`): the Google Mobile Ads package is
-linked, the `#if canImport(GoogleMobileAds)` paths compile, `AdUnits` is exported
-to Swift, and `xcodebuild` is green. What is unproven is the only thing that
-matters to a player, that a rewarded request actually shows Google's test ad and
-the reward lands after it.
-
-**Done when:** Someone has watched a test ad on an iOS simulator or device and
-seen the bones or sniffs arrive afterwards.
-
-**Hints:** Blocked on `docs/OWNER-TODO.md` item 11: tapping the simulator needs a
-`sudo xcode-select` this host cannot run. Dropped from P0 to P2 because the free
-rewards are fixed; this is verification debt, not a live defect.
-
-Check the fail-open rule while you are there: pull the network mid-ad and confirm
-the reward still lands. Only a deliberate dismissal may withhold it.
-
-**Known gap, filed rather than fixed:** Android wraps its load and consent calls
-in `withTimeoutOrNull` so a wedged SDK becomes a free reward instead of a frozen
-board. iOS has no equivalent, because racing an `async throws` whose cancellation
-is opaque risks a leaked continuation, which fails worse than what it guards.
-Worth doing properly once someone can test it.
-
 ## SD-6 [P2] — Standing code review, by an agent that did not write the code
 
 **Ask:** A recurring review pass looking for better ways of doing things:
@@ -124,7 +99,6 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
-
 ## SD-9 [P1] — There is no leaderboard at all on Android
 
 **Ask:** `RealLeaderboards` is bound to `NoGameServices` on Android, which
@@ -148,7 +122,6 @@ Two things that are not true of Game Center: Play Games sign-in can fail for a
 player who has never opted into a Games profile, which is a normal state and not
 an error, and the console needs the boards created and published before a
 submission is anything but a silent no-op.
-
 ## SD-12 [P1] — The starter dog leaves too early
 
 **Ask:** Owner, 2026-09-09: "I feel like we remove the starting dog too soon."
@@ -164,7 +137,6 @@ placed, and the number is remote config rather than a constant.
 the bands. It scores nothing, so widening it cannot inflate an early best, and
 that property has to survive the change. Config key belongs under
 `progression.*`.
-
 ## SD-13 [P1] — 500 levels is not a campaign
 
 **Ask:** Meowdoku reviewers report being at level 1912 and past 1000. Ours ends
@@ -174,6 +146,10 @@ Two problems, and the second one is worse than the first.
 **Done when:** Finishing the last level lands on something that says so, and the
 shipped campaign is at least 1000 levels.
 
+**Do SD-20 first.** Whether the campaign grows past 10x10 changes what
+"1000 levels" is made of, and generating a thousand boards to one shape and then
+deciding the shape was wrong is the expensive order to do this in.
+
 **Hints:** The generator makes 1,230 boards in about 42 seconds, so content is
 cheap; verification is what costs. `LevelPacks.PACK_VERSION` exists because
 progress is keyed on level id, which makes appending safe and reordering a
@@ -181,7 +157,6 @@ silent reassignment of everyone's history. Do not spend the daily pool on this,
 for the reason in `proposals.md`. Meowdoku's own reviewers say its boards start
 repeating around every 100, so this is a place where we can be better rather
 than merely bigger.
-
 ## SD-17 [P2] — A time to beat on a replay
 
 **Ask:** Owner, 2026-09-09, on the ghost race: "I wouldn't wanna see my previous
@@ -195,59 +170,13 @@ marked. Offline, no identity, no server.
 The whole feature is display plus one comparison, which is why it is the cheapest
 competitive thing on this list. Decide what a replay that beats the time does to
 `best_score`, which keeps the better of the two today.
-
-## SD-18 [P2] — Golden Race: a periodic pack where one mistake ends the run
-
-**Ask:** Owner's design, 2026-09-09, taking the shape of Meowdoku's Golden Fish
-(added late August 2026: one error and the run is over). A pool of 100 to 200
-boards compiled every few weeks, not repeated in the campaign, entered from the
-side pane with a badge, one mistake ends the run, ranked on how far and how
-fast.
-
-**Done when:** A decision is written down first, then built. The mode itself is
-small; where the ranking lives is not.
-
-**Decision needed:** Game Center and Play Games can both host a recurring
-leaderboard that resets on a schedule, which covers ranking with no accounts and
-no server. What they cannot host is the content, and what nothing can host
-without a durable player identity is the Duolingo-style bracket the owner also
-raised: promotion and relegation need cohorts assigned and remembered somewhere.
-So this splits into (a) a local mode plus a platform recurring board, which can
-ship now, and (b) a served event with brackets, which is v2 and reopens the
-accounts question C0 closed. Pick (a) first and say so in `decisions.md`.
-
-**Hints:** Content delivery is SD-19. One mistake ending the run interacts with
-bones, which are one global count across the whole game: a race must not spend
-them, or a bad run costs a player the campaign too. Meowdoku's own players are
-angry about Golden Fish, and the complaint is that it changed the main loop
-underneath them rather than sitting beside it. Ours has to be opt-in.
-
-## SD-19 [P2] — Deliver level packs over the wire
-
-**Ask:** Owner, 2026-09-09: a way to add levels, remove levels, and reorder the
-campaign without a release. Today both packs are Kotlin source compiled into the
-binary (`CampaignPackData.kt`, `DailyPackData.kt`) and decoded lazily by
-`LevelPacks`, so every content change is an app update.
-
-**Done when:** The app can fetch a pack, verify it, and use it in place of the
-bundled one, and falls back to the bundled pack when the fetch fails, the device
-is offline, or verification does not pass.
-
-**Hints:** This does not break SPEC 3. Generation stays offline on a JVM;
-only delivery moves. SPEC 18 lists server-delivered packs as a v1 non-goal, so
-this is a deliberate reversal and belongs in `decisions.md`.
-
-Two hazards, both sharp. Progress is keyed on level id, so a pack that removes
-or reorders ids silently reassigns a player's completed levels;
-`PACK_VERSION` exists for exactly this and there is no migration behind it yet.
-And `LevelPackVerificationTest` is the only thing standing between an unsolvable
-board and a player, and it runs at build time, so a served pack needs the same
-uniqueness check before it is signed, not after it is downloaded.
-
 ## SD-20 [P2] — Boards past 10x10, with zoom and pan (spike)
 
 **Ask:** Owner brainstorm, 2026-09-09: "Maybe we could even make larger grid
 sizes where you need to zoom in and pan?"
+
+**Blocks SD-13.** Extending the campaign to 1000 levels means deciding what
+those levels look like, so this answer comes first.
 
 **Done when:** There is a written answer with a recommendation, not a feature.
 
@@ -259,43 +188,43 @@ generator, which converts 23 of 40 attempts to a unique board at 10x10 and gets
 worse from there. Also answer whether size adds difficulty at all: SPEC 1.7 says
 it does not, difficulty is deduction depth, and a 12x12 that falls to repeated
 last-candidate is a long board rather than a hard one.
-
-## SD-21 [P2] — Lockdown mode, where regions fade and the board reshuffles (spike)
-
-**Ask:** Owner brainstorm, 2026-09-09: lock a colour in by finding its dog, and
-if you do not, watch it fade to grey and the remaining tiles shuffle up into a
-new valid configuration. "The animation there would need to be sick."
-
-**Done when:** There is a written answer with a recommendation.
-
-**Hints:** The animation is not the hard part. Every board has exactly one
-solution, and that is the entire reason a tap can be answered right or wrong
-(SPEC 1.1). A reshuffle changes the answer underneath the player, so "wrong"
-stops being a fact about the puzzle. The only version that keeps the promise is
-a precomputed chain generated offline: board 2 is a valid unique board that
-agrees with every dog already locked on board 1. Price that in the generator
-before anybody designs the screen, because nothing is generated on device.
-
-The cheap cousin worth costing in the same pass: the fade as pure time pressure,
-with no reshuffle at all.
-
-## SD-22 [P2] — Write down what the game actually offers
+## SD-22 [P2] — Write down what the game offers, and delete SPEC
 
 **Ask:** Owner, 2026-09-09: "It seems like it would be nice to have a wiki
-markdown about the features we do offer." SPEC is a design document that argues
-with itself across 1,500 lines and records decisions that were later reversed.
-There is nowhere to read what is true today.
+markdown about the features we do offer." Confirmed 2026-09-10: *"at this stage
+we can delete the spec doc and rebuild a features md."*
 
-**Done when:** `docs/reference/features.md` lists every player-facing feature
-with its rules, which numbers are remote config, and where it lives in code, and
-the doc map in `README.md` points at it.
+`docs/SPEC.md` is a design document that argues with itself across 1,500 lines
+and records decisions that were later reversed. It is the only place that reads
+like a description of the game, which makes it worse than nothing: a reader
+trusts it and is wrong. The game shipped, so the code is the specification now.
 
-**Hints:** Candidate sections: the board and auto-mark, bones, sniffs and
-treats, score and paws, skip, the campaign ladder and its bands, the daily, the
-streak with freeze and restore, achievements, sharing, leaderboards, Pro, ads,
-settings, accessibility. Derive every line from the code, not from SPEC. Where
-the two disagree the code is right and SPEC gets a correction in the same pass.
+**Done when:**
 
+1. `docs/reference/features.md` describes every player-facing feature as it
+   actually behaves, with its rules, which of its numbers are remote config, and
+   where it lives in code.
+2. `docs/SPEC.md` is deleted.
+3. Every `SPEC <n>` citation in the codebase points at a section of the new doc
+   or is removed. There are around 145 of them, mostly in KDoc, and leaving them
+   dangling would trade one wrong map for a hundred broken links.
+4. The doc map in `README.md` and any pointer in `AGENTS.md` names the new doc.
+
+**Derive every line from the code, not from SPEC.** Where the two disagree the
+code is right, and the disagreement is worth a sentence in the commit message
+because it is usually a feature somebody remembers differently than it works.
+
+**Hints:** Candidate sections: the board and auto-mark cascade, bones, sniffs
+and treats, score and paws, skip, the campaign ladder and its bands, the daily,
+the streak, achievements, leaderboards, Pro, ads, settings, accessibility.
+
+Two things the old SPEC gets wrong that you will trip over. The streak is no
+longer folded from the daily, it folds over `play_day`, and any day with a
+finished board counts. Sharing was removed entirely and SPEC still describes it.
+
+Where a decision was genuinely reversed rather than merely restated, the
+reversal belongs in `decisions.md` before SPEC goes, or the reasoning dies with
+the file.
 ## SD-23 [P2] — A weekly score board, so a newcomer can win something
 
 **Ask:** `Leaderboard.kt` names this itself: an all-time score board is
@@ -310,7 +239,6 @@ lifetime total and there is no "points banked since a date". That addition
 first, then one entry in the `Leaderboard` enum. Do not use a recurring board
 for the daily challenge, for the local-midnight reason already written down
 there.
-
 ## SD-25 [P2] — Custom quick actions on the iOS home-screen long press
 
 **Ask:** Owner, 2026-09-09: *"on iOS how can I edit the options shown on the hold
@@ -348,15 +276,48 @@ already has rather than inventing a second way in. Android's equivalent is
 neither.
 
 **Not blocked on anything.** No store review implication, no new permission.
-
-## SD-26 [P0] — Navigation dies while the board keeps taking taps
+## SD-26 [P0] — The screen stops updating while it keeps taking taps
 
 **Ask:** Owner, 2026-09-09, on iOS: *"idk whats happening but im clicking all
 over and nothing is happening Im marking things, trying to open the side pine,
 trying to go to achivements. Its not working."*
 
-**What the logs show.** Not a frozen UI. Marks still register and the view model
-still fires events; only navigation stops.
+**UPDATE 2026-09-10, and it moves the whole diagnosis.** Owner, asked again:
+*"it wasnt just about navigation. I couldnt draw X's or do anything. It didnt
+work again until the shake dialog popped back up."*
+
+So the earlier reading below is wrong where it says marks still register. Marks
+reached the view model and never reached the screen. Nothing on the board moved
+either.
+
+**That is one symptom, not two.** Taps are still delivered, because the view is
+still in the hierarchy and its pointer handlers still exist, which is why
+`Sending event OpenAchievements` keeps logging. What stopped is everything
+downstream of state: the board does not redraw, `repeatOnLifecycle(STARTED)`
+collectors suspend, and the router's queue fills without draining. A paused
+recomposer plus a lifecycle below STARTED produces exactly this and nothing else
+does. The `STARTED` gate is not the bug, it is the one part of the wreck that
+left a log line.
+
+Which points at the host rather than at any of our code. On iOS,
+`ComposeUIViewController` drives both the frame clock and the lifecycle owner
+from the controller's appearance callbacks, so a controller that believes it
+disappeared and never hears that it reappeared pauses recomposition and drops
+the lifecycle, while its view keeps taking touches. The feedback panel had a
+keyboard up moments before, and `ShakeDialogRoute` arrived while that was
+tearing down. **Presenting the shake dialog again is what un-stuck it**, which is
+what a controller re-entering the appeared state would do, and is hard to explain
+any other way.
+
+**Start here:** what the feedback panel and the shake dialog do to the hosting
+`UIViewController`, whether either presents over the Compose host, and whether
+an appearance transition can be interrupted by the keyboard dismissing under it.
+Confirm the frame clock is stopped rather than assumed: an on-screen frame
+counter, or the recomposition logging that already exists, will tell the
+difference between a paused recomposer and a lifecycle-only stall in one look.
+
+**What the logs showed at the time.** Only navigation looked broken, because
+only navigation logs.
 
 ```
 17:11:08.182  Sending event OpenAchievements
@@ -434,53 +395,6 @@ do to the hosting `UIViewController` and therefore to the lifecycle owner.
 
 Reproduce with the log lines above rather than by guessing: `Enqueuing
 navigation` with no visible result is the signature.
-
-## SD-28 [P2] — Decide what a streak freeze is, now that the streak is not the daily's
-
-**Ask:** Owner, 2026-09-09: *"We should have a todo to figure out streak freezes
-and how that will work later. Maybe thats another thing users and earn idk."*
-
-**Why this is now open rather than done.** Freezes already exist, but they were
-built for the *daily*: `DailyRepository` has `freeze` and `restore`, they are
-budgeted per month, and `DailyOutcome.Frozen`/`Restored` are rows in
-`daily_result`. The streak no longer reads any of that. It folds over `play_day`,
-where a day is either played or not, and `StreakDayState.Bridged` is currently a
-state nothing can produce.
-
-So there are two half-systems: a freeze that covers a missed *daily puzzle*, and
-a streak that does not care about the daily. Neither is wrong; they are just no
-longer the same feature.
-
-**The decision to make first**, before any code:
-
-- **What does a freeze cover?** Missing a day entirely is the only way to break a
-  streak now, so a freeze is a day you did not open the app. That is a different
-  product from "I opened the daily and lost", which is what the current freeze
-  was for.
-- **Where does one come from?** The owner's instinct is earning them. Options
-  worth weighing: a reward for a run length (7 days pays one), a level reward
-  alongside the Treat, an ad, or a Pro perk. Each implies a different cap.
-- **Is it spent or automatic?** Duolingo's is bought in advance and spent
-  silently on the missed day, which is why it feels like insurance rather than a
-  refund. Spending it after the fact turns a broken streak into a shop prompt at
-  the worst moment.
-
-**Done when:** A missed day can be covered, the calendar draws it as
-`StreakDayState.Bridged` (the state already exists and is already styled), and
-`playStreakOn` walks through it without counting it. That last part matters:
-`DailyStreak.streakOn` already had this shape, where a bridged day continues the
-run without adding to it, and the new fold deliberately does not.
-
-**Hints:** `libraries/progress/impl/.../streak/PlayStreak.kt` is the fold and is
-a pure function of a set of dates, so covering a day is a matter of what goes
-into that set, or a second set walked alongside it. The daily's own freeze
-budgeting in `DailyRepositoryImpl` is worth reading before designing this, and
-worth deciding whether it survives: two separate freeze economies would be one
-too many.
-
-Not urgent. A streak with no freeze is a working streak, and shipping the wrong
-freeze is harder to undo than shipping none.
-
 ## SD-29 [P1] — The `install_id` tag is set opportunistically, and the privacy policy now leans on it
 
 **Found by:** the agent that rewrote the legal pages, 2026-09-10.
@@ -511,7 +425,6 @@ anything.
 
 `libraries/sodogku/impl/.../SessionTelemetryBinder.kt`,
 `libraries/sodogku/impl/.../AppTelemetry.kt` (`setInstallId`, `captureUserFeedback`).
-
 ## SD-32 [P1] — The app still ships a Supabase anon key, and a pile of account machinery nothing calls
 
 **Found by:** the SD-30 agent, 2026-09-10, while clearing account-era leftovers.
@@ -551,6 +464,11 @@ grep for `AuthGate`, `SignIn`, `guest` or `Supabase` in `libraries/` and
 
 **Do the key first and separately.** It is the only part with a consequence, and
 it should not wait behind a large deletion.
+
+**This app was generated from `Workspace/KMPTemplate`, so the key is probably
+still there too.** Whatever the fix is here, it belongs in the template as well,
+or the next app generated from it ships the same credential. The template keeps
+`docs/PORT-CANDIDATES.md` for exactly this.
 
 **Hints:** Start from `Versioning.kt:138,150` and work outward. `PROFILE_WRITE_LIMIT`
 on the server was left in place deliberately by the SD-30 agent because that
