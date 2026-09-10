@@ -21,28 +21,68 @@ a placeholder or a public test credential, it says so.
 
 ---
 
-## 2. Rewrite the privacy policy, because the shipped one is false
+## 2. Read and own the privacy policy and the terms
 
-**Would fail review at both stores.**
+**Both stores link to these pages, and both are live.**
 
-`pages/privacy.html:37` currently claims the app does not:
+`pages/privacy.html` was rewritten against the code in `1ec24e0`; every
+statement traces to a file. `pages/terms.html` gained sections on ads, Sodogku
+Pro, and in-game items on 2026-09-10, written from `StoreBilling.kt`,
+`AdNetwork.kt`, the paywall strings and SPEC §5 and §6. An agent wrote both.
+A person has to read them end to end and accept them as their own, and that
+person is you. Read them in a browser at the Pages URL rather than in the
+editor, since that is what a reviewer sees.
 
-> Use advertising or analytics SDKs (no Google Analytics, no Facebook SDK, no ad networks).
+Three things in the privacy policy were deliberate choices rather than
+factual checks, and you should know they were made:
 
-That is inherited template text and it is not true. The app ships AdMob, the
-UMP consent SDK, App Tracking Transparency, and a Grafana Cloud log pipe:
+- **The opening line no longer says the app is unreleased.** It now says the
+  page describes the build current on the "Last updated" date, which is true
+  before and after launch, so nothing goes stale on launch day.
+- **Deletion requests are routed through the in-app feedback form**, not
+  email. The only key on any record is the install id, the app never shows
+  it, and an email cannot be matched to anything. A feedback report, though,
+  reaches Sentry tagged with `install_id` (`AppTelemetry.kt`, `setInstallId`),
+  so the policy tells players to ask there. That is a real route today with no
+  code change, and it is what lets Play's "can users request deletion" be
+  answered yes. Whether it is enough is the decision below.
+- **Analytics have no in-app opt-out**, and the page says so plainly rather
+  than implying a choice the player does not have.
 
-- `libraries/ads/impl/src/androidMain/.../AdMobAdNetwork.kt:134` — `UserMessagingPlatform`
-- `apps/ios/iosApp/Info.plist:37` — `NSUserTrackingUsageDescription`
-- `libraries/telemetry/impl/.../GrafanaAppEvents.kt:139-151` — Grafana Cloud
+**Decision: how visible should the install id be?** The policy commits us to
+serving a deletion request that arrives by feedback. Three ways to go from
+here, in increasing cost; none of them is chosen, because the choice sets a
+support expectation only you can carry:
 
-Both stores require the policy to accurately describe what is collected.
-`docs/store/data-safety.md` is the drafted input for a correct one, and an
-agent can write the replacement text. **You have to read and own it before it
-goes live**, which is the part that belongs here.
+1. **Leave it as written.** Feedback form is the route. Cost: nothing to
+   build. Risk: a player who emails instead gets told to go back into the app,
+   and a player who has already uninstalled has no route at all (their id is
+   gone with the install, which is also the argument that nothing links them
+   any more).
+2. **Show the id in Settings**, an "About" row with the UUID and a copy
+   action, and say in the policy that a player may quote it by email. Cost:
+   one row in `features/settings/impl`, one string, and the policy paragraph.
+   Risk: small; it is a random UUID with nothing behind it. It does give a
+   player something that looks like an account number for an app that has no
+   accounts, which is a copy problem more than a privacy one.
+3. **Add an in-app "share usage data" switch** wired to the same gate as
+   `telemetry.appEventsEnabled`. Cost: real. It changes the Data safety
+   answers (the install id row stops being "required"), it needs the switch to
+   also stop the Sentry tag and the `X-Install-Id` header or it is a half
+   truth, and it removes the diagnostics you will want most in the first
+   month. Not recommended before launch.
 
-`pages/terms.html` carries the same template date but its content is generic
-enough to stand.
+Whichever you pick, the deletion paragraph in `pages/privacy.html` and the
+Play Data safety answer have to say the same thing. Also note SD-29 in
+`docs/todos.md`: the `install_id` tag is set opportunistically at cold boot,
+and until that is fixed a report filed in the first seconds after a cold start
+can arrive without it. That does not change the decision, but it is why the
+route is "a real route" and not yet "a guaranteed one".
+
+**Versioning:** `legal.termsVersion` and `legal.privacyVersion` are both still
+`1` in `FallbackConfigMap.kt`. Nobody has accepted a version yet, so these
+edits do not need a bump. The first change after launch does, through remote
+config, per `LegalConfigValues.kt`.
 
 ---
 

@@ -74,36 +74,6 @@ board. iOS has no equivalent, because racing an `async throws` whose cancellatio
 is opaque risks a leaked continuation, which fails worse than what it guards.
 Worth doing properly once someone can test it.
 
-## SD-2 [P1] — Three decisions the privacy policy defers, and a terms page that says nothing about money
-
-**Ask:** Owner, 2026-09-09: this is not owner-blocked, work it.
-
-`pages/privacy.html` was rewritten against the code in `1ec24e0` and every
-statement traces to a file. What is left is not "somebody read it": it is three
-passages that punt, and a terms page with a hole in it.
-
-**Done when:**
-
-1. **The launch-day line is gone or cannot rot.** The opening says the app is not
-   released yet. True today, false on launch day, and nothing catches it. There is
-   a `DELETE THIS ON LAUNCH DAY` comment on it, which is a reminder rather than a
-   mechanism. Either rewrite the line so it is true either way, or make something
-   fail when it goes stale.
-2. **The deletion gap is closed or consciously accepted.** The page states that
-   the install identifier is the only key on our records and that the app never
-   shows it to the player, so a deletion request cannot be matched to anything.
-   That is honest, and Play's Data safety form asks the question directly. Either
-   surface the identifier somewhere a player can quote it, or write down why not.
-3. **`pages/terms.html` covers purchases and ads.** Nothing in it is false; it
-   simply does not mention that the app sells a subscription and serves ads. That
-   is a gap on the page a store links to.
-
-**Hints:** `pages/privacy.html`, `pages/terms.html`, and
-`docs/store/data-safety.md` as the factual input for both. The install
-identifier is in `libraries/networking/.../SessionIdProvider.kt`. Do not invent
-policy: where a decision is genuinely the owner's, write the options into
-`docs/OWNER-TODO.md` rather than picking one.
-
 ## SD-3 [P1] — A Settings toggle tells a screen reader "on" without saying what is on
 
 **Ask:** Every toggle row in Settings exposes an unnamed `checkable` node beside
@@ -678,3 +648,34 @@ too many.
 
 Not urgent. A streak with no freeze is a working streak, and shipping the wrong
 freeze is harder to undo than shipping none.
+
+## SD-29 [P1] — The `install_id` tag is set opportunistically, and the privacy policy now leans on it
+
+**Found by:** the agent that rewrote the legal pages, 2026-09-10.
+
+`pages/privacy.html` now routes deletion requests through the in-app feedback
+form, on the grounds that a feedback report reaches Sentry tagged with
+`install_id` while an email cannot be matched to anything. That is the answer
+Play's "can users request deletion" question is being given.
+
+The tag is not guaranteed. `SessionTelemetryBinder.kt:55` does
+`installIdProvider.current()?.let { telemetry.setInstallId(it) }`, and `current()`
+is nullable because the id comes from an async `AppCache` read. A report filed in
+the first seconds after a cold start can arrive untagged, silently, and there is
+nothing in the report to say the tag is missing rather than absent by design.
+
+Rare in practice and load-bearing in policy, which is the combination worth
+fixing rather than accepting.
+
+**Done when:** every feedback report carries an `install_id`, or the report
+carries an explicit marker saying the id was not available so a triager can tell
+the two apart.
+
+**Hints:** Two shapes. Either await the id before capturing feedback (it is one
+cache read and the capture is already suspending), or set the tag from
+`captureUserFeedback` itself rather than relying on a scope set at boot. The
+second is closer to where it is needed and does not make cold boot wait on
+anything.
+
+`libraries/sodogku/impl/.../SessionTelemetryBinder.kt`,
+`libraries/sodogku/impl/.../AppTelemetry.kt` (`setInstallId`, `captureUserFeedback`).
