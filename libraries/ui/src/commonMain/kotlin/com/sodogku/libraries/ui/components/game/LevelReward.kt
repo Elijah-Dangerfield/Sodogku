@@ -31,7 +31,7 @@ val TreatColor: Color = ColorResource.Orange600.color
 /**
  * "Clearing this level pays a Treat", as a chip on a level row.
  *
- * The pane is 500 rows and the rewards are the reason to scroll it, so this has
+ * The pane is a thousand rows and the rewards are the reason to scroll it, so this has
  * to read as a prize from across the row rather than as a decoration on it —
  * which is what the bare glyph it replaces did. It gets the same face-on-a-lip
  * the booster buttons wear ([com.sodogku.libraries.ui.system.deepFace]), in the
@@ -64,7 +64,7 @@ fun LevelRewardChip(
         modifier = modifier
             .deepFace(
                 // A spent chip keeps its shape so the column stays a straight
-                // line down 500 rows, but goes flat-grey: it is still an object,
+                // line down a thousand rows, but goes flat-grey: it is still an object,
                 // just not a prize any more.
                 color = if (claimed) AppTheme.colors.surfaceDisabled.color else color,
             )

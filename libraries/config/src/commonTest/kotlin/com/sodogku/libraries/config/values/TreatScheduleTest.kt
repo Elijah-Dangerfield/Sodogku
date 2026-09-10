@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
  * schedules that will ever run — a tuning pass can push any array of bands into
  * `boosters.treatSchedule` and the client will use it. So the tests split in
  * two: what the *rule* does with an arbitrary schedule, including hostile ones,
- * and what the *shipped numbers* actually pay across a 500-level campaign.
+ * and what the *shipped numbers* actually pay across the whole campaign.
  *
  * The second half is the one that matters for the ask. "Front-loaded, then
  * sparser" is a claim about totals, and a claim about totals is only checked by
@@ -42,7 +42,7 @@ class TreatScheduleTest {
         // of the campaign, and the later one pays no more often than the earlier
         // one. This holds for any monotone schedule, so it survives retuning.
         val schedule = DefaultTreatBands
-        val perHundred = (0 until 5).map { hundred ->
+        val perHundred = (0 until CAMPAIGN_LEVELS / HUNDRED).map { hundred ->
             val range = (hundred * HUNDRED + 1)..((hundred + 1) * HUNDRED)
             range.count { schedule.paysTreatAt(it) }
         }
@@ -127,11 +127,16 @@ class TreatScheduleTest {
     }
 
     private companion object {
-        const val CAMPAIGN_LEVELS = 500
+        /**
+         * `LevelPacks.campaign.size`, spelled out because this module sits
+         * under the pack and cannot see it. A schedule tested over half the
+         * campaign would say nothing about the half it did not count.
+         */
+        const val CAMPAIGN_LEVELS = 1_000
         const val HUNDRED = 100
 
         /** 3, 6, 9, 12, 15, 18, then every sixth, twelfth and twenty-fifth. */
-        const val EXPECTED_TOTAL = 34
+        const val EXPECTED_TOTAL = 54
 
         const val FLAT_RULE_FIRST_TWENTY = 4
         const val FLAT_RULE_LAST_THREE_HUNDRED = 60

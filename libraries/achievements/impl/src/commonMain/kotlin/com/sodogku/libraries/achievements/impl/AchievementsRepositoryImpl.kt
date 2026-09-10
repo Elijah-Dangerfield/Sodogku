@@ -25,7 +25,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * Room-backed [AchievementsRepository].
  *
  * There is no in-memory tally. Every read folds the stored fact log from
- * scratch, which sounds wasteful and is not: a completionist's log is 500
+ * scratch, which sounds wasteful and is not: a completionist's log is a thousand
  * campaign rows plus one a day, and the fold is arithmetic over a list. What it
  * buys is that there is exactly one representation of a player's progress — the
  * facts — so no cached counter can disagree with the history it came from, and

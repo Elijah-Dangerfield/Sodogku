@@ -71,6 +71,35 @@ data class LevelShape(val size: Int, val difficulty: Int)
  * learns to read a wider board. It also keeps roughly a quarter of the back
  * half at tier 3, which a solid diet of tier 4 would not.
  *
+ * ### Past level 500, where both axes are spent
+ *
+ * The size ladder finishes at ten. `docs/reference/large-boards-spike.md`
+ * measured an 11x11 as a *longer* board rather than a harder one — reasoning per
+ * square falls monotonically as the grid grows — costing 22 times as much
+ * generator time per shipped tier-4 board and putting a colourblind glyph on a
+ * 20.8dp square. Tier 5 is `BEYOND_DEDUCTION` and never ships. So there is no
+ * axis left to climb, and pretending otherwise would mean either shipping boards
+ * we cannot rate or a grid we cannot read.
+ *
+ * What the second five hundred are for is therefore *not repeating*. Meowdoku's
+ * reviewers report its boards recurring around every hundred; every board here
+ * is distinct up to the eight grid symmetries and any renaming of regions, and
+ * `LevelPackVerificationTest` asserts that over the whole pack rather than
+ * trusting the generator that produced it.
+ *
+ * The shape is five more 10x10 bands of a hundred, each twenty tier-3 boards
+ * then eighty tier-4 ones. The dip at every hundredth level is the same
+ * breather the sawtooth gives everywhere else, minus its usual excuse: no grid
+ * grew. It stays because the alternative is five hundred consecutive boards at
+ * the ceiling, which is the diet this curve already argues against, and because
+ * a rhythm is the only structure left once size and tier are both spent.
+ *
+ * **Append only.** Progress is keyed on level id, so reordering or removing a
+ * band silently reassigns everyone's completed levels to different boards.
+ * Adding bands to the end does not: the generator draws band by band from one
+ * sequential `Random`, so bands nobody touched come out byte for byte identical.
+ * See [LevelPacks.PACK_VERSION].
+ *
  * ### The daily curve
  *
  * Deliberately not a ramp, per SPEC Q3 — a daily is a three-to-five-minute
@@ -100,6 +129,15 @@ object LevelCurve {
         CurveBand(size = 8, runs = listOf(TierRun(3, 30), TierRun(4, 70))),
         CurveBand(size = 9, runs = listOf(TierRun(3, 30), TierRun(4, 80))),
         CurveBand(size = 10, runs = listOf(TierRun(3, 30), TierRun(4, 80))),
+        // Levels 501 to 1000. Written out five times rather than repeated by a
+        // loop, because this list is the one human-readable record of the curve
+        // and a `repeat(5)` in the middle of it is the thing a reader has to
+        // evaluate instead of read. Each is an edit somebody could make.
+        CurveBand(size = 10, runs = listOf(TierRun(3, 20), TierRun(4, 80))),
+        CurveBand(size = 10, runs = listOf(TierRun(3, 20), TierRun(4, 80))),
+        CurveBand(size = 10, runs = listOf(TierRun(3, 20), TierRun(4, 80))),
+        CurveBand(size = 10, runs = listOf(TierRun(3, 20), TierRun(4, 80))),
+        CurveBand(size = 10, runs = listOf(TierRun(3, 20), TierRun(4, 80))),
     )
 
     /** Two years of dailies, drawn from mid-sized boards at a steady mix. */
@@ -115,18 +153,31 @@ object LevelCurve {
     }
 
     /**
-     * How far into its band [levelId] sits, counting from zero, or null when no
-     * campaign band contains it.
+     * How far past the first level at its grid size [levelId] sits, counting
+     * from zero, or null when no campaign band contains it.
+     *
+     * Counted from the first level at that *size* and not from the start of its
+     * band. The two were the same thing until the campaign grew past 500, where
+     * it keeps going without the grid growing with it: six consecutive 10x10
+     * bands are one stretch as far as the player's eyes are concerned, and
+     * counting from each band's start would restart the number five more times
+     * for no reason the board shows.
      *
      * Null rather than a clamp for an id off either end of the curve. Every
      * caller here is asking "is this one of the opening levels of a size", and a
      * clamp would answer yes for level 0 and for a level past the end of the
      * pack, which are both nonsense rather than edges.
      */
-    fun positionInBand(levelId: Int): Int? {
+    fun positionAtSize(levelId: Int): Int? {
         var firstInBand = 1
+        var firstAtSize = 1
+        var sizeSoFar = 0
         campaign.forEach { band ->
-            if (levelId in firstInBand until firstInBand + band.count) return levelId - firstInBand
+            if (band.size != sizeSoFar) {
+                firstAtSize = firstInBand
+                sizeSoFar = band.size
+            }
+            if (levelId in firstInBand until firstInBand + band.count) return levelId - firstAtSize
             firstInBand += band.count
         }
         return null
@@ -135,11 +186,15 @@ object LevelCurve {
     /**
      * Whether campaign level [levelId] opens with one dog already placed.
      *
-     * Position in a band rather than an absolute id, because what the free dog
-     * is for is the auto-mark cascade, and the cascade is worth watching again
-     * every time the grid grows. Keyed on one number it ran out inside the 5x5
-     * band and never came back for a player's first 7x7 or first 10x10, which
-     * are the boards where it says the most.
+     * Position at a grid size rather than an absolute id, because what the free
+     * dog is for is the auto-mark cascade, and the cascade is worth watching
+     * again every time the grid grows. Keyed on one number it ran out inside
+     * the 5x5 band and never came back for a player's first 7x7 or first 10x10,
+     * which are the boards where it says the most.
+     *
+     * The grid is the trigger and the band is not, which only became a visible
+     * difference when the campaign grew past 500 on a grid that had stopped
+     * growing. See [positionAtSize].
      *
      * [levelsPerBand] is `progression.starterDogLevelsPerBand`. Zero or less
      * hands out none, which is how the whole head start is switched off from
@@ -147,7 +202,7 @@ object LevelCurve {
      */
     fun opensWithStarterDog(levelId: Int, levelsPerBand: Int): Boolean {
         if (levelsPerBand <= 0) return false
-        val position = positionInBand(levelId) ?: return false
+        val position = positionAtSize(levelId) ?: return false
         return position < levelsPerBand
     }
 

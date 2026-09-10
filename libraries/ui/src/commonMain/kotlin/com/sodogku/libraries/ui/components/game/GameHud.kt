@@ -103,7 +103,7 @@ fun PawRating(
      * False draws the paws already earned, with no pop.
      *
      * The animation says "you just won these", which is a lie anywhere the
-     * rating is being *recalled* rather than awarded. In the 500-row level list
+     * rating is being *recalled* rather than awarded. In the thousand-row level list
      * it is also a nuisance: rows recycle as they scroll, so every completed
      * level pops each time it comes back on screen and the list appears to
      * twitch.
@@ -193,7 +193,7 @@ fun RuleChipGroup(
  * One of the three permanent rule reminders, with a miniature board showing the
  * rule rather than describing it.
  *
- * These stay on screen for all 500 levels. A player who has internalised the
+ * These stay on screen for every level. A player who has internalised the
  * rules stops reading them, and a player who has not can glance without leaving
  * the board.
  *

@@ -13,7 +13,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
 /**
  * Skips a player may take per day, Pro included. The cap is on everyone on
- * purpose: without it a Pro player skips to level 500 in an afternoon and has
+ * purpose: without it a Pro player skips to the end of the pack in a day and has
  * nothing left to play.
  */
 @Inject

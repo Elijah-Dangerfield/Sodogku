@@ -14,10 +14,16 @@ import com.sodogku.libraries.levels.generated.DAILY_LEVEL_LINES
  * seed or band layout. Progress is keyed on level id, so a regenerated pack
  * silently reassigns everyone's completed levels to different boards — the
  * version is what a future migration would key off.
+ *
+ * Version 3 appended levels 501 to 1000 and changed nothing before them. That
+ * is the only safe way to grow a pack: the generator draws band by band from
+ * one sequential `Random`, so bands nobody edited come out byte for byte
+ * identical and every existing level id still names the board it always named.
+ * A version bump is not a licence to reorder.
  */
 object LevelPacks {
 
-    const val PACK_VERSION: Int = 2
+    const val PACK_VERSION: Int = 3
 
     val campaign: LevelPack by lazy {
         LevelCodec.decodePack(PackKind.Campaign, PACK_VERSION, CAMPAIGN_LEVEL_LINES)

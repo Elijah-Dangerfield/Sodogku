@@ -203,7 +203,7 @@ data class AchievementCounters(
                 if (flawless) inc(Stat.DailyFlawlessClears)
                 if (threePaws) inc(Stat.DailyThreePawClears)
             }
-            // Levels, not clears: the campaign is 500 boards, and replaying one
+            // Levels, not clears: the campaign is a fixed set of boards, and replaying one
             // of them is not progress through it.
             PlayMode.Campaign -> if (result.isFirstClear) inc(Stat.LevelsCleared)
         }

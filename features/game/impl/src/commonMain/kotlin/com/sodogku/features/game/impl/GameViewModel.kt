@@ -2142,7 +2142,7 @@ class GameViewModel(
     /**
      * The drawer's per-level history, read when it opens rather than observed.
      *
-     * 500 rows that only change when an attempt ends do not need a live query
+     * A thousand rows that only change when an attempt ends do not need a live query
      * behind them, and the drawer is the only thing that reads them.
      */
     private suspend fun GameAction.loadRecords() {

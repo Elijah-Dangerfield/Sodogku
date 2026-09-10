@@ -10,7 +10,7 @@ package com.sodogku.libraries.progress
  * it depend on advertising.
  *
  * The cap is on everyone, Pro included (SPEC 1.6). Pro skips for free rather
- * than more often — without that a Pro player reaches level 500 in an afternoon
+ * than more often — without that a Pro player reaches the end of the pack in a day
  * and has nothing left to play.
  */
 interface SkipRepository {

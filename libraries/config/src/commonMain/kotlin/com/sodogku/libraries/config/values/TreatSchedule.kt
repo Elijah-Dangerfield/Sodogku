@@ -15,8 +15,9 @@ data class TreatBand(val fromLevel: Int, val everyNLevels: Int)
 /**
  * Whether clearing [level] for the first time pays a Treat.
  *
- * The campaign used to pay one every five levels all the way to 500 — a hundred
- * free Treats, arriving at the same rate on level 480 as on level 5. That is
+ * The campaign used to pay one every five levels all the way to the end — two
+ * hundred free Treats, arriving at the same rate on level 980 as on level 5.
+ * That is
  * backwards twice over. Early on a Treat is a teaching aid and a reason to keep
  * going, and the player has no stash, so grants should be *denser* than they
  * were. Late on the player has been earning them for hours, a Treat is worth
@@ -54,9 +55,10 @@ fun List<TreatBand>.paysTreatAt(level: Int): Boolean {
  * The shipped curve, chosen against the campaign's actual shape rather than
  * picked to look tidy.
  *
- * Over 500 levels it pays 34 Treats where the flat every-fifth rule paid 100.
- * The first twenty levels get *more* than before — six instead of four — and the
- * last three hundred get one roughly every twenty-five.
+ * Over the thousand-level campaign it pays 54 Treats where the flat every-fifth
+ * rule paid 200. The first twenty levels get *more* than before — six instead of
+ * four — and everything past 150 gets one every twenty-five, which is the rate
+ * the appended second half runs at from end to end.
  *
  * The band edges sit near where the campaign's difficulty tiers change, so the
  * rate drops at the same points the boards get harder rather than at an

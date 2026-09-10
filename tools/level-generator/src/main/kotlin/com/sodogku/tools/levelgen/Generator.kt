@@ -4,6 +4,7 @@ import com.sodogku.libraries.levels.CurveBand
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.puzzle.Board
 import com.sodogku.libraries.puzzle.BoardFactory
+import com.sodogku.libraries.puzzle.canonicalKey
 import com.sodogku.libraries.puzzle.Difficulty
 import com.sodogku.libraries.puzzle.PuzzleSolver
 import com.sodogku.libraries.puzzle.Solution
@@ -59,59 +60,12 @@ class Generator(private val random: Random) {
             val difficulty = Difficulty.score(refined)
             val remaining = wanted[difficulty] ?: continue
             if (remaining == 0) continue
-            if (!seen.add(canonicalKey(refined))) continue
+            if (!seen.add(refined.canonicalKey())) continue
 
             wanted[difficulty] = remaining - 1
             results += Candidate(refined, solution, difficulty)
         }
         return results
-    }
-
-    /**
-     * Identity of a board up to the eight grid symmetries and any renaming of
-     * regions, so a rotated or recoloured duplicate is caught.
-     *
-     * Region ids are renumbered by first appearance in each transform before
-     * comparing, which is what makes "same shape, different colours" collapse to
-     * one key.
-     */
-    private fun canonicalKey(board: Board): String =
-        symmetriesOf(board).minOf { relabel(it, board.size) }
-
-    private fun symmetriesOf(board: Board): List<IntArray> {
-        val size = board.size
-        var current = board.regions
-        val forms = mutableListOf<IntArray>()
-        repeat(4) {
-            forms += current
-            forms += mirror(current, size)
-            current = rotate(current, size)
-        }
-        return forms
-    }
-
-    private fun rotate(regions: IntArray, size: Int): IntArray =
-        IntArray(size * size) { index ->
-            val row = index / size
-            val col = index % size
-            regions[(size - 1 - col) * size + row]
-        }
-
-    private fun mirror(regions: IntArray, size: Int): IntArray =
-        IntArray(size * size) { index ->
-            val row = index / size
-            val col = index % size
-            regions[row * size + (size - 1 - col)]
-        }
-
-    private fun relabel(regions: IntArray, size: Int): String {
-        val mapping = HashMap<Int, Int>(size)
-        val builder = StringBuilder(regions.size)
-        regions.forEach { region ->
-            val id = mapping.getOrPut(region) { mapping.size }
-            builder.append(Board.REGION_LETTERS[id])
-        }
-        return builder.toString()
     }
 
     private companion object {

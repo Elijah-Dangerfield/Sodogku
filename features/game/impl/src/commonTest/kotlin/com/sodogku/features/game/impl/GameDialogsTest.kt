@@ -68,6 +68,6 @@ class GameDialogsTest {
     private companion object {
         const val MinTier = 1
         const val MaxTier = 5
-        const val ShippedCampaignLevels = 500
+        const val ShippedCampaignLevels = 1_000
     }
 }
