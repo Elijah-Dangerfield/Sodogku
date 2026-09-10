@@ -31,6 +31,10 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * The install id rides along as a second `install_id` tag — stable across
  * sessions, handy for "every session from this tester." It hydrates async,
  * so we set it opportunistically whenever it's available on a session emit.
+ * Opportunistic is fine for crashes and wrong for feedback, which the privacy
+ * policy points deletion requests at: those tag themselves at capture time and
+ * do not depend on this having landed. See `Scope.tagInstallId` in
+ * [com.sodogku.libraries.sodogku.impl.AppTelemetry].
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, multibinding = true, boundType = AppEventListener::class)

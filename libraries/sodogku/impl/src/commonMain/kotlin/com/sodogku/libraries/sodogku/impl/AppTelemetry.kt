@@ -10,6 +10,7 @@ import com.sodogku.libraries.core.logging.InMemoryLogTree
 import com.sodogku.libraries.core.logging.KLog
 import com.sodogku.libraries.core.logging.LogLevel
 import com.sodogku.libraries.core.logging.Logger
+import com.sodogku.libraries.networking.InstallIdProvider
 import com.sodogku.libraries.sodogku.FeedbackKind
 import com.sodogku.libraries.sodogku.Telemetry
 import com.sodogku.libraries.sodogku.impl.logging.DevConsoleWriter
@@ -18,6 +19,7 @@ import com.sodogku.libraries.sodogku.impl.logging.SentryLogTree
 import co.touchlab.kermit.Logger as KermitLogger
 import co.touchlab.kermit.Severity as KermitSeverity
 import io.sentry.kotlin.multiplatform.Attachment
+import io.sentry.kotlin.multiplatform.Scope
 import io.sentry.kotlin.multiplatform.Sentry
 import io.sentry.kotlin.multiplatform.SentryOptions
 import io.sentry.kotlin.multiplatform.protocol.User
@@ -33,16 +35,30 @@ import kotlin.uuid.Uuid
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class AppTelemetry : Telemetry by ConfiguredTelemetry(
-    configProvider = { SentryRuntimeConfig.forApp(BuildInfo) }
+class AppTelemetry(
+    installIdProvider: InstallIdProvider,
+) : Telemetry by ConfiguredTelemetry(
+    configProvider = { SentryRuntimeConfig.forApp(BuildInfo) },
+    installIdProvider = installIdProvider,
 )
 
+/**
+ * The extension has no [com.sodogku.libraries.sodogku.AppCache] to read the
+ * install id out of, and no UI to file feedback from, so it reports without
+ * one. A carrier event from here would carry [INSTALL_ID_UNAVAILABLE], which
+ * is the truthful answer rather than a gap.
+ */
 class IosExtensionTelemetry(
     private val configProvider: () -> SentryRuntimeConfig = { SentryRuntimeConfig.forIosExtension(BuildInfo) }
-) : Telemetry by ConfiguredTelemetry(configProvider)
+) : Telemetry by ConfiguredTelemetry(configProvider, NoInstallId)
+
+private object NoInstallId : InstallIdProvider {
+    override fun current(): String? = null
+}
 
 private class ConfiguredTelemetry(
-    private val configProvider: () -> SentryRuntimeConfig
+    private val configProvider: () -> SentryRuntimeConfig,
+    private val installIdProvider: InstallIdProvider,
 ) : Telemetry {
 
     private val logger: Logger = KLog.withTag("Telemetry")
@@ -226,6 +242,10 @@ private class ConfiguredTelemetry(
             // The one thing triage filters on. See [FeedbackKind] for why it is
             // a tag and not part of the message.
             scope.setTag(FEEDBACK_KIND_TAG, kind.tag)
+            // Read now rather than trusting the boot-time scope. See
+            // [tagInstallId] for why a feedback report cannot go out without
+            // this answered one way or the other.
+            scope.tagInstallId(installIdProvider)
 
             // Info, not the default. A feedback report is not an error and a
             // Sentry issue at error level pulls triage toward it as if it were
@@ -294,6 +314,43 @@ private class ConfiguredTelemetry(
         }
     }
 }
+
+/**
+ * Writes the `install_id` tag onto a feedback carrier event, with a value
+ * either way.
+ *
+ * `pages/privacy.html` sends deletion requests through the in-app feedback form
+ * rather than an email address, because the report arrives keyed to this id and
+ * an email matches nothing we hold. So a report is only as useful as its tag.
+ *
+ * The tag used to arrive here by inheritance from the scope
+ * [SessionTelemetryBinder] writes at boot, which sets it only if the async
+ * `AppCache` read has already landed and then only re-tries on a session
+ * rollover. A report filed in the first seconds of a cold boot could carry
+ * nothing, silently. Reading at capture time instead puts the read after the
+ * player has navigated to the form and typed, by which point hydration is long
+ * done, and writing it on the carrier's own local scope means the report
+ * carries it even if the global scope never got one.
+ *
+ * When there genuinely is no id, the tag says [INSTALL_ID_UNAVAILABLE] rather
+ * than being left off. An absent tag cannot be told apart from a tag lost in
+ * transit, and the two want different responses from whoever reads the report.
+ *
+ * Nothing here may cost the player their report: [InstallIdProvider.current] is
+ * a cached field by contract, and a throw from a provider that breaks that
+ * contract lands on the same marker instead of unwinding the capture.
+ */
+internal fun Scope.tagInstallId(provider: InstallIdProvider) {
+    val installId = Catching { provider.current() }.getOrNull()?.takeIf { it.isNotBlank() }
+    setTag(INSTALL_ID_KEY, installId ?: INSTALL_ID_UNAVAILABLE)
+}
+
+/**
+ * Stands in for the install id on a report filed before the id could be read.
+ * Queryable (`install_id:unavailable` finds every one of them) and impossible
+ * to mistake for the UUID it replaces.
+ */
+internal const val INSTALL_ID_UNAVAILABLE = "unavailable"
 
 /**
  * Where the typed report lands on the carrier event, so it is readable next to
