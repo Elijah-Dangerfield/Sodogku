@@ -162,6 +162,15 @@ data class GameState(
      * it needs the config the attempt was actually scored against.
      */
     val nearMiss: NearMiss? = null,
+
+    /**
+     * Days in a row the player has finished *any* board.
+     *
+     * Not `daily.streak`, which counts consecutive dailies and is a different
+     * number. Both used to be shown as "streak" in four places, which meant the
+     * drawer and the streak page could disagree about how long the run was.
+     */
+    val playStreak: Int = 0,
     val elapsedMs: Long = 0,
     val sniffs: Int = 0,
     val treats: Int = 0,
@@ -754,6 +763,8 @@ sealed interface GameAction {
 
     /** A new daily snapshot: a result was written, or the local date rolled over. */
     data class DailyChanged(val status: DailyStatus) : GameAction
+
+    data class PlayStreakChanged(val days: Int) : GameAction
 
     data object PlayDaily : GameAction
 

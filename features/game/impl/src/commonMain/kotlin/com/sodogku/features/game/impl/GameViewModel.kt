@@ -407,6 +407,12 @@ class GameViewModel(
         // repository re-emits at local midnight — so a drawer left open past
         // midnight picks up the new board without this screen watching a clock.
         daily.observe().collectIn(viewModelScope) { takeAction(GameAction.DailyChanged(it)) }
+        // The run the flame in the drawer shows. Re-emits when a board is
+        // finished and at local midnight, so a drawer left open across either
+        // picks the new number up.
+        streak.observe().collectIn(viewModelScope) {
+            takeAction(GameAction.PlayStreakChanged(it.current))
+        }
         // `live()`, not the replaying stream. These are edges: a board opened
         // seconds after a foreground would otherwise be handed that foreground
         // as its first event, and the daily opens on its own route over a
@@ -450,6 +456,9 @@ class GameViewModel(
             GameAction.LevelsOpened -> action.loadRecords()
             GameAction.LevelsClosed -> action.updateState { it.copy(drawerOpen = false) }
             is GameAction.GoToLevel -> action.goToLevel(action.levelId)
+            is GameAction.PlayStreakChanged ->
+                action.updateState { it.copy(playStreak = action.days) }
+
             is GameAction.DailyChanged -> action.updateState { it.copy(daily = action.status) }
             GameAction.PlayDaily -> action.playDaily()
             GameAction.DailyIntroDismissed -> action.dismissDailyIntro()

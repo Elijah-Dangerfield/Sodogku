@@ -199,44 +199,6 @@ The new `pages/privacy.html` was written against the code rather than against
 this file, so it is the more trustworthy of the two. Reconcile toward it, and
 where they disagree, check the code rather than picking one.
 
-## SD-8 [P1] — A streak day should be earned by finishing any board, not only the daily
-
-**Ask:** The owner, on 2026-09-09: "Is it normal for the streak to be only the
-daily challenge thing? I kinda thought a streak would've been 'did you play at
-all' specifically did you finish any single board."
-
-Decided: **any finished board keeps the streak alive**, campaign or daily.
-
-The flaw in the current design is concrete rather than theoretical. A player who
-clears ten campaign levels today and does not open the daily still loses their
-streak, which reads as the app being broken rather than as a rule. It also makes
-the campaign, which is the bulk of the game, contribute nothing to the one
-retention mechanic. Duolingo, which the owner named as the model, counts any
-lesson.
-
-**Done when:** Finishing any board records today as a streak day, the streak
-page and the flame badge reflect it, and the daily still pays its own separate
-reward so it keeps a reason to exist.
-
-**Hints:** The streak is currently derived entirely from the `daily_result`
-table. `libraries/progress/impl/.../streak/StreakRepositoryImpl.kt:63` builds
-`summary()` from `dao.all()` on that table alone, and
-`libraries/progress/src/.../streak/StreakSummary.kt` documents the rebuild.
-
-So this is a data-model change, not a copy change: a streak day needs a source
-that campaign clears also write to. Options are a new table of active days, or
-folding campaign completions into the same rows the streak folds over. Decide
-deliberately and say which, because `DailyRepository` reads the same table for a
-different question and must not start seeing campaign rows as daily results.
-
-Two things that were priced against daily-only difficulty and should be
-re-examined once this lands, though neither has to change in the same commit:
-the streak freeze and the streak restore. A streak that is much easier to keep
-makes both cheaper in real terms.
-
-**Blocked** until the agents working `features/streak/impl` and
-`features/game/impl` have landed; both are in the way.
-
 <!--
 SD-9 through SD-23 came out of one sitting on 2026-09-09: a feature-by-feature
 read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
@@ -364,22 +326,32 @@ the rule that there is no badge at zero. `DailyRepository.status()` already
 answers the question. A dot is invisible to a screen reader, so the button's
 label has to say it too.
 
-## SD-16 [P2] — A QA panel that can move the day
+## SD-16 [P2] — The QA panel cannot move the day
 
 **Ask:** Owner, 2026-09-09: "How can I test out streaks without actually playing
-them?" Streak, freeze and restore are all built and none of them is reachable in
-under a week of real calendar time.
+them?"
 
-**Done when:** A debug-only panel can move the date the daily and streak code
-sees, write a result for an arbitrary past date, and clear the lot, and a
-freeze offer and a restore offer can both be produced in one sitting.
+**Half of this shipped.** `com.sodogku.qa.QaToolsScreen` exists, is reachable
+from Settings and from the shake dialog in debug builds, and can seed past days,
+mark today played, reset the streak prompts and wipe the lot. That covers
+testing the streak itself, which was the original need.
 
-**Hints:** The shake dialog is the way in: `ShakeDialogEntryPoint` already
-gates the network inspector on `BuildInfo.isDebug` and is the established place
-for this. The streak folds out of stored rows (`DailyStreak.kt`), so seeding
-rows is enough and a second source of truth would be a bug. Two rules to respect
-rather than route around: future-dated results are deliberately invisible to the
-walk, and the skip allowance keeps a high-water day on purpose.
+**What is left is the clock.** Nothing can move the date the daily and streak
+code sees, so anything that depends on a *rollover* still needs real calendar
+time: watching a run break at midnight, checking the countdown as it runs down,
+or seeing the calendar redraw when the day changes.
+
+**Done when:** The panel can set the date the app resolves as today, and undo it.
+
+**Hints:** Both `DailyRepositoryImpl` and `StreakRepositoryImpl` take a
+`kotlin.time.Clock` and a `DeviceTimeZone` and derive everything from them, so
+the seam already exists and there is exactly one place to override. Two rules to
+respect rather than route around: future-dated results are deliberately invisible
+to the walk (`playCalendarOn` checks future before played, for exactly this), and
+the skip allowance keeps a high-water day on purpose.
+
+Freeze and restore were part of the original ask and are no longer testable
+because they are no longer designed; see SD-28.
 
 ## SD-17 [P2] — A time to beat on a replay
 
@@ -509,56 +481,6 @@ lifetime total and there is no "points banked since a date". That addition
 first, then one entry in the `Leaderboard` enum. Do not use a recurring board
 for the daily challenge, for the local-midnight reason already written down
 there.
-
-## SD-24 [P2] — The Pro upsell reads like a shakedown, and looks flat
-
-**Ask:** Owner, 2026-09-09, on the redesigned paywall.
-
-Copy first, because it is the part that actually matters:
-
-> "the copy on the upsell kinda sucks. Like saying 'and Sodogku stops asking
-> you for anything' is like saying 'hey give us money and we will stop
-> bothering you'. Maybe the header could be better too. Could just be 'Unlock
-> Sodogku Pro' and the other text could be 'Here's what you get with pro:' just
-> keeping it super simple."
-
-They are right, and it is worth naming why: the line frames the free product as
-a nuisance the player is paying to switch off. That is an argument for
-resenting the app, printed on the screen asking for money. Replace it. The
-suggested header and lead are deliberately plain and should be taken more or
-less as given rather than "improved" into something clever.
-
-Visual, same message:
-
-> "we should likely use that paw svg and we need a touch more contrast between
-> the background yellow and paw yellow. Also pick a different dog still."
-> "would be really cool if we could make the status bar yellow when the upsell
-> is up. and maybe we need to make the back nav an X since its a slide up type
-> of thing."
-
-**Done when:** The copy no longer implies the app pesters you; the bullets use
-the shared paw; the paw reads clearly against the amber slab; a different
-`DogPose` is chosen; the dismiss affordance is an X rather than a back chevron;
-and the status bar is amber while the sheet is up and back to normal after.
-
-**Hints:** `features/paywall/impl/.../PaywallScreen.kt`. The paw is `Icons.Paw`
-in `libraries/ui/.../components/icon/` (added by the booster-row work — confirm
-the name before using it).
-
-Contrast: the bullets currently draw at an amber close to the slab's own amber.
-Note the slab already had one contrast fix — the type on it is Brown900 rather
-than the white the mockup showed, because white measures 1.79:1 on that amber.
-Whatever colour the paw takes, measure it; `Colors.kt` documents its ratios and
-there is a `NoRawDesignValues` rule.
-
-The status bar is platform-specific. Find how the app sets system bar
-appearance today before adding a second mechanism, and make sure it is restored
-when the sheet closes **by any route** — dismiss, back, purchase, or a process
-death with the sheet open. A status bar left amber over the board is a worse
-bug than the one being fixed.
-
-`DogPose` options are in `libraries/ui/.../components/dog/`.
-
 
 ## SD-25 [P2] — Custom quick actions on the iOS home-screen long press
 

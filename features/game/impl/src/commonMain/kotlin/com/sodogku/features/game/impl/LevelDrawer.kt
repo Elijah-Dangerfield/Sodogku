@@ -113,6 +113,7 @@ fun BoxScope.LevelDrawer(
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
     daily: DailyStatus? = null,
+    playStreak: Int = 0,
     isDailyBoard: Boolean = false,
     onPlayDaily: () -> Unit = {},
     onUseFreeze: () -> Unit = {},
@@ -157,17 +158,20 @@ fun BoxScope.LevelDrawer(
             )
             // Here rather than in the board's header, which already carries a
             // menu, a level, a score and a gear. The streak's only input is the
-            // daily, the daily card is the next thing down this pane, and the
-            // number is most interesting in the moment right after playing one.
-            // Absent with the daily, for the same reason the card is: a control
-            // that says the daily exists but cannot be opened is a support
-            // ticket.
-            if (daily != null && daily.enabled) {
+            // Always shown, and showing the *play* streak.
+            //
+            // It used to be `daily.streak` and to disappear with the daily,
+            // which made sense when the streak was the daily's. Now the two are
+            // different numbers: a player who clears campaign boards every day
+            // has a run, and the flame saying zero next to a streak page saying
+            // nine is the app disagreeing with itself. It also outlives the
+            // daily being switched off, because the run does.
+            run {
                 StreakButton(
-                    streak = daily.streak,
+                    streak = playStreak,
                     label = stringResource(Res.string.daily_streak_label),
-                    stateLabel = if (daily.streak > 0) {
-                        stringResource(Res.string.daily_streak, daily.streak)
+                    stateLabel = if (playStreak > 0) {
+                        stringResource(Res.string.daily_streak, playStreak)
                     } else {
                         stringResource(Res.string.daily_streak_none)
                     },

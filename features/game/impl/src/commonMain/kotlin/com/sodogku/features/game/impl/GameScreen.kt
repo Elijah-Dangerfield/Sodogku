@@ -258,6 +258,7 @@ fun GameScreen(
                 onPick = { onAction(GameAction.GoToLevel(it)) },
                 onDismiss = { onAction(GameAction.LevelsClosed) },
                 daily = state.daily,
+                playStreak = state.playStreak,
                 isDailyBoard = state.isDaily,
                 onPlayDaily = { onAction(GameAction.PlayDaily) },
                 onUseFreeze = { onAction(GameAction.UseFreeze) },
@@ -359,7 +360,7 @@ private fun GameHeader(
                 state.isRehearsal -> Unit
                 state.isDaily -> HeaderStat(
                     label = stringResource(Res.string.daily_streak_label),
-                    value = (state.daily?.streak ?: 0).toString(),
+                    value = state.playStreak.toString(),
                     onClick = onExplainLevel,
                 )
                 else -> HeaderStat(
