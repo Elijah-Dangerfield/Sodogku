@@ -339,6 +339,11 @@ new `logEvent` attribute, and anything that starts calling `Telemetry.setUser`.
 
 ## 10. Sentry
 
+**Done on 2026-09-10**, on this machine and in CI: `local.properties` carries a
+DSN, both secrets and both variables are set, and a debug build was seen logging
+`Sentry initialized for dev-android-debug`. Feedback has been round-tripped end
+to end. What follows is only for a second machine or a fresh clone.
+
 **One command.** The project (`elijah-dangerfield` / `sodogku`) and its DSN
 exist; nothing here needs code:
 
@@ -359,7 +364,7 @@ at `build-logic/.../Versioning.kt:190` as env `SENTRY_DSN`, then
 `SentryRuntimeConfig.isEnabled` false, which is why a fresh clone works with no
 setup. Without the auth token, Android R8 mapping upload is skipped and every
 crash frame arrives as `a.b.c`; iOS dSYM upload is skipped too. The org and
-project go in as **variables, not secrets** — `release.yml:127-128` reads them
+project go in as **variables, not secrets**. `release.yml:127-128` reads them
 via `vars.`, and getting that wrong fails silently.
 
 **Not covered:** the server's own `SENTRY_DSN`, which is a Fly secret on a

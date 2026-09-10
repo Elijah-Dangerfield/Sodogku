@@ -145,34 +145,6 @@ Ask for a ranked list with a file:line and a concrete failure scenario for each,
 and require it to say which findings it verified versus which are hunches. Take
 nothing on trust: reviews from agents have been confidently wrong here before.
 
-## SD-7 [P1] — Re-derive `docs/store/data-safety.md` against the code
-
-**What the file is for**, since it is easy to mistake for a one-off: it is the
-derived answer sheet for *two* store forms, Play's **Data safety** and Apple's
-**App Privacy** nutrition label, with every row citing the file and mechanism
-that makes it true. It is also the factual input for `pages/privacy.html`.
-
-Both forms have to be **updated whenever what the app collects changes**, not
-filed once. So the file staying true is ongoing engineering work, and it is
-this item. Actually editing the store forms is the owner's, and is a bullet in
-`docs/OWNER-TODO.md` rather than a second todo here.
-
-**Ask:** Three of its findings no longer match the code. It was derived on
-2026-09-08 and the header names the three things most likely to invalidate it: a
-new `logEvent` attribute, a new SDK, and anything calling `Telemetry.setUser`.
-All three areas have moved since.
-
-**Done when:** Every row is re-derived against the current tree, each still
-cites a file and a line that exists, and the header's date is updated. Where an
-answer changed, say so explicitly rather than silently editing the row, because
-the owner has to know which form fields to go and change.
-
-**Hints:** The file's own §1 explains the two facts that shape every answer (no
-accounts, `setUser` uncalled). Verify both are still true rather than assuming:
-`grep -rn "setUser(" --include=*.kt` should still return only the declaration
-and the implementation. Sentry was switched on since this was written, and the
-feedback path now attaches a session log and screenshots.
-
 <!--
 SD-9 through SD-23 came out of one sitting on 2026-09-09: a feature-by-feature
 read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
@@ -679,3 +651,36 @@ anything.
 
 `libraries/sodogku/impl/.../SessionTelemetryBinder.kt`,
 `libraries/sodogku/impl/.../AppTelemetry.kt` (`setInstallId`, `captureUserFeedback`).
+
+## SD-30 [P2] — Three things the privacy derivation tripped over in the code
+
+**Found by:** the agent re-deriving `docs/store/data-safety.md`, 2026-09-10.
+None of these is a live bug; all three mislead the next person deriving a
+privacy answer, which is how a wrong answer ends up on a store form.
+
+1. **`setUser` is the one Sentry scope writer with no `isEnabled()` guard.**
+   `setCurrentRoute`, `setSession`, `setInstallId` and `setContext` all open with
+   `if (!Sentry.isEnabled()) return`; `setUser` calls straight into the SDK
+   (`AppTelemetry.kt:127-138`). Latent, because nothing calls it, and "nothing
+   calls it" is exactly what section 1 of the data-safety derivation rests on.
+   Add the guard so the odd one out stops being odd.
+
+2. **The session log is attached to every feedback report with no disclosure in
+   the app.** `includeLogs` defaults to `true` and neither player-facing caller
+   sets it, so every report ships `session-log.txt`. Only the tester panel has a
+   switch. The privacy policy says so; the screen the player is typing into does
+   not. Either say it on the screen or give the player the switch.
+
+3. **Two KDocs describe machinery deleted in C0 and say the opposite of the
+   truth.** `AppCache.kt:154-156` says the install id is sent "so the server can
+   associate anonymous accounts from the same install", and `UserScopedClearer`'s
+   KDoc describes sign-out and account switching. There are no accounts. Anyone
+   deriving a privacy answer from those comments would get it wrong.
+
+Also still true from an earlier pass and worth clearing at the same time: dead
+`DELETE_ACCOUNT_LIMIT` and `PLAYER_REPORT_LIMIT` on the server
+(`RateLimits.kt:23-24`), and Supabase OAuth comments left in the shipped Android
+manifest and iOS `Info.plist`.
+
+**Done when:** the guard is added, the log attachment is either disclosed on the
+feedback screen or switchable, and no KDoc in the tree describes accounts.
