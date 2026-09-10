@@ -28,17 +28,17 @@ import androidx.compose.ui.graphics.graphicsLayer
  * before and after the `clickable` (the labelled child stayed a separate node
  * both times), and a `label` parameter on this function setting
  * `contentDescription` here. The same `contentDescription`, set by the caller one
- * link earlier in the chain, works. The difference is `composed { }`, which is
- * deprecated for reasons of about this shape; rewriting this onto `Modifier.Node`
- * is the real fix and would let the label move back in here where it belongs.
+ * link earlier in the chain, works.
  *
- * Confirmed on a device while fixing the Settings toggles: the identical
- * `Modifier.toggleable`, applied straight onto a Row rather than through a
- * `composed { }` wrapper like this one, *does* merge its descendants and does
- * name the row. So `composed { }` is the cause rather than a suspicion, and
- * `ListItem` builds its own press animation instead of calling this. Anything
- * here that needs a merged, named node has to do the same until this is a
- * `Modifier.Node`.
+ * `composed { }` was blamed for that and is not the cause, and the correction is
+ * worth having here because the wrong version of it sent one fix down a blind
+ * alley. Merging descendants does not name a node on Android at all: the
+ * accessibility bridge deliberately skips `contentDescription` on any merging
+ * node that still has children, and hangs the name off a synthetic extra child
+ * instead. A merged, named node needs `clearAndSetSemantics` so that there are
+ * no children left to protect. `ListItem`'s toggle row is the worked example,
+ * and it builds its own press animation rather than calling this, because a
+ * `composed { }` chain cannot contribute the role and toggled state either.
  */
 fun Modifier.bounceClick(
     enabled: Boolean = true,

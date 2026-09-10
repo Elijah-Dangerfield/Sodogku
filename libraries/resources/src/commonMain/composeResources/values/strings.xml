@@ -81,6 +81,12 @@
     <string name="settings_haptics_body">A small buzz when you mark a square, place a dog, or get one wrong.</string>
     <string name="settings_done">Done</string>
 
+    <!-- A settings toggle is one control to a screen reader, so its headline and
+         its explanation have to arrive as one label rather than as two nodes.
+         A format rather than a concatenation, so a translation can reorder the
+         two halves or join them with something other than a full stop. -->
+    <string name="list_row_spoken_format">%1$s. %2$s</string>
+
     <!-- Shake to report. The body says why the dialog appeared, because a shake
          is easy to trigger by accident and a bare "Report a problem" on a phone
          in your pocket is alarming rather than helpful. -->

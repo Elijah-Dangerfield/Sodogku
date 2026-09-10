@@ -1,7 +1,7 @@
 package com.sodogku.libraries.ui.components
 
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.bounceClick
+import com.sodogku.libraries.ui.components.board.fill
 import com.sodogku.libraries.ui.components.icon.Icon
 import com.sodogku.libraries.ui.components.icon.IconResource
 import com.sodogku.libraries.ui.components.icon.IconSize
@@ -47,7 +48,10 @@ import com.sodogku.system.Radii
 import com.sodogku.system.VerticalSpacerD200
 import com.sodogku.system.thenIf
 import com.sodogku.system.typography.TypographyResource
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.list_row_spoken_format
 
 @Composable
 fun ListSection(
@@ -91,20 +95,8 @@ fun ListSection(
                 ListItem(
                     modifier = Modifier,
                     leadingContent = item.leadingContent,
-                    headlineContent = {
-                        Text(
-                            text = item.headlineText,
-                            typography = ListItemDefaults.headlineTypography()
-                        )
-                    },
-                    supportingContent = item.supportingText?.let { text ->
-                        {
-                            Text(
-                                text = text,
-                                typography = ListItemDefaults.supportingTypography()
-                            )
-                        }
-                    },
+                    headlineText = item.headlineText,
+                    supportingText = item.supportingText,
                     accessory = item.accessory,
                     enabled = item.enabled,
                     onClick = item.onClick,
@@ -128,14 +120,20 @@ data class ListSectionItem(
     val dividerStartInset: Dp? = null,
 )
 
+/**
+ * The row takes `String`s rather than composable slots because a toggle row has
+ * to be able to *say* its own name, and a slot can only be drawn. See the
+ * `clearAndSetSemantics` below for why the row cannot borrow the name from the
+ * text it contains.
+ */
 @Composable
 fun ListItem(
+    headlineText: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     leadingContent: (@Composable () -> Unit)? = null,
-    headlineContent: @Composable () -> Unit,
-    supportingContent: (@Composable () -> Unit)? = null,
+    supportingText: String? = null,
     accessory: ListItemAccessory = ListItemAccessory.Chevron,
     contentPadding: PaddingValues = ListItemDefaults.contentPadding(),
     showDivider: Boolean = false,
@@ -157,17 +155,14 @@ fun ListItem(
     val toggle = accessory as? ListItemAccessory.Switch
     val toggleEnabled = enabled && toggle?.enabled != false
 
-    // The press animation is built here rather than through `bounceClick`, and
-    // that is the whole reason this works.
-    //
-    // `Modifier.toggleable` merges its descendants, which is what folds the
-    // headline into the row so the row can say its own name. Wrapped in a
-    // `composed { }` helper it did not: the row came out of a `uiautomator` dump
-    // checkable and unnamed with the text still in separate child nodes, and an
-    // explicit `contentDescription` beside it became *another* child rather than
-    // naming the row. `bounceClick`'s KDoc guessed `composed { }` was why; this
-    // is that guess confirmed, since the same `toggleable` applied directly
-    // merges.
+    val spokenFormat = stringResource(Res.string.list_row_spoken_format)
+    val spokenLabel = remember(spokenFormat, headlineText, supportingText) {
+        spokenRowLabel(spokenFormat, headlineText, supportingText)
+    }
+
+    // The press animation is built here rather than through `bounceClick`
+    // because `bounceClick` is a `composed { }` helper and cannot carry the
+    // toggle's role or state. See its KDoc.
     val toggleInteraction = remember { MutableInteractionSource() }
     val pressScale = remember { Animatable(1f) }
     LaunchedEffect(toggleInteraction) {
@@ -187,26 +182,9 @@ fun ListItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = Dimension.D1400)
-                .thenIf(supportingContent != null) {
+                .thenIf(supportingText != null) {
                     padding(vertical = Dimension.D400)
                 }
-                // Named here, one link *earlier* than the modifier that takes
-                // the gesture, because that is the only position that reaches
-                // the tree. `mergeDescendants` was tried first and does not
-                // work even from here — the row came out of a dump still
-                // checkable and still unnamed, which is the same trap
-                // `bounceClick` documents. An explicit `contentDescription`
-                // does work, and it is what `RuleChip` and `BoosterButton`
-                // already do.
-                //
-                // The headline alone, not the supporting sentence. The
-                // supporting text stays its own node and is read after; folding
-                // it in would make the control's *name* a paragraph.
-                //
-                // No `stateDescription`: `Role.Switch` plus the toggleable value
-                // already gives a reader "on" or "off" in its own words, and
-                // saying it twice is worse than the house pattern in
-                // `BoardCellLabels`, where nothing else supplies the state.
                 .then(
                     when {
                         toggle != null -> Modifier
@@ -224,6 +202,37 @@ fun ListItem(
                                 role = Role.Switch,
                                 onValueChange = { toggle.onCheckedChange(it) },
                             )
+                            // What makes the row one node instead of two.
+                            //
+                            // `toggleable` alone is not enough, and the reason
+                            // is specific. It sets `mergeDescendants`, and
+                            // Compose's Android bridge then *skips* assigning
+                            // `contentDescription` to any merging node that
+                            // still has children, to avoid clobbering them: it
+                            // hangs the description off a synthetic extra child
+                            // instead. So the row arrives in a `uiautomator`
+                            // dump checkable with no name, whether or not a
+                            // `contentDescription` was set on it, which is
+                            // exactly the shape SD-3 reports. `clearAndSetSemantics`
+                            // drops the children, and with no children left the
+                            // bridge puts the name on the row itself.
+                            //
+                            // That is also why the label has to carry the
+                            // supporting sentence: nothing under this row is
+                            // reachable any more, so anything left out of
+                            // [spokenRowLabel] is not read at all.
+                            //
+                            // Peers on one layout node collapse rather than
+                            // overwrite, so `toggleable`'s role, click action
+                            // and on/off state all survive this and supply the
+                            // state half of the label. No `stateDescription`
+                            // here: the platform speaks `Role.Switch` plus the
+                            // toggled value in the reader's own system
+                            // language, which an app-supplied string would
+                            // override with English. `BoardCellLabels` has to
+                            // set one because a crossed-off square has no
+                            // platform state to borrow.
+                            .clearAndSetSemantics { contentDescription = spokenLabel }
 
                         onClick != null -> Modifier.bounceClick(
                             enabled = enabled,
@@ -248,15 +257,21 @@ fun ListItem(
                 ProvideTextConfig(
                     color = if (enabled) AppTheme.colors.onSurfacePrimary else AppTheme.colors.onSurfaceDisabled
                 ) {
-                    headlineContent()
+                    Text(
+                        text = headlineText,
+                        typography = ListItemDefaults.headlineTypography()
+                    )
                 }
 
-                if (supportingContent != null) {
+                if (supportingText != null) {
                     VerticalSpacerD200()
                     ProvideTextConfig(
                         color = if (enabled) AppTheme.colors.onSurfaceSecondary else AppTheme.colors.onSurfaceDisabled
                     ) {
-                        supportingContent()
+                        Text(
+                            text = supportingText,
+                            typography = ListItemDefaults.supportingTypography()
+                        )
                     }
                 }
             }
@@ -306,6 +321,25 @@ sealed interface ListItemAccessory {
 
 /** Matches `bounceClick`'s default, so a toggle row presses like every other row. */
 private const val BounceScaleDown = 0.90f
+
+/**
+ * Everything a toggle row has to say, in one string.
+ *
+ * A toggle row clears its children's semantics so that the row itself can be
+ * named, which means this is the only thing a screen reader gets: a sentence
+ * left out here is a sentence nobody hears. The headline comes first because it
+ * is what the control *is*; the supporting line is detail and can be skipped
+ * past.
+ *
+ * Assembled through a translatable format rather than concatenated, for the
+ * same reason `board_cell_format` is: a translation may want the two the other
+ * way round, or joined by something other than a full stop.
+ */
+internal fun spokenRowLabel(
+    format: String,
+    headlineText: String,
+    supportingText: String?,
+): String = if (supportingText == null) headlineText else format.fill(headlineText, supportingText)
 
 object ListItemDefaults {
     private val HorizontalPadding = Dimension.D500
@@ -361,16 +395,16 @@ private fun Accessory(
                 size = accessory.size
             )
 
-        // `onCheckedChange = null` and no semantics of its own: the row owns
-        // both the gesture and the state now, and a switch that kept either
-        // would be the duplicate node this exists to remove. Still drawn, still
-        // animates, still shows enabled or disabled.
+        // `onCheckedChange = null`: the row owns the gesture and the state now,
+        // and a switch that kept either would be the duplicate node this exists
+        // to remove. Still drawn, still animates, still shows enabled or
+        // disabled. The row clears this subtree anyway, so this is about not
+        // handing the switch a second tap target rather than about semantics.
         is ListItemAccessory.Switch ->
             Switch(
                 checked = accessory.checked,
                 onCheckedChange = null,
                 enabled = enabled && accessory.enabled,
-                modifier = Modifier.clearAndSetSemantics { },
             )
 
 

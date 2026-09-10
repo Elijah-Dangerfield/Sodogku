@@ -74,33 +74,6 @@ board. iOS has no equivalent, because racing an `async throws` whose cancellatio
 is opaque risks a leaked continuation, which fails worse than what it guards.
 Worth doing properly once someone can test it.
 
-## SD-3 [P1] — A Settings toggle tells a screen reader "on" without saying what is on
-
-**Ask:** Every toggle row in Settings exposes an unnamed `checkable` node beside
-its label, so a screen reader announces the state with nothing naming the
-setting it belongs to.
-
-**Done when:** Each toggle is one node carrying both its name and its state, and
-an accessibility dump shows no unnamed checkable node in Settings.
-
-**Hints:** Found on an API 36 emulator while investigating the item this
-section used to hold. The switch is rendered by the shared list item, so the fix
-is in `libraries/ui`'s list components and reaches every toggle at once rather
-than in `features/settings`.
-
-The board is the worked example of the right shape: `BoardCellLabels.kt` puts
-identity in `contentDescription` and state in `stateDescription`, on one node.
-
-**This replaces the original SD-3, which was my mistake.** I reported that a
-crossed-off square is invisible to a screen reader, having seen identical
-`drive.py text` output with the assist on and off. The board has announced all
-five cell states since `bc81aa5`, through `stateDescription`. `drive.py` reads
-only `text` and `content-desc` from a `uiautomator` dump, and
-`stateDescription` is not in that attribute set at all: it is readable only by
-an accessibility service. So the tool is structurally blind to exactly the half
-of the label that carries state, and identical output was never evidence of
-anything. `scripts/dev/drive.py` now says so in its docstring.
-
 ## SD-6 [P2] — Standing code review, by an agent that did not write the code
 
 **Ask:** A recurring review pass looking for better ways of doing things:
