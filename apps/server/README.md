@@ -1,6 +1,7 @@
 # `:apps:server` — Ktor backend
 
-A small, opinionated Ktor + Postgres backend with Supabase JWT auth. It mirrors
+A small, opinionated Ktor + Postgres backend. There is no auth and no user data
+(see "No accounts" in AGENTS.md); it serves health and remote config. It mirrors
 the client's conventions (kotlin-inject DI, `domain/`↔`data` split, one blessed
 way to do each thing) so moving between client and server is the same mental
 model. This README is the detailed reference; keep `AGENTS.md` minimal and point
@@ -16,28 +17,24 @@ curl localhost:8080/_health           # {"ok":true}
 curl localhost:8080/v1/example        # {"message":"…","items":[…]}
 ```
 
-To enable the database-backed + authenticated routes, set env vars (copy
-`apps/server/.env.example` → `apps/server/.env`, which is gitignored):
+To enable the database-backed routes, set env vars (copy
+`apps/server/.env.example` → `apps/server/.env`, which is gitignored). Start the
+bundled Postgres and point at it:
 
-1. **Database** — start the bundled Postgres and point at it:
-   ```bash
-   docker compose -f apps/server/docker-compose.yml up -d
-   # in apps/server/.env:
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
-   ```
-   On boot, Flyway applies everything in `src/main/resources/db/migration`.
+```bash
+docker compose -f apps/server/docker-compose.yml up -d
+# in apps/server/.env:
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+```
 
-2. **Supabase auth** — set `SUPABASE_URL=https://<project>.supabase.co` to mount
-   `/v1/me`. The server verifies the client's Supabase JWTs against the project's
-   public keys (JWKS); no secret is stored server-side.
+On boot, Flyway applies everything in `src/main/resources/db/migration`.
 
 Boot modes (graceful degradation is a deliberate standard):
 
-| `DATABASE_URL` | `SUPABASE_URL` | What's served |
-|---|---|---|
-| unset | unset | `/_health`, `/v1/example` |
-| set   | unset | + DB connected (no auth routes) |
-| set   | set   | + `/v1/me` (full) |
+| `DATABASE_URL` | What's served |
+|---|---|
+| unset | `/_health`, `/v1/example` |
+| set   | + `/v1/app-config`, and `/v1/admin/config` when `ADMIN_API_TOKEN` is set |
 
 ## Layout
 
@@ -47,15 +44,15 @@ di/          ServerScope + ServerComponent (kotlin-inject + anvil)
 db/          Database (Hikari + Flyway + Exposed), Tables, TimeConversions
 domain/      interfaces + models + sealed outcomes (no framework imports)
 data/        impls, prefixed by backing store (InMemory*, Postgres*)
-plugins/     Ktor plugins: Serialization, Errors, Cors, Observability, Authentication
+plugins/     Ktor plugins: Serialization, Errors, Cors, Observability, RateLimits
 routes/      one `fun Route.xRoutes(deps)` per resource + its DTO file
 resources/db/migration/   Flyway V<n>__snake.sql (source of truth for the schema)
 ```
 
 `Main.kt` parses config → `Application.module(config)` does production-only setup
-(observability, DB connect, DI graph, JWT strategy) → `installApp(component,
-verification)` installs the functional plugins + mounts routes. `installApp` is
-the seam full-stack tests reuse (real graph, real DB, `JwtVerification.Static`).
+(observability, DB connect, DI graph) → `installApp(component)` installs the
+functional plugins + mounts routes. `installApp` is the seam full-stack tests
+reuse (real graph, real DB).
 
 ## Conventions (copy these)
 
@@ -71,7 +68,7 @@ Document the var in `.env.example`.
 ### Add a service — `domain/` interface + `data/` impl
 ```kotlin
 // domain/Thing.kt
-interface ThingRepository { suspend fun get(id: UserId): Thing }
+interface ThingRepository { suspend fun get(id: ThingId): Thing }
 
 // data/PostgresThingRepository.kt
 @SingleIn(ServerScope::class)
@@ -86,17 +83,16 @@ anvil + KSP wire the rest. The impl prefix names the backing store
 ### Add a route — `routes/XxxRoutes.kt` + `XxxDto.kt`
 ```kotlin
 fun Route.thingRoutes(repo: ThingRepository) {
-    authenticate(SUPABASE_JWT_AUTH) {                 // omit for public routes
-        get("/v1/thing") {
-            val userId = call.userId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
-            call.respond(repo.get(userId).toResponse())  // respond with a DTO, never a domain type
-        }
+    get("/v1/thing/{id}") {
+        val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        call.respond(repo.get(ThingId(id)).toResponse())  // a DTO, never a domain type
     }
 }
 ```
 - real paths are versioned under `/v1`; `/_health` is the deliberate exception.
 - DTOs live in `XxxDto.kt`, named `*Response` / `*Request`; map with `Thing.toResponse()`.
-- the caller's id is the JWT `sub` via `call.userId()` — never trust a body field.
+- routes that only an operator or a machine should reach go behind `requireAdmin`
+  (`routes/AdminAuth.kt`, an `X-Admin-Token` header). There is no per-user auth.
 - map domain outcomes to status codes with an exhaustive `when`; errors use the
   one `ProblemResponse` envelope (`call.respond(status, problem("code", "msg"))`).
 - mount it in `installApp`.
@@ -111,30 +107,25 @@ arbiter rather than pre-checking.
 
 ## Auth
 
-The server is a pure resource server: it **verifies** Supabase JWTs, it never
-issues them. `plugins/Authentication.kt` exposes a `JwtVerification` seam —
-`Jwks` (production: ES256 via the project JWKS endpoint) and `Static` (tests:
-a caller-supplied verifier, so tests mint HS256 tokens with no network). Inside
-`authenticate(SUPABASE_JWT_AUTH) { }`, `call.userId()` is the `sub` claim and
-`call.isAnonymousUser()` reflects Supabase's `is_anonymous` claim.
+There is none, deliberately. No JWT plugin, no user identity, no `call.userId()`.
+The only gate is `requireAdmin` in `routes/AdminAuth.kt`, an `X-Admin-Token`
+header for the config admin API, whose caller is a machine or the admin console
+rather than a person with an account. Rate limiting keys on IP for the same
+reason (`plugins/RateLimits.kt`).
 
-`profiles.user_id` references `auth.users(id)` (V2 FK, cascade delete). In
-production `auth.users` is owned by Supabase; locally and in tests it's a minimal
-stub (`docker/init-auth.sql` for compose, `src/test/resources/init-auth.sql` for
-Testcontainers). Tests seed a row via `DatabaseTest.seedAuthUser()` before
-creating dependent rows.
+The client sends no credential either. Read "No accounts" in AGENTS.md before
+adding one.
 
 ## Testing
 
 Three patterns, each with a copyable example:
-- **Route test** (`routes/MeRoutesTest.kt`, `routes/ExampleRoutesTest.kt`) —
-  `testApplication` + the real plugins + a fake passed as a plain arg. Auth is
-  faked by minting an HS256 token + `JwtVerification.Static`.
-- **Repository test** (`data/PostgresProfileRepositoryTest.kt`) — real Postgres
+- **Route test** (`routes/ExampleRoutesTest.kt`, `routes/ConfigAdminRoutesTest.kt`) —
+  `testApplication` + the real plugins + a fake passed as a plain arg.
+- **Repository test** (`data/PostgresAppConfigSourceTest.kt`) — real Postgres
   via Testcontainers (`DatabaseTest`), `@After` table cleanup, injected clock.
   Skips cleanly (JUnit `Assume`) when Docker is absent.
-- **Full-stack test** (`FullStackMeTest.kt`) — the real DI graph + real Postgres
-  through the `installApp` seam; proves auth + repo + route integrate.
+- **Full-stack test** (`:apps:integration`) — the real client stack over real TCP
+  against the real `installApp` seam on a Testcontainers Postgres.
 
 ```bash
 ./gradlew :apps:server:test           # add -Dsodogku.skipGitHooksCheck=true outside a hooked checkout
@@ -147,13 +138,9 @@ Three patterns, each with a copyable example:
 | `DATABASE_URL` | no | — | `postgresql://user:pass@host:port/db`. Unset → limited mode. URL-encode `$`→`%24`. |
 | `DATABASE_POOL_MAX_SIZE` | no | 10 | |
 | `DATABASE_POOL_MIN_IDLE` | no | 2 | |
-| `SUPABASE_URL` | no | — | `https://<project>.supabase.co`. Unset → `/v1/me` not mounted. |
 | `SERVER_HOST` | no | `0.0.0.0` | |
 | `SERVER_PORT` | no | 8080 | |
+| `ADMIN_API_TOKEN` | no | — | Unset → the config admin API isn't mounted. |
 
-## Roadmap (planned, not yet wired)
-
-- Env-gated observability (Sentry + OpenTelemetry), no-op until configured.
-- Containerized deploy (Dockerfile + Fly.io + `DEPLOY.md`).
-
-See `docs/backend-and-supabase-auth-plan.md` for the full plan.
+The full list, with the rest of the optional vars, is in
+[`.env.example`](.env.example).

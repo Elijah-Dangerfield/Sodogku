@@ -36,8 +36,6 @@ postgres = "42.7.4"
 hikari = "5.1.0"
 flyway = "10.20.0"
 testcontainers = "1.20.4"
-auth0Jwt = "4.4.0"
-auth0JwksRsa = "0.22.1"
 sentryJvm = "7.18.1"
 opentelemetry = "1.45.0"
 opentelemetryInstrumentation = "2.11.0-alpha"
@@ -61,7 +59,6 @@ sentryKmp = "0.22.0"
 # auto-installation turned OFF so it cannot add a second Sentry SDK alongside
 # the KMP one.
 sentryAndroidGradlePlugin = "6.21.0"
-supabaseKt = "3.6.0"
 turbine = "1.2.1"
 lifecycleProcess = "2.10.0"
 
@@ -107,8 +104,6 @@ ktor-serverCors = { module = "io.ktor:ktor-server-cors-jvm", version.ref = "ktor
 ktor-serverStatusPages = { module = "io.ktor:ktor-server-status-pages-jvm", version.ref = "ktor" }
 ktor-serverCallLogging = { module = "io.ktor:ktor-server-call-logging-jvm", version.ref = "ktor" }
 ktor-serverCallId = { module = "io.ktor:ktor-server-call-id-jvm", version.ref = "ktor" }
-ktor-serverAuth = { module = "io.ktor:ktor-server-auth-jvm", version.ref = "ktor" }
-ktor-serverAuthJwt = { module = "io.ktor:ktor-server-auth-jwt-jvm", version.ref = "ktor" }
 ktor-serverRateLimit = { module = "io.ktor:ktor-server-rate-limit", version.ref = "ktor" }
 ktor-serverWebsockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
@@ -132,12 +127,6 @@ okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 opentelemetry-extension-kotlin = { module = "io.opentelemetry:opentelemetry-extension-kotlin", version.ref = "opentelemetry" }
 opentelemetry-logback-appender = { module = "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0", version.ref = "opentelemetryInstrumentation" }
 opentelemetry-ktor = { module = "io.opentelemetry.instrumentation:opentelemetry-ktor-3.0", version.ref = "opentelemetryInstrumentation" }
-
-# Supabase JWT verification. java-jwt is what ktor-server-auth-jwt sits on; we
-# use it directly to build the verifier. jwks-rsa fetches Supabase's public
-# signing keys from the project JWKS endpoint (cached + rate-limited).
-auth0-jwt = { module = "com.auth0:java-jwt", version.ref = "auth0Jwt" }
-auth0-jwksRsa = { module = "com.auth0:jwks-rsa", version.ref = "auth0JwksRsa" }
 
 # Server persistence: Postgres + HikariCP + Exposed DSL + Flyway migrations.
 postgres-jdbc = { module = "org.postgresql:postgresql", version.ref = "postgres" }
@@ -173,13 +162,8 @@ ktor-client-contentNegotiation = { module = "io.ktor:ktor-client-content-negotia
 wiretap-ktor = { module = "dev.skymansandy:wiretap-ktor", version.ref = "wiretap" }
 wiretap-ktor-noop = { module = "dev.skymansandy:wiretap-ktor-noop", version.ref = "wiretap" }
 ktor-client-encoding = { module = "io.ktor:ktor-client-encoding", version.ref = "ktor" }
-ktor-client-auth = { module = "io.ktor:ktor-client-auth", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
-
-# Supabase auth (client). The server does NOT use this — it verifies JWTs via
-# JWKS (see :apps:server). Only the GoTrue/auth module is needed client-side.
-supabase-auth = { module = "io.github.jan-tennert.supabase:auth-kt", version.ref = "supabaseKt" }
 
 google-play-review = { module = "com.google.android.play:review", version = "2.0.2" }
 google-play-review-ktx = { module = "com.google.android.play:review-ktx", version = "2.0.2" }

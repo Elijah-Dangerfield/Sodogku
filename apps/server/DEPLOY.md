@@ -1,7 +1,8 @@
 # Deploying the server
 
 The server ships as a Docker image (multi-stage, `installDist`) and is set up to
-deploy to [Fly.io](https://fly.io). Postgres + auth live on Supabase, not Fly.
+deploy to [Fly.io](https://fly.io). Postgres lives on Supabase, not Fly. There
+is no auth: the server has no users. See "No accounts" in AGENTS.md.
 
 ## Two environments
 
@@ -24,7 +25,7 @@ end-to-end — see SETUP.md for the GitHub secrets.
 ## Prerequisites
 
 - [`flyctl`](https://fly.io/docs/flyctl/install/) installed and `fly auth login`
-- A Supabase project per environment (for `DATABASE_URL` + `SUPABASE_URL`)
+- A Supabase project per environment (for `DATABASE_URL`)
 
 ## One-time setup (repeat per environment)
 
@@ -36,8 +37,6 @@ fly apps create your-server-name-prod
 # 2. Set secrets (injected as env at runtime — never baked into the image).
 fly secrets set \
   DATABASE_URL='postgresql://postgres:<url-encoded-pw>@db.<ref>.supabase.co:5432/postgres' \
-  SUPABASE_URL='https://<ref>.supabase.co' \
-  SUPABASE_SERVICE_ROLE_KEY='<service-role-jwt>' \
   -a your-server-name-dev
 
 # 3. Deploy from the repo root (the Dockerfile COPYs repo-root paths).
@@ -80,7 +79,7 @@ a `COPY libraries/foo/ libraries/foo/` line to the [Dockerfile](Dockerfile).
 ```bash
 # From the repo root:
 docker build -f apps/server/Dockerfile -t sodogku-server .
-docker run --rm -p 8080:8080 -e DATABASE_URL=... -e SUPABASE_URL=... sodogku-server
+docker run --rm -p 8080:8080 -e DATABASE_URL=... sodogku-server
 ```
 
 ## Environment & secrets
@@ -88,9 +87,8 @@ docker run --rm -p 8080:8080 -e DATABASE_URL=... -e SUPABASE_URL=... sodogku-ser
 All config is env vars (see [`.env.example`](.env.example) and
 [`README.md`](README.md#environment-variables)). In prod, set them via
 `fly secrets set`; OS env always wins over the local `.env` file. `DATABASE_URL`
-and `SUPABASE_URL` are the two that unlock the full feature set — the server
-boots without them (limited mode) so a misconfigured deploy still answers
-`/_health`.
+is the one that unlocks the full feature set — the server boots without it
+(limited mode) so a misconfigured deploy still answers `/_health`.
 
 ## Notes
 

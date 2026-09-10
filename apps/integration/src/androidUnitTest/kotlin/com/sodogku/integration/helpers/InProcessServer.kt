@@ -38,7 +38,7 @@ class InProcessServer : AutoCloseable {
 
     private val engine: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> =
         embeddedServer(Netty, port = 0) {
-            installApp(component = ServerComponent::class.create(sharedDatabase(), null))
+            installApp(component = ServerComponent::class.create(sharedDatabase()))
         }.start(wait = false)
 
     private val boundPort: Int = runBlocking {

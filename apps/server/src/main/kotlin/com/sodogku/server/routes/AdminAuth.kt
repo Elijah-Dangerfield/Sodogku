@@ -6,9 +6,9 @@ import io.ktor.server.request.header
 
 /**
  * Shared gate for the token-protected admin routes under `/v1/admin`. The
- * caller is a machine (cron, the local config admin UI), not a Supabase user,
- * so these routes use a bearer-style `X-Admin-Token: <ADMIN_API_TOKEN>` header
- * instead of the JWT plugin.
+ * caller is a machine (cron, the local config admin UI) and the server has no
+ * notion of a user, so these routes use a bearer-style
+ * `X-Admin-Token: <ADMIN_API_TOKEN>` header. It is the only gate on the server.
  *
  * Returns false (→ 401) when no token is configured server-side or the header
  * is missing / wrong. The compare is constant-time over the expected length to

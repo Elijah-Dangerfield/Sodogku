@@ -105,7 +105,6 @@ docker run --rm -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16
 # 2. the server — Flyway applies every migration (incl. the config tables) on boot.
 #    Put these in apps/server/.env (gitignored) or export them, then run:
 #      DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
-#      SUPABASE_URL=https://<your-project-ref>.supabase.co   # any valid URL; admin routes don't use JWT
 #      ADMIN_API_TOKEN=<same value as `local=` in admin-tokens.local.properties>
 ./gradlew :apps:server:run
 

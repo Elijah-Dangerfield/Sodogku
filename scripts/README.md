@@ -58,10 +58,6 @@ Creates new KMP modules with proper structure and configuration.
 ./scripts/create_module.main.kts library user:preferences  # sub-module
 ```
 
-## rotate_apple_sign_in_token.main.kts
-
-Rotates the Apple Sign In client secret (it expires at most every 6 months).
-
 ## cleanup.sh
 
 Cleans build artifacts and caches:

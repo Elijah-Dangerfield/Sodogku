@@ -19,7 +19,6 @@ package com.sodogku.server.config
 data class ServerConfig(
     val http: HttpConfig,
     val database: DatabaseConfig?,
-    val supabase: SupabaseConfig?,
     val sentry: SentryConfig,
     val observability: ObservabilityConfig,
     val accessControl: AccessControlConfig,
@@ -30,7 +29,6 @@ data class ServerConfig(
         fun fromEnv(env: Env = Env()): ServerConfig = ServerConfig(
             http = HttpConfig.fromEnv(env),
             database = DatabaseConfig.fromEnv(env),
-            supabase = SupabaseConfig.fromEnv(env),
             sentry = SentryConfig.fromEnv(env),
             observability = ObservabilityConfig.fromEnv(env),
             accessControl = AccessControlConfig.fromEnv(env),
@@ -42,8 +40,8 @@ data class ServerConfig(
 
 /**
  * Token-gated admin endpoints (the config admin API under `/v1/admin/config`).
- * The caller is a machine or the admin console, not a Supabase user, so these
- * routes take an `X-Admin-Token` header instead of a JWT. With [apiToken]
+ * The caller is a machine or the admin console, and the server has no notion of
+ * a user, so these routes take an `X-Admin-Token` header. With [apiToken]
  * unset the admin routes aren't mounted — the server runs with remote config
  * read-only.
  */
@@ -149,45 +147,6 @@ data class ObservabilityConfig(
                 ?: SentryConfig.environmentFromFlyAppName(env),
             release = env["OTEL_SERVICE_VERSION"] ?: env["SENTRY_RELEASE"],
         )
-    }
-}
-
-/**
- * Settings for verifying Supabase-issued JWTs.
- *
- * Supabase signs JWTs with ES256 (asymmetric). The server fetches the project's
- * public keys from `<projectUrl>/auth/v1/.well-known/jwks.json` at runtime and
- * verifies signatures against them — no shared secret lives on the server.
- *
- * Nullable: with no `SUPABASE_URL` the server boots without authenticated routes
- * (the `/v1/me` endpoint isn't mounted). Set it to enable auth.
- *
- * [serviceRoleKey] is the project's service_role JWT, required for Admin API
- * calls (e.g. `DELETE /auth/v1/admin/users/<id>` for account deletion).
- * Optional because most routes don't need it — endpoints that do (see
- * `DELETE /v1/me`) respond 503 NotConfigured when it isn't set, so
- * non-deletion deployments stay functional. Treat as a root password: never
- * log it, never return it from any endpoint.
- */
-data class SupabaseConfig(
-    /** e.g. `https://abcdefgh.supabase.co`. */
-    val projectUrl: String,
-    val serviceRoleKey: String? = null,
-) {
-    /** Issuer the Auth service stamps on every JWT it issues. */
-    val expectedIssuer: String get() = "$projectUrl/auth/v1"
-
-    /** Discovery endpoint for the project's public signing keys. */
-    val jwksUrl: String get() = "$projectUrl/auth/v1/.well-known/jwks.json"
-
-    companion object {
-        fun fromEnv(env: Env): SupabaseConfig? =
-            env["SUPABASE_URL"]?.trimEnd('/')?.let {
-                SupabaseConfig(
-                    projectUrl = it,
-                    serviceRoleKey = env["SUPABASE_SERVICE_ROLE_KEY"],
-                )
-            }
     }
 }
 

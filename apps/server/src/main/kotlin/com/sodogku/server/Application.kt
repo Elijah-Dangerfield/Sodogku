@@ -23,7 +23,6 @@ import com.sodogku.server.routes.configAdminRoutes
 import com.sodogku.server.routes.exampleRoutes
 import com.sodogku.server.routes.healthRoutes
 import io.ktor.server.application.Application
-import io.ktor.server.auth.authenticate
 import io.ktor.server.routing.routing
 import org.slf4j.LoggerFactory
 
@@ -32,20 +31,17 @@ import org.slf4j.LoggerFactory
  * plugins/ and routes/ packages own their concerns and this wires them together
  * in the right order.
  *
- *  - [module] does production-only setup (observability, the DB connection),
- *    builds the DI graph, and picks the JWT verification strategy, then
- *    delegates to [installApp].
+ *  - [module] does production-only setup (observability, the DB connection) and
+ *    builds the DI graph, then delegates to [installApp].
  *  - [installApp] installs the functional plugins + mounts every route. It is
  *    the seam reused by full-stack tests: a test builds a [ServerComponent]
- *    against a Testcontainers database and passes a [JwtVerification.Static]
- *    verifier to exercise the real plugins + routes + DB.
+ *    against a Testcontainers database and gets the real plugins + routes + DB.
  *
  * Graceful degradation: with no `DATABASE_URL` the server runs in limited mode
- * (health + example); with no `SUPABASE_URL` the authenticated `/v1/me` route
- * isn't mounted. Either way it boots — so you can clone and run with zero config.
+ * (health + example) and still boots, so you can clone and run with zero config.
  *
- * Order matters: serialization before status pages (so error envelopes encode),
- * auth after serialization (the 401 challenge writes a JSON body), CORS early.
+ * Order matters: serialization before status pages, so error envelopes encode.
+ * CORS early.
  */
 fun Application.module(config: ServerConfig) {
     val logger = LoggerFactory.getLogger("Bootstrap")
@@ -66,7 +62,7 @@ fun Application.module(config: ServerConfig) {
         logger.warn("DATABASE_URL not set — limited mode (no DB-backed routes). See apps/server/README.md.")
     }
 
-    val component = database?.let { ServerComponent::class.create(it, config.supabase) }
+    val component = database?.let { ServerComponent::class.create(it) }
     installApp(
         component = component,
         adminConfig = config.admin,
@@ -86,11 +82,10 @@ fun Application.module(config: ServerConfig) {
 
 /**
  * Installs the functional plugins + every route. Shared by production [module]
- * and full-stack tests (which pass a real [component] + a [JwtVerification.Static]).
+ * and full-stack tests, which pass a real [component].
  *
- * [component] is null only in limited mode (no `DATABASE_URL`); [verification] is
- * null only when Supabase isn't configured. Health + the example resource are
- * always served.
+ * [component] is null only in limited mode (no `DATABASE_URL`). Health + the
+ * example resource are always served.
  */
 fun Application.installApp(
     component: ServerComponent?,

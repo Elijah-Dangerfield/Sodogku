@@ -432,8 +432,8 @@ least urgent item here for that reason.
 - One **Supabase project per environment** for `DATABASE_URL`. Steps at
   `apps/server/DEPLOY.md:24-48`.
 - Fly secrets per app: `DATABASE_URL`, `ADMIN_API_TOKEN`
-  (`openssl rand -hex 32`), optionally `SUPABASE_URL`,
-  `SUPABASE_SERVICE_ROLE_KEY`, `SENTRY_DSN`, `APPEAL_URL`.
+  (`openssl rand -hex 32`), optionally `SENTRY_DSN` and `APPEAL_URL`. The server
+  reads no Supabase credential any more; Supabase is only the Postgres host.
 
 Failure is silent: with no `DATABASE_URL` the server starts in limited mode and
 `/v1/app-config` is simply not mounted.

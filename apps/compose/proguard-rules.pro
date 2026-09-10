@@ -115,7 +115,7 @@
 # ---------------------------------------------------------------------------
 # Third parties with JVM-only branches that Android never reaches
 # ---------------------------------------------------------------------------
-# Ktor, Supabase, Sentry and Room ship their own consumer rules. These cover the
+# Ktor, Sentry and Room ship their own consumer rules. These cover the
 # warnings left over from code paths that only exist on a desktop JVM.
 -dontwarn org.slf4j.**
 -dontwarn java.lang.management.**

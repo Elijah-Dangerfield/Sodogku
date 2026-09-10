@@ -1,6 +1,5 @@
 package com.sodogku.server.di
 
-import com.sodogku.server.config.SupabaseConfig
 import com.sodogku.server.db.Database
 import com.sodogku.server.domain.AppConfigAdminRepository
 import com.sodogku.server.domain.AppConfigManifestRepository
@@ -24,7 +23,7 @@ import kotlin.time.ExperimentalTime
  *
  * ```
  * val component = ServerComponent::class.create(database)
- * routing { meRoutes(component.profileRepository) }
+ * routing { appConfigRoutes(component.appConfigSource) }
  * ```
  *
  * Add a new service: annotate its impl with `@ContributesBinding(ServerScope::class)`,
@@ -39,11 +38,6 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 abstract class ServerComponent(
     @get:Provides val database: Database,
-    /**
-     * Null when Supabase isn't configured — consumers degrade (the admin
-     * client answers NotConfigured) instead of failing at construction.
-     */
-    @get:Provides val supabaseConfig: SupabaseConfig? = null,
 ) {
     abstract val exampleSource: ExampleSource
     abstract val appConfigSource: AppConfigSource

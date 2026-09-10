@@ -1,19 +1,19 @@
 # Sodogku
 
-A Kotlin Multiplatform template with the production systems already wired — not a hello-world scaffold. It carries the hardened patterns of a shipped KMP app (Compose Multiplatform client, Ktor server on Fly.io, Supabase auth) so a new project starts at "day 30", not day 0.
+A Kotlin Multiplatform template with the production systems already wired — not a hello-world scaffold. It carries the hardened patterns of a shipped KMP app (Compose Multiplatform client, Ktor server on Fly.io) so a new project starts at "day 30", not day 0.
 
 ## What you get, working, on day one
 
 **Client (Android + iOS from one codebase)**
-- Anonymous-first **Supabase auth**: guest creation in onboarding, email/password + Sign in with Apple + browser OAuth, encrypted session storage (Keychain / EncryptedSharedPreferences), session self-heal, blocking screens for expired sessions and banned accounts
+- **No accounts, on purpose**: no sign-in, no user-scoped server state, progress is device-local. The seams that once carried them are gone; see "No accounts" in AGENTS.md
 - **Offline detection that tells the truth** — OS connectivity combined with witnessed request reachability, driving an offline banner and a `ConnectivityRegained` event
-- **Triggered sync**: implement one idempotent `sync()`, register it, and it runs on sign-in, foreground, and reconnect with retry — plus an offline-write outbox pattern with a shipped reference
+- **Triggered sync**: implement one idempotent `sync()`, register it, and it runs on foreground and reconnect with retry — plus an offline-write outbox pattern with a shipped reference
 - **Remote config end-to-end**: typed `ConfiguredValue`s, offline-first fetch with kill-switch flags (`upgrade.maintenanceMode`, forced-upgrade), QA overrides, and a hosted **admin console** (Kotlin/JS) with targeting rules, audit log, and prod confirm-by-typing
 - **Telemetry that answers pages**: one `session_id` pivots Sentry issues, Grafana Loki logs, and Tempo traces; structured `logEvent`s ship over OTLP with disk-buffered durability; MetricKit exit reports on iOS
 - **Dev tooling**: shake for the QA dialog, on-device Wiretap network inspector (debug-only, noop artifact in store builds), a living design-system catalog, in-app review prompting with sane eligibility gates
 
 **Server (Ktor + Postgres, deploys to Fly.io)**
-- Supabase JWT verification, ban gate (403 envelope the client understands), player reports (Google Play UGC compliance), account deletion (`DELETE /v1/me`), remote-config source + admin API, session-correlated tracing/logging
+- Remote-config source + token-gated admin API, ban gate (403 envelope the client understands), session-correlated tracing/logging. No auth plugin and no user data
 - Boots gracefully with zero config (limited mode) and ships a docker-compose local stack
 - Two environments: dev auto-deploys on merge, prod behind an approval gate
 
@@ -46,7 +46,7 @@ docker compose -f apps/server/docker-compose.yml up -d
 
 ### First-time setup
 
-See **[SETUP.md](SETUP.md)** for the hour-1/day-1 runbook — Supabase project + auth providers, Fly dev/prod apps, GitHub secrets, Sentry/Grafana keys, store listings, and the first-release manual-promotion gotcha. Each step has the command and the expected output.
+See **[SETUP.md](SETUP.md)** for the hour-1/day-1 runbook — Fly dev/prod apps, GitHub secrets, Sentry/Grafana keys, store listings, and the first-release manual-promotion gotcha. Each step has the command and the expected output.
 
 Before your first commit:
 

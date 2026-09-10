@@ -29,16 +29,10 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.logback.classic)
 
-    // Outbound HTTP (Supabase Admin API client)
+    // Outbound HTTP (the config-change webhook)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.contentNegotiation)
-
-    // Auth — verify Supabase-issued JWTs (JWKS / ES256).
-    implementation(libs.ktor.serverAuth)
-    implementation(libs.ktor.serverAuthJwt)
-    implementation(libs.auth0.jwt)
-    implementation(libs.auth0.jwksRsa)
 
     // Rate limiting + observability. Sentry is a no-op until SENTRY_DSN is set;
     // OpenTelemetry exports to stdout until OTEL_EXPORTER_OTLP_ENDPOINT is set.

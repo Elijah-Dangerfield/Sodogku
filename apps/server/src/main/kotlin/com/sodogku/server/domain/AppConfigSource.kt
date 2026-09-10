@@ -8,14 +8,12 @@ import kotlinx.serialization.json.JsonObject
  * (`PostgresAppConfigSource`); routes depend on this interface, not the
  * concrete implementation, so swapping the source is a one-line DI change.
  *
- * Reads are scoped to the requesting client via [ClientContext] and, when the
- * call presents a Supabase JWT, the resolved [userId]. That's how per-flag
- * targeting and staged rollouts resolve server-side without the client model
- * ever changing: the endpoint still returns a *resolved* override tree keyed by
- * `ConfiguredValue.path`, the client just merges it over its defaults. [userId]
- * is null for the unauthenticated first-launch fetch — targeting then falls
- * back to the client-context axes (platform / app version / country / locale)
- * and install-id rollout bucketing.
+ * Reads are scoped to the requesting client via [ClientContext] alone. That's
+ * how per-flag targeting and staged rollouts resolve server-side without the
+ * client model ever changing: the endpoint returns a *resolved* override tree
+ * keyed by `ConfiguredValue.path` and the client merges it over its defaults.
+ * The axes are platform, app version, country, locale, and install-id rollout
+ * bucketing. There is no user axis, because there are no users.
  */
 fun interface AppConfigSource {
     /** Returns the resolved config tree for this caller, keyed by ConfiguredValue.path. */
