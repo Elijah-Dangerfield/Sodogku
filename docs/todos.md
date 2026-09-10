@@ -445,3 +445,39 @@ or the next app generated from it ships the same credential. The template keeps
 **Hints:** Start from `Versioning.kt:138,150` and work outward. `PROFILE_WRITE_LIMIT`
 on the server was left in place deliberately by the SD-30 agent because that
 todo named only two rate limits; decide whether it goes too.
+
+## SD-34 [P1] — There is no way to test a composable
+
+**Found by:** the SD-26 investigation, 2026-09-10.
+
+A grep for `runComposeUiTest`, `ComposeUiTest` and `createComposeRule` returns
+nothing, and the version catalog has no Compose test artifact. Every test in this
+repo is a ViewModel test, a pure-function test or an integration test that reads
+source files as text. Nothing has ever asserted against a composition.
+
+**This is what SD-26 is stuck behind.** The suspected fault is an entry left in
+`NavController.transitionsInProgress` because a `DisposableEffect` in
+`FloatingWindowHost` never disposed, which is a statement about recomposition and
+cannot be proved or ruled out from a ViewModel test. The reported sequence is
+four navigations long (sheet open, sheet popped, dialog pushed, dialog popped)
+and would be about twenty lines to drive with a composition under test.
+
+**Done when:** a test can compose something, act on it, and assert, on at least
+the JVM target, and one real test exists that would have caught a bug we shipped.
+
+**Hints:** `org.jetbrains.compose.ui:ui-test-junit4` for the JVM/desktop target
+is the cheap way in and covers everything in `libraries/ui` and every entry
+point. Do not start by trying to cover the board: the board's gestures are the
+hardest thing here and a first attempt at them will produce a flaky test that
+teaches everybody to distrust the tier.
+
+Two candidates worth writing first, because both are known-hard and currently
+unguarded. The `FloatingWindowHost` transition-completion sequence above. And
+`AnimatedStateReadInComposition`, the custom detekt rule, which catches the
+static shape of a per-frame read but cannot catch one that is laundered through
+a helper.
+
+Weigh this against what it costs. A UI test tier that nobody trusts is worse
+than none, so the bar is that it runs in CI, does not flake, and fails for a real
+reason. If the first two tests cannot meet that, say so and close this rather
+than leaving a tier half built.
