@@ -112,29 +112,6 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
-## SD-9 [P1] — There is no leaderboard at all on Android
-
-**Ask:** `RealLeaderboards` is bound to `NoGameServices` on Android, which
-reports `Unavailable` from construction and never changes its mind. So
-`isOfferable` stays false, no entry point is ever drawn, and every score is
-collected and never flushed. Meowdoku ships a global board on Android, which is
-where most of this genre's installs are.
-
-**Done when:** An Android player can reach the same leaderboard entry point iOS
-draws, a `LifetimeScore` submission is accepted, and the platform's own
-dashboard opens.
-
-**Hints:** `libraries/leaderboards/impl/src/androidMain/.../NoGameServices.kt`
-already names the whole mapping in its doc comment: `GamesSignInClient` answers
-`startAuthentication`, `LeaderboardsClient.submitScore(id, value)` answers
-`submit`, `getLeaderboardIntent` answers `presentDashboard`. Play mints its own
-ids, so `Leaderboard` needs a second id per board and a resolver in the shape of
-`AdUnits.android(format)`.
-
-Two things that are not true of Game Center: Play Games sign-in can fail for a
-player who has never opted into a Games profile, which is a normal state and not
-an error, and the console needs the boards created and published before a
-submission is anything but a silent no-op.
 ## SD-13 [P1] — 500 levels is not a campaign
 
 **Ask:** Meowdoku reviewers report being at level 1912 and past 1000. Ours ends
@@ -496,7 +473,6 @@ has nothing to do with what it asserts is a test people re-run instead of read.
 already there to copy: an `onEnter` filter excluding `build`, `.git` and
 `.claude`. Check every other source-walking test in `:apps:integration` in the
 same pass rather than fixing the one that happened to fail.
-
 ## SD-39 [P1] — `iap.*` outcomes are class names, and R8 renames them in the Play build
 
 **Ask:** `iap.purchase_result` and `iap.restore_result` send `outcome` as
@@ -534,7 +510,6 @@ a class.
 the contract test is not the place for this; a `CheckReleaseMapping`-style test that
 reads `mapping.txt` when it exists would be. Filed by the SD-6 telemetry review,
 2026-09-10.
-
 ## SD-40 [P2] — `placement` is two vocabularies, so the refill cannot be joined to its ad
 
 **Ask:** `game.bones_refilled` emits `"placement" to placement.name`
@@ -565,7 +540,6 @@ returns both. The doc row is corrected in the same change.
 property, and delete the impl-private extension in `AdPlacements.kt:24`. The other
 `.name` emits in the surface (`step`, `board`, `outcome` on `daily.reviewed`) are enum
 names on both ends and are fine. Filed by the SD-6 telemetry review, 2026-09-10.
-
 ## SD-41 [P2] — The sampling test passes whether or not sampling happens
 
 **Ask:** `GrafanaLogTreeTest.samplingIsStablePerSession` sets the rate to 0.5, emits two
@@ -592,7 +566,6 @@ not, and the mutation above goes red.
 **Hints:** `GrafanaLogTreeTest.kt:165`. The stability property the existing test wants
 is still worth keeping; it just needs the two-id boundary test beside it. Filed by the
 SD-6 telemetry review, 2026-09-10.
-
 ## SD-42 [P2] — "The practice board emits no `game.*` events" is pinned for one of them
 
 **Ask:** The registry and two long comments in `GameViewModel` say the tutorial board
@@ -620,7 +593,6 @@ the mutation above goes red.
 **Hints:** `GameViewModelTest.aPlayerWithNoBonesLeftCanStillBeTaught` shows how to drive
 the rehearsal (`vm.driveTo(TutorialStep.…)`); `RecordingEvents.all` already exists for
 exactly this assertion. Filed by the SD-6 telemetry review, 2026-09-10.
-
 ## SD-43 [P2] — Log redaction runs on one of the three sinks
 
 **Ask:** `redactSecrets` (`LogRedaction.kt:22`) has exactly one caller,
@@ -653,7 +625,6 @@ bearer token in a Warn line does not reach it. Or, if per-tree is preferred,
 through; `LogEntry` is a data class so a scrubbed copy is cheap. `redactSecrets` is
 `internal` to `:libraries:core`, which the engine is in, so no visibility change is
 needed for that placement. Filed by the SD-6 telemetry review, 2026-09-10.
-
 ## SD-44 [P2] — The event registry and the dashboard prose have drifted from the code
 
 **Ask:** `docs/practices/app-events.md` calls itself the source of truth for names and
@@ -703,7 +674,6 @@ table is empty or true, and the two dashboard descriptions match the emit site.
 against a parse of the registry's tables so an emitted event with no row fails, which is
 the same shape as the existing dashboard check and cheaper than remembering. Filed by
 the SD-6 telemetry review, 2026-09-10.
-
 ## SD-45 [P2] — `ads.result.latency_ms` is the only wall-clock duration in the surface
 
 **Ask:** `RealAdGate` measures ad latency as `now() - started` where `now()` is
@@ -729,7 +699,6 @@ windows, which do need calendar time.
 **Hints:** `LifecycleAppEventLogger` shows the injected `TimeSource` pattern with a
 `@Inject constructor() : this(TimeSource.Monotonic)` secondary. Filed by the SD-6
 telemetry review, 2026-09-10.
-
 ## SD-46 [P2] — Two PII seams on `Telemetry` that nothing uses and the policy promises never will
 
 **Ask:** `Telemetry.setUser(email, name, id)` (`Telemetry.kt:6`, implemented at
@@ -754,7 +723,6 @@ the policy already describes.
 
 **Hints:** `Telemetry.kt`, `AppTelemetry.kt`, `FeedbackRepository.kt`. No Swift caller:
 `grep setUser apps/ios` is empty. Filed by the SD-6 telemetry review, 2026-09-10.
-
 ## SD-47 [P1] — Five paws looks unreachable on a run that deserves it
 
 **Ask:** Owner, 2026-09-10, two reports ninety seconds apart on `GameRoute`:
@@ -791,7 +759,6 @@ the answer is the multipliers, not the thresholds.
 itself part of the question. The three `Stat.BestScore` achievements derive from
 `parScore` and must stay reachable. Provenance: Sentry SODOGKU-B and SODOGKU-C,
 session `fd9affc0`, 2026-09-10.
-
 ## SD-48 [P1] — A rewarded ad is a way to reproduce SD-26
 
 **Ask:** Owner, 2026-09-10, on `GameRoute`: *"both the levels button and the start
@@ -828,7 +795,6 @@ host lifecycle state and every back stack entry's state while this is happening.
 Reproduce it with logs attached and the answer is in the report.
 
 Provenance: Sentry SODOGKU-A and SODOGKU-9, session `95dd30d1`, 2026-09-10.
-
 ## SD-49 [P1] — Losing a board dead-ends, and giving up on the daily dead-ends harder
 
 **Ask:** Owner, 2026-09-10, twice. On the fail dialog: *"I'm also not really sure
@@ -857,7 +823,6 @@ over `play_day` and counts any finished board, so a daily restart is no longer
 the same question it was.
 
 Provenance: Sentry SODOGKU-9 and SODOGKU-5, session `95dd30d1`, 2026-09-10.
-
 ## SD-50 [P2] — The achievements page does not look like the rest of the app
 
 **Ask:** Owner, 2026-09-10, on `AchievementsRoute`: *"The UI of the achievements
@@ -875,7 +840,6 @@ event rather than a row changing color. Use design-system components; a screen
 built out of raw values will fail `NoRawDesignValues`.
 
 Provenance: Sentry SODOGKU-8, session `95dd30d1`, 2026-09-10.
-
 ## SD-51 [P2] — Nothing tells a player the missing starting dog is deliberate
 
 **Ask:** Owner, 2026-09-10: *"we pretty quickly start giving us those puzzles that
@@ -900,7 +864,6 @@ reason copy does. It has to be dismissible and must not fire on the rehearsal
 board, which always has a dog.
 
 Provenance: Sentry SODOGKU-7, session `95dd30d1`, 2026-09-10.
-
 ## SD-52 [P2] — The timer is small and the boosters barely ask
 
 **Ask:** Owner, 2026-09-10: *"let's make the timer text just slightly bigger and
