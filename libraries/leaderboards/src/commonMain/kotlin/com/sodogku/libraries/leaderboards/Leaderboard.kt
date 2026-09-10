@@ -59,25 +59,37 @@ package com.sodogku.libraries.leaderboards
  * platform ([GameServices.currentWindowStart]) rather than worked out here —
  * the daily above is what happens when a client invents a window.
  *
- * ## The ids
+ * ## The ids, two per board
  *
  * They are committed constants rather than remote config, for the reason
  * `AdUnits` gives: an id is a store operation, and a config outage that blanked
- * one would take the board down with it. They are typed by hand into App Store
- * Connect and must match exactly. Getting one wrong is silent, and it looks like
- * a board nobody is on.
+ * one would take the board down with it. Getting one wrong is silent, and it
+ * looks like a board nobody is on.
  *
- * [id] is the Game Center id. Google Play Games is out of scope, and when it is
- * not, its console mints its own ids; that arrives as a second property here and
- * a resolver like `AdUnits.android(format)`, not as a different interface.
+ * [appleId] is the Game Center id, typed by hand into App Store Connect and
+ * matched by string. [playId] is the Play Games id for the same board, and it
+ * is not typed by hand: the Play Console mints an opaque id (`CgkI…`) when the
+ * board is created, so the value has to be copied back out of the console into
+ * this file. Until somebody does that it is empty, which every Android caller
+ * reads as "no board here" and skips — see `PlayGamesServices`.
+ *
+ * The two id spaces never meet. Submitting a Game Center id to Play is a
+ * rejection Play does not explain, so `PlayGamesServicesTest` pins which of the
+ * two reaches the platform.
  */
-enum class Leaderboard(val id: String) {
+enum class Leaderboard(val appleId: String, val playId: String) {
 
     /** Every point the player has ever banked, campaign and daily together. */
-    LifetimeScore("com.sodogku.leaderboard.lifetime_score"),
+    LifetimeScore(
+        appleId = "com.sodogku.leaderboard.lifetime_score",
+        playId = "",
+    ),
 
     /** The longest run of consecutive dailies the player has ever finished. */
-    LongestStreak("com.sodogku.leaderboard.longest_streak"),
+    LongestStreak(
+        appleId = "com.sodogku.leaderboard.longest_streak",
+        playId = "",
+    ),
 
     /**
      * Points banked inside the window Game Center currently has open, campaign
@@ -87,6 +99,18 @@ enum class Leaderboard(val id: String) {
      * and the only one submitted through [Leaderboards.submitWindowed]. Both of
      * those are the same fact: the value depends on when the window opened, and
      * only the platform knows that.
+     *
+     * **[playId] is empty here permanently, and that is the answer rather than
+     * a gap.** Play Games has no recurring board. It splits one board into
+     * daily, weekly and all-time views by the time a score was submitted
+     * (`LeaderboardVariant.TIME_SPAN_WEEKLY`), so the weekly standing an Android
+     * player wants is already a tab on the lifetime board and a second board
+     * would only halve the room. There is also nothing to ask for a window
+     * start, which is why `GameServices.currentWindowStart` answers `null` on
+     * Android and this board is never submitted there at all.
      */
-    WeeklyScore("com.sodogku.leaderboard.weekly_score"),
+    WeeklyScore(
+        appleId = "com.sodogku.leaderboard.weekly_score",
+        playId = "",
+    ),
 }

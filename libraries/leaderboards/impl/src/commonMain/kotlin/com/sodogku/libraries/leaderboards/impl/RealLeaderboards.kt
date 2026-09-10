@@ -146,7 +146,7 @@ class RealLeaderboards(
 
     override fun openDashboard(board: Leaderboard?) {
         appScope.launch {
-            Catching { services.presentDashboard(board?.id) }
+            Catching { services.presentDashboard(board) }
                 .logOnFailure { "Could not present the leaderboard dashboard" }
         }
     }
@@ -188,8 +188,8 @@ class RealLeaderboards(
      * way: held, silent, tried again on the next board.
      */
     private suspend fun sendWindowed(board: Leaderboard, points: WindowedScore) {
-        val windowStart = Catching { services.currentWindowStart(board.id) }
-            .logOnFailure { "Could not read the leaderboard window for ${board.id}" }
+        val windowStart = Catching { services.currentWindowStart(board) }
+            .logOnFailure { "Could not read the leaderboard window for ${board.name}" }
             .getOrNull()
             ?: return
 
@@ -203,7 +203,7 @@ class RealLeaderboards(
         }
 
         val value = Catching { points.bankedSince(windowStart) }
-            .logOnFailure { "Could not price ${board.id} against its window" }
+            .logOnFailure { "Could not price ${board.name} against its window" }
             .getOrNull()
             ?: return
 
@@ -216,8 +216,8 @@ class RealLeaderboards(
 
     /** True when the platform took it, which is the only thing worth forgetting a hold for. */
     private suspend fun send(board: Leaderboard, value: Long): Boolean {
-        val result = Catching { services.submit(board.id, value) }
-            .logOnFailure { "Leaderboard submit threw for ${board.id}" }
+        val result = Catching { services.submit(board, value) }
+            .logOnFailure { "Leaderboard submit threw for ${board.name}" }
             .getOrDefault(SubmitResult.Failed)
 
         if (result != SubmitResult.Submitted) {

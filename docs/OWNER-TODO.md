@@ -529,6 +529,113 @@ that list on its own once it is live.
 
 ---
 
+## 16. Play Games Services, so Android has leaderboards at all
+
+Until this change Android had no leaderboards of any kind. It does now, in
+code: the app talks to Play Games Services exactly the way it talks to Game
+Center, and the Leaderboards row in Settings appears on an Android phone the
+same way it appears on an iPhone. What it cannot do is invent the boards. Play
+mints the ID for a board when you create it, so the two IDs the app needs do
+not exist anywhere until you have been through the console.
+
+Nothing is broken while this is undone. The app checks whether it has any Play
+board IDs before it calls Play at all, finds none, reports the platform
+unavailable, and draws no row. An Android player today sees exactly what they
+saw last week.
+
+**Two boards, not three.** Game Center got three in item 4 and item 15. Play
+gets two, and the missing one is deliberate rather than an oversight: Play has
+no recurring leaderboard. It takes a single board and shows it three ways,
+Today, This Week and All Time, working out which scores belong in which from
+the time each one was submitted. So the weekly standing is already a tab on the
+lifetime board, and a separate Weekly Score board would split the same players
+across two rooms and rank them twice. The app knows this and never submits a
+weekly score on Android.
+
+Everything below is in the Play Console, in the app you created in item 5, under
+**Grow users**, then **Play Games Services**, then **Setup and management**.
+
+### a. Create the Play Games Services project
+
+Open **Configuration**. Choose to create a new Play Games Services project and
+give it a name (`Sodogku` is fine, it is internal). Save.
+
+The page then shows a **Project ID**, a twelve digit number. Copy it. It goes
+into `apps/compose/src/androidMain/res/values/strings.xml`, into the empty
+`play_games_project_id` string, and from there into the manifest, which is
+where the SDK reads it before any of the app's own code runs. It has to be a
+string resource rather than typed into the manifest directly, because Android
+would read a bare numeral as an integer and the number is too big for one.
+
+### b. Add the credentials, which is the step that goes wrong
+
+Still under **Configuration**, add a credential of type **Android**. Play needs
+to recognize the app by its package name and the fingerprint of the key it was
+signed with, and it refuses sign-in silently when it does not.
+
+- Package name is `com.sodogku`, the same one in item 5.
+- The console will walk you through creating an OAuth client for it. Let it.
+- **Add a second credential for the debug key as well.** This is the trap. The
+  release fingerprint comes from Play App Signing and covers what players
+  install; a build installed from Android Studio is signed with the local debug
+  key, and with only the release credential registered it will fail sign-in
+  with no message anywhere. The debug key's SHA-1 comes from
+  `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey
+  -storepass android -keypass android`. Without this you cannot test any of
+  this yourself.
+
+### c. Create the two leaderboards
+
+Open **Leaderboards**, then **Create leaderboard**, twice.
+
+For both: **Score format** Numeric with 0 decimal places, **Ordering** Larger
+is better, no maximum. Play always keeps a player's best score, so there is no
+equivalent of the Best Score choice item 15 makes for Game Center. Each one
+needs a display name and a 512 by 512 icon, same requirement as the Game Center
+boards.
+
+| Name to show players | What it is | Where its ID goes |
+|---|---|---|
+| `Lifetime Score` | Every point banked, campaign and daily together | `Leaderboard.LifetimeScore`, the `playId` field |
+| `Longest Streak` | The longest run of consecutive days played | `Leaderboard.LongestStreak`, the `playId` field |
+
+After you save each one the list shows an ID that looks like
+`CgkI8s6Wl-0dEAIQAQ`. Copy it exactly. It goes into
+`libraries/leaderboards/src/commonMain/kotlin/com/sodogku/libraries/leaderboards/Leaderboard.kt`,
+into the `playId = ""` next to the matching board. The `appleId` on the same
+line is the Game Center one and stays as it is. Do not put a Play ID in the
+`appleId` slot or the other way round: both are matched by string, both fail
+silently, and both look like a board nobody is on.
+
+`WeeklyScore` keeps `playId = ""`. That is its finished state, for the reason
+at the top.
+
+### d. Add yourself as a tester, then publish
+
+Open **Testers** and add your own Google account. An unpublished Play Games
+Services project refuses sign-in for anyone who is not on that list, and the
+refusal is quiet, so this looks identical to a wrong fingerprint.
+
+Then **Publish** the Play Games Services project. This is its own button and
+its own review, separate from publishing an app release, the same way Game
+Center leaderboards are reviewed separately from the app.
+
+### e. What the player sees when it is live
+
+A Leaderboards row in Settings on Android, the same row iOS has. Tapping it
+opens Google's own leaderboard screen. A player who has never made a Play Games
+profile gets offered one at that point, and only at that point: the app never
+raises a sign-in sheet on its own, and a player who declines carries on with a
+game that behaves exactly as it did before.
+
+One side effect worth knowing about, because it is Google's doing and not ours.
+Adding the Play Games SDK adds shortcuts to the app's icon long press menu on
+Android, pointing at the Play Games profile and achievements. It appears once
+the project above is live, it is not something the app asks for, and it is not
+something the app can turn off.
+
+---
+
 ## Checked and genuinely not needed
 
 Stated so nobody adds them by reflex.

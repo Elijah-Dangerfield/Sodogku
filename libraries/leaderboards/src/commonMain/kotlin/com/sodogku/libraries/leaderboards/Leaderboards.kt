@@ -14,10 +14,11 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * Note what the signatures refuse to offer. Nothing suspends and nothing
  * returns a result, so there is no way to write a call site that waits on a
  * leaderboard or branches on one. That is the fail-open rule made structural:
- * Game Center is absent when the player is signed out, restricted by Screen
- * Time, offline, or in a region without it, and in every one of those cases the
- * only correct behaviour is that the game does not notice. An API that handed
- * back a `Boolean` would eventually get an `if` written around it.
+ * the platform is absent when the player is signed out, restricted by Screen
+ * Time, offline, in a region without it, or on an Android device with no Play
+ * services and no Games profile, and in every one of those cases the only
+ * correct behaviour is that the game does not notice. An API that handed back a
+ * `Boolean` would eventually get an `if` written around it.
  *
  * The one thing callers may read is [isOfferable], and only to decide whether
  * to draw an entry point.
@@ -30,8 +31,8 @@ interface Leaderboards {
 
     /**
      * Whether showing the player a way into the leaderboards would lead
-     * anywhere. False on Android, false while authentication is unresolved, and
-     * false when the platform has said no.
+     * anywhere. False while authentication is unresolved, and false when the
+     * platform has said no.
      *
      * True includes [GameServicesStatus.SignInRequired], because opening the
      * dashboard in that state presents the sign-in screen we held back at
@@ -59,10 +60,11 @@ interface Leaderboards {
      * [points], and sends what comes back.
      *
      * [points] may be called late, more than once, or never — never being the
-     * normal case on Android and for a signed-out player, because a window that
-     * cannot be established is a submission that does not happen. Write it as a
-     * fresh read rather than a captured number; if it is called a second time,
-     * a second answer is the right answer.
+     * normal case for a signed-out player and the *only* case on Android, where
+     * Play Games has no recurring board to have a window. A window that cannot
+     * be established is a submission that does not happen. Write it as a fresh
+     * read rather than a captured number; if it is called a second time, a
+     * second answer is the right answer.
      */
     fun submitWindowed(board: Leaderboard, points: WindowedScore)
 

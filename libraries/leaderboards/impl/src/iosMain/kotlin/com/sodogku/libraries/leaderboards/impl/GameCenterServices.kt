@@ -5,6 +5,7 @@ import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.logging.KLog
 import com.sodogku.libraries.leaderboards.GameServices
 import com.sodogku.libraries.leaderboards.GameServicesStatus
+import com.sodogku.libraries.leaderboards.Leaderboard
 import com.sodogku.libraries.leaderboards.SubmitResult
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.coroutines.Dispatchers
@@ -108,7 +109,8 @@ class GameCenterServices : GameServices {
         }
     }
 
-    override suspend fun submit(leaderboardId: String, value: Long): SubmitResult {
+    override suspend fun submit(board: Leaderboard, value: Long): SubmitResult {
+        val leaderboardId = board.appleId
         val player = GKLocalPlayer.local
         if (!player.authenticated) return SubmitResult.NotAuthenticated
 
@@ -144,7 +146,8 @@ class GameCenterServices : GameServices {
      * nothing rather than sending a number measured against a window that does
      * not exist.
      */
-    override suspend fun currentWindowStart(leaderboardId: String): Long? {
+    override suspend fun currentWindowStart(board: Leaderboard): Long? {
+        val leaderboardId = board.appleId
         if (!GKLocalPlayer.local.authenticated) return null
 
         return Catching {
@@ -167,9 +170,9 @@ class GameCenterServices : GameServices {
             .getOrNull()
     }
 
-    override suspend fun presentDashboard(leaderboardId: String?) {
+    override suspend fun presentDashboard(board: Leaderboard?) {
         withContext(Dispatchers.Main) {
-            Catching { present(leaderboardId) }
+            Catching { present(board?.appleId) }
                 .logOnFailure { "Could not present Game Center" }
         }
     }

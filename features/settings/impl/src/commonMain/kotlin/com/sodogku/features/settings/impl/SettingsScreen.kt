@@ -160,9 +160,9 @@ fun SettingsScreen(
                     ).takeIf { state.achievementsAvailable },
                     // In this card rather than one of its own, because to a
                     // player badges and standings are the same question. It is
-                    // also only ever drawn on iOS, and a lone row floating
-                    // between two cards on one platform is worse than a third
-                    // row on a card that is already there.
+                    // also drawn on some launches and not others, and a lone
+                    // row floating between two cards is worse than a third row
+                    // on a card that is already there.
                     //
                     // Hidden entirely when the platform has nothing to show,
                     // not disabled: there is no state in which explaining why

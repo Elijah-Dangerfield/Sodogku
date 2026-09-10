@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Sodogku</string>
+
+    <!--
+      The Play Games Services project number, read from AndroidManifest.xml by
+      the Play Games SDK before any Kotlin runs. Empty until the game exists in
+      the Play Console; see item 16 of docs/OWNER-TODO.md, which also lists the
+      board ids that go into Leaderboard.kt at the same time. Not player facing.
+    -->
+    <string name="play_games_project_id" translatable="false"></string>
 </resources>

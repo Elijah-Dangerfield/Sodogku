@@ -76,6 +76,23 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3940256099942544~3347511713" />
 
+        <!--
+          Play Games Services reads its project number from here, the way AdMob
+          reads its app id above, and for the same reason: the SDK is running
+          before any Kotlin is. The value has to be a string resource rather
+          than the number itself, because a bare numeral in a manifest attribute
+          is parsed as an integer and the project number does not fit in one.
+          There is no test project to point at, the way there is for ads, so
+          @string/play_games_project_id is empty until the Play Console exists.
+          Nothing reads a blank one: PlayGamesServices checks whether any board
+          has a Play id before it calls the SDK at all, and with none set it
+          reports the platform unavailable and no leaderboard row is drawn.
+          Item 16 of docs/OWNER-TODO.md is what fills both in.
+        -->
+        <meta-data
+            android:name="com.google.android.gms.games.APP_ID"
+            android:value="@string/play_games_project_id" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

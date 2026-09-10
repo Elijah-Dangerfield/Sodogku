@@ -44,6 +44,7 @@ opentelemetryInstrumentation = "2.11.0-alpha"
 opentelemetryKotlin = "0.5.0"
 okio = "3.9.1"
 playServicesAds = "24.9.0"
+playServicesGames = "22.0.0"
 userMessagingPlatform = "4.0.0"
 playBilling = "8.3.0"
 jetbrainsNavigationCompose = "2.9.1"
@@ -173,6 +174,10 @@ google-play-review-ktx = { module = "com.google.android.play:review-ktx", versio
 # `ReviewLauncher` takes.
 google-play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
 google-ump = { module = "com.google.android.ump:user-messaging-platform", version.ref = "userMessagingPlatform" }
+
+# Play Games Services v2, the Android half of `GameServices`. iOS reaches Game
+# Center through the GameKit platform bindings and needs nothing here.
+google-play-services-games = { module = "com.google.android.gms:play-services-games-v2", version.ref = "playServicesGames" }
 
 # Play Billing. SPEC 5.2 says "Play Billing 7"; 8.x is what Play actually
 # accepts for new releases now, and the migration is `QueryProductDetailsResult`

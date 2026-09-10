@@ -1,6 +1,7 @@
 package com.sodogku.libraries.leaderboards.impl
 
 import com.sodogku.libraries.leaderboards.GameServicesStatus
+import com.sodogku.libraries.leaderboards.Leaderboard
 import com.sodogku.libraries.leaderboards.SubmitResult
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -37,7 +38,7 @@ class GameCenterServicesTest {
 
     @Test
     fun aSubmissionWithNobodySignedInRefusesWithoutTouchingTheNetwork() = runTest {
-        val result = GameCenterServices().submit("com.sodogku.leaderboard.lifetime_score", 4_200L)
+        val result = GameCenterServices().submit(Leaderboard.LifetimeScore, 4_200L)
 
         assertEquals(SubmitResult.NotAuthenticated, result)
     }
@@ -47,7 +48,7 @@ class GameCenterServicesTest {
         // Same fail-open path, and the one that keeps the weekly board silent
         // rather than wrong: with no window there is no value to compute, so the
         // layer above never asks for one.
-        val start = GameCenterServices().currentWindowStart("com.sodogku.leaderboard.weekly_score")
+        val start = GameCenterServices().currentWindowStart(Leaderboard.WeeklyScore)
 
         assertNull(start)
     }

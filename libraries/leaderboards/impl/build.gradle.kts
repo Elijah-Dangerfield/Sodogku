@@ -27,5 +27,17 @@ kotlin {
             implementation(projects.libraries.flowroutines.testing)
             implementation(libs.kotlinx.coroutines.test)
         }
+
+        androidMain.dependencies {
+            implementation(libs.google.play.services.games)
+            // ActivityProvider (every Play Games entry point needs the
+            // foreground Activity) and AppEvents (the foreground edge the
+            // sign-in state is re-read on).
+            implementation(projects.libraries.sodogku)
+        }
+
+        androidUnitTest.dependencies {
+            implementation(projects.libraries.sodogku)
+        }
     }
 }

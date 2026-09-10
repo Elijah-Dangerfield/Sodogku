@@ -2,6 +2,7 @@ package com.sodogku.libraries.leaderboards.impl
 
 import com.sodogku.libraries.leaderboards.GameServices
 import com.sodogku.libraries.leaderboards.GameServicesStatus
+import com.sodogku.libraries.leaderboards.Leaderboard
 import com.sodogku.libraries.leaderboards.SubmitResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,11 +24,11 @@ class FakeGameServices(
 
     override val status: StateFlow<GameServicesStatus> = state
 
-    /** Every (leaderboardId, value) pair that reached the platform, in order. */
-    val submissions = mutableListOf<Pair<String, Long>>()
+    /** Every (board, value) pair that reached the platform, in order. */
+    val submissions = mutableListOf<Pair<Leaderboard, Long>>()
 
     /** Every dashboard request, including the nulls that mean "no focused board". */
-    val dashboards = mutableListOf<String?>()
+    val dashboards = mutableListOf<Leaderboard?>()
 
     var startCalls = 0
         private set
@@ -46,7 +47,7 @@ class FakeGameServices(
     var windowStart: Long? = null
 
     /** Every board asked about its window, so a test can prove it was asked once. */
-    val windowQueries = mutableListOf<String>()
+    val windowQueries = mutableListOf<Leaderboard>()
 
     fun becomes(next: GameServicesStatus) {
         state.value = next
@@ -56,18 +57,18 @@ class FakeGameServices(
         startCalls++
     }
 
-    override suspend fun submit(leaderboardId: String, value: Long): SubmitResult {
-        submissions += leaderboardId to value
+    override suspend fun submit(board: Leaderboard, value: Long): SubmitResult {
+        submissions += board to value
         if (throwOnSubmit) error("Game Center exploded")
         return result
     }
 
-    override suspend fun currentWindowStart(leaderboardId: String): Long? {
-        windowQueries += leaderboardId
+    override suspend fun currentWindowStart(board: Leaderboard): Long? {
+        windowQueries += board
         return windowStart
     }
 
-    override suspend fun presentDashboard(leaderboardId: String?) {
-        dashboards += leaderboardId
+    override suspend fun presentDashboard(board: Leaderboard?) {
+        dashboards += board
     }
 }

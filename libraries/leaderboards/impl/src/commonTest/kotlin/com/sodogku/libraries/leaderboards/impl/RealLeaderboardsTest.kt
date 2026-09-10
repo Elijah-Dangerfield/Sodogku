@@ -53,7 +53,7 @@ class RealLeaderboardsTest : CoroutineTest() {
         leaderboards().submit(Leaderboard.LifetimeScore, 4_200L)
 
         assertEquals(1, services.submissions.size)
-        assertEquals(Leaderboard.LifetimeScore.id to 4_200L, services.submissions.single())
+        assertEquals(Leaderboard.LifetimeScore to 4_200L, services.submissions.single())
     }
 
     @Test
@@ -64,8 +64,8 @@ class RealLeaderboardsTest : CoroutineTest() {
 
         assertEquals(
             listOf(
-                Leaderboard.LifetimeScore.id to 4_200L,
-                Leaderboard.LongestStreak.id to 9L,
+                Leaderboard.LifetimeScore to 4_200L,
+                Leaderboard.LongestStreak to 9L,
             ),
             services.submissions,
         )
@@ -79,8 +79,8 @@ class RealLeaderboardsTest : CoroutineTest() {
 
         assertEquals(
             listOf(
-                Leaderboard.LifetimeScore.id to 500L,
-                Leaderboard.LifetimeScore.id to 900L,
+                Leaderboard.LifetimeScore to 500L,
+                Leaderboard.LifetimeScore to 900L,
             ),
             services.submissions,
         )
@@ -98,7 +98,7 @@ class RealLeaderboardsTest : CoroutineTest() {
         leaderboards.submit(Leaderboard.LifetimeScore, 400L)
 
         assertEquals(1, services.submissions.size)
-        assertEquals(Leaderboard.LifetimeScore.id to 500L, services.submissions.single())
+        assertEquals(Leaderboard.LifetimeScore to 500L, services.submissions.single())
     }
 
     @Test
@@ -138,7 +138,7 @@ class RealLeaderboardsTest : CoroutineTest() {
         services.becomes(GameServicesStatus.Authenticated)
 
         assertEquals(1, services.submissions.size)
-        assertEquals(Leaderboard.LifetimeScore.id to 4_200L, services.submissions.single())
+        assertEquals(Leaderboard.LifetimeScore to 4_200L, services.submissions.single())
     }
 
     @Test
@@ -153,7 +153,7 @@ class RealLeaderboardsTest : CoroutineTest() {
         services.becomes(GameServicesStatus.Authenticated)
 
         assertEquals(1, services.submissions.size)
-        assertEquals(Leaderboard.LifetimeScore.id to 900L, services.submissions.single())
+        assertEquals(Leaderboard.LifetimeScore to 900L, services.submissions.single())
     }
 
     @Test
@@ -171,8 +171,8 @@ class RealLeaderboardsTest : CoroutineTest() {
 
         assertEquals(
             listOf(
-                Leaderboard.LifetimeScore.id to 500L,
-                Leaderboard.LifetimeScore.id to 500L,
+                Leaderboard.LifetimeScore to 500L,
+                Leaderboard.LifetimeScore to 500L,
             ),
             services.submissions,
         )
@@ -193,7 +193,7 @@ class RealLeaderboardsTest : CoroutineTest() {
         }
 
         assertEquals(MONDAY, askedAbout, "the window has to come from the platform, not from here")
-        assertEquals(Leaderboard.WeeklyScore.id to 900L, services.submissions.single())
+        assertEquals(Leaderboard.WeeklyScore to 900L, services.submissions.single())
     }
 
     @Test
@@ -223,7 +223,7 @@ class RealLeaderboardsTest : CoroutineTest() {
 
         services.becomes(GameServicesStatus.Authenticated)
 
-        assertEquals(Leaderboard.WeeklyScore.id to 900L, services.submissions.single())
+        assertEquals(Leaderboard.WeeklyScore to 900L, services.submissions.single())
     }
 
     @Test
@@ -261,8 +261,8 @@ class RealLeaderboardsTest : CoroutineTest() {
 
         assertEquals(
             listOf(
-                Leaderboard.WeeklyScore.id to 9_000L,
-                Leaderboard.WeeklyScore.id to 400L,
+                Leaderboard.WeeklyScore to 9_000L,
+                Leaderboard.WeeklyScore to 400L,
             ),
             services.submissions,
         )
@@ -294,8 +294,8 @@ class RealLeaderboardsTest : CoroutineTest() {
 
         assertEquals(
             listOf(
-                Leaderboard.WeeklyScore.id to 900L,
-                Leaderboard.WeeklyScore.id to 900L,
+                Leaderboard.WeeklyScore to 900L,
+                Leaderboard.WeeklyScore to 900L,
             ),
             services.submissions,
         )
@@ -323,8 +323,8 @@ class RealLeaderboardsTest : CoroutineTest() {
 
         assertEquals(
             listOf(
-                Leaderboard.WeeklyScore.id to 900L,
-                Leaderboard.WeeklyScore.id to 900L,
+                Leaderboard.WeeklyScore to 900L,
+                Leaderboard.WeeklyScore to 900L,
             ),
             services.submissions,
         )
@@ -347,7 +347,7 @@ class RealLeaderboardsTest : CoroutineTest() {
 
         leaderboards.submitWindowed(Leaderboard.WeeklyScore) { 900L }
 
-        assertEquals(Leaderboard.WeeklyScore.id to 900L, services.submissions.single())
+        assertEquals(Leaderboard.WeeklyScore to 900L, services.submissions.single())
     }
 
     // ------------------------------------------------------------------
@@ -366,8 +366,8 @@ class RealLeaderboardsTest : CoroutineTest() {
 
         assertEquals(
             listOf(
-                Leaderboard.LifetimeScore.id to 500L,
-                Leaderboard.LifetimeScore.id to 500L,
+                Leaderboard.LifetimeScore to 500L,
+                Leaderboard.LifetimeScore to 500L,
             ),
             services.submissions,
         )
@@ -404,14 +404,14 @@ class RealLeaderboardsTest : CoroutineTest() {
     fun openingTheDashboardForwardsTheBoard() = runUnitTest {
         leaderboards().openDashboard(Leaderboard.LongestStreak)
 
-        assertEquals(listOf<String?>(Leaderboard.LongestStreak.id), services.dashboards)
+        assertEquals(listOf<Leaderboard?>(Leaderboard.LongestStreak), services.dashboards)
     }
 
     @Test
     fun openingTheDashboardWithNoBoardAsksForNoFocus() = runUnitTest {
         leaderboards().openDashboard()
 
-        assertEquals(listOf<String?>(null), services.dashboards)
+        assertEquals(listOf<Leaderboard?>(null), services.dashboards)
     }
 
     @Test
@@ -421,7 +421,7 @@ class RealLeaderboardsTest : CoroutineTest() {
         val services = FakeGameServices(initial = GameServicesStatus.SignInRequired)
         RealLeaderboards(services, AppCoroutineScope(dispatchers)).openDashboard()
 
-        assertEquals(listOf<String?>(null), services.dashboards)
+        assertEquals(listOf<Leaderboard?>(null), services.dashboards)
     }
 
     private companion object {
