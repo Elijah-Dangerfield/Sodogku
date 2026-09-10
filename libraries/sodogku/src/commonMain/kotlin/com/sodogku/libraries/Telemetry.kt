@@ -68,6 +68,11 @@ interface Telemetry {
      * [includeLogs] attaches the in-memory session log tail. Default on: a
      * report without the logs around it usually costs a round trip to
      * reproduce, and the tail is redacted before it is ever buffered.
+     *
+     * Neither player-facing screen passes it, so the default is what actually
+     * ships, and both screens say so in `feedback_log_notice`. Changing the
+     * default changes what the app has told the player and what the privacy
+     * policy claims; move all three together.
      */
     fun captureUserFeedback(
         message: String,

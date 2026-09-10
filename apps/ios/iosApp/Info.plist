@@ -70,9 +70,12 @@
 		<string>processing</string>
 	</array>
 	<!--
-	  Custom-scheme deep links. `sodogku://login-callback` is the browser
-	  OAuth return trip and `sodogku://auth/confirmed` the verify-email
-	  redirect — .onOpenURL in iOSApp.swift forwards both to DeepLinkBridge.
+	  Custom-scheme deep links. Nothing claims a `sodogku://` URL today: the
+	  two that did (`login-callback` and `auth/confirmed`) were the Supabase
+	  sign-in return trips, and they went with accounts in C0. The scheme is
+	  kept registered, and .onOpenURL in iOSApp.swift still forwards whatever
+	  arrives to DeepLinkBridge, so a future link needs a route and not a
+	  plist change.
 
 	  Universal Links (https://...) require an `Associated Domains`
 	  entitlement (`applinks:example.com`) plus an

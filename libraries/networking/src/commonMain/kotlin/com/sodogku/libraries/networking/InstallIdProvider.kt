@@ -1,13 +1,14 @@
 package com.sodogku.libraries.networking
 
 /**
- * Per-installation identifier the client attaches to every authenticated
- * request via the `X-Install-Id` header (see [ClientHeaders.HEADER_INSTALL_ID]).
+ * Per-installation identifier the client attaches to every request via the
+ * `X-Install-Id` header (see [ClientHeaders.HEADER_INSTALL_ID]).
  *
  * The id is a UUID generated once on first launch and persisted locally; it
- * regenerates on reinstall (app-local storage is wiped). The server uses it
- * for L1 orphan-account cleanup — see
- * the install-id recovery design notes.
+ * regenerates on reinstall (app-local storage is wiped). It identifies the
+ * install rather than a person: there are no accounts for the server to tie it
+ * to, and it is there so one device's requests can be correlated with its own
+ * crash reports and logs.
  *
  * Implementations MUST be cheap and non-suspending — they're called on every
  * outgoing request. The expected shape is "hydrate once at boot, cache in

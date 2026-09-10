@@ -65,6 +65,22 @@ class FeedbackViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun aPlayerSubmissionAttachesTheSessionLogTheScreenPromises() = runUnitTest {
+        // The feedback screen prints `feedback_log_notice`, which tells the
+        // player their note travels with a log of the session. Nothing on this
+        // path passes `includeLogs`, so the promise rests entirely on the
+        // interface default. If this fails, the copy is the thing to fix, not
+        // the assertion.
+        val repository = RecordingRepository()
+        val vm = FeedbackViewModel(repository, InMemoryAppCache())
+
+        vm.takeAction(FeedbackAction.MessageChanged("the daily explainer showed twice"))
+        vm.takeAction(FeedbackAction.Submit)
+
+        assertTrue(repository.logsAttached.single())
+    }
+
+    @Test
     fun typingIsCappedAtTheCharacterLimit() = runUnitTest {
         val vm = FeedbackViewModel(RecordingRepository(), InMemoryAppCache())
 
@@ -76,6 +92,7 @@ class FeedbackViewModelTest : CoroutineTest() {
     private class RecordingRepository : FeedbackRepository {
         val sent = mutableListOf<String>()
         val kinds = mutableListOf<FeedbackKind>()
+        val logsAttached = mutableListOf<Boolean>()
         override suspend fun submitFeedback(
             message: String,
             kind: FeedbackKind,
@@ -86,6 +103,7 @@ class FeedbackViewModelTest : CoroutineTest() {
         ): Catching<Unit> {
             sent += message
             kinds += kind
+            logsAttached += includeLogs
             return Catching.success(Unit)
         }
     }

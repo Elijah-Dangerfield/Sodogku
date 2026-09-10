@@ -36,6 +36,7 @@ import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.feedback_done
 import sodogku.libraries.resources.generated.resources.feedback_empty_error
 import sodogku.libraries.resources.generated.resources.feedback_label
+import sodogku.libraries.resources.generated.resources.feedback_log_notice
 import sodogku.libraries.resources.generated.resources.feedback_placeholder
 import sodogku.libraries.resources.generated.resources.feedback_prompt
 import sodogku.libraries.resources.generated.resources.feedback_send
@@ -152,6 +153,16 @@ private fun FeedbackForm(
     }
 
     VerticalSpacerD800()
+
+    // Above the button, not below it: a report ships `session-log.txt` whether
+    // or not the player asked, so this has to be readable before the tap.
+    Text(
+        text = stringResource(Res.string.feedback_log_notice),
+        typography = AppTheme.typography.Body.B500,
+        color = AppTheme.colors.textSecondary,
+    )
+
+    VerticalSpacerD500()
 
     ButtonPrimary(
         modifier = Modifier.fillMaxWidth(),

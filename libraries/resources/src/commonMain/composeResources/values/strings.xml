@@ -159,6 +159,18 @@
     <string name="settings_section_play">Playing</string>
     <string name="settings_section_about">About</string>
 
+    <!-- Shown on both player-facing report screens, above the send button, so
+         it is read before the tap rather than after. Every report attaches
+         `session-log.txt` (Telemetry.captureUserFeedback, includeLogs defaults
+         true) and the player had no way to know that. Deliberately not a
+         toggle: the log is what makes a report actionable, and the privacy
+         policy states the attachment unconditionally, so a switch would make
+         the policy a half-truth. Keep it plain. It is a sentence a player
+         reads on the way to the button, not a notice they consent to. If the
+         attachment ever stops being unconditional, this copy and the policy
+         both have to move. -->
+    <string name="feedback_log_notice">Your note is sent with a log of what the app did this session. It is how we find the problem without making you describe it.</string>
+
     <string name="feedback_prompt">Tell us what you love, what broke, or what is missing. A real person reads every one.</string>
     <string name="feedback_label">Message</string>
     <string name="feedback_placeholder">What is on your mind?</string>
@@ -166,7 +178,7 @@
     <string name="feedback_sending">Sending…</string>
     <string name="feedback_empty_error">Add a quick note before sending.</string>
     <string name="feedback_sent_title">Got it. Thank you!</string>
-    <string name="feedback_sent_body">Your note is on its way, along with the app version so we can make sense of it.</string>
+    <string name="feedback_sent_body">Your note is on its way, along with the app version and this session's log so we can make sense of it.</string>
     <string name="feedback_done">Done</string>
 
     <string name="common_close">Close</string>

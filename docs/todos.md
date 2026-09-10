@@ -579,62 +579,46 @@ anything.
 `libraries/sodogku/impl/.../SessionTelemetryBinder.kt`,
 `libraries/sodogku/impl/.../AppTelemetry.kt` (`setInstallId`, `captureUserFeedback`).
 
-## SD-30 [P2] — Three things the privacy derivation tripped over in the code
+## SD-32 [P1] — The app still ships a Supabase anon key, and a pile of account machinery nothing calls
 
-**Found by:** the agent re-deriving `docs/store/data-safety.md`, 2026-09-10.
-None of these is a live bug; all three mislead the next person deriving a
-privacy answer, which is how a wrong answer ends up on a store form.
+**Found by:** the SD-30 agent, 2026-09-10, while clearing account-era leftovers.
 
-1. **`setUser` is the one Sentry scope writer with no `isEnabled()` guard.**
-   `setCurrentRoute`, `setSession`, `setInstallId` and `setContext` all open with
-   `if (!Sentry.isEnabled()) return`; `setUser` calls straight into the SDK
-   (`AppTelemetry.kt:127-138`). Latent, because nothing calls it, and "nothing
-   calls it" is exactly what section 1 of the data-safety derivation rests on.
-   Add the guard so the odd one out stops being odd.
+Accounts were deleted in C0. The machinery was not, and some of it is still
+compiled into the shipped binary.
 
-2. **The session log is attached to every feedback report with no disclosure in
-   the app.** `includeLogs` defaults to `true` and neither player-facing caller
-   sets it, so every report ships `session-log.txt`. Only the tester panel has a
-   switch. The privacy policy says so; the screen the player is typing into does
-   not. Either say it on the screen or give the player the switch.
+**The one that is not merely untidy:** `libraries/core/SupabaseInfo.kt` exposes
+`SUPABASE_PROJECT_ID`, `SUPABASE_URL` and `SUPABASE_ANON_KEY`, wired through
+`build-logic/.../Versioning.kt:150` into `BuildConfig`. **Nothing reads it**, and
+a grep for `SupabaseInfo.` returns no call sites at all. So every release build
+carries a Supabase anon key for a project the app never contacts. Not a
+vulnerability on its own, an anon key is meant to be public, but shipping a
+credential for a service you do not use is the kind of thing a security review
+asks about and nobody can answer.
 
-3. **Two KDocs describe machinery deleted in C0 and say the opposite of the
-   truth.** `AppCache.kt:154-156` says the install id is sent "so the server can
-   associate anonymous accounts from the same install", and `UserScopedClearer`'s
-   KDoc describes sign-out and account switching. There are no accounts. Anyone
-   deriving a privacy answer from those comments would get it wrong.
+The rest, all confirmed present and uncalled:
 
-Also still true from an earlier pass and worth clearing at the same time: dead
-`DELETE_ACCOUNT_LIMIT` and `PLAYER_REPORT_LIMIT` on the server
-(`RateLimits.kt:23-24`), and Supabase OAuth comments left in the shipped Android
-manifest and iOS `Info.plist`.
+- **The server still has a Supabase auth surface.** `ServerConfig.kt:162-188`
+  parses `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and KDocs in
+  `Application.kt` and `ServerConfig.kt` describe "the authenticated `/v1/me`
+  route". There is no `MeRoutes` and no auth plugin.
+- `libraries/core/AuthGate.kt`, a whole guest/claimed/anonymous vocabulary,
+  referenced in 13 places.
+- `libraries/networking/`: `SessionRejectionBus` (AGENTS.md already notes nothing
+  can trigger it), `AuthTokenInvalidator`, `AuthTokenProvider`.
+- `NativeViewFactory.createAppleSignInButton` and `AppleSignInButtonHost` in
+  `IOSNativeViewFactory.swift`, fully implemented, no caller.
+- `libraries/navigation/impl/build.gradle.kts:18-22`, comments about minting
+  guest sessions and a `SignInRoute`.
+- `config/detekt/baseline.xml:42,45`, baselined onboarding strings "Continue as
+  guest" and "sign in to pick up where you left off".
 
-**Done when:** the guard is added, the log attachment is either disclosed on the
-feedback screen or switchable, and no KDoc in the tree describes accounts.
+**Done when:** no Supabase credential is compiled into a release build, and a
+grep for `AuthGate`, `SignIn`, `guest` or `Supabase` in `libraries/` and
+`apps/compose/` returns nothing live.
 
-## SD-31 [P2] — `DatabaseSchemaTest.migrationsCreateAppConfigTable` has been failing
+**Do the key first and separately.** It is the only part with a consequence, and
+it should not wait behind a large deletion.
 
-**Found by:** the agent removing the sharing feature, 2026-09-10, while running
-`:apps:server:test`. Confirmed pre-existing by stashing that work and re-running:
-it fails either way.
-
-The test asserts `app_config_values` is empty after the migrations run.
-`V4__app_config.sql:26-28` seeds three `upgrade.*` rows, so it cannot be. The
-migration has not changed since the commit that generated it, so the test has
-presumably never passed against the seeded version.
-
-**Why nobody noticed:** the server has its own Gradle task and its own CI job.
-The command used all session to verify client work is
-`:apps:compose:compileDebugKotlinAndroid :apps:compose:compileKotlinIosSimulatorArm64 testDebugUnitTest detekt`,
-and none of those four reach `:apps:server:test`. CI does run it, so this is
-presumably red on main and has been.
-
-**Done when:** either the test expects the seeded rows, or the migration stops
-seeding them and something else supplies the defaults. Decide which is right
-rather than making the assertion match: those three rows are the maintenance
-kill switch, so whether they belong in a migration is a real question.
-
-**Hints:** `apps/server/src/test/.../DatabaseSchemaTest.kt`,
-`apps/server/src/main/resources/db/migration/V4__app_config.sql`. Check the last
-green CI run for `Server tests` before assuming; if it is green there, the
-difference is the local testcontainers Postgres and that is the actual bug.
+**Hints:** Start from `Versioning.kt:138,150` and work outward. `PROFILE_WRITE_LIMIT`
+on the server was left in place deliberately by the SD-30 agent because that
+todo named only two rate limits; decide whether it goes too.

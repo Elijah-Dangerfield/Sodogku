@@ -129,6 +129,10 @@ private class ConfiguredTelemetry(
         name: String?,
         id: String?
     ) {
+        // Same best-effort guard as every other scope writer below. Nothing
+        // calls this today, and the guard is what makes that visible: with it,
+        // a disabled build cannot hand identity to the SDK even by accident.
+        if (!Sentry.isEnabled()) return
         Sentry.setUser(
             User(
                 id = id,

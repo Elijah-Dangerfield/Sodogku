@@ -9,31 +9,26 @@ sealed class AppEvent {
     data object OnBackground : AppEvent()
 
     /**
-     * The active user identity changed. Fired by the auth layer at the single
-     * point it knows the current user id moved — covering every transition:
+     * The active user identity changed.
      *
-     *  - `null → X`  first sign-in / guest creation (nothing to clear).
-     *  - `X → X`     **not fired** — claim/link keeps the same user; the guest's
-     *                progress is theirs to keep.
-     *  - `X → Y`     account switch — Y is now active; X's local data was already
-     *                wiped (see below) before this event.
-     *  - `X → null`  sign-out / delete / forced session invalidation.
+     * **Nothing dispatches this.** The auth layer that fired it, and the
+     * `UserScopedClearer` dump it announced, both went with accounts in C0.
+     * There is one player per install, that identity never moves, and no local
+     * data is ever wiped short of uninstall. The event and
+     * [AppEventListener.onUserChanged] survive as the shape a future identity
+     * feature would reuse; until then, a listener written for it will never
+     * run.
      *
-     * The actual wipe of the departing user's device-local data (Room tables,
-     * profile mirror, account-scoped settings) is **not** a listener's job — it
-     * runs through `UserScopedClearer` / `UserScopedDataReset` *before* the new
-     * `AuthState` is emitted, so a
-     * reactive loader can't race the clear. This event is the *announcement*
-     * after the fact, for side-effects that don't hold user-scoped storage
-     * (telemetry user binding, dropping an on-screen message).
-     *
-     * Listeners must run synchronously and must NOT trigger network work.
+     * If it is ever revived: listeners must run synchronously, must not trigger
+     * network work, and are the *announcement* rather than the clear. Anything
+     * holding per-identity storage has to be wiped before the event, not by a
+     * listener reacting to it.
      *
      * @param previous the user id that was active, or null if none.
-     * @param current the user id now active, or null after sign-out / delete.
+     * @param current the user id now active, or null if none.
      */
     data class UserChanged(val previous: String?, val current: String?) : AppEvent() {
-        /** True when this transition ended in no signed-in user (sign-out / delete). */
+        /** True when this transition ended with no identity at all. */
         val isSignedOut: Boolean get() = current == null
     }
 
