@@ -704,3 +704,49 @@ settings already use.
 
 Related: whether this FAB should also be the shake dialog's entry point, so
 there is one way into feedback rather than three.
+
+## SD-28 [P2] — Decide what a streak freeze is, now that the streak is not the daily's
+
+**Ask:** Owner, 2026-09-09: *"We should have a todo to figure out streak freezes
+and how that will work later. Maybe thats another thing users and earn idk."*
+
+**Why this is now open rather than done.** Freezes already exist, but they were
+built for the *daily*: `DailyRepository` has `freeze` and `restore`, they are
+budgeted per month, and `DailyOutcome.Frozen`/`Restored` are rows in
+`daily_result`. The streak no longer reads any of that. It folds over `play_day`,
+where a day is either played or not, and `StreakDayState.Bridged` is currently a
+state nothing can produce.
+
+So there are two half-systems: a freeze that covers a missed *daily puzzle*, and
+a streak that does not care about the daily. Neither is wrong; they are just no
+longer the same feature.
+
+**The decision to make first**, before any code:
+
+- **What does a freeze cover?** Missing a day entirely is the only way to break a
+  streak now, so a freeze is a day you did not open the app. That is a different
+  product from "I opened the daily and lost", which is what the current freeze
+  was for.
+- **Where does one come from?** The owner's instinct is earning them. Options
+  worth weighing: a reward for a run length (7 days pays one), a level reward
+  alongside the Treat, an ad, or a Pro perk. Each implies a different cap.
+- **Is it spent or automatic?** Duolingo's is bought in advance and spent
+  silently on the missed day, which is why it feels like insurance rather than a
+  refund. Spending it after the fact turns a broken streak into a shop prompt at
+  the worst moment.
+
+**Done when:** A missed day can be covered, the calendar draws it as
+`StreakDayState.Bridged` (the state already exists and is already styled), and
+`playStreakOn` walks through it without counting it. That last part matters:
+`DailyStreak.streakOn` already had this shape, where a bridged day continues the
+run without adding to it, and the new fold deliberately does not.
+
+**Hints:** `libraries/progress/impl/.../streak/PlayStreak.kt` is the fold and is
+a pure function of a set of dates, so covering a day is a matter of what goes
+into that set, or a second set walked alongside it. The daily's own freeze
+budgeting in `DailyRepositoryImpl` is worth reading before designing this, and
+worth deciding whether it survives: two separate freeze economies would be one
+too many.
+
+Not urgent. A streak with no freeze is a working streak, and shipping the wrong
+freeze is harder to undo than shipping none.
