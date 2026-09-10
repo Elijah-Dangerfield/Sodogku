@@ -35,7 +35,7 @@ regions. The player places `N` dogs so that:
 
 Three rule chips sit permanently under the header, each with a tiny 3x3 diagram illustrating the
 rule, exactly as the competitor does. They are not a one-time tutorial element, they stay on
-screen for all 500 levels.
+screen for every level.
 
 **Every puzzle must have exactly one solution.** The tap mechanic tells the player "right" or
 "wrong" on every tap, and "right" is only definable if the answer is unique. A two-solution
@@ -295,9 +295,9 @@ already do not trust — but it drags the recorded day with it, so the player th
 until the real calendar catches up. See `decisions.md` for why this keeps a high-water mark where
 the daily challenge deliberately does not.
 
-### 1.7 Grid sizes and the 500-level curve
+### 1.7 Grid sizes and the thousand-level curve
 
-500 verified levels in a bundled pack, ordered into bands. Within each band the difficulty
+1000 verified levels in a bundled pack, ordered into bands. Within each band the difficulty
 sawtooths (each band opens easier than the previous band closed) so the ramp never feels like a
 wall.
 
@@ -310,6 +310,13 @@ wall.
 | 181 to 280 | 8x8 |
 | 281 to 390 | 9x9 |
 | 391 to 500 | 10x10 |
+| 501 to 1000 | 10x10, five more bands of a hundred |
+
+The size ladder finishes at ten and the tier ceiling at four, so the back five hundred climb
+neither. `docs/reference/large-boards-spike.md` has the measurements behind that, and
+`LevelCurve` has what those levels are for instead: every board in the pack is distinct up to
+the eight grid symmetries and any renaming of regions, which is a claim the genre's incumbent
+cannot make. Levels are appended and never reordered, because progress is keyed on level id.
 
 Difficulty is not grid size, it is the deduction depth the solver needs, scored 1 to 5:
 
@@ -1121,7 +1128,7 @@ one must too.
 The template already has Sentry + Loki + Tempo pivoting on `session_id`, with conventions in
 `docs/practices/app-events.md`. Add these in the same change that introduces each one.
 
-**No per-tap event.** Forty taps per level across 500 levels is a volume and cost problem.
+**No per-tap event.** Forty taps per level across a thousand levels is a volume and cost problem.
 Aggregate into the completion event.
 
 | Event | Attributes |

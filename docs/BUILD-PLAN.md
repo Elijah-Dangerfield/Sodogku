@@ -158,7 +158,7 @@ Budget real time for C2 regardless: the 9x9 and 10x10 bands are where it will be
 
 - `tools/level-generator`: JVM CLI implementing spec 3.1. Seeded and deterministic, so a given
   seed reproduces a given pack.
-- `campaign.pack` (500 levels on the band curve) and `daily.pack` (730 levels).
+- `campaign.pack` (1000 levels on the band curve) and `daily.pack` (730 levels).
 - `:libraries:levels`: pack model, asset loading, `LevelRepository`.
 - **The verification test.** Loads both shipped packs and asserts every level: contiguous
   regions, region count equals size, exactly one solution, matches the shipped solution, paw
