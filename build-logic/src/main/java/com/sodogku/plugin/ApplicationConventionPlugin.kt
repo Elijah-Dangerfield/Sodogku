@@ -9,13 +9,11 @@ import com.sodogku.util.configureKotlinMultiplatform
 import com.sodogku.util.configureReleaseSigning
 import com.sodogku.util.enforceModuleBoundaries
 import com.sodogku.util.libs
-import com.sodogku.util.loadSupabaseMetadata
 import com.sodogku.util.verifyGitHooksInstalled
 import com.sodogku.util.loadVersionMetadata
 import com.sodogku.util.optInKotlinMarkers
 import com.sodogku.util.VersionMetadata
 import com.sodogku.util.writeCommonMetadata
-import com.sodogku.util.writeSupabaseMetadata
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -129,7 +127,6 @@ class ApplicationConventionPlugin : Plugin<Project> {
     }
 
     private fun Project.configureAppBuildConfig(metadata: VersionMetadata) {
-        val supabaseMetadata = loadSupabaseMetadata()
         extensions.configure(BuildConfigExtension::class.java) {
             packageName("${metadata.applicationId}.appconfig")
             className("AppBuildConfig")
@@ -137,7 +134,6 @@ class ApplicationConventionPlugin : Plugin<Project> {
                 internalVisibility = false
             }
             writeCommonMetadata(metadata)
-            writeSupabaseMetadata(supabaseMetadata)
         }
     }
 }

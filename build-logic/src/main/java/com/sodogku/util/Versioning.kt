@@ -23,15 +23,6 @@ data class VersionMetadata(
     val releaseDisplay: String = "$versionName ($buildNumber)"
 }
 
-data class SupabaseMetadata(
-    val projectId: String,
-    val anonKey: String
-) {
-    val url: String = projectId.takeIf { it.isNotBlank() }
-        ?.let { "https://$it.supabase.co" }
-        ?: ""
-}
-
 /**
  * Resolves the app's version/build metadata with this precedence:
  *  1. **CI env overrides** — `VERSION_NAME_OVERRIDE`, `VERSION_CODE_OVERRIDE`,
@@ -120,34 +111,6 @@ fun BuildConfigExtension.writeCommonMetadata(metadata: VersionMetadata) {
     buildConfigField("Int", "BUILD_NUMBER", metadata.buildNumber.toString())
     buildConfigField("String", "COMMIT_SHA", "\"${metadata.commitSha}\"")
     buildConfigField("String", "COMMIT_BRANCH", "\"${metadata.commitBranch}\"")
-}
-
-fun Project.loadSupabaseMetadata(): SupabaseMetadata {
-    val properties = Properties()
-    val localProperties = rootProject.file("local.properties")
-    if (localProperties.exists()) {
-        FileInputStream(localProperties).use(properties::load)
-    }
-
-    fun env(key: String): String? = System.getenv(key)?.takeIf { it.isNotBlank() }
-
-    val projectId = properties.stringOrNull("supabase.projectId")
-        ?: env("SUPABASE_PROJECT_ID")
-        ?: "mfozvowjsxdwrslyoyrf"
-    val anonKey = properties.stringOrNull("supabase.anonKey")
-        ?: env("SUPABASE_ANON_KEY")
-        ?: ""
-
-    return SupabaseMetadata(
-        projectId = projectId,
-        anonKey = anonKey
-    )
-}
-
-fun BuildConfigExtension.writeSupabaseMetadata(metadata: SupabaseMetadata) {
-    buildConfigField("String", "SUPABASE_PROJECT_ID", "\"${metadata.projectId}\"")
-    buildConfigField("String", "SUPABASE_URL", "\"${metadata.url}\"")
-    buildConfigField("String", "SUPABASE_ANON_KEY", "\"${metadata.anonKey}\"")
 }
 
 data class TelemetryMetadata(

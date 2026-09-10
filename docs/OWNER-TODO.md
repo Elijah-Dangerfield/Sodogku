@@ -468,11 +468,6 @@ overrides it, so even a deployed server is unreachable by the client.
   from identity work that was deleted, and nothing enables it. Removing an
   entitlement is safe where adding one is not, but it deserves a deliberate
   decision rather than a drive-by removal.
-- **The Supabase project ref `mfozvowjsxdwrslyoyrf`** is hardcoded at
-  `Versioning.kt:136` and baked into every build. Nothing reads it:
-  `SupabaseInfo.kt` has zero call sites and there is no Supabase client. It
-  points at a project you may not own, and it goes live the moment anything
-  reads it. Replace it or delete it.
 
 ---
 

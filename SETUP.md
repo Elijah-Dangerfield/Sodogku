@@ -4,7 +4,6 @@ Action items after running `./scripts/init_project.main.kts`. Work through these
 
 **Hour 1 — a running app:**
 - [ ] [Local dev](#local-dev) — hooks + first build
-- [ ] [Supabase auth](#supabase-auth-hour-1) — project, providers, redirect URLs
 - [ ] [Server deploy](#server-deploy-flyio) — dev Fly app + secrets + `/_health`
 
 **Day 1 — pipelines + visibility:**
@@ -193,41 +192,6 @@ and network errors; the rest of the codebase already uses this pattern.
 **JSON config.** `NetworkJson` is strict in debug (unknown keys/missing
 fields throw) and lenient in release (so a backend tweak can't crash users).
 
-## Supabase auth (hour 1)
-
-The app ships with anonymous-first Supabase auth wired end to end (guest
-creation in onboarding, email/password + Apple + browser-OAuth sign-in,
-encrypted session storage, `/v1/me` profile). To light it up:
-
-1. Create a Supabase project (free tier is fine). Note the project URL and
-   the **publishable (anon) key** (Settings → API Keys).
-2. Client config — add to `local.properties` (or export as env vars in CI):
-   ```
-   supabase.projectId=<ref>
-   supabase.url=https://<ref>.supabase.co
-   supabase.anonKey=<publishable key>
-   ```
-3. Enable providers in the Supabase dashboard (Authentication → Providers):
-   **Anonymous sign-ins** (required for the guest flow), **Email**
-   (confirm-email on), and optionally **Apple** / **Google**.
-4. Redirect URLs (Authentication → URL Configuration): add your custom
-   scheme callbacks so browser OAuth and the verify-email link return to
-   the app:
-   ```
-   <yourscheme>://login-callback
-   <yourscheme>://auth/confirmed
-   ```
-   The scheme is your project's lowercase name (see the intent filter in
-   `AndroidManifest.xml` / `CFBundleURLTypes` in `Info.plist` — both already
-   enabled).
-5. Server env (see `apps/server/.env.example`): `SUPABASE_URL` for JWT
-   verification, and `SUPABASE_SERVICE_ROLE_KEY` if you want in-app account
-   deletion (`DELETE /v1/me`) and display-name mirroring. Treat the service
-   role key as a root password — server secrets only, never the client.
-6. Verify: launch the app → complete onboarding as a guest → a user appears
-   in Supabase → Authentication → Users with `is_anonymous = true`, and
-   `GET /v1/me` (through the app) creates the profile row.
-
 ## Deep links
 
 Compose NavHost handles the routing once URLs reach it. Per-route deep
@@ -267,10 +231,10 @@ the tools you'll be debugging with later.
    curl https://<your-app>-server-dev.fly.dev/_health
    ```
    Expected: `{"ok":true}`.
-2. **Client → server round trip.** Launch the app (device or simulator),
-   complete onboarding as a guest. Expected: a new user in Supabase →
-   Authentication → Users with `is_anonymous = true`, and a row in the
-   `profiles` table.
+2. **Client → server round trip.** Launch the app (device or simulator) and
+   foreground it twice, which is what triggers a config refresh. Expected: a
+   `GET /v1/app-config` in the server's request logs. There are no accounts, so
+   there is no user row to look for.
 3. **Find your session in Loki** (if Grafana is wired). In Grafana → Explore →
    Loki, query your client logs by the app's service name and filter
    `session_id="<id>"` — grab the id from the app's debug shake dialog or

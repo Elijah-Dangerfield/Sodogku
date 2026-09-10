@@ -3,12 +3,15 @@ package com.sodogku.libraries.core
 import com.sodogku.buildinfo.SodogkuBuildConfig
 
 /**
- * Build-time-injected telemetry credentials, mirroring [SupabaseInfo]'s
- * pattern: CI reads repo secrets, local builds read `local.properties`
- * (`sentry.dsn`, `grafana.*` keys — see `loadTelemetryMetadata` in
- * build-logic). Blank values mean the corresponding pipe stays dormant —
- * telemetry no-ops rather than failing, so a fresh clone builds and runs
- * with zero setup.
+ * Build-time-injected telemetry credentials: CI reads repo secrets, local
+ * builds read `local.properties` (`sentry.dsn`, `grafana.*` keys — see
+ * `loadTelemetryMetadata` in build-logic). Blank values mean the corresponding
+ * pipe stays dormant — telemetry no-ops rather than failing, so a fresh clone
+ * builds and runs with zero setup.
+ *
+ * These are the only credentials the app compiles in. Anything else that shows
+ * up in [SodogkuBuildConfig] is a credential for a service the app does not
+ * contact, which is why `ShippedCredentialsTest` fails the build on one.
  */
 object TelemetryInfo {
     /** Single Sentry DSN for all platforms/build types. The `environment`

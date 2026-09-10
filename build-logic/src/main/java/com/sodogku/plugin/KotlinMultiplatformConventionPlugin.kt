@@ -7,13 +7,11 @@ import com.sodogku.util.configureKotlinMultiplatform
 import com.sodogku.util.configureKotlinInject
 import com.sodogku.util.enforceModuleBoundaries
 import com.sodogku.util.libs
-import com.sodogku.util.loadSupabaseMetadata
 import com.sodogku.util.loadTelemetryMetadata
 import com.sodogku.util.loadVersionMetadata
 import com.sodogku.util.optInKotlinMarkers
 import com.sodogku.util.VersionMetadata
 import com.sodogku.util.writeCommonMetadata
-import com.sodogku.util.writeSupabaseMetadata
 import com.sodogku.util.writeTelemetryMetadata
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import org.gradle.api.Plugin
@@ -81,7 +79,6 @@ class KotlinMultiplatformConventionPlugin : Plugin<Project> {
     }
 
     private fun Project.configureSharedBuildConfig(metadata: VersionMetadata) {
-        val supabaseMetadata = loadSupabaseMetadata()
         extensions.configure(BuildConfigExtension::class.java) {
             packageName("com.sodogku.buildinfo")
             className("SodogkuBuildConfig")
@@ -89,7 +86,6 @@ class KotlinMultiplatformConventionPlugin : Plugin<Project> {
                 internalVisibility = false
             }
             writeCommonMetadata(metadata)
-            writeSupabaseMetadata(supabaseMetadata)
             writeTelemetryMetadata(loadTelemetryMetadata())
         }
     }
