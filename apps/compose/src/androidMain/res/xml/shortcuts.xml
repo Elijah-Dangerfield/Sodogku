@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The rows we own in the launcher's long-press menu. iOS's
+  UIApplicationShortcutItems are the same two in the same order. Both lists are
+  read before any of our code runs, so neither can be generated from the other;
+  ShortcutEntriesAgreeTest in :apps:integration reads this file, the plist and
+  AppShortcuts.kt together and fails when they drift.
+
+  Each intent carries the deep link and no component, which is deliberate. The
+  documented form names android:targetPackage, and a resource file gets no
+  ${applicationId} substitution, so the literal would have to be com.sodogku
+  and every debug install is com.sodogku.debug. An implicit VIEW intent has no
+  such problem: the filter on MainActivity claims the sodogku scheme, an
+  implicit launch carries CATEGORY_DEFAULT, and the filter declares it.
+
+  Routing is then the same path a sodogku:// link from anywhere else takes.
+  A manifest shortcut relaunches the task, so the URL is on the launching
+  intent and NavController handles it as the graph is built; MainActivity
+  forwards onNewIntent as well, for the case where the launcher keeps the task.
+
+  The labels are string resources rather than literals because a launcher label
+  is player-facing and is translated with everything else.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:shortcutId="daily-challenge"
+        android:shortcutLongLabel="@string/shortcut_daily_long"
+        android:shortcutShortLabel="@string/shortcut_daily_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="sodogku://game?daily=true" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:shortcutId="report-bug"
+        android:shortcutLongLabel="@string/shortcut_report_bug_long"
+        android:shortcutShortLabel="@string/shortcut_report_bug_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="sodogku://feedback/feedbackScreenOpens" />
+    </shortcut>
+
+</shortcuts>

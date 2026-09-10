@@ -23,8 +23,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sodogku.devfeedback.DevFeedbackHost
 import com.sodogku.features.gate.impl.LaunchGateHost
-import com.sodogku.libraries.core.Catching
-import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.BuildInfo
 import com.sodogku.libraries.core.Platform
 import com.sodogku.libraries.core.logging.KLog
@@ -37,6 +35,7 @@ import com.sodogku.libraries.navigation.RouteTransitions
 import com.sodogku.libraries.navigation.floatingwindow.FloatingWindowHost
 import com.sodogku.libraries.navigation.floatingwindow.FloatingWindowNavigator
 import com.sodogku.libraries.navigation.impl.DelegatingRouter
+import com.sodogku.libraries.navigation.impl.routeDeepLinks
 import com.sodogku.libraries.navigation.serializableType
 import com.sodogku.libraries.navigation.toEnterTransition
 import com.sodogku.libraries.navigation.toExitTransition
@@ -56,6 +55,7 @@ import com.sodogku.libraries.ui.system.LocalBuildInfo
 import com.sodogku.libraries.ui.system.LocalClock
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.system.AppThemeProvider
+import kotlinx.coroutines.flow.first
 import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.seconds
 
@@ -97,21 +97,20 @@ fun App(appComponent: AppComponent) {
     }
 
     LaunchedEffect(navController, deepLinkBridge, launchGateViewModel) {
-        deepLinkBridge.urls.collect { url ->
-            // Dropped rather than queued while a launch gate is blocking. The
-            // nav host is not composed behind a blocking gate, so nothing would
-            // render — but a queued deep link would fire the moment the block
-            // lifted, which is a link arriving minutes late at a screen the
-            // player is no longer expecting. Read off the ViewModel rather than
-            // from composition so this collector never recomposes App.
-            if (launchGateViewModel.state.blocking != null) {
-                KLog.w { "Dropping deep link behind a blocking launch gate: $url" }
-                return@collect
-            }
-            Catching {
-                val request = NavDeepLinkRequest.Builder.fromUri(NavUri(url)).build()
-                navController.handleDeepLink(request)
-            }.logOnFailure { "Failed to handle deep link: $url" }
+        deepLinkBridge.routeDeepLinks(
+            // Read off the ViewModel rather than from composition so this
+            // collector never recomposes App.
+            isBlocked = { launchGateViewModel.state.blocking != null },
+            // The first back stack entry is the signal that `setGraph` has run.
+            // A deep link handed over before then throws on the missing graph,
+            // and on a cold start via a home-screen quick action the URL is
+            // always there first — UIKit hands it over while the scene is being
+            // built, and the nav host waits on the boot gate.
+            awaitNavGraph = { navController.currentBackStackEntryFlow.first() },
+        ) { url ->
+            navController.handleDeepLink(
+                NavDeepLinkRequest.Builder.fromUri(NavUri(url)).build(),
+            )
         }
     }
 

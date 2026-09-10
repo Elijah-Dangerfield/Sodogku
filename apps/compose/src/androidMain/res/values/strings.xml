@@ -8,4 +8,13 @@
       board ids that go into Leaderboard.kt at the same time. Not player facing.
     -->
     <string name="play_games_project_id" translatable="false"></string>
+
+    <!-- The launcher long-press entries. Short labels are what the menu row
+         shows and the platform truncates them hard, so both stay to two words;
+         the long labels are used where there is room. Player-facing copy, and
+         the same wording as the iOS plist. -->
+    <string name="shortcut_daily_short">Daily</string>
+    <string name="shortcut_daily_long">Daily challenge</string>
+    <string name="shortcut_report_bug_short">Report a bug</string>
+    <string name="shortcut_report_bug_long">Report a bug</string>
 </resources>

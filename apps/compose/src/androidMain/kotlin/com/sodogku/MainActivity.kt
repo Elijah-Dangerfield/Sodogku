@@ -1,5 +1,6 @@
 package com.sodogku
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.ViewTreeObserver
 import androidx.activity.ComponentActivity
@@ -85,6 +86,24 @@ class MainActivity : ComponentActivity() {
                 },
             )
         }
+    }
+
+    /**
+     * The warm half of deep-link handling, launcher shortcuts included.
+     *
+     * A cold launch needs nothing here: NavController reads the launching
+     * Activity's intent itself once the graph is built. Nothing reads a
+     * *second* intent, though, so a `sodogku://` link arriving at a running app
+     * used to be silently dropped. It goes through the same bridge iOS uses.
+     *
+     * `setIntent` is deliberately not called. The intent is handled from here
+     * once, and leaving `getIntent()` alone means a NavController built later —
+     * a new one is created if the App composable is ever recreated — cannot
+     * find it and open the same link a second time.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.data?.let { appComponent.deepLinkBridge.emit(it.toString()) }
     }
 
     override fun onStop() {

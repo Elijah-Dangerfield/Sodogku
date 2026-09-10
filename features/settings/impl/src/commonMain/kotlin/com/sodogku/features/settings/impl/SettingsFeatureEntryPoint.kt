@@ -13,10 +13,12 @@ import com.sodogku.features.settings.impl.feedback.FeedbackEvent
 import com.sodogku.features.settings.impl.feedback.FeedbackScreen
 import com.sodogku.features.settings.impl.feedback.FeedbackViewModel
 import com.sodogku.libraries.flowroutines.ObserveEvents
+import com.sodogku.libraries.navigation.AppShortcuts
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.NavigationOptions
 import com.sodogku.libraries.navigation.QaToolsRoute
 import com.sodogku.libraries.navigation.Router
+import com.sodogku.libraries.navigation.routeDeepLink
 import com.sodogku.libraries.navigation.screen
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -66,7 +68,14 @@ class SettingsFeatureEntryPoint(
 
         // `FeedbackRoute` is declared in :features:home — see the note on the
         // route itself. The screen and its view model live here.
-        screen<FeedbackRoute> {
+        //
+        // The home-screen "Report a bug" entry lands here rather than making
+        // someone find Settings first, which is the point of putting it there.
+        screen<FeedbackRoute>(
+            deepLinks = listOf(
+                routeDeepLink<FeedbackRoute>(basePath = AppShortcuts.FeedbackBasePath),
+            ),
+        ) {
             val viewModel: FeedbackViewModel = viewModel { feedbackViewModelFactory() }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
 

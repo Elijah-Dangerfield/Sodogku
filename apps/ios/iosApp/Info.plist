@@ -81,6 +81,51 @@
 	  entitlement (`applinks:example.com`) plus an
 	  apple-app-site-association file at https://example.com/.well-known/.
 	-->
+	<!--
+	  The rows we own in the home-screen long-press menu. Everything below them
+	  (Delete App, Share App, Edit Home Screen, Require Face ID) is the system's
+	  and cannot be removed, reordered or renamed.
+
+	  Static rather than UIApplication.shared.shortcutItems, because a dynamic
+	  list does not exist until the app has run once and these two are most
+	  wanted by someone who has not opened it in a while. Dynamic items append
+	  to these rather than replace them, so the two mechanisms cannot both be
+	  used for the same entry.
+
+	  Order is the order shown, and Report a bug is second on purpose: it is the
+	  row directly above Delete App.
+
+	  Each ItemType is matched in Kotlin by `AppShortcuts.urlFor`, which turns it
+	  into the deep link, and `ShortcutEntriesAgreeTest` fails the build when the
+	  two lists of strings drift apart. Nothing here is a URL; the mapping lives
+	  in one place and this file names an entry, not a destination.
+
+	  The titles are player-facing English and this app has no translations yet.
+	  When it gets them, `UIApplicationShortcutItemTitle` is localized through
+	  `InfoPlist.strings` in each `.lproj`, the same mechanism as
+	  `CFBundleDisplayName` — it is not reachable from the shared
+	  `composeResources` strings, because iOS reads this file before any Kotlin
+	  runs.
+	-->
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.sodogku.shortcut.daily-challenge</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Daily challenge</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypePlay</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.sodogku.shortcut.report-bug</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Report a bug</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeCompose</string>
+		</dict>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -127,6 +127,16 @@ tasks.withType<Test>().configureEach {
         },
     ).withPropertyName("stringResourceScan")
 
+    // And the Android app's own resources. `ShortcutEntriesAgreeTest` reads the
+    // launcher shortcut declarations and their labels out of `res/`, which the
+    // `*.kt` and `composeResources` trees above both miss — editing a shortcut
+    // URL alone would leave this task UP-TO-DATE and the drift green.
+    inputs.files(
+        rootProject.fileTree(repo.dir("apps/compose/src/androidMain/res")) {
+            include("**/*.xml")
+        },
+    ).withPropertyName("androidResourceScan")
+
     // Same again for the agent skills. `FeedbackTriageQueryContractTest` holds
     // the triage skill's Sentry queries against the enum that produces the tag
     // values — and the enum half is covered by the `*.kt` tree above while the

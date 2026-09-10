@@ -20,6 +20,10 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(projects.libraries.navigation)
+            // `RouteDeepLinksTest` drives the bridge and its consumer against a
+            // controlled scheduler, so a link held for a graph that does not
+            // exist yet is a step rather than a sleep.
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }

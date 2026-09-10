@@ -11,8 +11,10 @@ import com.sodogku.features.settings.SettingsRoute
 import com.sodogku.features.streak.StreakIntentionRoute
 import com.sodogku.features.streak.StreakRoute
 import com.sodogku.libraries.flowroutines.ObserveEvents
+import com.sodogku.libraries.navigation.AppShortcuts
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.Router
+import com.sodogku.libraries.navigation.routeDeepLink
 import com.sodogku.libraries.navigation.screen
 import com.sodogku.libraries.ui.system.Feel
 import com.sodogku.libraries.ui.system.rememberHaptics
@@ -29,7 +31,13 @@ class GameFeatureEntryPoint(
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
-        screen<GameRoute> { backStackEntry ->
+        // The home-screen "Daily challenge" entry lands here, as
+        // `sodogku://game?daily=true`. Both of the route's own args are
+        // optional, so the link carries only the one that decides the pack —
+        // see `AppShortcuts.DailyChallengeUrl` for why it names no level.
+        screen<GameRoute>(
+            deepLinks = listOf(routeDeepLink<GameRoute>(basePath = AppShortcuts.GameBasePath)),
+        ) { backStackEntry ->
             val route = backStackEntry.toRoute<GameRoute>()
             val viewModel: GameViewModel = viewModel {
                 gameViewModelFactory(route.levelId, route.daily)

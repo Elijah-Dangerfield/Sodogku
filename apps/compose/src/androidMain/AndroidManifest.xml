@@ -21,6 +21,7 @@
         <activity
             android:exported="true"
             android:name=".MainActivity"
+            android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|screenLayout|uiMode|keyboardHidden|smallestScreenSize|density|fontScale|locale">
             <!--
               configChanges: handle these changes inside Compose instead of
@@ -53,6 +54,15 @@
               When adding App Links (https://, requires assetlinks.json on
               the host) sit them alongside this filter as a separate
               <intent-filter android:autoVerify="true"> block.
+
+              launchMode is singleTop for the same routing. A launcher shortcut
+              starts a VIEW intent rather than the MAIN/LAUNCHER one this task
+              was created with, and under the default launchMode that is a
+              second MainActivity stacked on the first — two Compose trees, and
+              a back press landing on the stale one. singleTop hands the intent
+              to onNewIntent instead. The Activity is already
+              recreation-proofed by the configChanges above, so this is the only
+              other way a second instance could appear.
             -->
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
@@ -60,6 +70,16 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="sodogku" />
             </intent-filter>
+
+            <!--
+              The launcher's long-press menu. Android's half of SD-25; the iOS
+              half is UIApplicationShortcutItems in apps/ios/iosApp/Info.plist.
+              See res/xml/shortcuts.xml for what the entries are and why their
+              intents name no component.
+            -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <!--
