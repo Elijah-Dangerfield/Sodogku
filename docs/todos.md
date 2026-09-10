@@ -201,19 +201,6 @@ for the reason in `proposals.md`. Meowdoku's own reviewers say its boards start
 repeating around every 100, so this is a place where we can be better rather
 than merely bigger.
 
-## SD-15 [P1] — Say the daily is waiting, on the button that opens it
-
-**Ask:** Owner, 2026-09-09: a badge on the menu icon while today's daily exists
-and has not been played.
-
-**Done when:** The drawer button carries a dot while today has no result, and it
-clears the moment the day is completed or forfeited.
-
-**Hints:** `AchievementsButton` in `GameScreen.kt:442` is the pattern, including
-the rule that there is no badge at zero. `DailyRepository.status()` already
-answers the question. A dot is invisible to a screen reader, so the button's
-label has to say it too.
-
 ## SD-16 [P2] — The QA panel cannot move the day
 
 **Ask:** Owner, 2026-09-09: "How can I test out streaks without actually playing

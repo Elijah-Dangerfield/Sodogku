@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -76,6 +77,7 @@ import sodogku.libraries.resources.generated.resources.game_achievements_new
 import sodogku.libraries.resources.generated.resources.daily_streak_label
 import sodogku.libraries.resources.generated.resources.game_level_label
 import sodogku.libraries.resources.generated.resources.game_levels_menu
+import sodogku.libraries.resources.generated.resources.game_levels_menu_daily_waiting
 import sodogku.libraries.resources.generated.resources.game_settings
 import sodogku.libraries.resources.generated.resources.game_score_label
 import sodogku.libraries.resources.generated.resources.game_rule_no_touching
@@ -340,11 +342,7 @@ private fun GameHeader(
         // White circles on the cream, rather than bare glyphs. Two icons
         // floating on a page read as decoration; the same icons on discs read
         // as the two things on this screen that are buttons.
-        IconButton(
-            icon = Icons.Menu(stringResource(Res.string.game_levels_menu)),
-            onClick = onOpenLevels,
-            backgroundColor = AppTheme.colors.surfacePrimary,
-        )
+        LevelsButton(dailyWaiting = state.dailyWaiting, onClick = onOpenLevels)
 
         Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D1000)) {
             // A daily's level id is a position in the daily pool, which means
@@ -444,6 +442,53 @@ private fun GameHeader(
  * `features.achievements` alike, so this is never a route into a screen that
  * would tell the player badges are off.
  */
+/**
+ * The drawer button, with a dot while today's daily is still unplayed.
+ *
+ * The daily card is inside the drawer, so without something on the button there
+ * is nothing anywhere on the board telling a player a fresh puzzle is waiting.
+ * They have to remember to look.
+ *
+ * A dot rather than a count, because there is only ever one daily and "1" would
+ * invite the question of what else there might be. It follows the same rule the
+ * badge count does: **no dot at zero**, so the button is quiet on the days there
+ * is nothing to say, which is what makes the dot mean anything on the days there
+ * is.
+ *
+ * The dot is invisible to a screen reader, so the button's own name carries it
+ * instead. Same shape as [AchievementsButton]: the name changes, and the drawn
+ * mark is cleared out of the semantics rather than left to announce itself as a
+ * loose shape.
+ */
+@Composable
+private fun LevelsButton(dailyWaiting: Boolean, onClick: () -> Unit) {
+    val label = if (dailyWaiting) {
+        stringResource(Res.string.game_levels_menu_daily_waiting)
+    } else {
+        stringResource(Res.string.game_levels_menu)
+    }
+    Box {
+        IconButton(
+            icon = Icons.Menu(label),
+            onClick = onClick,
+            backgroundColor = AppTheme.colors.surfacePrimary,
+        )
+        if (dailyWaiting) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    // Already said by the button's name above. Left alone this
+                    // announces as an unlabelled shape next to the thing being
+                    // pressed.
+                    .clearAndSetSemantics {}
+                    .size(DailyDotSize)
+                    .clip(Radii.Round)
+                    .background(AppTheme.colors.danger.color),
+            )
+        }
+    }
+}
+
 @Composable
 private fun AchievementsButton(newBadges: Int, onClick: () -> Unit) {
     // The count goes in the button's own name rather than being left as a bare
@@ -928,6 +973,9 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
  * disc had no visible face left, only a rim.
  */
 private val BoardControlDog = Dimension.D1300
+
+/** Small enough to read as a mark on the button rather than as a second control. */
+private val DailyDotSize = Dimension.D400
 
 /**
  * The bones on the refill offer, matching the ones in the life counter.

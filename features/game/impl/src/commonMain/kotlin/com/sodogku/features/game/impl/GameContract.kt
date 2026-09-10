@@ -418,6 +418,20 @@ data class GameState(
     val standing: Standing? = null,
 ) {
     /**
+     * Whether today's daily exists and has not been finished or forfeited.
+     *
+     * Derived rather than stored, so the dot on the drawer button and the card
+     * inside the drawer cannot disagree: both read the same [daily] snapshot,
+     * which carries one resolution of the clock.
+     *
+     * `result == null` is the whole test. `DailyStatus.result` is null while the
+     * day is still open and non-null the moment it is completed, failed, frozen
+     * or restored, so the dot clears on any of those without listing them.
+     */
+    val dailyWaiting: Boolean
+        get() = daily?.let { it.enabled && it.result == null } == true
+
+    /**
      * What this attempt would bank: what it earned, less the boosters it spent.
      * The win sheet and the share text both show this rather than [score],
      * because it is the number that reaches the player's record.

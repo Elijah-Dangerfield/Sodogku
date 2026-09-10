@@ -73,6 +73,9 @@
     <string name="game_refill_bones">Watch an ad for %1$d bones</string>
     <string name="game_settings">Settings</string>
     <string name="game_levels_menu">Levels</string>
+    <!-- The same button when today's daily is unplayed. The dot on it is
+         invisible to a screen reader, so the name has to carry it. -->
+    <string name="game_levels_menu_daily_waiting">Levels, today's puzzle is waiting</string>
     <string name="settings_auto_mark">Cross off squares for me</string>
     <string name="settings_auto_mark_body">Turn this on and a placed dog crosses off every square its row, column, block and neighbours rule out, so you do not have to mark them yourself.</string>
     <string name="settings_colorblind">Shapes on colors</string>

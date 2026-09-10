@@ -14,7 +14,7 @@ fun Project.verifyGitHooksInstalled() {
     val configFile = File(gitDir, "config").takeIf { it.exists() } ?: return
     val configured = readHooksPath(configFile)
 
-    if (configured == EXPECTED_HOOKS_PATH) return
+    if (pointsAtOurHooks(configured, rootProject.projectDir)) return
 
     throw GradleException(
         """
@@ -31,6 +31,27 @@ fun Project.verifyGitHooksInstalled() {
 
         """.trimIndent()
     )
+}
+
+/**
+ * Whether [configured] names this repo's hooks directory, however it is spelled.
+ *
+ * String equality against `.githooks` was the whole check, and it is wrong the
+ * moment anything writes an absolute path. `git config core.hooksPath .githooks`
+ * run from a *worktree* records the absolute path in the shared config, so
+ * installing hooks from a worktree broke every Gradle task in the main checkout
+ * with "Git hooks are not installed" while the hooks were fine. That happened
+ * twice in one day once agents started working in worktrees.
+ *
+ * Resolving both sides to a canonical file answers the question actually being
+ * asked, which is "will git find our hooks", not "is this string the one we
+ * expected".
+ */
+private fun pointsAtOurHooks(configured: String?, projectDir: File): Boolean {
+    if (configured.isNullOrBlank()) return false
+    val expected = File(projectDir, EXPECTED_HOOKS_PATH)
+    val actual = File(configured).let { if (it.isAbsolute) it else File(projectDir, configured) }
+    return runCatching { actual.canonicalFile == expected.canonicalFile }.getOrDefault(false)
 }
 
 private fun resolveGitDir(projectDir: File): File? {
