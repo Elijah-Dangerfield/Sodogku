@@ -128,7 +128,8 @@ and anything that needs a human.
 - **Idempotent.** The ledger check in step 1 is not optional.
 - **This routine writes two files and nothing else.** `docs/todos.md`,
   `docs/feedback-log.md`, plus Sentry comments and statuses. It does not change
-  code. A separate worker routine does that.
+  code. The `nightly-run` skill is the routine that does, and it calls this one as
+  its first phase.
 - **One report, at most one TODO.** If a directive contains three asks, file the
   one it leads with and note the others in **Hints**. Three items from one report
   become three half-remembered items.

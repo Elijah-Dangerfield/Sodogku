@@ -1,8 +1,8 @@
 # TODO queue
 
-Work waiting to be done, one `##` section per item. A worker routine takes items
-off the top; the `feedback-triage` skill puts them on. Humans can edit it by hand
-too, and should.
+Work waiting to be done, one `##` section per item. The `nightly-run` skill takes
+items off the top; the `feedback-triage` skill puts them on. Humans can edit it by
+hand too, and should.
 
 **This is a queue, not a changelog.** When an item ships, delete its section in
 the same commit as the fix. An item that stays here with a tick next to it is an
