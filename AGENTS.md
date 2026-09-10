@@ -103,16 +103,18 @@ Sodogku has **no auth, no accounts, and no user-scoped server state**. The templ
 
 What survives, and why:
 
-- **`AuthGate`** still has its seam in `:libraries:core`, bound to `AlwaysReadyAuthGate` in
-  `:libraries:networking` (next to `NoOpAuthTokenProvider`, and in the api module for the same
-  boundary reason). Every call and route is ungated.
 - **`SyncTriggers`** (`:libraries:sodogku:impl`) keeps `warmForeground` / `cameOnline` /
   `isOffline`. There is no `activeAccount` level any more. Use these edges for anything
   network-touching (config refresh, ad preloading); read `isOffline` before starting work that
   should defer.
 - **`AccessDeniedBus`** still routes a `403` locked envelope to a blocking screen.
-  `SessionRejectionBus` exists but nothing can trigger it.
 - **Progress is device-local.** It does not survive a reinstall, and that is stated in Settings.
+
+What went with SD-32, so you do not go looking for it: `AuthGate` and its
+`AuthRequirement` / `AuthReason` / `AuthVerdict` / `AuthUnready` vocabulary, `AuthTokenProvider`,
+`AuthTokenInvalidator`, `SessionRejectionBus`, and `NetworkClient.authenticatedClient`. There is
+one HTTP client now and one call helper, `networkCall`, with `webSocketCall` beside it. Nothing
+attaches a bearer token because there is nothing to attach.
 
 ## Player-facing copy goes through `:libraries:resources`
 

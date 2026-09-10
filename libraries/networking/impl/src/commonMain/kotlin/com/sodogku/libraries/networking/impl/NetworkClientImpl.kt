@@ -1,13 +1,8 @@
 package com.sodogku.libraries.networking.impl
 
-import com.sodogku.libraries.core.AuthGate
-import com.sodogku.libraries.core.AuthRequirement
-import com.sodogku.libraries.core.AuthVerdict
 import com.sodogku.libraries.core.BuildInfo
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.networking.AccessDeniedBus
-import com.sodogku.libraries.networking.SessionRejectionBus
-import com.sodogku.libraries.networking.AuthTokenProvider
 import com.sodogku.libraries.networking.ClientHeaders
 import com.sodogku.libraries.networking.InternalNetworkingApi
 import com.sodogku.libraries.networking.ClientHeadersProvider
@@ -23,9 +18,6 @@ import io.ktor.client.plugins.DefaultRequest
 import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.ResponseException
-import io.ktor.client.plugins.auth.Auth
-import io.ktor.client.plugins.auth.providers.BearerTokens
-import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpStatusCode
@@ -43,72 +35,28 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @OptIn(InternalNetworkingApi::class)
 class NetworkClientImpl(
     private val config: NetworkConfig,
-    private val tokenProvider: AuthTokenProvider,
     private val headersProvider: ClientHeadersProvider,
     private val reachability: NetworkReachability,
     private val accessDeniedBus: AccessDeniedBus,
-    private val sessionRejectionBus: SessionRejectionBus,
-    // Lazy: AuthGate's impl (identity) reaches NetworkClient through its own
-    // deps, so a direct injection would cycle at construction time.
-    private val authGate: () -> AuthGate,
 ) : NetworkClient {
 
     override val client: HttpClient by lazy {
         HttpClient(platformHttpEngineFactory) {
             applyCommonConfig(config, headersProvider, reachability, accessDeniedBus)
-        }
-    }
-
-    override val authenticatedClient: HttpClient by lazy {
-        HttpClient(platformHttpEngineFactory) {
-            applyCommonConfig(config, headersProvider, reachability, accessDeniedBus)
-            install(Auth) {
-                bearer {
-                    // By the time loadTokens runs, authedCall has already
-                    // called [awaitAuthReady], so the gateway peek is
-                    // synchronous and instant. Null means there's no
-                    // session (anon disabled, offline before first auth) —
-                    // request goes unauthed and the server 401s cleanly.
-                    loadTokens {
-                        val token = tokenProvider.accessToken()
-                            ?: return@loadTokens null
-                        BearerTokens(accessToken = token, refreshToken = "")
-                    }
-                    refreshTokens {
-                        val token = tokenProvider.refreshAccessToken()
-                            ?: return@refreshTokens null
-                        BearerTokens(accessToken = token, refreshToken = "")
-                    }
-                    sendWithoutRequest { true }
-                }
-            }
-            // WebSocket plugin so callers can open sockets via the same
-            // authenticated client (the Auth bearer is attached on the WS
-            // handshake). The plugin is additive — existing HTTP calls don't
+            // WebSocket plugin so callers can open sockets through the same
+            // client. The plugin is additive — existing HTTP calls don't
             // notice it. Keepalive is per-engine; see
             // installWebSocketKeepalive for the OkHttp trap.
             installWebSocketKeepalive()
             if (BuildInfo.isDebug) {
-                // Wiretap's WS capture — sockets run through this
-                // authenticated client, so this surfaces every sent/received
-                // frame + connect/close in the same inspector as HTTP.
-                // Installed AFTER WebSockets so it can wrap the raw session
-                // before WebSockets transforms it. Debug-only + noop in
-                // release, same as the HTTP capture.
+                // Wiretap's WS capture, so every sent/received frame plus
+                // connect/close lands in the same inspector as HTTP. Installed
+                // AFTER WebSockets so it can wrap the raw session before
+                // WebSockets transforms it. Debug-only + noop in release.
                 installWebSocketInspector()
             }
         }
     }
-
-    override suspend fun awaitAuthReady() {
-        tokenProvider.awaitReady()
-    }
-
-    override suspend fun authVerdict(requirement: AuthRequirement): AuthVerdict =
-        authGate().awaitVerdict(requirement)
-
-    override val sessionRejectionEpoch: Long
-        get() = sessionRejectionBus.rejectionEpoch
 }
 
 private fun HttpClientConfig<*>.applyCommonConfig(

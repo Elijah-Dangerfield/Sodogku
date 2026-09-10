@@ -54,8 +54,8 @@ class SentryLogTree(
     /**
      * Error-level and above becomes a Sentry event, except two expected classes
      * that still breadcrumb but never inflate error counts:
-     * typed control-flow throwables (e.g. `AuthUnready` short-circuiting an
-     * authed call before it hits the wire), and device-offline connectivity
+     * typed control-flow throwables (anything marked `ExpectedControlFlow`, a
+     * short-circuit the caller handles), and device-offline connectivity
      * failures (a phone in airplane mode failing background calls is
      * not an app failure, and one such device flooded the error panel).
      */

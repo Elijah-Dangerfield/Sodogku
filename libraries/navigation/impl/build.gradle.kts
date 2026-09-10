@@ -15,13 +15,6 @@ kotlin {
             implementation(projects.libraries.ui)
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.sodogku)
-            // Session-expired recovery reads AuthState + mints guest sessions.
-            // `:features:onboarding` api carries `SignInRoute`, where the
-            // session-expired screen's "sign in again" lands.
-            implementation(projects.features.onboarding)
-            // `:features:home` api carries `HomeRoute`, where a guest's
-            // "start fresh" lands once a new session is minted.
-            implementation(projects.features.home)
             api(libs.jetbrains.navigation.compose)
             implementation(libs.kotlinx.serialization.json)
         }

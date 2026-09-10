@@ -8,9 +8,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Immutable retry policy passed to `withRetry` / `NetworkClient.authedCall` /
- * `NetworkClient.unauthedCall`. Built with a fluent chain — every wither
- * returns a new instance:
+ * Immutable retry policy passed to `withRetry` / `NetworkClient.networkCall`.
+ * Built with a fluent chain — every wither returns a new instance:
  *
  * ```
  * val policy = RetryPolicy.exponential().withJitter().maxRetries(5)

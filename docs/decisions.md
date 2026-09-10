@@ -6,6 +6,34 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-10 — the auth seam goes, and the network client keeps one HTTP client
+
+**Decision:** `AuthGate` and its `AuthRequirement` / `AuthReason` / `AuthVerdict`
+/ `AuthUnready` vocabulary, `AuthTokenProvider`, `AuthTokenInvalidator`,
+`SessionRejectionBus` and `NetworkClient.authenticatedClient` are deleted.
+`NetworkClient` exposes one `client`; `unauthedCall` is renamed `networkCall`
+and `authedWebSocketSession` becomes `webSocketCall`.
+
+**Why:** the C0 decision below kept these as seams for an app that might grow
+accounts later. Nine months of the game says it will not, and the seam was not
+free: `authedCall` had zero callers, so every reader of the networking module
+had to work out that "authenticated" meant a bearer plugin loading a token from
+a provider that always returns null. A seam that describes a thing the app does
+not do is a false statement about the codebase, and the cost of rebuilding it
+from the template's git history is an afternoon.
+
+**Alternatives:** keep the gate and bind it to always-ready, which is what C0
+did. Rejected on the same argument: the gate had exactly one verdict and no
+consultant.
+
+**Kept deliberately.** `AccessDeniedBus` still routes a `403` locked envelope to
+a blocking screen and is reachable from the response validator. The
+`ExpectedControlFlow` marker stays with no implementor, because the rule it
+encodes (an expected short-circuit is not a Sentry event) is enforced by
+`SentryLogTree` and outlives any one implementor. The WebSocket plugin and its
+debug inspector move onto the surviving client rather than dying with the
+authenticated one; nothing about them was account-shaped.
+
 ## 2026-09-10 — Sharing is deleted, and the flag with it
 
 The owner, asked whether the share text should drop the emoji grid and be

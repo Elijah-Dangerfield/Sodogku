@@ -1,7 +1,6 @@
 package com.sodogku.libraries.sodogku.impl.logging
 
-import com.sodogku.libraries.core.AuthReason
-import com.sodogku.libraries.core.AuthUnready
+import com.sodogku.libraries.core.ExpectedControlFlow
 import com.sodogku.libraries.core.logging.LogContext
 import com.sodogku.libraries.core.logging.LogEntry
 import com.sodogku.libraries.core.logging.LogLevel
@@ -16,10 +15,11 @@ class SentryLogTreeTest {
         minEventLevel = LogLevel.Error,
     )
 
+    private class ShortCircuit(message: String) : Exception(message), ExpectedControlFlow
+
     @Test
     fun `expected control-flow throwable at error level is not captured as an event`() {
-        assertFalse(tree.shouldCaptureEvent(errorEntry(AuthUnready(AuthReason.FinishingSetup))))
-        assertFalse(tree.shouldCaptureEvent(errorEntry(AuthUnready(AuthReason.NeedAccount))))
+        assertFalse(tree.shouldCaptureEvent(errorEntry(ShortCircuit("not ready yet"))))
     }
 
     @Test

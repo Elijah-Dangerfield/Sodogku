@@ -71,8 +71,8 @@ interface AdGate {
  * The binding until the real AdMob implementation lands (C8): every rewarded ad
  * succeeds instantly.
  *
- * It lives in this api module rather than an `impl` for the same reason
- * `NoOpAuthTokenProvider` does — the real implementation will replace it with
+ * It lives in this api module rather than an `impl` so the real implementation
+ * can replace it with
  * `@ContributesBinding(AppScope::class, replaces = [AlwaysRewardingAdGate::class])`
  * without crossing the impl-module boundary.
  */

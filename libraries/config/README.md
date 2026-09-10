@@ -17,15 +17,15 @@ fill in `resolveValue` for scalars, so a concrete flag only declares
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class GoogleSignInEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
-    override val name = "Google sign-in enabled"
-    override val path = "identity.googleSignInEnabled"
-    override val default = false
+class DailyEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
+    override val name = "Daily challenge enabled"
+    override val path = "daily.enabled"
+    override val default = true
 }
 
 @Inject
-class SignInViewModel(googleSignInEnabled: GoogleSignInEnabled) {
-    val showGoogle = googleSignInEnabled()   // invoke() resolves the current value
+class HomeViewModel(dailyEnabled: DailyEnabled) {
+    val showDaily = dailyEnabled()   // invoke() resolves the current value
 }
 ```
 
@@ -65,9 +65,9 @@ fetch fails and there is no cached snapshot, the bundled
 `fallback_app_config.json` is persisted so subscribers still get a usable map;
 with a cached snapshot, failures are logged and the cache stays.
 
-The fetch is unauthenticated (kill-switch flags must load before sign-in), but
-attaches a bearer token best-effort when one is on hand so the server can do
-per-user targeting and rollout bucketing.
+The fetch carries no identity. There are no accounts, so the server targets and
+buckets rollouts on the install id and the client-context headers every request
+already carries.
 
 ## Observing changes
 

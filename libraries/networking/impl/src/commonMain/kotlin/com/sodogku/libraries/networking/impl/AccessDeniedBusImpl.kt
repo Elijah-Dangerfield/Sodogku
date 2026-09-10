@@ -11,10 +11,9 @@ import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
 /**
- * App-scoped [AccessDeniedBus]. Same conflate-friendly buffered shape as
- * [SessionRejectionBusImpl]: a non-suspending [signalDenied] called from the
- * response validator must reach the (rare) collector without blocking the
- * network thread.
+ * App-scoped [AccessDeniedBus]. Conflate-friendly and buffered because the
+ * non-suspending [signalDenied] is called from the response validator and must
+ * reach the (rare) collector without blocking the network thread.
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)

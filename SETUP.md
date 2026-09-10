@@ -181,10 +181,12 @@ class AppNetworkConfig : NetworkConfig {
 }
 ```
 
-**Authenticated calls.** Inject `NetworkClient` and use
-`networkClient.authenticatedClient` for endpoints that need a Bearer token.
-The token comes from your `AuthTokenProvider` binding (default is no-op).
-401s trigger `refreshAccessToken()`.
+**Making a call.** Inject `NetworkClient` and go through
+`networkClient.networkCall("thing.fetch") { client -> … }`, or `webSocketCall`
+for a socket. Both wrap the call in `Catching`, apply the retry policy you pass,
+and log the failure under the description you gave. The raw client is behind an
+opt-in annotation on purpose. Nothing attaches a bearer token: there are no
+accounts. See "No accounts" in AGENTS.md before you add one.
 
 **Wrap calls with `Catching { }`** at the call site. Ktor throws on non-2xx
 and network errors; the rest of the codebase already uses this pattern.

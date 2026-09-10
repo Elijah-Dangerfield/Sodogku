@@ -23,7 +23,12 @@ private fun Throwable.isThrowableCancellation() =
  * Marker for typed, expected control-flow throwables — a short-circuit the caller
  * is meant to handle, not a failure. Telemetry sinks drop these before they turn
  * into error events, so an expected signal that reaches an error-level log line
- * never inflates error counts. [AuthUnready] is the reference implementor.
+ * never inflates error counts.
+ *
+ * Nothing implements it right now. The one implementor was `AuthUnready`, which
+ * went with accounts, and the marker is kept because the rule it encodes (an
+ * expected short-circuit is not an error event) outlives any one implementor
+ * and `SentryLogTree` still enforces it.
  */
 interface ExpectedControlFlow
 

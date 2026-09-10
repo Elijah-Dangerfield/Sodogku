@@ -5,16 +5,13 @@ import com.sodogku.libraries.config.impl.data.RemoteConfigRemoteDataSource
 import com.sodogku.libraries.config.impl.serialization.ConfigJsonConverter
 import com.sodogku.libraries.flowroutines.AppCoroutineScope
 import com.sodogku.libraries.flowroutines.DefaultDispatcherProvider
-import com.sodogku.libraries.networking.AlwaysReadyAuthGate
 import com.sodogku.libraries.networking.InstallIdProvider
 import com.sodogku.libraries.networking.NetworkConfig
-import com.sodogku.libraries.networking.NoOpAuthTokenProvider
 import com.sodogku.libraries.networking.SessionIdProvider
 import com.sodogku.libraries.networking.impl.AccessDeniedBusImpl
 import com.sodogku.libraries.networking.impl.DefaultClientHeadersProvider
 import com.sodogku.libraries.networking.impl.NetworkClientImpl
 import com.sodogku.libraries.networking.impl.NetworkReachabilityImpl
-import com.sodogku.libraries.networking.impl.SessionRejectionBusImpl
 import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -44,19 +41,15 @@ class TestClient(
 
     private val networkClient = NetworkClientImpl(
         config = config,
-        tokenProvider = NoOpAuthTokenProvider(),
         headersProvider = DefaultClientHeadersProvider(FixedInstallId(installId), FixedSessionId),
         reachability = NetworkReachabilityImpl(appScope),
         accessDeniedBus = AccessDeniedBusImpl(),
-        sessionRejectionBus = SessionRejectionBusImpl(),
-        authGate = { AlwaysReadyAuthGate() },
     )
 
     /** The real remote-config data source over the real API. */
     val remoteConfig: RemoteConfigDataSource = RemoteConfigRemoteDataSource(
         dispatcherProvider = DefaultDispatcherProvider(),
         networkClient = networkClient,
-        authTokenProvider = NoOpAuthTokenProvider(),
         converter = ConfigJsonConverter(Json),
     )
 

@@ -20,21 +20,6 @@ enum class CameraGuidanceState {
 @ObjCName("SodogkuNativeViewFactory", exact = true)
 interface NativeViewFactory {
 
-    @Throws(Exception::class)
-    fun createAppleSignInButton(
-        kind: NativeAppleSignInButtonKind,
-        style: NativeAppleSignInButtonStyle,
-        cornerRadius: Float,
-        onTap: () -> Unit
-    ): UIView
-
-    fun updateAppleSignInButton(
-        view: UIView,
-        enabled: Boolean,
-        onTap: () -> Unit
-    )
-
-    
     /**
      * Toggle flash/torch on the camera preview.
      * @return true if flash is now enabled, false if disabled
@@ -48,19 +33,3 @@ interface NativeViewFactory {
 }
 
 val LocalNativeViewFactory = staticCompositionLocalOf<NativeViewFactory?> { null }
-
-@OptIn(ExperimentalObjCName::class)
-@ObjCName("SodogkuNativeAppleSignInButtonKind", exact = true)
-enum class NativeAppleSignInButtonKind {
-    SignIn,
-    ContinueFlow
-}
-
-@OptIn(ExperimentalObjCName::class)
-@ObjCName("SodogkuNativeAppleSignInButtonStyle", exact = true)
-enum class NativeAppleSignInButtonStyle {
-    Black,
-    White,
-    WhiteOutline
-}
-

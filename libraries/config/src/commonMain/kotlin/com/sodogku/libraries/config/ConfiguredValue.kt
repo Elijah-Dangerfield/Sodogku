@@ -14,15 +14,15 @@ package com.sodogku.libraries.config
  * @Inject
  * @SingleIn(AppScope::class)
  * @ContributesBinding(AppScope::class, ConfiguredValue::class, multibinding = true)
- * class GoogleSignInEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
- *     override val name = "Google sign-in enabled"
- *     override val path = "identity.googleSignInEnabled"
- *     override val default = false
+ * class DailyEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
+ *     override val name = "Daily challenge enabled"
+ *     override val path = "daily.enabled"
+ *     override val default = true
  * }
  *
  * @Inject
- * class SignInViewModel(googleSignInEnabled: GoogleSignInEnabled) {
- *     val showGoogle = googleSignInEnabled()   // resolves the value
+ * class HomeViewModel(dailyEnabled: DailyEnabled) {
+ *     val showDaily = dailyEnabled()   // resolves the value
  * }
  * ```
  *
@@ -96,6 +96,6 @@ abstract class ConfiguredValue<out T : Any> : QaConfigValue {
     /** The resolved value. */
     val value: T get() = resolveValue()
 
-    /** Sugar so a value reads like `googleSignInEnabled()`. */
+    /** Sugar so a value reads like `dailyEnabled()`. */
     operator fun invoke(): T = value
 }

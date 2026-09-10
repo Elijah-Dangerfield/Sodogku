@@ -7,12 +7,10 @@ import kotlinx.coroutines.flow.Flow
  * **`403` with the locked [Denial] envelope** — the caller is blocked
  * (banned/suspended) and any further calls will keep failing the same way.
  *
- * Deliberately a bus, not a direct call into the auth / app layers, so the
- * networking module stays narrow (it depends on nothing app-shaped) and the
- * app layer chooses how to react — today: route to a blocking access-denied
- * screen with localized copy keyed off [Denial.reason]. Sibling shape to
- * [SessionRejectionBus] so the two server-confirmed-rejection paths (401-after-refresh
- * and 403-with-envelope) are mechanically parallel.
+ * Deliberately a bus, not a direct call into the app layer, so the networking
+ * module stays narrow (it depends on nothing app-shaped) and the app layer
+ * chooses how to react — today: route to a blocking access-denied screen with
+ * localized copy keyed off [Denial.reason].
  *
  * This is **not** the path for an *un-enveloped* 403 (a route's own permission
  * check, etc.) — only a 403 carrying the wire contract flows through here.
