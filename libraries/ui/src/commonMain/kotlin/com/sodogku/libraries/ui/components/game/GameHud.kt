@@ -376,7 +376,15 @@ fun BoosterButton(
 /** How many bones an attempt starts with. Mirrors `ScoringConfig.MAX_LIVES`. */
 const val DefaultLives: Int = 3
 
-private const val MaxPaws = 3
+/**
+ * Five, matching `ScoreCard.MAX_PAWS`.
+ *
+ * Duplicated rather than imported: `:libraries:ui` does not depend on
+ * `:libraries:scoring` and should not start, since a design system that knows
+ * how a rating is *earned* is a design system that has opinions about scoring.
+ * `DefaultLives` above mirrors `ScoringConfig.MAX_LIVES` for the same reason.
+ */
+private const val MaxPaws = 5
 private const val SpentAlpha = 0.28f
 private const val SpentScale = 0.82f
 

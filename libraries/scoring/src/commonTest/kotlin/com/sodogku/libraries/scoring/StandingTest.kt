@@ -29,15 +29,21 @@ class StandingTest {
                     val paws = Scoring.paws(score, size, difficulty, completed = true)
                     val standing = Scoring.standingFor(score, size, difficulty, completed = true)
                     checked++
-                    when (standing) {
-                        Standing.Flawless, Standing.Sharp ->
-                            assertEquals(3, paws, "$standing at $percent% of par should be three paws")
-                        Standing.Solid ->
-                            assertEquals(2, paws, "Solid at $percent% of par should be two paws")
-                        Standing.Scraped ->
-                            assertEquals(1, paws, "Scraped at $percent% of par should be one paw")
+                    // Bands rather than single values, because the verdict has
+                    // four rungs and the rating now has five: Solid covers the
+                    // two middle paws. What must never happen is the two
+                    // disagreeing about direction, which is what a reordering of
+                    // the shared thresholds would produce.
+                    val allowed = when (standing) {
+                        Standing.Flawless, Standing.Sharp -> Scoring.MAX_PAWS..Scoring.MAX_PAWS
+                        Standing.Solid -> Scoring.THREE_PAWS..Scoring.FOUR_PAWS
+                        Standing.Scraped -> Scoring.ONE_PAW..Scoring.TWO_PAWS
                         null -> error("a completed run has no verdict")
                     }
+                    assertTrue(
+                        paws in allowed,
+                        "$standing at $percent% of par rated $paws, outside $allowed",
+                    )
                 }
             }
         }

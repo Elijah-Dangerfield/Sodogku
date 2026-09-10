@@ -152,11 +152,14 @@ class ScoringTest {
     }
 
     @Test
-    fun parIsAThreePawScore() {
+    fun parIsATopRatedScore() {
+        // Par is what a clean, quick run scores, and the top rung sits just
+        // under it. If par did not earn every paw, the rating would top out
+        // somewhere the player cannot see.
         val par = Scoring.parScore(size = 7, difficulty = 2)
 
         assertEquals(
-            Scoring.THREE_PAWS,
+            Scoring.MAX_PAWS,
             Scoring.paws(par, size = 7, difficulty = 2, completed = true),
         )
     }
@@ -170,17 +173,24 @@ class ScoringTest {
         fun pawsAt(fraction: Double) =
             Scoring.paws((par * fraction).toInt(), size, difficulty, completed = true)
 
+        // Each rung checked on both sides, so a `>` slipping to `>=` or a rung
+        // being read out of order shows up as a specific paw rather than as a
+        // vague drift.
         assertEquals(Scoring.ONE_PAW, pawsAt(config.twoPawFraction - 0.05))
         assertEquals(Scoring.TWO_PAWS, pawsAt(config.twoPawFraction + 0.01))
         assertEquals(Scoring.TWO_PAWS, pawsAt(config.threePawFraction - 0.05))
         assertEquals(Scoring.THREE_PAWS, pawsAt(config.threePawFraction + 0.01))
+        assertEquals(Scoring.THREE_PAWS, pawsAt(config.fourPawFraction - 0.05))
+        assertEquals(Scoring.FOUR_PAWS, pawsAt(config.fourPawFraction + 0.01))
+        assertEquals(Scoring.FOUR_PAWS, pawsAt(config.fivePawFraction - 0.05))
+        assertEquals(Scoring.FIVE_PAWS, pawsAt(config.fivePawFraction + 0.01))
     }
 
     @Test
     fun aPerfectRunClearsPar() {
         // Drives the real API rather than the formula: every placement instant,
-        // no strikes, all lives intact. If this ever scores below par, three
-        // paws would be unreachable and nobody would find out from a unit test
+        // no strikes, all lives intact. If this ever scores below par, the top
+        // rating would be unreachable and nobody would find out from a unit test
         // of the pieces.
         listOf(4, 7, 10).forEach { size ->
             var card = ScoreCard.Empty
@@ -188,7 +198,7 @@ class ScoringTest {
             card = Scoring.complete(card, size, difficulty = 3, livesRemaining = ScoringConfig.MAX_LIVES)
 
             assertEquals(
-                Scoring.THREE_PAWS,
+                Scoring.MAX_PAWS,
                 Scoring.paws(card.total, size, difficulty = 3, completed = true),
                 "a flawless ${size}x$size run scored ${card.total} against par " +
                     "${Scoring.parScore(size, 3)}",
@@ -218,59 +228,79 @@ class ScoringTest {
     }
 
     @Test
-    fun aCleanButUnhurriedRunEarnsTwoPaws() {
-        // The middle band has to be reachable too, or paws are just a
+    fun aCleanButUnhurriedRunLandsInTheMiddle() {
+        // The middle of the ladder has to be reachable too, or paws are just a
         // pass/perfect flag. Twenty seconds a move on an 8x8 is well past that
         // board's speed window, so the bonus is gone and only the clean sheet
         // is left.
+        //
+        // Asserted as a band rather than a rung. With five paws the exact rung a
+        // clean unhurried run lands on depends on the shape, and pinning it
+        // would pin the test to a tuning; what has to stay true is that it is
+        // neither the floor nor the ceiling.
         val size = 8
         var card = ScoreCard.Empty
         repeat(size) { card = Scoring.placement(card, size, millisSinceLastPlacement = 20_000).card }
         card = Scoring.complete(card, size, difficulty = 3, livesRemaining = 3)
 
-        assertEquals(
-            Scoring.TWO_PAWS,
-            Scoring.paws(card.total, size, difficulty = 3, completed = true),
-            "scored ${card.total} against par ${Scoring.parScore(size, 3)}",
+        val paws = Scoring.paws(card.total, size, difficulty = 3, completed = true)
+
+        assertTrue(
+            paws > Scoring.ONE_PAW && paws < Scoring.MAX_PAWS,
+            "a clean unhurried run rated $paws, scoring ${card.total} against par " +
+                "${Scoring.parScore(size, 3)}",
         )
     }
 
     @Test
-    fun allThreeRatingsAreReachableOnEveryBoardShapeTheCampaignShips() {
+    fun everyRatingIsEarnableAndThePacesLandInOrder() {
         // The failure this exists for is a *rating nobody can get*, which no
-        // assertion about a particular score would catch: three paws was
+        // assertion about a particular score would catch: the top rating was
         // unreachable above 6x6 for months while every worked example above
         // stayed green, because they all pick their own board.
         //
-        // So it sweeps the shapes the packs actually contain — 4x4 to 10x10,
-        // tiers 1 to 4 (tier 5 is BEYOND_DEDUCTION and never ships) — and asks
-        // for each one that all three ratings have a run that earns them. The
-        // paces are wall-clock per row of board, not fractions of a config
-        // value, so a retune that quietly moves the window still has to keep
-        // real play inside the bands.
+        // Two questions, and they are different. First: does every rung on the
+        // ladder have a run somewhere that earns it? Second: on each individual
+        // board, does going faster rate at least as well as going slower?
+        //
+        // Deliberately *not* "this pace earns exactly this rating". The unhurried
+        // pace lands between 79% and 84% of par depending on the shape, which
+        // straddles a rung, so pinning it to one number would be pinning the test
+        // to a tuning rather than to real play. Retuning the ladder is allowed;
+        // making a rating unreachable is not.
+        val earned = mutableSetOf<Int>()
         val failures = mutableListOf<String>()
 
         (SMALLEST_BOARD..BIGGEST_BOARD).forEach { size ->
             (1..SHIPPED_MAX_DIFFICULTY).forEach { difficulty ->
-                listOf(
-                    Triple(Scoring.THREE_PAWS, FAST_MS_PER_ROW, 0),
-                    Triple(Scoring.TWO_PAWS, UNHURRIED_MS_PER_ROW, 0),
-                    Triple(Scoring.ONE_PAW, SLOW_MS_PER_ROW, ScoringConfig.MAX_LIVES - 1),
-                ).forEach { (expected, msPerRow, strikes) ->
-                    val score = runAt(size, difficulty, msPerRow, strikes)
-                    val actual = Scoring.paws(score, size, difficulty, completed = true)
-                    if (actual != expected) {
-                        val fraction = score.toDouble() / Scoring.parScore(size, difficulty)
-                        failures += "${size}x$size tier $difficulty at ${msPerRow}ms/row with " +
-                            "$strikes strike(s): expected $expected paws, got $actual " +
-                            "(${(fraction * PERCENT).toInt()}% of par)"
-                    }
+                val fast = ratingAt(size, difficulty, FAST_MS_PER_ROW, strikes = 0)
+                val unhurried = ratingAt(size, difficulty, UNHURRIED_MS_PER_ROW, strikes = 0)
+                val slow = ratingAt(size, difficulty, SLOW_MS_PER_ROW, ScoringConfig.MAX_LIVES - 1)
+                earned += listOf(fast, unhurried, slow)
+
+                if (fast != Scoring.MAX_PAWS) {
+                    failures += "${size}x$size tier $difficulty: a quick clean run earned $fast, " +
+                        "so the top rating is unreachable there"
+                }
+                if (slow != Scoring.ONE_PAW) {
+                    failures += "${size}x$size tier $difficulty: the worst completable run earned $slow"
+                }
+                if (fast < unhurried || unhurried < slow) {
+                    failures += "${size}x$size tier $difficulty: ratings do not fall with pace " +
+                        "($fast, $unhurried, $slow)"
                 }
             }
         }
 
         assertTrue(failures.isEmpty(), failures.joinToString("\n"))
+        assertTrue(
+            earned.containsAll(listOf(Scoring.ONE_PAW, Scoring.MAX_PAWS)),
+            "the ends of the ladder were never earned across the whole sweep: $earned",
+        )
     }
+
+    private fun ratingAt(size: Int, difficulty: Int, msPerRow: Long, strikes: Int): Int =
+        Scoring.paws(runAt(size, difficulty, msPerRow, strikes), size, difficulty, completed = true)
 
     @Test
     fun theThirdPawIsWhatSpeedBuys() {
@@ -366,9 +396,9 @@ class ScoringTest {
 
         assertTrue(banked < card.total, "two boosters have to cost something")
         assertEquals(
-            Scoring.THREE_PAWS,
+            Scoring.MAX_PAWS,
             Scoring.paws(card.total, size, difficulty = 3, completed = true),
-            "a flawless run stays a three-paw run however much help it took",
+            "a flawless run keeps its rating however much help it took",
         )
     }
 

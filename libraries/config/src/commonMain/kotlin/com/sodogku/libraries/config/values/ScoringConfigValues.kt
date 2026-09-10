@@ -184,7 +184,7 @@ class ScoringBoosterPenaltyRate(appConfigMap: AppConfigMap) : DoubleConfigValue(
 class ScoringTwoPawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Two paw fraction of par"
     override val path = "scoring.twoPawFraction"
-    override val default = 0.60
+    override val default = 0.6
 }
 
 /** Fraction of par at which the third paw is awarded. See [ScoringTwoPawFraction]. */
@@ -194,6 +194,26 @@ class ScoringTwoPawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(appC
 class ScoringThreePawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Three paw fraction of par"
     override val path = "scoring.threePawFraction"
+    override val default = 0.7
+}
+
+/** Fraction of par at which the fourth paw is awarded. See [ScoringTwoPawFraction]. */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class ScoringFourPawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
+    override val name = "Four paw fraction of par"
+    override val path = "scoring.fourPawFraction"
+    override val default = 0.78
+}
+
+/** Fraction of par at which the fifth and last paw is awarded. See [ScoringTwoPawFraction]. */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class ScoringFivePawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
+    override val name = "Five paw fraction of par"
+    override val path = "scoring.fivePawFraction"
     override val default = 0.85
 }
 
@@ -258,6 +278,8 @@ fun scoringConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>> = 
     ScoringBoosterPenaltyRate(appConfigMap),
     ScoringTwoPawFraction(appConfigMap),
     ScoringThreePawFraction(appConfigMap),
+    ScoringFourPawFraction(appConfigMap),
+    ScoringFivePawFraction(appConfigMap),
     ScoringNicePraiseAt(appConfigMap),
     ScoringGreatPraiseAt(appConfigMap),
     ScoringExcellentPraiseAt(appConfigMap),

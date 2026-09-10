@@ -82,11 +82,11 @@ fun Scoring.standingFor(
 ): Standing? {
     if (!completed) return null
     val par = parScore(size, difficulty, config)
-    val sharp = score >= par * config.threePawFraction
+    val sharp = score >= par * config.fivePawFraction
     return when {
         sharp && livesRemaining >= ScoringConfig.MAX_LIVES -> Standing.Flawless
         sharp -> Standing.Sharp
-        score >= par * config.twoPawFraction -> Standing.Solid
+        score >= par * config.threePawFraction -> Standing.Solid
         else -> Standing.Scraped
     }
 }

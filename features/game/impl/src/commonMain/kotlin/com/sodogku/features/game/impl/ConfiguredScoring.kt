@@ -13,6 +13,8 @@ import com.sodogku.libraries.config.values.ScoringNicePraiseAt
 import com.sodogku.libraries.config.values.ScoringPerfectPraiseAt
 import com.sodogku.libraries.config.values.ScoringSpeedMaxMultiplier
 import com.sodogku.libraries.config.values.ScoringSpeedWindowMs
+import com.sodogku.libraries.config.values.ScoringFivePawFraction
+import com.sodogku.libraries.config.values.ScoringFourPawFraction
 import com.sodogku.libraries.config.values.ScoringThreePawFraction
 import com.sodogku.libraries.config.values.ScoringTwoPawFraction
 import com.sodogku.libraries.core.Catching
@@ -36,8 +38,8 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * three paws for scoring zero. But a throw here would be a crash on the tap
  * that placed a dog, so it is caught. Rebuilding the config field by field,
  * keeping the remote values that validate and defaulting the rest, was
- * rejected: two of the rules are about *pairs* (`threePawFraction` against
- * `twoPawFraction`), the coefficients were balanced against each other, and a
+ * rejected: some of the rules are about *pairs* (each paw fraction against the
+ * one below it), the coefficients were balanced against each other, and a
  * half-remote blend is a combination nobody chose and nobody could reproduce
  * from the console. The shipped set is the one arrangement known to be sane.
  */
@@ -55,6 +57,8 @@ class ConfiguredScoring(
     private val boosterPenaltyRate: ScoringBoosterPenaltyRate,
     private val twoPawFraction: ScoringTwoPawFraction,
     private val threePawFraction: ScoringThreePawFraction,
+    private val fourPawFraction: ScoringFourPawFraction,
+    private val fivePawFraction: ScoringFivePawFraction,
     private val nicePraiseAt: ScoringNicePraiseAt,
     private val greatPraiseAt: ScoringGreatPraiseAt,
     private val excellentPraiseAt: ScoringExcellentPraiseAt,
@@ -82,6 +86,8 @@ class ConfiguredScoring(
             boosterPenaltyRate = boosterPenaltyRate(),
             twoPawFraction = twoPawFraction(),
             threePawFraction = threePawFraction(),
+            fourPawFraction = fourPawFraction(),
+            fivePawFraction = fivePawFraction(),
             nicePraiseAt = nicePraiseAt(),
             greatPraiseAt = greatPraiseAt(),
             excellentPraiseAt = excellentPraiseAt(),

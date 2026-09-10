@@ -98,11 +98,44 @@ data class ScoringConfig(
     val boosterPenaltyRate: Double = 0.15,
 
     /**
-     * Score fractions of par at which the second and third paw are awarded.
+     * Score fractions of par at which each paw above the first is awarded.
      * Finishing at all earns the first, so there is no threshold for it.
+     *
+     * **Five paws, not three.** The rating is a five-star scale in everything
+     * but name now, and the two original fractions kept their config keys
+     * (`scoring.twoPawFraction`, `scoring.threePawFraction`) so a remote
+     * override does not break, while being retuned to sit in the middle of a
+     * longer ladder rather than at the top of a short one.
+     *
+     * Nothing had to be migrated for this. Paws are derived from score and par,
+     * and the score is what is stored, so an old record is simply re-rated under
+     * the new ladder. A player who had three paws does not wake up with "3 out
+     * of 5".
+     *
+     * The rungs are spaced against *measured play*, not by dividing the range
+     * up neatly. `ScoringTest`'s sweep runs every shipped board shape at three
+     * paces and reports what fraction of par each reaches: a quick clean run
+     * lands around 90%, an unhurried one around 79%, and a slow run with two
+     * strikes around 58%. A first pass at 0.45/0.65/0.82/0.95 put the top rung
+     * above anything the fast pace could reach, which is the failure that sweep
+     * exists to catch -- a rating nobody can earn, invisible to every worked
+     * example because they each pick their own board.
+     *
+     * So **both original rungs stay exactly where they were**: 0.60 above the
+     * worst completable run, and 0.85 at what a quick clean run scores on the
+     * *hardest* shape to score well on. Those two were already validated by the
+     * sweep. The two new rungs are inserted between them, which adds granularity
+     * without moving either end of a ladder that was known to work.
+     *
+     * A pass at 0.88 for the top looked reasonable and failed on 8x8 and larger,
+     * where a quick run reaches about 85% rather than the 90% a 4x4 reaches. The
+     * curve does not scale uniformly with board size, which is the sort of thing
+     * only the sweep knows.
      */
     val twoPawFraction: Double = 0.60,
-    val threePawFraction: Double = 0.85,
+    val threePawFraction: Double = 0.70,
+    val fourPawFraction: Double = 0.78,
+    val fivePawFraction: Double = 0.85,
 
     /** Combined-multiplier cutoffs for the floating praise text. */
     val nicePraiseAt: Double = 1.2,
@@ -134,11 +167,15 @@ data class ScoringConfig(
         require(comboMax >= 1.0) { "comboMax must be at least 1.0" }
         require(speedMaxMultiplier >= 1.0) { "speedMaxMultiplier must be at least 1.0" }
         require(speedWindowMs > 0) { "speedWindowMs must be positive" }
-        require(twoPawFraction in 0.0..1.0 && threePawFraction in 0.0..1.0) {
+        val pawFractions = listOf(twoPawFraction, threePawFraction, fourPawFraction, fivePawFraction)
+        require(pawFractions.all { it in 0.0..1.0 }) {
             "paw fractions must be between 0 and 1"
         }
-        require(threePawFraction >= twoPawFraction) {
-            "the third paw cannot be easier to earn than the second"
+        // Zipped rather than four hand-written comparisons, so adding a sixth
+        // paw cannot leave one pair unchecked. A ladder that is not ascending
+        // silently makes a rung unreachable rather than throwing.
+        require(pawFractions.zipWithNext().all { (lower, higher) -> higher >= lower }) {
+            "each paw must be at least as hard to earn as the one below it"
         }
         // Above 1.0 a booster would *add* points, and below 0 it would too.
         require(boosterPenaltyRate in 0.0..1.0) {

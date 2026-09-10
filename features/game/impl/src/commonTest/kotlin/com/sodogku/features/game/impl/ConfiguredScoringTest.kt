@@ -14,6 +14,8 @@ import com.sodogku.libraries.config.values.ScoringNicePraiseAt
 import com.sodogku.libraries.config.values.ScoringPerfectPraiseAt
 import com.sodogku.libraries.config.values.ScoringSpeedMaxMultiplier
 import com.sodogku.libraries.config.values.ScoringSpeedWindowMs
+import com.sodogku.libraries.config.values.ScoringFivePawFraction
+import com.sodogku.libraries.config.values.ScoringFourPawFraction
 import com.sodogku.libraries.config.values.ScoringThreePawFraction
 import com.sodogku.libraries.config.values.ScoringTwoPawFraction
 import com.sodogku.libraries.scoring.ScoringConfig
@@ -42,9 +44,9 @@ class ConfiguredScoringTest {
     @Test
     fun everyKeyIsActuallyRead() {
         // One assertion per key, because the failure this guards against is a
-        // single field left off the constructor call — which fifteen keys and
+        // single field left off the constructor call — which seventeen keys and
         // a copy-pasted list makes very easy. A test that only checked one
-        // coefficient would pass with the other fourteen ignored.
+        // coefficient would pass with the other sixteen ignored.
         val tuned = scoringFrom(
             configOf(
                 "scoring.basePerPlacement" to 111,
@@ -56,8 +58,14 @@ class ConfiguredScoringTest {
                 "scoring.livesBonusRate" to 0.75,
                 "scoring.difficultyBonusRate" to 0.33,
                 "scoring.boosterPenaltyRate" to 0.42,
+                // Ascending, because `ScoringConfig` requires it and a set that
+                // is not throws, falls back to the defaults, and makes this test
+                // fail on `basePerPlacement` with no hint that the paws were the
+                // problem. Which is exactly what it did.
                 "scoring.twoPawFraction" to 0.4,
-                "scoring.threePawFraction" to 0.9,
+                "scoring.threePawFraction" to 0.5,
+                "scoring.fourPawFraction" to 0.6,
+                "scoring.fivePawFraction" to 0.9,
                 "scoring.nicePraiseAt" to 1.1,
                 "scoring.greatPraiseAt" to 1.4,
                 "scoring.excellentPraiseAt" to 1.7,
@@ -75,7 +83,9 @@ class ConfiguredScoringTest {
         assertEquals(0.33, tuned.difficultyBonusRate)
         assertEquals(0.42, tuned.boosterPenaltyRate)
         assertEquals(0.4, tuned.twoPawFraction)
-        assertEquals(0.9, tuned.threePawFraction)
+        assertEquals(0.5, tuned.threePawFraction)
+        assertEquals(0.6, tuned.fourPawFraction)
+        assertEquals(0.9, tuned.fivePawFraction)
         assertEquals(1.1, tuned.nicePraiseAt)
         assertEquals(1.4, tuned.greatPraiseAt)
         assertEquals(1.7, tuned.excellentPraiseAt)
@@ -143,6 +153,8 @@ class ConfiguredScoringTest {
         ScoringBoosterPenaltyRate(config),
         ScoringTwoPawFraction(config),
         ScoringThreePawFraction(config),
+        ScoringFourPawFraction(config),
+        ScoringFivePawFraction(config),
         ScoringNicePraiseAt(config),
         ScoringGreatPraiseAt(config),
         ScoringExcellentPraiseAt(config),

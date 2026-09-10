@@ -155,8 +155,8 @@ object Scoring {
     }
 
     /**
-     * Paws earned, 0 to 3. Zero means the level was never finished; finishing at
-     * all is worth one, and the other two are fractions of [parScore].
+     * Paws earned, 0 to 5. Zero means the level was never finished; finishing at
+     * all is worth one, and the other four are fractions of [parScore].
      */
     fun paws(
         score: Int,
@@ -167,7 +167,12 @@ object Scoring {
     ): Int {
         if (!completed) return 0
         val par = parScore(size, difficulty, config)
+        // Walked from the top so the first rung cleared wins. A `when` written
+        // the other way round would award the lowest paw the score qualifies
+        // for, which is every paw except the right one.
         return when {
+            score >= par * config.fivePawFraction -> FIVE_PAWS
+            score >= par * config.fourPawFraction -> FOUR_PAWS
             score >= par * config.threePawFraction -> THREE_PAWS
             score >= par * config.twoPawFraction -> TWO_PAWS
             else -> ONE_PAW
@@ -219,4 +224,9 @@ object Scoring {
     const val ONE_PAW: Int = 1
     const val TWO_PAWS: Int = 2
     const val THREE_PAWS: Int = 3
+    const val FOUR_PAWS: Int = 4
+    const val FIVE_PAWS: Int = 5
+
+    /** The top of the rating, for anything drawing an "out of" row. */
+    const val MAX_PAWS: Int = FIVE_PAWS
 }

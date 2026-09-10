@@ -32,6 +32,8 @@ import com.sodogku.libraries.config.values.ScoringNicePraiseAt
 import com.sodogku.libraries.config.values.ScoringPerfectPraiseAt
 import com.sodogku.libraries.config.values.ScoringSpeedMaxMultiplier
 import com.sodogku.libraries.config.values.ScoringSpeedWindowMs
+import com.sodogku.libraries.config.values.ScoringFivePawFraction
+import com.sodogku.libraries.config.values.ScoringFourPawFraction
 import com.sodogku.libraries.config.values.ScoringThreePawFraction
 import com.sodogku.libraries.config.values.ScoringTwoPawFraction
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
@@ -3174,13 +3176,17 @@ class GameViewModelTest : CoroutineTest() {
 
     @Test
     fun thePawRatingMovesWithItsConfiguredThresholds() = runUnitTest {
-        // Both fractions at zero puts every finish over the three-paw line, and
-        // the default set does not — so this fails against a `paws` call that
-        // kept defaulting its config parameter.
+        // Every fraction at zero puts any finish over the top line, and the
+        // default set does not — so this fails against a `paws` call that kept
+        // defaulting its config parameter. All four, because leaving the two new
+        // rungs at their defaults would cap this at three paws and the test
+        // would pass for the wrong reason.
         val generous = viewModel(
             config = configOf(
                 "scoring.twoPawFraction" to 0.0,
                 "scoring.threePawFraction" to 0.0,
+                "scoring.fourPawFraction" to 0.0,
+                "scoring.fivePawFraction" to 0.0,
             ),
         )
         // Slow, sloppy play: every placement outside the speed window.
@@ -3188,7 +3194,7 @@ class GameViewModelTest : CoroutineTest() {
             clock += PastSpeedWindow
             generous.commit(cellFor(row))
         }
-        assertEquals(3, generous.state.paws)
+        assertEquals(5, generous.state.paws)
 
         val shipped = viewModel()
         (0 until level.size).forEach { row ->
@@ -3196,8 +3202,9 @@ class GameViewModelTest : CoroutineTest() {
             shipped.commit(cellFor(row))
         }
         assertTrue(
-            shipped.state.paws < 3,
-            "the fixture has to be a run the shipped thresholds would not rate three paws",
+            shipped.state.paws < 5,
+            "the fixture has to be a run the shipped thresholds would not rate top marks, " +
+                "or the generous config above proves nothing",
         )
     }
 
@@ -4102,6 +4109,8 @@ class GameViewModelTest : CoroutineTest() {
         ScoringBoosterPenaltyRate(config),
         ScoringTwoPawFraction(config),
         ScoringThreePawFraction(config),
+        ScoringFourPawFraction(config),
+        ScoringFivePawFraction(config),
         ScoringNicePraiseAt(config),
         ScoringGreatPraiseAt(config),
         ScoringExcellentPraiseAt(config),

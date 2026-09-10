@@ -116,7 +116,8 @@ object ShareText {
     /** Three spaces, wide enough to read as a gap between emoji on one line. */
     private const val GROUP_GAP = "   "
 
-    private const val MAX_PAWS = 3
+    /** Mirrors ScoreCard.MAX_PAWS; this module does not depend on :libraries:scoring. */
+    private const val MAX_PAWS = 5
 
     /**
      * Bone holdings are uncapped, but a line of fifteen bones is a wall rather
