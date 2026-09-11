@@ -91,7 +91,7 @@ Architecture rules (enforced at Gradle configuration time), the ViewModel/DI/nav
 | [docs/decisions.md](docs/decisions.md) | Why anything non-obvious is the way it is. Newest first |
 | [docs/todos.md](docs/todos.md) | The work queue. `docs/backlog.md` is the same for things nobody has committed to |
 | [docs/store/](docs/store/) | Listing copy, data safety, icons, screenshots |
-| [docs/practices/testing.md](docs/practices/testing.md) | Which layer catches which bug; fakes; the integration harness |
+| [docs/practices/testing.md](docs/practices/testing.md) | Which layer catches which bug; mutation checking and its traps; fakes; the source-scanning guards; the integration harness |
 | [docs/practices/observability.md](docs/practices/observability.md) | The session_id pivot; finding one session across Sentry/Loki/Tempo |
 | [docs/practices/app-events.md](docs/practices/app-events.md) | The structured-event registry + `logEvent` discipline |
 | [apps/server/DEPLOY.md](apps/server/DEPLOY.md) | Fly.io two-environment deployment |
