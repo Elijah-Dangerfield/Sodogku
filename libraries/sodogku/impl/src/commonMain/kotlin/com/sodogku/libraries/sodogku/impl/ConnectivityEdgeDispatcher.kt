@@ -37,7 +37,8 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  *    `false` here is necessarily preceded by a `true`, i.e. a true→false edge.
  *
  * [AutoInit] so the observer is running before the user can navigate — a regain
- * that arrives during the splash still heals identity / flushes outboxes.
+ * that arrives during the splash still refreshes what the screen behind it is
+ * about to read.
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = AutoInit::class, multibinding = true)

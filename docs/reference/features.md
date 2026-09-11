@@ -870,6 +870,29 @@ whatever is in hand. Refresh happens on foreground, throttled, with a five-secon
 and the timestamp is stamped at the *attempt* so a failure does not retry on every rapid
 resume. A corrupt cached snapshot takes the same path as an absent one.
 
+**Nothing queues a player write, because there are none to queue.** The client never sends
+player state anywhere: the backend serves `/_health` and remote config, and the client only
+reads from it. Progress is device-local and stays that way (see
+[What the game does not have](#what-the-game-does-not-have)). So there is no outbox in this
+app, no pending-writes table, and nothing that needs an idempotency key or a
+reconcile-on-reject path.
+
+Two things do leave the device, and neither is that shape:
+
+- **Telemetry** is store-and-forward, handed to OTel's `persistingLogRecordProcessor`
+  (`libraries/telemetry/impl/.../DurableLogExport.kt`). Batches are written to disk before
+  export and deleted only on gateway ack, so events emitted offline survive process death.
+  Delivery is at-least-once and the dashboards say so.
+- **Leaderboard scores** are held in memory, one slot per board, newest wins, and flushed
+  when the platform finishes authenticating (`RealLeaderboards`). They are deliberately
+  *not* persisted: every value is a running total the next completed board recomputes, so
+  a process death costs nothing and a disk copy would be the same fact in a more fragile
+  place.
+
+What survives of the sync machinery is `SyncTriggers` (`:libraries:sodogku:impl`) and its
+`warmForeground` / `cameOnline` / `isOffline`. Those are triggers for refreshing reads. There
+is no `activeAccount` level and nothing hangs a flush off them.
+
 **Where it lives:** `libraries/ads/impl/.../RealAdGate.kt` and `AdStateCache.kt`,
 `features/paywall/impl/.../OfflineBlockScreen.kt`,
 `libraries/config/impl/.../repository/OfflineFirstAppConfigRepository.kt`.
@@ -1505,6 +1528,8 @@ Not oversights. Each of these was decided, and most of them were built and then 
   The code is there and inert. See [Leaderboards](#leaderboards).
 - **No mirrored platform achievements.**
 - **No in-app analytics opt-out**, and no way to request deletion in the app.
+- **No outbox.** Nothing the player does produces a write that has to reach a server, so
+  there is no pending-writes queue anywhere. See [Offline](#offline).
 
 **Not in this list, because it is not settled:** the kids-versus-general-audience decision.
 See [Audience and consent](#audience-and-consent).

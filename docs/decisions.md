@@ -6,6 +6,49 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-11 — the outbox doc is deleted, because this app cannot have one
+
+The outbox page under `docs/practices/` was a set of instructions nobody could
+follow, and is deleted rather than cited here, so that `DocReferencesResolveTest`
+stays true. Its worked example was `PendingProfileEditStore` and `ProfileEditFlusher` in
+`:libraries:identity:impl`, and its step 3 said to implement `UserScopedSyncer`
+and hang off the `activeAccount` trigger level. All of that went with accounts in
+C0. The doc map row had been relabelled to warn a reader off it, which stops the
+lie but leaves the file.
+
+The question SD-70 asked was whether to rewrite it against `SyncTriggers` or
+delete it. Deletion, because the premise is gone rather than the example. An
+outbox exists to stop a *player write* being lost on its way to a server, and
+this client never sends one. The backend serves `/_health` and remote config and
+the client only reads from it; progress is device-local and the Settings screen
+says so.
+
+The two things that do leave the device were checked before deciding, and neither
+is the pattern:
+
+- **Telemetry** is store-and-forward, but the queue is OTel's
+  `persistingLogRecordProcessor` rather than anything we wrote. It has no
+  idempotency key and no reject path — delivery is at-least-once and the
+  dashboards are written to tolerate a duplicate.
+- **`RealLeaderboards`** holds an unsendable score per board and flushes it when
+  the platform authenticates, which is outbox-shaped from a distance. It is
+  explicitly in memory only, and the class KDoc argues why: every held value is a
+  running total the next completed board recomputes, so persisting it would be
+  caching something already on disk in a more fragile form. Newest-wins
+  coalescing, no key, no revert.
+
+What survives is `SyncTriggers`' `warmForeground` / `cameOnline` / `isOffline`,
+which are refresh triggers for reads. `features.md#offline` now carries the
+paragraph the doc's readers actually needed, which is that there is nothing to
+queue, and `features.md#what-the-game-does-not-have` has the one-line version.
+
+Two code comments went with it: `ConnectivityEdgeDispatcher` and
+`AppEvent.ConnectivityRegained` both described flushing outboxes off the regain
+edge, which named machinery the reader would then go looking for.
+
+If a future feature does need one, the pattern is well documented outside this
+repo and the template it came from still has the file.
+
 ## 2026-09-10: the spec is deleted, and the two reversals it was the last copy of
 
 The spec doc is gone, replaced by `docs/reference/features.md`. Almost

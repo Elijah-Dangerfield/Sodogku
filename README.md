@@ -94,7 +94,6 @@ Architecture rules (enforced at Gradle configuration time), the ViewModel/DI/nav
 | [docs/practices/testing.md](docs/practices/testing.md) | Which layer catches which bug; fakes; the integration harness |
 | [docs/practices/observability.md](docs/practices/observability.md) | The session_id pivot; finding one session across Sentry/Loki/Tempo |
 | [docs/practices/app-events.md](docs/practices/app-events.md) | The structured-event registry + `logEvent` discipline |
-| [docs/practices/outbox.md](docs/practices/outbox.md) | Offline writes that must not be lost. Inherited from the template and written against its identity stack, which this app deleted, so read it as a pattern rather than a description of code here |
 | [apps/server/DEPLOY.md](apps/server/DEPLOY.md) | Fly.io two-environment deployment |
 | [apps/admin/README.md](apps/admin/README.md) | The remote-config admin console |
 | [docs/swift-kotlin-communication-patterns.md](docs/swift-kotlin-communication-patterns.md) | Exposing Kotlin to Swift and vice versa |

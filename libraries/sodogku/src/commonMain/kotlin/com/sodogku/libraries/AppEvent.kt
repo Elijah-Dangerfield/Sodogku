@@ -39,10 +39,10 @@ sealed class AppEvent {
      * debounces flapping, and only fires on the true→false transition (so an
      * online cold boot never emits one).
      *
-     * This is a *data-freshness* trigger: identity self-heal, authed-call
-     * retriggers, and offline outboxes hang their reconnect flush off it. Like
-     * the other events, listeners must run synchronously and hand heavy work off
-     * to their own scope.
+     * This is a *data-freshness* trigger: a remote-config refresh and an ad
+     * preload hang their reconnect retry off it. Nothing hangs a *write* off it,
+     * because nothing in this app queues one. Like the other events, listeners
+     * must run synchronously and hand heavy work off to their own scope.
      */
     data object ConnectivityRegained : AppEvent()
 }
