@@ -367,33 +367,6 @@ bookkeeping is what put SD-26 on the wrong trail for a day.
 `navigation-compose` version actually on the classpath rather than against
 memory. Decide the `pushWithTransition` question separately; it may be
 deliberate, and the git history will say.
-
-## SD-63 [P2] — A badge added to the catalog later arrives already stale
-
-**Found by:** the SD-55 agent, 2026-09-10, while checking its new badge against
-the achievements page.
-
-`AchievementEngine.apply` stamps a backfilled badge with the **historical**
-`finishedAt` that crossed its threshold, not with the moment it was granted. The
-achievements page decides "just earned" by comparing `unlockedAt` against the
-`achievementsSeenAt` watermark, so a badge added to the catalog today and
-immediately backfilled onto an existing player is stamped with a date from weeks
-ago and lands older than the watermark.
-
-The result is a badge that toasts and then is not on the "Just earned" shelf when
-the player opens the page the toast sent them to. Pre-existing, exposed rather
-than caused by `HalfwayHound`, and it will happen to **every** badge added to the
-catalog from now on.
-
-**Done when:** a badge granted for the first time reads as new on the page it
-points at, however old the play that earned it.
-
-**Hints:** The historical stamp is not wrong for what it is. "When did you cross
-this line" is the true answer and the recap and the log both want it. What the
-shelf needs is a different fact, "when did we tell you", so this is likely a
-second column rather than a changed one. Check what else reads `unlockedAt`
-before moving it.
-
 ## SD-64 [P2] — `proposals.md` item 4 argues entirely from a 500-level campaign
 
 **Found by:** the SD-55 agent, 2026-09-10.
