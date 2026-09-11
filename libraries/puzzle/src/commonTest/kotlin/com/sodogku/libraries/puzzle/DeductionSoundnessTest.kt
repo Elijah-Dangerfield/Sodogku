@@ -109,6 +109,40 @@ class DeductionSoundnessTest {
         }
     }
 
+    /**
+     * The treat's supply, and the reason `game.booster_no_op` only ever carries
+     * `booster="sniff"` (SD-60).
+     *
+     * A sniff runs dry for a real reason: it owes the player a square they could
+     * not already see, and late on a board there is often no such square left. A
+     * treat owes them a dog, and the board is full of dogs until it is finished.
+     * [HintFinder.nextCell] is null in exactly three cases — a complete board, a
+     * partial that breaks a rule, and a legal partial with no completion — and a
+     * game that only ever places correct dogs cannot reach the last two.
+     *
+     * [hintsAlwaysPointAtTheRealAnswer] walks one order, the hint's own. A player
+     * does not: they place whichever dog they worked out, so the claim has to
+     * hold for *any* correct subset of the answer, which is what is checked here.
+     */
+    @Test
+    fun aTreatAlwaysHasADogToPlaceOnAnUnfinishedBoard() {
+        val random = Random(60_2026)
+        forEachUniqueBoard(seed = 60_2026, boards = 25) { board, solution ->
+            repeat(PARTIALS_PER_BOARD) {
+                val rows = (0 until board.size).shuffled(random)
+                    .take(random.nextInt(board.size))
+                val partial = rows.fold(Solution.empty(board.size)) { acc, row ->
+                    acc.withPlacement(row, solution[row])
+                }
+
+                assertNotNull(
+                    HintFinder.nextCell(board, partial),
+                    "no dog to hand over with rows $rows placed\n$board",
+                )
+            }
+        }
+    }
+
     private fun forEachUniqueBoard(
         seed: Int,
         boards: Int,
@@ -256,5 +290,11 @@ class DeductionSoundnessTest {
 
         const val MAX_STEPS = 2_000
         const val ATTEMPT_SLACK = 4
+
+        /**
+         * Correct partials sampled per board. `take(nextInt(size))` never draws
+         * the whole answer, so every one of these is an unfinished board.
+         */
+        const val PARTIALS_PER_BOARD = 12
     }
 }

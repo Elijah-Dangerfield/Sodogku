@@ -562,7 +562,7 @@
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "description": "`game.booster_no_op` \u2014 a Sniff or a Treat the player spent that had nothing left to show.\n\nIn the registry's own words this is a difficulty-calibration signal, not a UI one: it means the hint engine ran out of things to say earlier than it should, which happens when a board's remaining deductions are not the kind the hint engine can express. A rise here alongside a flat clear time is the engine and the boards drifting apart.",
+      "description": "`game.booster_no_op` \u2014 a Sniff the player spent that the hint engine had nothing left to answer with.\n\nIn the registry's own words this is a difficulty-calibration signal, not a UI one: it means the hint engine ran out of things to say earlier than it should, which happens when a board's remaining deductions are not the kind the hint engine can express. A rise here alongside a flat clear time is the engine and the boards drifting apart.\n\n**One series is the whole chart, on purpose.** The split by booster is kept so a second one draws itself if the game ever changes, but today only a Sniff can run dry: a Treat owes the player a dog, and an unfinished board always has one left to give. See `game.booster_no_op` in docs/practices/app-events.md for the argument. A flat absence of a Treat series is the game working, not a gap in the reporting.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -652,7 +652,7 @@
           "legendFormat": "{{booster}}"
         }
       ],
-      "title": "Hint engine running dry, per day",
+      "title": "Sniffs the hint engine could not answer, per day",
       "type": "timeseries"
     },
     {

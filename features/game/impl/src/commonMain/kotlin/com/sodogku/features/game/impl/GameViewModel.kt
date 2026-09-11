@@ -2512,7 +2512,24 @@ class GameViewModel(
         )
     }
 
-    /** The free placement. Costs a treat, no bone, and no risk. */
+    /**
+     * The free placement. Costs a treat, no bone, and no risk.
+     *
+     * **No `game.booster_no_op` here, and that is the answer to SD-60 rather
+     * than an omission.** The sniff emits one because it can genuinely run dry:
+     * it owes the player a square they could not already see, and late on a
+     * board there is often no such square left. A treat owes them a dog, and
+     * [HintFinder.nextCell] only comes back empty on a finished board, on a
+     * partial that breaks a rule, or on a legal partial with no completion. The
+     * board is finished means the level is won and the booster row is not live;
+     * the other two need a wrong dog in `placed`, and `commit` marks a wrong
+     * guess rather than placing it. So the branch below is a guard against a
+     * future undo or restore, not a path a player can reach, and an event
+     * emitted from it would be a series that can only ever read zero.
+     * `DeductionSoundnessTest.aTreatAlwaysHasADogToPlaceOnAnUnfinishedBoard`
+     * is what holds the first half of that; `aTreatAlwaysFindsADogToPlace` in
+     * `GameViewModelTest` holds this end of it.
+     */
     private suspend fun GameAction.useTreat() {
         val level = state.level ?: return
         val cell = HintFinder.nextCell(level.board, state.placed) ?: run {

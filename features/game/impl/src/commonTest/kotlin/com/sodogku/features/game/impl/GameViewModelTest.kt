@@ -1800,6 +1800,38 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun aTreatAlwaysFindsADogToPlace() = recordingEvents { events ->
+        runUnitTest {
+            // The board end of SD-60, and the reason `useTreat` emits no
+            // `game.booster_no_op`. A sniff can genuinely run dry and reports it;
+            // a treat cannot, because an unfinished board always has another dog
+            // to hand over. Every row of a real board is spent on here, so the
+            // branch that closes the prompt in silence is shown to be
+            // unreachable rather than assumed to be.
+            val cache = InMemoryAppCache()
+            cache.set(AppData(treats = level.size))
+            val vm = viewModel(cache = cache)
+
+            repeat(level.size) { spent ->
+                vm.takeAction(GameAction.BoosterConfirmed(Consumable.Treat))
+                settle()
+                assertEquals(spent + 1, vm.state.dogsPlaced, "treat ${spent + 1} placed nothing")
+            }
+
+            assertEquals(
+                level.size,
+                events.attributesOf("game.booster_used").count { it["booster"] == "treat" },
+                "a treat came back without spending itself",
+            )
+            assertEquals(
+                emptyList(),
+                events.attributesOf("game.booster_no_op"),
+                "a treat reported a no-op, so the registry's one-booster claim is wrong",
+            )
+        }
+    }
+
+    @Test
     fun aRefillToppedUpByAnAdNeverReducesAHolding() = runUnitTest {
         // Someone who earned five treats from level rewards and then watches an
         // ad must not be punished back down to three.
