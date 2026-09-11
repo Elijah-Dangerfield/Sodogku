@@ -3331,6 +3331,112 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun twoTapsOnTheDailyCardStartOneDaily() = recordingEvents { appEvents ->
+        runUnitTest {
+            // The pane slides out rather than vanishing, so the card is still
+            // drawn and still hittable while it goes, and `drawerOpen` could
+            // not have gated this anyway: `state` lags `updateState` by a
+            // dispatch, so both taps are in the channel before the close
+            // renders. Two `OpenDaily` a frame apart push the route twice, and
+            // replayed navigation events are what crashed NavController in
+            // production. `daily.started` is the denominator of the daily
+            // funnel, so the second one also inflates every conversion on it.
+            val vm = viewModel(daily = FakeDaily(levelId = DailyLevel))
+            val events = eventsOf(vm)
+            vm.takeAction(GameAction.LevelsOpened)
+
+            vm.takeAction(GameAction.PlayDaily)
+            vm.takeAction(GameAction.PlayDaily)
+            settle()
+
+            assertEquals(
+                1,
+                events.count { it is GameEvent.OpenDaily },
+                "the second tap pushed the daily route again",
+            )
+            assertEquals(
+                1,
+                appEvents.attributesOf("daily.started").size,
+                "the second tap reported its own start",
+            )
+        }
+    }
+
+    @Test
+    fun hammeringTheDailyCardStillStartsOneDaily() = runUnitTest {
+        // A tap that is refused re-marks the route as open, so a card being
+        // hammered cannot walk past the window one tap at a time. Three taps
+        // 400ms apart are each inside it and together are not, which is what
+        // the same card being held down through the pane's slide-out looks
+        // like.
+        val vm = viewModel(daily = FakeDaily(levelId = DailyLevel))
+        val events = eventsOf(vm)
+        vm.takeAction(GameAction.LevelsOpened)
+
+        repeat(3) {
+            vm.takeAction(GameAction.PlayDaily)
+            settle()
+            clock += AHammerGap
+        }
+
+        assertEquals(
+            1,
+            events.count { it is GameEvent.OpenDaily },
+            "a tap the guard refused let the window lapse under it",
+        )
+    }
+
+    @Test
+    fun comingBackFromTheDailyAndTappingAgainStartsItAgain() = recordingEvents { appEvents ->
+        runUnitTest {
+            // The other direction, and the one a guard is most likely to break.
+            // Playing the daily twice in a session is ordinary — the card is in
+            // the drawer of every board — so the question is "is the daily
+            // already what is in front", never "has it been started before". A
+            // flag that never cleared would answer the second one and leave the
+            // card dead for the rest of the session.
+            val vm = viewModel(daily = FakeDaily(levelId = DailyLevel))
+            val events = eventsOf(vm)
+            vm.takeAction(GameAction.LevelsOpened)
+            vm.takeAction(GameAction.PlayDaily)
+            settle()
+
+            clock += ARoundTrip
+            vm.takeAction(GameAction.LevelsOpened)
+            vm.takeAction(GameAction.PlayDaily)
+            settle()
+
+            assertEquals(
+                2,
+                events.count { it is GameEvent.OpenDaily },
+                "the player could not get back into the daily",
+            )
+            assertEquals(2, appEvents.attributesOf("daily.started").size)
+        }
+    }
+
+    @Test
+    fun theDailyCardDoesNotReopenTheDailyItIsAlreadyOn() = runUnitTest {
+        // The card knows this already — it draws Current instead of Play, and
+        // withholds Review when the recap on screen is the one it would open —
+        // but the card is not the only caller. The campaign ending sheet offers
+        // the daily too, and the accessibility path and the deep link both
+        // reach a view model rather than a button.
+        val vm = viewModel(isDaily = true, daily = FakeDaily(levelId = DailyLevel))
+        val events = eventsOf(vm)
+        vm.takeAction(GameAction.LevelsOpened)
+
+        vm.takeAction(GameAction.PlayDaily)
+        settle()
+
+        assertTrue(
+            events.none { it is GameEvent.OpenDaily },
+            "the daily pushed a second copy of its own route",
+        )
+        assertFalse(vm.state.drawerOpen, "the pane still closes, as it does for the level you are on")
+    }
+
+    @Test
     fun aDailyRouteOpenedWhileTheSwitchIsOffStartsNoAttempt() = runUnitTest {
         // The card honoured the switch and the route did not, and the card is
         // not the only way in: `sodogku://game?daily=true` is a home-screen
@@ -5857,6 +5963,18 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Just past the commit window, so a second tap is a second note. */
         val LateGap = 400.milliseconds
+
+        /**
+         * Out to the daily route and back, which is nothing like two taps on
+         * one card. Past `DailyRouteWindowMs` with room to spare.
+         */
+        val ARoundTrip = 3.seconds
+
+        /**
+         * A gap between taps on one card. Inside `DailyRouteWindowMs`, but
+         * three of them are not, which is what a hammered card looks like.
+         */
+        val AHammerGap = 400.milliseconds
 
         /**
          * Longer than the speed window of the biggest board these tests play,

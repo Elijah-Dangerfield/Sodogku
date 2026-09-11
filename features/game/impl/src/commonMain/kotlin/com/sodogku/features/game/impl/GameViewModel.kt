@@ -437,6 +437,29 @@ class GameViewModel(
      */
     private var dailyDate: LocalDate? = null
 
+    /**
+     * When this screen last handed the daily route to the navigator, or null if
+     * it never has.
+     *
+     * It answers "is the daily already the route in front", which is the
+     * question [playDaily] has to ask, and deliberately not "has the daily been
+     * started before" — a player who finishes today's board, comes back and
+     * taps the card again is starting it on purpose, and a flag that never
+     * cleared would refuse them for the rest of the session.
+     *
+     * A time mark rather than a boolean because **nothing tells this screen it
+     * is in front again.** `Router` has no current-route query, the campaign
+     * board sits on the back stack for the whole of the daily, and the actions
+     * that do arrive while it is back there are all flow-driven, so there is no
+     * gesture to clear a flag on. What this screen does know is how long ago it
+     * asked, and a navigation it asked for two frames ago is still the one on
+     * screen. See [DailyRouteWindowMs] for the bound.
+     *
+     * Re-marked by a refused tap as well as by an accepted one, so hammering
+     * the card cannot walk past the window one tap at a time.
+     */
+    private var dailyRouteOpenedAt: ComparableTimeMark? = null
+
     init {
         takeAction(GameAction.Load)
 
@@ -2356,11 +2379,35 @@ class GameViewModel(
      * the old forfeit-on-leave had no way back into it and no explanation. The
      * kill switch is still honoured — a daily that is switched off has no route
      * to open.
+     *
+     * **What it does refuse is a daily that is already the route in front**,
+     * the same shape as `goToLevel` declining the row the player is standing
+     * on. Two of those refusals, for the two ways the daily can already be
+     * open. The board on screen *being* the daily is the card's own rule, which
+     * draws Current instead of Play and withholds Review on a recap; it is
+     * repeated here because the card is not the only caller — the campaign
+     * ending sheet offers the daily too, and the accessibility path and the
+     * deep link both reach a view model rather than a button.
+     *
+     * The second is the one that was reported. Nothing gated this at all, and
+     * `drawerOpen` could not: the pane slides out, so the card takes a second
+     * tap while it goes, and `state` lags [updateState] by a dispatch anyway.
+     * Two taps were two `daily.started` in the funnel and two `OpenDaily` in
+     * the channel, and two navigations a frame apart is the shape that crashed
+     * NavController in production — see [SEAViewModel.eventFlow]. The five
+     * second shelf life added there does not help: both of these are fresh.
      */
     private suspend fun GameAction.playDaily() {
         val status = state.daily ?: return
         if (!status.enabled) return
         updateState { it.copy(drawerOpen = false) }
+        if (isDaily) return
+        val alreadyOpen = dailyRouteOpenedAt
+            ?.elapsedNow()
+            ?.inWholeMilliseconds
+            ?.let { it <= DailyRouteWindowMs } == true
+        dailyRouteOpenedAt = clock.markNow()
+        if (alreadyOpen) return
         // Only a real attempt is a start. Reviewing a finished day emits
         // `daily.reviewed` from the route instead, so the funnel keeps counting
         // attempts rather than visits.
@@ -2953,6 +3000,18 @@ class GameViewModel(
          * without inheriting its latency.
          */
         const val DoubleTapWindowMs = 320L
+
+        /**
+         * How long after asking for the daily route this screen goes on
+         * treating it as the one in front.
+         *
+         * Long enough to cover a burst of taps on a card that is still on
+         * screen — the pane slides out rather than vanishing, so the card stays
+         * live and hittable for the length of that animation after the first
+         * tap closed it. Far shorter than any genuine leave-and-return, which needs
+         * the daily to draw, a back gesture, and this screen to draw again.
+         */
+        const val DailyRouteWindowMs = 500L
 
         const val MillisPerSecond = 1_000L
     }
