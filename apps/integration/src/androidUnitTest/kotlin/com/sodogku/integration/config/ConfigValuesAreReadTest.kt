@@ -3,6 +3,7 @@ package com.sodogku.integration.config
 import com.sodogku.libraries.config.values.SodogkuConfigValues
 import com.sodogku.libraries.config.impl.model.BasicMapAppConfig
 import java.io.File
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -85,6 +86,34 @@ class ConfigValuesAreReadTest {
         )
     }
 
+    @Test
+    fun theWalkCannotSeeAGeneratedDirectory() {
+        // On a real checkout `build/` may not exist yet, so this asserts against
+        // a tree it builds, where it does. A walk that descends into another
+        // task's output reads a directory that is being written while it reads,
+        // and the only reason the scan survives that today is a second filter
+        // downstream, which is one edit away from not covering it.
+        val root = Files.createTempDirectory("config-scan").toFile()
+        try {
+            val source = File(root, "sodogku/src/commonMain/kotlin").apply { mkdirs() }
+                .resolve("Real.kt").apply { writeText("class Real") }
+            File(root, "sodogku/build/generated").apply { mkdirs() }
+                .resolve("Gen.kt").writeText("class Gen")
+
+            val visited = sourceTree(root).toList()
+
+            assertTrue(source in visited, "the walk found nothing at all, so it proves nothing")
+            assertTrue(
+                visited.none { entry -> "build" in entry.path.split(File.separator) },
+                "the walk entered a generated directory:\n" +
+                    visited.filter { "build" in it.path.split(File.separator) }
+                        .joinToString("\n") { "  $it" },
+            )
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     /** Declared class names that no source file outside `:libraries:config` mentions. */
     private fun unreadClassNames(): List<String> {
         val sources = sourceFiles()
@@ -107,8 +136,25 @@ class ConfigValuesAreReadTest {
             ?: error("$REPO_ROOT_PROPERTY is unset — apps/integration/build.gradle.kts should supply it")
         return listOf("libraries", "features", "apps")
             .map { File(root, it) }
-            .flatMap { dir -> dir.walkTopDown().filter { it.isSourceFile() }.toList() }
+            .flatMap { dir -> sourceTree(dir).filter { it.isSourceFile() }.toList() }
     }
+
+    /**
+     * Generated output is skipped by not entering it, not by discarding what it
+     * yields. The file list is identical either way, since [isSourceFile] drops
+     * anything under a `build` segment too, so this is about what the walk
+     * touches rather than what it returns. `build/` is another task's output,
+     * it is being written while this runs, and descending into it means listing
+     * a few hundred thousand files to throw every one away.
+     *
+     * Worth being precise about what this does *not* fix. `FileTreeWalk` does
+     * not throw when a directory vanishes underneath it: `listFiles` returns
+     * null and the walk moves on. The operation that throws is [File.readText]
+     * below, on a path the walk handed over that is gone by the time it is
+     * read, and build output has never been in that set.
+     */
+    private fun sourceTree(dir: File): Sequence<File> =
+        dir.walkTopDown().onEnter { it.name !in NOT_SOURCE }
 
     /** Generated output and test doubles both mention names without reading them. */
     private fun File.isSourceFile(): Boolean {
@@ -123,6 +169,13 @@ class ConfigValuesAreReadTest {
 
         /** A floor, so a broken scan reports "found nothing" rather than passing. */
         const val MIN_SOURCE_FILES = 200
+
+        /**
+         * Directories the walk refuses to enter. `build` is Gradle's, `.claude`
+         * holds agent worktrees, which are full checkouts of this repo and come
+         * and go while a build runs.
+         */
+        val NOT_SOURCE = setOf("build", ".git", ".claude")
 
         /**
          * The debt. It is now 3 names.
