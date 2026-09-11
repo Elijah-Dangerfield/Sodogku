@@ -109,6 +109,11 @@ Also still missing and owner-supplied:
   `docs/store/screenshots/android-phone/` exist and must not be submitted as
   iPhone screenshots.
 
+  **The Android frames are also stale now.** The achievements page was rebuilt
+  on 2026-09-10 and no longer looks like the one in the shot. Retake that one at
+  least, and check the rest against the app before you submit any of them: the
+  streak pages, the win sheet and the board clock have all moved since.
+
 ---
 
 ## 4. App Store Connect and the Apple developer portal

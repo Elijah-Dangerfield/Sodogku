@@ -677,23 +677,6 @@ over `play_day` and counts any finished board, so a daily restart is no longer
 the same question it was.
 
 Provenance: Sentry SODOGKU-9 and SODOGKU-5, session `95dd30d1`, 2026-09-10.
-## SD-50 [P2] — The achievements page does not look like the rest of the app
-
-**Ask:** Owner, 2026-09-10, on `AchievementsRoute`: *"The UI of the achievements
-page honestly isn't really in line with what we're going for. Let's see if we can
-make this a little bit more in line with the rest of the app. Think Duolingo."*
-
-**Done when:** the page reads as the same app as the streak page and the win
-sheet.
-
-**Hints:** The streak work landed the vocabulary this should borrow:
-`StreakHero`, `StatPills`, `OutlinedText` and the count-up-then-thump idiom. The
-Duolingo reference is about weight and celebration, so the thing to copy is that
-a locked achievement still looks like something worth having and an unlock is an
-event rather than a row changing color. Use design-system components; a screen
-built out of raw values will fail `NoRawDesignValues`.
-
-Provenance: Sentry SODOGKU-8, session `95dd30d1`, 2026-09-10.
 ## SD-51 [P2] — Nothing tells a player the missing starting dog is deliberate
 
 **Ask:** Owner, 2026-09-10: *"we pretty quickly start giving us those puzzles that
@@ -804,7 +787,6 @@ both entries appeared and launched.
 **If they did not**, this is the cause, and the fix is a Gradle-generated
 `@string/` holding the real application id rather than a literal in the resource.
 Nothing else in the change would explain the entries being absent or dead.
-
 ## SD-58 [P2] — The ad funnel filters on an outcome nothing emits
 
 **Found by:** the SD-39 agent, 2026-09-10, while confirming that enum `.name`
