@@ -266,29 +266,6 @@ tree is half-removed is a different situation from a walk that skips it.
 
 Reproducing it may mean running the tier in a loop while adding and removing a
 worktree. That is worth an hour: everything else in this repo trusts these guards.
-## SD-94 [P2] — A quarter of the test files skip the header the practices doc requires
-
-**Found by:** the SD-72 agent, 2026-09-10, while rewriting that doc.
-
-`docs/practices/testing.md` mandates a top-level KDoc on every test file saying
-what it holds and why. Around 138 of 186 files have one. `GameViewModelTest`,
-the largest test file in the repo, is one of the ones without.
-
-A convention three quarters kept is not yet a convention, and this one earns its
-keep: several bugs this week were found by reading a test's stated purpose and
-noticing the assertions did not serve it.
-
-**Done when:** either every test file carries the header, or the doc stops
-requiring it.
-
-**Hints:** Consider a guard in `:apps:integration` rather than a one-time sweep,
-since the sweep is what rots. It is the same shape as the other source-scanning
-tests there, and `DocReferencesResolveTest` is the closest model. Declare the
-Gradle inputs with `inputs.files(...)` or the guard will silently read nothing,
-which has happened four times in this repo.
-
-Write the headers where they are missing rather than deleting the rule. Starting
-with `GameViewModelTest` would be worth it on its own.
 ## SD-97 [P2] — Two taps on the daily card start two dailies
 
 **Found by:** the SD-87 agent, 2026-09-11, while sweeping for events that can
@@ -318,3 +295,29 @@ not "the daily has been started before".
 
 A `SEAViewModel` test can drive two actions through the channel without a UI
 harness, which is how SD-85's and SD-87's tests reached their second tap.
+
+## SD-98 [P2] — Two template test files assert that 1 + 2 is 3
+
+**Found by:** the SD-94 agent, 2026-09-11, while writing 48 test file headers.
+
+`libraries/ui/src/commonTest/kotlin/com/sodogku/SharedCommonTest.kt` and
+`apps/compose/src/commonTest/kotlin/com/sodogku/ComposeAppCommonTest.kt` are
+template leftovers. Each asserts `1 + 2 == 3`. The only thing either can fail on
+is its source set still having a test runner attached.
+
+They are this repo's own definition of a test that cannot fail, which is the
+thing six of this week's items were about. They now carry headers saying exactly
+that, so the next reader is deciding rather than guessing, but a header is not a
+fix.
+
+**Done when:** they are deleted, or something in the repo actually depends on
+each one proving its source set runs.
+
+**Hints:** "Does this source set run at all" is a real thing to want to know, and
+it is the only argument for keeping them. If that is the reason, say so in the
+header and make the assertion about the source set rather than about arithmetic.
+If it is not, delete both.
+
+Check whether anything reads their presence first. A module with no test sources
+can behave differently in Gradle from one with an empty test, so confirm the
+source sets still configure the way the build expects before removing them.
