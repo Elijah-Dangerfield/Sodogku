@@ -23,6 +23,7 @@ enum class AchievementId {
     WellTrained,
     BestInShow,
     SeasonedSnout,
+    HalfwayHound,
     TopDog,
     GridSeven,
     GridTen,
@@ -198,7 +199,14 @@ object Achievements {
                 Achievement(AchievementId.WellTrained, Stat.LevelsCleared, target = 50),
                 Achievement(AchievementId.BestInShow, Stat.LevelsCleared, target = 100),
                 Achievement(AchievementId.SeasonedSnout, Stat.LevelsCleared, target = 250),
-                Achievement(AchievementId.TopDog, Stat.LevelsCleared, target = 500),
+                // These two are the campaign's length and half of it, and their
+                // copy says so out loud. Typed rather than read from
+                // `LevelPacks.campaign`, because the pack decodes lazily to keep
+                // it off the boot path and this object is touched by the unlock
+                // toast. `AchievementReachabilityTest` holds both to the pack
+                // instead, which is what caught them being a pack behind.
+                Achievement(AchievementId.HalfwayHound, Stat.LevelsCleared, target = 500),
+                Achievement(AchievementId.TopDog, Stat.LevelsCleared, target = 1_000),
                 Achievement(AchievementId.GridSeven, Stat.LargestGridCleared, target = 7),
                 Achievement(AchievementId.GridTen, Stat.LargestGridCleared, target = 10),
                 Achievement(AchievementId.BigLeague, Stat.BigBoardClears, target = 10),

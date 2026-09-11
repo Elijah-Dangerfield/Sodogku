@@ -419,6 +419,39 @@ class AchievementsViewModelTest : CoroutineTest() {
     }
 
     /**
+     * The shelf offers the rung in front of the player, not the one behind it.
+     *
+     * `TopDog` asks for twice what `HalfwayHound` asks for, off the same counter,
+     * and both sit on the Campaign shelf. Progress is a fraction of each badge's
+     * own target, so the dearer one always sorts lower and `distinctBy` keeps one
+     * of them; a shelf sorted on raw counter, or on the target, would put a
+     * thousand-level ask in front of somebody four hundred levels in.
+     */
+    @Test
+    fun theSpotlightOffersTheNearerRungWhenOneLadderStepIsTwiceTheLast() = runUnitTest {
+        val earnedSoFar = Achievements.catalog
+            .filter { it.stat == Stat.LevelsCleared && it.target <= 400 }
+            .associate { it.id to OlderUnlock }
+        val vm = viewModel(
+            repository = FakeAchievements(
+                AchievementState(
+                    counters = counters(Stat.LevelsCleared to 400L),
+                    unlocked = earnedSoFar,
+                ),
+            ),
+            cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
+        )
+
+        val campaignPick = vm.state.spotlight?.badges?.first { it.group == AchievementGroup.Campaign }
+
+        assertEquals(AchievementId.HalfwayHound, campaignPick?.id)
+        assertFalse(
+            vm.state.spotlight?.badges.orEmpty().any { it.id == AchievementId.TopDog },
+            "the end of the campaign is not a next step at four hundred levels in",
+        )
+    }
+
+    /**
      * A player who has everything except the secrets is offered nothing, which is
      * the right answer: "Next up: ???" names a goal nobody can act on, and naming
      * the real one gives away the half of the surprise worth keeping.

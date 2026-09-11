@@ -439,7 +439,7 @@
     <string name="achievement_best_in_show_name">Best in Show</string>
     <string name="achievement_best_in_show_body">Clear 100 levels.</string>
     <string name="achievement_top_dog_name">Top Dog</string>
-    <string name="achievement_top_dog_body">Clear all 500 levels.</string>
+    <string name="achievement_top_dog_body">Clear all 1,000 levels. The whole campaign.</string>
     <string name="achievement_perfect_form_name">Perfect Form</string>
     <string name="achievement_perfect_form_body">Clear a level without losing a single bone.</string>
     <string name="achievement_flawless_ten_name">Flawless Ten</string>
@@ -479,7 +479,9 @@
     <string name="achievement_well_trained_name">Well Trained</string>
     <string name="achievement_well_trained_body">Clear 50 levels.</string>
     <string name="achievement_seasoned_snout_name">Seasoned Snout</string>
-    <string name="achievement_seasoned_snout_body">Clear 250 levels. Halfway home.</string>
+    <string name="achievement_seasoned_snout_body">Clear 250 levels.</string>
+    <string name="achievement_halfway_hound_name">Halfway Hound</string>
+    <string name="achievement_halfway_hound_body">Clear 500 levels. Half the campaign behind you.</string>
     <string name="achievement_big_league_name">Big League</string>
     <string name="achievement_big_league_body">Clear 10 boards of 7x7 or bigger.</string>
     <string name="achievement_heavy_lifting_name">Heavy Lifting</string>

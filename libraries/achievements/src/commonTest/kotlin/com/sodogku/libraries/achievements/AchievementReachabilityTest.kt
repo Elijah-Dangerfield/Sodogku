@@ -131,6 +131,33 @@ class AchievementReachabilityTest {
         )
     }
 
+    @Test
+    fun theBadgesThatClaimAFractionOfTheCampaignStillHaveIt() {
+        // The hole every other test here left open, and the bug it let through.
+        // `noTargetIsBeyondWhatTheShippedGameCanProduce` only asks that a target
+        // is not *impossible*, so `TopDog` sat at 500 through the pack doubling
+        // to a thousand and stayed green the whole time — a badge whose copy
+        // reads "clear all the levels" quietly became an award for being
+        // halfway. A ceiling cannot catch that. Only the claim can.
+        //
+        // These two are the only badges whose copy describes the campaign
+        // instead of counting to a number, which is why they are named here
+        // rather than derived: adding a rung at 750 should not silently acquire
+        // a promise about the pack.
+        val campaign = LevelPacks.campaign.size.toLong()
+
+        assertEquals(
+            campaign,
+            Achievements[AchievementId.TopDog].target,
+            "Top Dog is the end of the campaign, and the campaign is $campaign levels long",
+        )
+        assertEquals(
+            campaign / 2,
+            Achievements[AchievementId.HalfwayHound].target,
+            "Halfway Hound is half the campaign, and half of $campaign is ${campaign / 2}",
+        )
+    }
+
     private fun ceilingFor(stat: Stat): Long? = when (stat) {
         // Par is every placement at full combo and full speed with all three
         // bones intact, so it is also the most the formula can ever pay.

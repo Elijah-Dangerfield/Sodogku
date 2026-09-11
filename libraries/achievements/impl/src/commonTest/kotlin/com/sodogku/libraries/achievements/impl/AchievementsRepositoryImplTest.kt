@@ -1,6 +1,7 @@
 package com.sodogku.libraries.achievements.impl
 
 import com.sodogku.libraries.achievements.AchievementId
+import com.sodogku.libraries.achievements.Achievements
 import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.achievements.Stat
@@ -99,6 +100,40 @@ class AchievementsRepositoryImplTest : CoroutineTest() {
         assertEquals(1L, dao.unlocks().first { it.achievementId == "FirstSteps" }.unlockedAt)
     }
 
+    /**
+     * The other direction of the same rule, and the one the catalog leans on
+     * whenever a target moves up.
+     *
+     * `TopDog` used to be 500 cleared levels and is now 1,000. A player carrying
+     * the old unlock row has 500-odd clears, so a fold against today's catalog
+     * does *not* re-earn it. The badge survives anyway, because the unlock table
+     * is the record of what was earned and the fold only ever adds to it. An
+     * implementation that rebuilt `unlocked` from the counters would pass every
+     * other test in this file and take the badge back.
+     */
+    @Test
+    fun aBadgeAlreadyEarned_survivesItsTargetMovingOutOfReach() = runUnitTest {
+        val dao = FakeAchievementDao()
+        (1..OldTopDogTarget).forEach { dao.insertFact(entity(result(levelId = it, finishedAt = it.toLong()))) }
+        dao.insertUnlocks(listOf(AchievementUnlockEntity(AchievementId.TopDog.name, unlockedAt = 500)))
+
+        val repository = AchievementsRepositoryImpl(dao)
+        val earned = repository.record(result(levelId = OldTopDogTarget + 1, finishedAt = 501))
+
+        assertTrue(
+            repository.state().isUnlocked(AchievementId.TopDog),
+            "the target moved past this player and the badge is still theirs",
+        )
+        assertFalse(
+            earned.any { it.id == AchievementId.TopDog },
+            "and nothing announces a badge they have had for months a second time",
+        )
+        assertTrue(
+            Achievements[AchievementId.TopDog].target > OldTopDogTarget,
+            "this proves nothing unless the target really has moved",
+        )
+    }
+
     @Test
     fun observe_tracksWritesAsTheyLand() = runUnitTest {
         val repository = AchievementsRepositoryImpl(FakeAchievementDao())
@@ -175,6 +210,9 @@ class AchievementsRepositoryImplTest : CoroutineTest() {
         localHour = 12,
         finishedAt = finishedAt,
     )
+
+    /** What `TopDog` asked for before the campaign grew to a thousand levels. */
+    private val OldTopDogTarget = 500
 
     private fun entity(result: LevelResult) = AchievementFactEntity(
         key = result.key,

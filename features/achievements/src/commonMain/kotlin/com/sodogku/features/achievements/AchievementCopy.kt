@@ -50,6 +50,8 @@ import sodogku.libraries.resources.generated.resources.achievement_grid_ten_body
 import sodogku.libraries.resources.generated.resources.achievement_grid_ten_name
 import sodogku.libraries.resources.generated.resources.achievement_grudge_match_body
 import sodogku.libraries.resources.generated.resources.achievement_grudge_match_name
+import sodogku.libraries.resources.generated.resources.achievement_halfway_hound_body
+import sodogku.libraries.resources.generated.resources.achievement_halfway_hound_name
 import sodogku.libraries.resources.generated.resources.achievement_hall_of_fame_body
 import sodogku.libraries.resources.generated.resources.achievement_hall_of_fame_name
 import sodogku.libraries.resources.generated.resources.achievement_hat_trick_body
@@ -184,6 +186,7 @@ object AchievementCopy {
         AchievementId.WellTrained -> Res.string.achievement_well_trained_name
         AchievementId.BestInShow -> Res.string.achievement_best_in_show_name
         AchievementId.SeasonedSnout -> Res.string.achievement_seasoned_snout_name
+        AchievementId.HalfwayHound -> Res.string.achievement_halfway_hound_name
         AchievementId.TopDog -> Res.string.achievement_top_dog_name
         AchievementId.GridSeven -> Res.string.achievement_grid_seven_name
         AchievementId.GridTen -> Res.string.achievement_grid_ten_name
@@ -260,6 +263,7 @@ object AchievementCopy {
         AchievementId.WellTrained -> Res.string.achievement_well_trained_body
         AchievementId.BestInShow -> Res.string.achievement_best_in_show_body
         AchievementId.SeasonedSnout -> Res.string.achievement_seasoned_snout_body
+        AchievementId.HalfwayHound -> Res.string.achievement_halfway_hound_body
         AchievementId.TopDog -> Res.string.achievement_top_dog_body
         AchievementId.GridSeven -> Res.string.achievement_grid_seven_body
         AchievementId.GridTen -> Res.string.achievement_grid_ten_body
@@ -356,6 +360,7 @@ object AchievementCopy {
         AchievementId.WellTrained -> "🎓"
         AchievementId.BestInShow -> "🏅"
         AchievementId.SeasonedSnout -> "🧭"
+        AchievementId.HalfwayHound -> "🚩"
         AchievementId.TopDog -> "👑"
         AchievementId.GridSeven -> "🔷"
         AchievementId.GridTen -> "🔶"

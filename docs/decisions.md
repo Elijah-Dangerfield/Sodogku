@@ -6,6 +6,82 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-10: Top Dog is moved to 1,000 rather than left at halfway
+
+The campaign grew from 500 levels to 1,000 today. `TopDog` stayed at 500, so a
+badge captioned "Clear all 500 levels" became an award for reaching the halfway
+point. SD-55 framed the fix as a choice between moving the target, which was
+believed to retract the badge from anyone holding it, and adding a second badge
+at 1,000, which leaves `TopDog` permanently misnamed.
+
+**The target moved, and a new badge, `HalfwayHound`, takes the 500 rung.**
+
+### The retraction the ticket was written around does not exist
+
+This was checked before choosing, because it was the whole reason the ticket
+was not a one-line edit, and it turns out to be false.
+`AchievementsRepositoryImpl.stateOf` builds `unlocked` from the
+`achievement_unlocks` table, not from the fold. The fold produces `counters`
+and, in `record`, the set of ids to *insert*. Nothing ever deletes an unlock
+row. So a player holding `TopDog` at 600 clears keeps it against a 1,000
+target: the badge renders as earned, with its original date, and is not
+re-announced because `record` diffs against the stored rows.
+
+Only the counters recompute. That is the sentence the ticket compressed into
+"the log recomputes", and the compression is what made a safe change look
+dangerous.
+
+`AchievementsRepositoryImplTest.aBadgeAlreadyEarned_survivesItsTargetMovingOutOfReach`
+now pins this, because it was load-bearing and untested: deriving `unlocked`
+from the fold instead of the table passed every other test in that file.
+
+### Why the target rather than a second badge
+
+Even with retraction off the table, the two options are not equal. A second
+badge at 1,000 leaves `TopDog` as the second-highest campaign badge with a name
+that claims to be the highest, forever, in a file whose own KDoc says ids are
+persisted by name and must not be renamed. That is a permanent wart bought to
+avoid a cost that does not exist.
+
+It is also the last moment this is free. Sodogku has not shipped: no git tags,
+`versionName` 0.1.0 with `releaseChannel=dev`, a CHANGELOG holding only
+"Initial version", both developer accounts unpurchased, no store records, ads
+still on Google's published test units, and `OWNER-TODO.md` item 5 still listing
+the first production release as outstanding. Everyone holding `TopDog` is a
+tester, and none of them loses it anyway.
+
+### Why a badge at 500 as well
+
+The campaign ladder steps 1, 10, 25, 50, 100, 250 and then doubles. Moving
+`TopDog` to 1,000 without a rung at 500 leaves a 750-level dead stretch between
+badges on the one shelf whose purpose is showing the ladder you are part-way up.
+`HalfwayHound` keeps the cadence and inherits the "halfway" line that
+`SeasonedSnout` was carrying, which had also quietly become false: 250 of 1,000
+is a quarter.
+
+This is a target change plus an addition, not a rename. `AchievementId.TopDog`
+and the string `achievement_top_dog_name` are both untouched, so nobody's stored
+unlock row is orphaned. `achievement_top_dog_body` did change, from "Clear all
+500 levels" to "Clear all 1,000 levels", because a description that names a
+number has to name the right one.
+
+### The test that should have caught the original bug
+
+`AchievementReachabilityTest` was green through the whole regression and would
+have stayed green, because 500 is perfectly reachable in a 1,000-level pack. Its
+question is whether a target is impossible, and a badge that fires early is not
+impossible. `theBadgesThatClaimAFractionOfTheCampaignStillHaveIt` asks the other
+question, holding these two targets to `LevelPacks.campaign.size` and half of
+it, so the next time the pack is regenerated the copy and the catalog fail
+together instead of drifting apart.
+
+The targets stay typed rather than derived from `LevelPacks.campaign.size`
+directly. The pack decodes lazily to stay off the boot path, and `Achievements`
+is touched by the unlock toast, so deriving them would pull a pack decode onto a
+hot path to save a constant the test already guards.
+
+---
+
 ## 2026-09-10 — giving up on the daily is deleted, and starting over replaces it
 
 The owner, twice in one session. On the lose sheet: *"I'm also not really sure
