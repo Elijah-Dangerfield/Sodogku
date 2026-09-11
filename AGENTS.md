@@ -230,20 +230,18 @@ Default it to a noop, never `error("not provided")`. This keeps `@Preview` and u
 - Custom UI components in libraries/ui—avoid Material directly
 - Check `ComposeApp.h` for Swift names of Kotlin types before using in Swift
 
-## This template is fed by the apps built from it
+## Porting things back to the template
 
-Apps generated from here run into production before the template does. They hit the App Store review, the Play policy deadline, the R8 keep rule that only breaks at runtime, the Compose gotcha that only shows up at 60fps with real data. That knowledge is worth more than anything written speculatively in this repo, and it only arrives if someone carries it back.
+Sodogku was generated from a Kotlin Multiplatform template, a sibling repo called `KMPTemplate`. It is not a dependency. Nothing here pulls from it, nothing here changes when it changes, and there is no merge path in either direction.
 
-**If you are working in a generated app, port it back.** Two things qualify, and both go to the same place — `docs/PORT-CANDIDATES.md` **in the template repo**, which is a queue of work for this repo, not a log of what has been done:
+What does run between the two repos is a one-way queue. This app reaches production and the template does not, so this is where the App Store review, the Play policy deadline, the R8 keep rule that only breaks at runtime and the Compose gotcha that only shows up at 60fps with real data actually get hit. That knowledge is worth more than anything written speculatively upstream, and it only arrives if somebody carries it.
 
-- **Something you built that a brand-new app would want before it has any features.** Say what it is, why a generic app wants it, and the path to copy from. Don't port speculatively; something that hasn't survived production downstream is not yet worth this repo's maintenance.
-- **A bug in code you inherited from the template, or a fix that generalizes.** These matter more, because every generated app already has them. Say what broke, *how it looked from the outside*, and why it was hard to spot — the next person meets a symptom, not a cause. Worth writing even when the fix is one line: the diagnosis is the value, not the diff. If you can fix it in the template yourself, do that and skip the entry.
+**When you find one, write it to `KMPTemplate/docs/PORT-CANDIDATES.md`.** That file is in the template repo. There is deliberately no copy of it here, so you are editing across repos on purpose, and what you write is a request for work upstream rather than a record of work done here. Two things qualify:
 
-Note that file lives in the template only; a generated project doesn't carry a copy, so you are writing across repos on purpose.
+- **A bug in code inherited from the template, or a fix that generalizes.** These matter most, because every app generated from it already has them. Say what broke, *how it looked from the outside*, and why it was hard to spot: the next person meets a symptom, not a cause. Worth writing even when the fix is one line, because the diagnosis is the value and not the diff. If you can land the fix in the template yourself, do that and skip the entry.
+- **Something built here that a brand-new app would want before it has any features.** Say what it is, why a generic app wants it, and the path to copy from. Don't port speculatively; something that has not survived production here is not worth the template's maintenance.
 
-**If you are working in this template**, `docs/PORT-CANDIDATES.md` is the queue. Take from it in priority order. Delete entries as you land them rather than ticking them off, so the file stays a queue and not a changelog.
-
-**Generalize on the way in.** A port arrives shaped like the app it came from. Strip its domain, name it for what it does rather than what it did, and keep the *reason* — the comment explaining why a rule exists is usually the most valuable line in the diff, because it is what stops the next person deleting it.
+**Generalize on the way out.** What you are handing over is shaped like this game. Strip the dogs, name it for what it does rather than what it did here, and keep the *reason*: the comment explaining why a rule exists is usually the most valuable line in the diff, because it is what stops the next person deleting it.
 
 ## Known landmines
 

@@ -2046,7 +2046,7 @@ interface default carries the reason so the next implementation does not quietly
 alternative — auditing call sites to avoid concurrent writes — was rejected because the writers are
 in different modules and none of them can know about the others.
 
-**This is a template bug**, not a Sodogku one. It belongs in `docs/PORT-CANDIDATES.md` upstream.
+**This is a template bug**, not a Sodogku one. It belongs in `KMPTemplate/docs/PORT-CANDIDATES.md`, which is upstream and not in this repo.
 
 ## 2026-09-07 — Settings is a screen, and the feedback page moved to it — but its route did not
 

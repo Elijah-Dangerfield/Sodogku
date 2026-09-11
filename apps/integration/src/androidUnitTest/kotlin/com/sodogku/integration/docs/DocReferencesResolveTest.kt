@@ -50,6 +50,13 @@ import kotlin.test.assertTrue
  * a file nobody has written yet, and failing on those would make the test a
  * nuisance rather than a guard.
  *
+ * That rule is also how a doc in another repo is written. This one had a hardcoded
+ * exemption for `KMPTemplate/docs/PORT-CANDIDATES.md`, cited here as a bare
+ * `docs/…` path, which read as local, resolved to nothing and had to be excused by
+ * name. Naming the repo it lives in makes it structurally not-a-path-here and the
+ * exemption unnecessary, which is better than a correct exemption: there is now no
+ * list to append the next one to.
+ *
  * ### The Gradle half
  *
  * This test reads files at *runtime*, which Gradle cannot see, so
@@ -64,7 +71,6 @@ class DocReferencesResolveTest {
     fun everyCitedDocExists() {
         val missing = citations()
             .filter { it.target == null && (it.looksRepoRelative || it.anchor != null) }
-            .filter { it.path !in CROSS_REPO }
             .map { "  ${it.source}: ${it.raw}" }
             .distinct()
 
@@ -211,16 +217,6 @@ class DocReferencesResolveTest {
 
         val DOC_ROOTS = listOf("docs", "apps", "pages", "ops", "libraries", "features", "tools")
 
-        /**
-         * The one path that is meant to be unresolvable here.
-         *
-         * `docs/PORT-CANDIDATES.md` lives in the template this app was generated
-         * from, not in this repo, and `AGENTS.md` says so in as many words: it is
-         * a queue you write to across repos. Deliberately a set of one, and a
-         * second entry should be argued for rather than appended, because the
-         * whole value of this test is that it has no quiet exceptions.
-         */
-        val CROSS_REPO = setOf("docs/PORT-CANDIDATES.md")
         val SCANNED_ROOTS =
             listOf("docs", "libraries", "features", "apps", "ops", "tools", "gradle")
 
