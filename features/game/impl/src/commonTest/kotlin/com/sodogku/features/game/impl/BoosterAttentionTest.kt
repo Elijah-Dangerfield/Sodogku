@@ -66,7 +66,6 @@ class BoosterAttentionTest {
     @Test
     fun aButtonUnderneathSomethingIsAskingForATapNobodyCanGive() {
         assertFalse(stuck.copy(drawerOpen = true).boostersAskingForAttention)
-        assertFalse(stuck.copy(forfeitPrompt = true).boostersAskingForAttention)
         assertFalse(stuck.copy(hintCells = setOf(0, 1)).boostersAskingForAttention)
     }
 

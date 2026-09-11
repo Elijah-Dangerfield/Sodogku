@@ -436,34 +436,6 @@ host lifecycle state and every back stack entry's state while this is happening.
 Reproduce it with logs attached and the answer is in the report.
 
 Provenance: Sentry SODOGKU-A and SODOGKU-9, session `95dd30d1`, 2026-09-10.
-## SD-49 [P1] — Losing a board dead-ends, and giving up on the daily dead-ends harder
-
-**Ask:** Owner, 2026-09-10, twice. On the fail dialog: *"I'm also not really sure
-that we should have levels as an option on this dialogue. It seems kind of stupid.
-Maybe similar to the success page that we have we should have a failure page.
-Maybe the user should be able to restart from zero on this puzzle."* And on the
-daily: *"I gave up on today's board and when I revisited it it just shows me this.
-We might need to rethink what giving up means. I don't think the user should be
-able to give up. I don't know if there should be a total failure state. I think
-you should probably always be able to just start from the beginning."*
-
-Two reports, one shape. The win path got a sheet that reports the run as facts.
-The lose path got a dialog with a Levels button on it, and the daily's give-up
-path got a screen that says the day is over and offers nothing.
-
-**Done when:** losing a board lands on something with the same weight as the win
-sheet, restarting from zero is always available, and giving up on the daily is
-either not offered or is not permanent.
-
-**Hints:** `GameOutcomeSheets.kt` holds the win sheet and is the register to
-match: facts, not commiseration. The daily's terminal states are
-`DailyOutcome`, and "gave up" being permanent is a deliberate old decision, so
-reversing it belongs in `decisions.md` with the reason. Check what a restart does
-to `daily_result` and to the streak before allowing one: the streak now folds
-over `play_day` and counts any finished board, so a daily restart is no longer
-the same question it was.
-
-Provenance: Sentry SODOGKU-9 and SODOGKU-5, session `95dd30d1`, 2026-09-10.
 ## SD-51 [P2] — Nothing tells a player the missing starting dog is deliberate
 
 **Ask:** Owner, 2026-09-10: *"we pretty quickly start giving us those puzzles that
@@ -488,24 +460,6 @@ reason copy does. It has to be dismissible and must not fire on the rehearsal
 board, which always has a dog.
 
 Provenance: Sentry SODOGKU-7, session `95dd30d1`, 2026-09-10.
-## SD-54 [P2] — Two exits from a board still throw the player out of the app
-
-**Found by:** the SD-13 agent, 2026-09-10, after fixing the third one.
-
-`GameAction.Leave` sends `NavigateBack`, and the board **is** the start
-destination, so popping it leaves the app. That was the whole bug behind "finishing
-the campaign closes the app", now fixed for the campaign ending.
-
-The same mechanism is still wired to the "Levels" button on the **lose** sheet, and
-to the same button on the fail dialog. It may be deliberate that losing walks you
-out; nobody has said so either way, and the owner has separately called that dialog
-"kind of stupid" (SD-49).
-
-**Done when:** every control that says "Levels" opens the level pane, or somebody
-writes down why one of them should close the app.
-
-**Hints:** Do this with SD-49 rather than before it, since that item is rebuilding
-the lose path anyway and this is one of the buttons on it.
 ## SD-55 [P2] — `TopDog` still unlocks at the halfway point
 
 **Found by:** the SD-13 agent, 2026-09-10.
@@ -587,7 +541,6 @@ it.
 **Hints:** Deleting is the answer unless somebody wants it. It is named in
 `docs/SPEC.md`, which SD-22 is deleting anyway, so do this after that or take
 the reference out in the same pass.
-
 ## SD-60 [P2] — The treat no-op emits nothing, so the panel splitting by booster is half a chart
 
 **Found by:** the SD-44 agent, 2026-09-10, which fixed the words rather than the
