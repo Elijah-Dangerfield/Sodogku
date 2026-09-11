@@ -2117,7 +2117,10 @@ class GameViewModel(
     /**
      * Trades an ad for a full set of bones and puts the board back in play.
      *
-     * **The one way back from zero**, and the reason there is only one. The lose
+     * **The one way back from zero**, and the reason there is only one. All
+     * three entrances land here: the standing offer under the board, the revive
+     * on the lose sheet, and the prompt behind the bones pill, which used to go
+     * through [refill] and report itself under a different name. The lose
      * sheet used to carry this *and* a "Keep going" that restored a single bone
      * for the same ad — strictly the worse of two buttons sitting directly under
      * the better one, and in a build with no ad inventory it read as a free bone
@@ -2148,7 +2151,13 @@ class GameViewModel(
         }
         val granted = entitlements.isPro.value ||
             adGate.showRewarded(placement) != RewardOutcome.Dismissed
-        if (!granted) return
+        if (!granted) {
+            // The prompt is only up when the bones pill sent us here; the
+            // standing offer and the lose sheet have nothing open. Leaving it
+            // would re-offer the ad the player just closed.
+            updateState { it.copy(boosterPrompt = null) }
+            return
+        }
 
         lastPlacementAt = clock.markNow()
         warnedAboutLastBone = false
@@ -2454,13 +2463,28 @@ class GameViewModel(
     }
 
     /**
-     * Tops the consumable back up to `boosters.refillTo` for an ad.
+     * Tops a sniff or a treat back up to `boosters.refillTo` for an ad.
      *
      * Never *reduces* a holding: a player who earned five treats from level
      * rewards and watches an ad should not be punished down to three.
+     *
+     * **Bones are not refilled here.** They had a branch of their own until
+     * SD-77, and it was reachable: the bones pill sends `BoosterTapped(Bone)`,
+     * which always opens the prompt, and for a bone the prompt's only button is
+     * the ad — so every refill taken through the pill landed here and emitted
+     * `game.booster_refilled { booster = bone }` with no placement, while the
+     * standing offer and the lose sheet emitted `game.bones_refilled`. The
+     * `ads.result` join `app-events.md` describes is on `placement`, so those
+     * refills were simply absent from it. The tell was in the branch itself: it
+     * set `phase = Playing` on a board that was already playing, which is
+     * something only the lose-sheet path ever needed.
      */
     private suspend fun GameAction.refill(consumable: Consumable) {
-        if (consumable != Consumable.Bone && !boostersEnabled()) return
+        if (consumable == Consumable.Bone) {
+            refillBones()
+            return
+        }
+        if (!boostersEnabled()) return
         markExplained(consumable)
         val granted = entitlements.isPro.value ||
             adGate.showRewarded(AdPlacement.BoosterGrant) != RewardOutcome.Dismissed
@@ -2477,16 +2501,15 @@ class GameViewModel(
         )
         persistCounts(consumable, topped)
         updateState {
-            val next = when (consumable) {
-                Consumable.Bone -> it.copy(livesRemaining = topped, phase = GamePhase.Playing)
-                Consumable.Sniff -> it.copy(sniffs = topped)
-                Consumable.Treat -> it.copy(treats = topped)
+            // Two-armed rather than a `when` over `Consumable`: the guard above
+            // is what makes the pair exhaustive, and a third branch here is a
+            // place for the bone path to grow back.
+            val next = if (consumable == Consumable.Sniff) {
+                it.copy(sniffs = topped)
+            } else {
+                it.copy(treats = topped)
             }
             next.copy(boosterPrompt = null)
-        }
-        if (consumable == Consumable.Bone) {
-            warnedAboutLastBone = false
-            lastPlacementAt = clock.markNow()
         }
     }
 

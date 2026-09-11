@@ -1945,6 +1945,59 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun theBonesPillRefillsUnderTheSameEventAsTheStandingOffer() = recordingEvents { events ->
+        runUnitTest {
+            // Two ways to trade an ad for bones reported under two names. The
+            // pill sends `BoosterTapped(Bone)`, which always opens the prompt,
+            // and for a bone the prompt's only button is the ad — so the pill
+            // landed in `refill` and emitted `game.booster_refilled` with no
+            // placement, while the standing offer emitted `game.bones_refilled`
+            // with one. `app-events.md` describes an `ads.result` join on
+            // `placement`, and every refill taken through the pill was missing
+            // from it.
+            val cache = InMemoryAppCache()
+            cache.set(AppData(bones = 0))
+            val vm = viewModel(cache = cache)
+
+            vm.takeAction(GameAction.BoosterTapped(Consumable.Bone))
+            settle()
+            assertEquals(Consumable.Bone, vm.state.boosterPrompt, "the pill did not open its prompt")
+            vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Bone))
+            settle()
+
+            assertEquals(
+                listOf("booster_grant"),
+                events.attributesOf("game.bones_refilled").map { it["placement"] },
+                "the pill's refill is absent from the event the ad join reads",
+            )
+            assertTrue(
+                events.attributesOf("game.booster_refilled").none { it["booster"] == "bone" },
+                "a bone was reported as a booster refill: ${events.attributesOf("game.booster_refilled")}",
+            )
+            assertEquals(ConsumableRefillTo, vm.state.livesRemaining, "the pill stopped refilling")
+            assertEquals(null, vm.state.boosterPrompt, "the prompt stayed up over the refilled board")
+        }
+    }
+
+    @Test
+    fun aBonePromptTheAdWasClosedOnGoesAway() = runUnitTest {
+        // The pill is the only bone path that arrives with a prompt open, and
+        // `refillBones` is now where it lands. Leaving the prompt up would
+        // re-offer the ad the player just closed.
+        val cache = InMemoryAppCache()
+        cache.set(AppData(bones = 0))
+        val vm = viewModel(adGate = FixedAdGate(RewardOutcome.Dismissed), cache = cache)
+
+        vm.takeAction(GameAction.BoosterTapped(Consumable.Bone))
+        settle()
+        vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Bone))
+        settle()
+
+        assertEquals(0, vm.state.livesRemaining, "a closed ad still paid out")
+        assertEquals(null, vm.state.boosterPrompt, "the prompt re-offered the ad that was just closed")
+    }
+
+    @Test
     fun aPlayerAtZeroWithNoNetworkIsNeverStuck() = runUnitTest {
         // The load-bearing rule of the whole ad layer, and since bones went
         // global it is the only thing standing between a player at zero and a
