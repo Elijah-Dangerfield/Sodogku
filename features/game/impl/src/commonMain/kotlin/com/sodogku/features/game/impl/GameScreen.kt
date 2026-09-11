@@ -954,22 +954,17 @@ private fun BoosterBar(state: GameState, onAction: (GameAction) -> Unit) {
             count = state.sniffs,
             modifier = Modifier.focusTarget(SniffFocusKey),
             enabled = playing,
+            // One button, not both. The Locate is the "I cannot see the next
+            // move" booster; two controls pulsing at once is a row demanding
+            // attention rather than a suggestion.
+            //
             // **No `sniffs > 0`.** That gate was the bug: a player holding
             // nothing is exactly the player worth showing this to, because
             // tapping an empty booster opens the prompt whose primary button is
             // an ad that refills it. Gating on the holding meant the offer was
             // hidden from everyone who needed it and shown only to people who
             // already had one.
-            //
-            // `!isCovered` because everything that covers the board — a hint
-            // awaiting an answer, the level pane, a prompt, a coach mark — takes
-            // the taps this is inviting. A button beating under a scrim is
-            // asking for something the player cannot give it.
-            //
-            // One button, not both. The Locate is the "I cannot see the next
-            // move" booster; two controls pulsing at once is a row demanding
-            // attention rather than a suggestion.
-            attention = playing && state.nudgeBoosters && !state.isCovered,
+            attention = state.boostersAskingForAttention,
             adBadge = state.tapPlaysAd(Consumable.Sniff),
             onClick = { onAction(GameAction.BoosterTapped(Consumable.Sniff)) },
         ) {

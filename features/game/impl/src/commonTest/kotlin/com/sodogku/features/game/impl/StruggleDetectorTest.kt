@@ -17,10 +17,10 @@ import kotlin.test.assertTrue
  * signal below is easy to make fire; the hard part, and the part a regression
  * would land in, is that it stops.
  *
- * What is deliberately not here: whether the button is *drawn* beating.
- * `GameScreen` gates that on the board being uncovered and the attempt being
- * live, and `GameViewModelTest` covers the wiring from a tap to
- * `GameState.nudgeBoosters`.
+ * What is deliberately not here: whether the button is *drawn* beating. That is
+ * `GameState.boostersAskingForAttention` and `BoosterAttentionTest`, which is a
+ * question about a screen rather than about a player. `GameViewModelTest` covers
+ * the wiring from a tap to `GameState.nudgeBoosters`.
  */
 class StruggleDetectorTest {
 
@@ -108,6 +108,71 @@ class StruggleDetectorTest {
             detector.nudging(lastMark + Second),
             "a few crosses is somebody thinking, not somebody stuck",
         )
+    }
+
+    /**
+     * The player the old rule could not see at all.
+     *
+     * Every tap is one the board refuses — on a dog already there, or on a
+     * square that already cost a bone — so the idle clock restarts constantly
+     * and the marking count never moves off one. Under the conjunction this
+     * replaces, idle could not fire because they were touching the screen and
+     * the stall could not fire because they were not crossing off, and there was
+     * no third thing. They could sit there for the whole board.
+     */
+    @Test
+    fun tappingAroundWithoutEverCrossingOffIsStillStuck() {
+        val detector = StruggleDetector()
+        detector.onMarked(0)
+        val drought = (StallFloor * DroughtMultiple).toLong()
+        touchThrough(detector, from = Beat, to = drought - Beat)
+
+        assertTrue(
+            detector.nudging(drought),
+            "a player who never crossed anything off was invisible to the detector",
+        )
+    }
+
+    /**
+     * The crosses set the allowance rather than granting one. Somebody who has
+     * done the work and come up empty is asked sooner than somebody who may
+     * still be reading the board, and the gap between them is the whole reason
+     * the marking count survived the rewrite.
+     */
+    @Test
+    fun crossingOffBuysTheSameDroughtSooner() {
+        val working = StruggleDetector()
+        val reading = StruggleDetector()
+        markThrough(working, from = 0, to = StallFloor)
+        reading.onMarked(0)
+        touchThrough(reading, from = Beat, to = StallFloor)
+
+        assertTrue(working.nudging(StallFloor), "the worked-through stall stopped firing at its own floor")
+        assertFalse(
+            reading.nudging(StallFloor),
+            "a player with nothing crossed off was judged on the same clock as one who had",
+        )
+    }
+
+    /**
+     * A drought is measured in this player's own pace like the stall it grew
+     * out of, so the deliberate player is not nagged twice as often just for
+     * having read the board before starting on it.
+     */
+    @Test
+    fun aDeliberatePlayersPaceStretchesTheDroughtToo() {
+        val slow = detectorPacedAt(FortySeconds)
+        val lastDog = FortySeconds * PlacementsForAPace
+        val bareFloor = lastDog + (StallFloor * DroughtMultiple).toLong()
+        val paced = lastDog + (FortySeconds * StallPaceMultiple * DroughtMultiple).toLong()
+
+        // Awake throughout and crossing nothing off, so the drought is the only
+        // arm that can fire and it runs on the paced threshold, not the floor.
+        touchThrough(slow, from = lastDog, to = bareFloor)
+        assertFalse(slow.nudging(bareFloor), "a forty-second-a-dog player met the drought at the bare floor")
+
+        touchThrough(slow, from = bareFloor, to = paced - Beat)
+        assertTrue(slow.nudging(paced), "the pace stretched the drought out of reach")
     }
 
     @Test
@@ -255,6 +320,19 @@ class StruggleDetectorTest {
         }
     }
 
+    /**
+     * The same every-[Beat] cadence as [markThrough], but with taps the board
+     * refuses. Keeps a player awake without crossing anything off, which is the
+     * only way to exercise the drought arm without the stall answering first.
+     */
+    private fun touchThrough(detector: StruggleDetector, from: Long, to: Long) {
+        var at = from
+        while (at <= to) {
+            detector.onTouched(at)
+            at += Beat
+        }
+    }
+
     private companion object {
         const val Second = 1_000L
         const val TwoSeconds = 2_000L
@@ -276,6 +354,7 @@ class StruggleDetectorTest {
         const val Burst = 7_000L
         const val Quiet = 23_000L
         const val MarksBeforeStall = 6
+        const val DroughtMultiple = 2f
 
         /** Enough placements to be past the detector's pace sample floor. */
         const val PlacementsForAPace = 3

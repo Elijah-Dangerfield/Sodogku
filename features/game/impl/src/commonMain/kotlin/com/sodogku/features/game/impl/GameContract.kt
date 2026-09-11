@@ -635,6 +635,32 @@ data class GameState(
     val dogsRequired: Int get() = level?.size ?: 0
 
     /**
+     * Whether the Locate button should be beating.
+     *
+     * [nudgeBoosters] is what `StruggleDetector` concluded; this is whether the
+     * screen is in any position to act on it, and the two are separate because
+     * the detector reasons about a player and this reasons about what is drawn.
+     *
+     * It lived in `GameScreen` as an expression inside the booster row, which
+     * meant the three conditions that stop a nudge could only be exercised by
+     * rendering a screen — so in practice they were not exercised at all, while
+     * every condition that *starts* one had a test. That is the wrong way round:
+     * a nudge that fails to fire is a missed hint, and a nudge that fires at the
+     * wrong moment is the app talking over itself.
+     *
+     * - **[phase] must be [GamePhase.Playing].** A tick on a finished board
+     *   returns before it asks the detector anything, so [nudgeBoosters] keeps
+     *   whatever it held when the last dog landed — and a player who won during
+     *   a burst would be congratulated by a button still insisting they are
+     *   stuck.
+     * - **Nothing may be on top of the board.** Everything in [isCovered] takes
+     *   the taps this is inviting. A button beating under a scrim is asking for
+     *   something the player cannot give it.
+     */
+    val boostersAskingForAttention: Boolean
+        get() = nudgeBoosters && phase == GamePhase.Playing && !isCovered
+
+    /**
      * Whether something is on top of the board.
      *
      * Every one of these draws over the grid and takes its taps — the spotlights

@@ -95,10 +95,14 @@ fun BoardControl(
     onClick: () -> Unit = {},
     art: @Composable () -> Unit,
 ) {
-    val still = LocalReduceAnimations.current || LocalInspectionMode.current
+    val beating = beatsForAttention(
+        attention = attention,
+        reduceAnimations = LocalReduceAnimations.current,
+        inspecting = LocalInspectionMode.current,
+    )
     val pulse = remember { Animatable(0f) }
-    LaunchedEffect(attention, still) {
-        if (!attention || still) {
+    LaunchedEffect(beating) {
+        if (!beating) {
             pulse.snapTo(0f)
             return@LaunchedEffect
         }
@@ -211,6 +215,29 @@ fun BoardControl(
         )
     }
 }
+
+/**
+ * Whether [BoardControl] should actually beat, given that it has been asked to.
+ *
+ * Pulled out of the composable because it is the one decision here that has a
+ * wrong answer rather than an ugly one, and inside a `@Composable` it could not
+ * be asserted: this repo has no Compose UI test harness, so a composition-local
+ * read is a branch nothing can reach from a test.
+ *
+ * [reduceAnimations] is the setting, and it wins. A control that shakes itself
+ * at somebody who has asked the app to hold still is not a nudge, it is the
+ * thing they turned the setting on to stop — and this one is an attention-
+ * seeking loop, which is the worst case of it.
+ *
+ * [inspecting] is the preview and screenshot path. The beat repeats forever, and
+ * an animation that never settles is an idle state a screenshot test waits on
+ * until it times out.
+ */
+internal fun beatsForAttention(
+    attention: Boolean,
+    reduceAnimations: Boolean,
+    inspecting: Boolean,
+): Boolean = attention && !reduceAnimations && !inspecting
 
 /**
  * A bone, sized for the middle of a [BoardControl].

@@ -21,13 +21,42 @@ package com.sodogku.features.game.impl
  *   only armed after the player has touched the board at least once — an
  *   untouched board is a board nobody has *tried* yet, and the honest reading of
  *   one after a minute is that the phone is on a table.
- * - **Working without progress.** At least [marksBeforeStall] crosses since the
- *   last commit, and no dog placed for longer than [stallThreshold]. This is the
- *   "crossing off but not guessing" case: the player is busy, so idle will never
- *   fire, and they are getting nowhere.
+ * - **A drought.** No dog placed for longer than [stallThreshold]. The one
+ *   signal that is about the board rather than about the hand: whatever the
+ *   player has been doing, they have not solved a square, and a run with no
+ *   placement in it is the plainest description of being stuck there is.
  * - **A wrong guess.** Direct evidence the deduction went wrong. Latched until
  *   the next placement, because a wrong guess that has not yet been followed by
  *   a right one is a question still open.
+ *
+ * ## What changed, and what it keyed on before
+ *
+ * The drought used to be a *conjunction*: at least [marksBeforeStall] crosses
+ * since the last commit **and** past [stallThreshold]. Both had to hold, so the
+ * whole rule was gated on the player having crossed six squares off. The three
+ * things it keyed on were, exactly: a latched wrong guess; [idleMs] since the
+ * last input on a touched board; and that six-marks-plus-threshold conjunction.
+ *
+ * That left a player the detector could not see at all. Crosses are the only
+ * gesture that counts toward [marksBeforeStall] — a tap the board refuses, on a
+ * dog already placed or on a square that already cost a bone, deliberately does
+ * not — so a player who taps around the board without crossing anything off
+ * keeps restarting the idle clock with every tap while never arming the stall.
+ * Idle never fires because they are touching the screen, the stall never fires
+ * because they are not marking, and nothing else exists. They can sit there for
+ * the length of the board and be told they are fine.
+ *
+ * The fix is to stop treating the crosses as a precondition and start treating
+ * them as *evidence of how long to wait*. The drought fires either way; six
+ * crosses since the last dog just means the player has already spent the
+ * deduction and can be asked sooner, so the threshold applies as it stands
+ * rather than multiplied by [droughtMultiple]. Somebody who has not crossed
+ * anything off may simply be reading the board, which is why they get longer —
+ * but "longer" is a number and not "never", which is what it was.
+ *
+ * A player reading carefully and a player with no idea do look identical for a
+ * while. That is unavoidable and it is the reason the answer to a false positive
+ * has to stay cheap: the most this can ever do is beat a button twice.
  *
  * The old code argued that one wrong guess is not struggling because everybody
  * gets one and the tutorial *instructs* one. Both are still true; neither is an
@@ -59,6 +88,7 @@ internal class StruggleDetector(
     private val stallFloorMs: Long = StallFloorMs,
     private val stallPaceMultiple: Float = StallPaceMultiple,
     private val marksBeforeStall: Int = MarksBeforeStall,
+    private val droughtMultiple: Float = DroughtMultiple,
     private val burstMs: Long = BurstMs,
     private val quietMs: Long = QuietMs,
 ) {
@@ -150,9 +180,32 @@ internal class StruggleDetector(
         return true
     }
 
-    private fun stuck(now: Long): Boolean = struck ||
-        (touched && now - lastInputAt >= idleMs) ||
-        (marksSinceCommit >= marksBeforeStall && now - lastPlacementAt >= stallThreshold())
+    private fun stuck(now: Long): Boolean = struck || idle(now) || droughted(now)
+
+    private fun idle(now: Long): Boolean = touched && now - lastInputAt >= idleMs
+
+    /**
+     * How long since the last dog, against how long this player is allowed.
+     *
+     * The crosses decide the allowance rather than whether there is one. Six of
+     * them since the last commit says the player has done the work and come up
+     * empty, so the threshold applies as it stands; short of that they may be
+     * reading rather than failing, and get [droughtMultiple] times as long
+     * before anyone assumes otherwise.
+     *
+     * Untouched boards are exempt for the same reason they are exempt from the
+     * idle rule: a board nobody has tried is a phone on a table.
+     */
+    private fun droughted(now: Long): Boolean {
+        if (!touched) return false
+        val threshold = stallThreshold()
+        val allowed = if (marksSinceCommit >= marksBeforeStall) {
+            threshold
+        } else {
+            (threshold * droughtMultiple).toLong()
+        }
+        return now - lastPlacementAt >= allowed
+    }
 
     /**
      * How long without a dog counts as stalled, for *this* player on *this*
@@ -194,6 +247,17 @@ internal class StruggleDetector(
          * One stroke across a row of a 10x10 makes more than this.
          */
         const val MarksBeforeStall = 6
+
+        /**
+         * How much longer a player who has not been crossing off gets before a
+         * drought counts.
+         *
+         * Two, which puts the shortest possible drought at forty seconds. That
+         * is a long time to be looking at a puzzle with nothing to show for it,
+         * and it is meant to be: this arm exists to catch the player nothing
+         * else can see, not to be the arm that usually fires.
+         */
+        const val DroughtMultiple = 2f
 
         /** Two full pulses of the button, and part of a third. */
         const val BurstMs = 7_000L
