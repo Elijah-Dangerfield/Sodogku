@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Which moment actually sells Pro (SPEC §14)?\n\n**The honest answer is: this board cannot fully say yet.** `iap.paywall_shown` carries the `trigger` that opened it; `iap.purchase_result` carries only `outcome` and `error_kind`. So the offer side splits by moment and the buy side does not, and conversion is a single blended number. Adding `trigger` to the purchase event is the one change that would make this board answer its own question — see `docs/practices/app-events.md`.\n\n**Refusals emit nothing.** An offer the coordinator declined — capped, disabled, already Pro — produces no event, so `iap.paywall_shown` is the offer rate and not the attempt rate. The ratio of it to `ads.gate_shown` is on this board as 'Offer rate'.\n\n**Loki-backed, so nothing here can see past Grafana Cloud's log retention.** Widening the time picker does not widen the answer.\n\n**Delivery is at-least-once.** A record can rarely ship twice (export acknowledged, process died before the buffer delete), so read raw counts as approximate. Panels that count *installs* rather than records are immune to it by construction — a duplicate lands in the same `install_id` series and collapses.",
+  "description": "Which moment actually sells Pro (`features.md#telemetry`)?\n\n**The honest answer is: this board cannot fully say yet.** `iap.paywall_shown` carries the `trigger` that opened it; `iap.purchase_result` carries only `outcome` and `error_kind`. So the offer side splits by moment and the buy side does not, and conversion is a single blended number. Adding `trigger` to the purchase event is the one change that would make this board answer its own question — see `docs/practices/app-events.md`.\n\n**Refusals emit nothing.** An offer the coordinator declined — capped, disabled, already Pro — produces no event, so `iap.paywall_shown` is the offer rate and not the attempt rate. The ratio of it to `ads.gate_shown` is on this board as 'Offer rate'.\n\n**Loki-backed, so nothing here can see past Grafana Cloud's log retention.** Widening the time picker does not widen the answer.\n\n**Delivery is at-least-once.** A record can rarely ship twice (export acknowledged, process died before the buffer delete), so read raw counts as approximate. Panels that count *installs* rather than records are immune to it by construction — a duplicate lands in the same `install_id` series and collapses.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -161,7 +161,7 @@
         "type": "mixed",
         "uid": "-- Mixed --"
       },
-      "description": "Successful purchases over paywalls shown.\n\n**Whole-funnel only.** `iap.purchase_result` does not carry the `trigger` that opened the paywall, so this cannot be split by moment — which is the question SPEC §14 actually asks of this board. Until the trigger rides on the purchase event, the panel below tells you which moment gets *offered* most, and this one tells you the blended rate. See `docs/practices/app-events.md`.",
+      "description": "Successful purchases over paywalls shown.\n\n**Whole-funnel only.** `iap.purchase_result` does not carry the `trigger` that opened the paywall, so this cannot be split by moment — which is the question `features.md#telemetry` actually asks of this board. Until the trigger rides on the purchase event, the panel below tells you which moment gets *offered* most, and this one tells you the blended rate. See `docs/practices/app-events.md`.",
       "fieldConfig": {
         "defaults": {
           "decimals": 2,
@@ -247,7 +247,7 @@
         "type": "mixed",
         "uid": "-- Mixed --"
       },
-      "description": "Paywalls shown per ad gate reached. How often a player who hit a wall was offered a way to buy past it rather than watch.\n\nThe lever the paywall cap sets. Pushing it up trades short-term revenue against the friction SPEC 5.3 spends a section avoiding.",
+      "description": "Paywalls shown per ad gate reached. How often a player who hit a wall was offered a way to buy past it rather than watch.\n\nThe lever the paywall cap sets. Pushing it up trades short-term revenue against the friction `features.md#ads` spends a section avoiding.",
       "fieldConfig": {
         "defaults": {
           "decimals": 1,

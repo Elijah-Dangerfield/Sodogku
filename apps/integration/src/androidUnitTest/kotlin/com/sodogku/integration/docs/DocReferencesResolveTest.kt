@@ -25,7 +25,11 @@ import kotlin.test.assertTrue
  * ### What counts as a citation
  *
  * A markdown filename, optionally with an anchor, in a Kotlin, Gradle, markdown,
- * Swift or XML file. The path is resolved three ways in order: against the citing
+ * Swift, XML or JSON file. JSON is in the set for one reason: the committed
+ * Grafana dashboards carry long markdown descriptions, thirteen citations
+ * between them, and nothing else would ever look at them.
+ *
+ * The path is resolved three ways in order: against the citing
  * file's own directory, then the repo root, then by filename if exactly one doc
  * in the repo has that name.
  *
@@ -218,7 +222,7 @@ class DocReferencesResolveTest {
          */
         val CROSS_REPO = setOf("docs/PORT-CANDIDATES.md")
         val SCANNED_ROOTS = listOf("docs", "libraries", "features", "apps", "ops", "tools")
-        val SCANNED_EXTENSIONS = setOf("kt", "kts", "md", "swift", "xml")
+        val SCANNED_EXTENSIONS = setOf("kt", "kts", "md", "swift", "xml", "json")
 
         /**
          * The two queues, and the only files here allowed to name a doc that

@@ -151,7 +151,7 @@ tasks.withType<Test>().configureEach {
         rootProject.fileTree(repo) {
             for (dir in listOf("docs", "libraries", "features", "apps", "ops", "tools")) {
                 include("$dir/**/*.md", "$dir/**/*.kt", "$dir/**/*.kts")
-                include("$dir/**/*.swift", "$dir/**/*.xml")
+                include("$dir/**/*.swift", "$dir/**/*.xml", "$dir/**/*.json")
             }
             exclude("**/build/**", "**/xcuserdata/**")
         },
