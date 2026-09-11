@@ -8,7 +8,7 @@ package com.sodogku.libraries.scoring
  * placement is worth and what counts as a three-paw clear are exactly the kind
  * of dials that want retuning against real play data without an app release.
  *
- * The defaults are the shipped fallbacks, balanced on four things.
+ * The defaults are the shipped fallbacks, balanced on five things.
  *
  * First, placements are roughly 60% of a good run's score and the completion
  * bonus the other 40%. Tilt too far toward completion and a fast clean solve
@@ -177,12 +177,31 @@ data class ScoringConfig(
      * grid size and every shipped tier, are:
      *
      * ```
-     * two strikes, past the speed window       0.48 .. 0.49   one paw
+     * two strikes early, past the speed window 0.48 .. 0.50   one paw
+     * two strikes anywhere, past the window    0.44 .. 0.51   one paw
      * one strike, past the window              0.57 .. 0.62   two paws
      * clean, past the window                   0.67 .. 0.75   three paws
      * clean, 2500ms a row (a considered pace)  0.79 .. 0.84   four paws
      * clean, 900ms a row (fast for the board)  0.92 .. 0.94   five paws
      * ```
+     *
+     * The first two rows were one row, reading 0.48 to 0.49 and labelled "two
+     * strikes, past the speed window", and both
+     * `ScoringTest.theBestTwoStrikeRunStillOnlyEarnsOnePaw` and the
+     * achievements sweep called it the worst run a player can finish. It is
+     * close to the *best* one. Both sweeps take their strikes on the second and
+     * third placements, and early is the cheapest place to take them: a strike
+     * costs the combo, and at the start of a board there is the least combo to
+     * lose. Move them anywhere else and the floor drops to 0.4445, on a 10x10
+     * with the strikes spread to the fourth and seventh placements.
+     *
+     * Nothing needs retuning for it. The two-paw cut has to sit above
+     * everything a two-strike run can reach, so what it is measured against is
+     * the band's *ceiling*, and the early arrangement is the ceiling. The
+     * measurement was right and only the label was wrong. But a reader
+     * retuning from the single row would have read 0.48 as the floor and
+     * believed they had four points of par more room than they do, which is
+     * the mistake this table exists to prevent.
      *
      * So the ladder reads: you finished; you finished after mistakes; you
      * finished clean; you finished clean and briskly; you finished clean and

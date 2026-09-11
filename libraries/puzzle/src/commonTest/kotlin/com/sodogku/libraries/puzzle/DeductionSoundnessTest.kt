@@ -275,6 +275,63 @@ class DeductionSoundnessTest {
         }
     }
 
+    @Test
+    fun aHintOnABoardDeductionCannotFinishComesFromTheTightestRowLeft() {
+        // `HintFinder.nextCell` falls back to the unique solution when no chain
+        // of deductions reaches a placement, and a review called that branch
+        // dead. It is not. It is dead *on shipped boards*, which is a different
+        // sentence and the one worth writing down.
+        //
+        // Measured: across 78 generated boards from 4x4 to 10x10 and 4,680 legal
+        // partials, the fallback fired zero times. Every level in both packs is
+        // verified unique and scored below `BEYOND_DEDUCTION` by
+        // `LevelPackVerificationTest`, and on a board the engine can finish from
+        // empty it can finish from any correct partial, because a correct
+        // placement only removes candidates. So no player reaches this.
+        //
+        // On a `BEYOND_DEDUCTION` board it fires constantly: 6,255 stalls in the
+        // same sweep restricted to tier 5. The fixture below is one of them,
+        // reduced. Deduction does not simply stop on it — the engine eliminates
+        // its way into a contradiction, because several techniques are sound
+        // only on a board with one answer and this one has two — so it never
+        // reaches a `Place` and the fallback takes over.
+        //
+        // Kept rather than deleted for the reason the file says: a hint that
+        // hands over nothing is a paid consumable spent for no visible effect,
+        // and tier 5 is one generator change away from being shippable.
+        val board = Board.parse("BBAAA" + "BBBAA" + "BCCDD" + "CCCCD" + "EEEDD")
+        val placed = Solution.empty(board.size).withPlacement(3, 4)
+
+        assertEquals(
+            Difficulty.BEYOND_DEDUCTION,
+            Difficulty.score(board),
+            "the fixture has to be a board no reasoning finishes, or it proves nothing",
+        )
+        assertEquals(emptyList(), board.ruleViolations(placed), "and a partial that breaks no rule")
+        assertNotNull(PuzzleSolver.solve(board, placed), "and still has a completion")
+
+        val hint = assertNotNull(HintFinder.nextCell(board, placed), "no hint on an unfinished board")
+
+        // The tightest row, not the loosest: it is the closest thing to "the
+        // square you were nearest to working out", and picking the loosest would
+        // hand over the one the player has least chance of following. Asserted
+        // as the property rather than as a cell id, so the solver picking the
+        // other completion does not make this a fixture test.
+        val grid = CandidateGrid.of(board, placed)
+        val open = (0 until board.size).filter { !grid.hasPlacement(Group(GroupKind.Row, it)) }
+        val widths = open.associateWith { grid.candidatesIn(Group(GroupKind.Row, it)).size }
+
+        assertEquals(
+            widths.values.min(),
+            widths.getValue(board.rowOf(hint)),
+            "hinted ${describe(board, hint)}, and the open rows have widths $widths",
+        )
+        assertNotNull(
+            PuzzleSolver.solve(board, placed.withPlacement(board.rowOf(hint), board.colOf(hint))),
+            "the hint pointed at ${describe(board, hint)}, which no completion uses",
+        )
+    }
+
     private companion object {
         /**
          * Default cap for the property tests, which run the tier-4 technique

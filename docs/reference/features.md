@@ -290,12 +290,26 @@ The rungs are placed in the gaps between measured runs, not chosen for roundness
 (`ScoringTest.theLadderIsSpacedAgainstMeasuredPlay` holds the measurement):
 
 ```
-two strikes, past the speed window    0.48 .. 0.49    one paw
+two strikes early, past the window    0.48 .. 0.50    one paw
+two strikes anywhere, past the window 0.44 .. 0.51    one paw
 one strike, past the window           0.57 .. 0.62    two paws
 clean, past the window                0.67 .. 0.75    three paws
 clean, 2500ms a row                   0.79 .. 0.84    four paws
 clean, 900ms a row                    0.92 .. 0.94    five paws
 ```
+
+The two-strike band is two rows because it used to be one, reading 0.48 to 0.49 and
+labelled as the worst run a player can finish. It is close to the best one. The sweep
+takes its strikes on the second and third placements, and early is the cheapest place to
+take them: a strike costs the combo, and at the start of a board there is the least combo
+to lose. Move them and the floor drops to 0.4445, on a 10x10 with the strikes spread to
+the fourth and seventh placements. No cut moves for it, because the two-paw cut is
+measured against the band's ceiling and the early arrangement is the ceiling, but a reader
+retuning from the single row would have read 0.48 as the floor.
+
+The verdict on the win sheet is cut from the same par at the two-paw and three-paw lines:
+under 0.53 is "Got there", 0.53 to 0.64 keeps the plain won headline, and above 0.64 it is
+"Sharp work" with a bone spent or "Flawless" with all three kept.
 
 **Compressing the range is the failure mode to watch** whenever these get retuned. Two
 separate rounds of this have shipped a rating that carried no information: once because

@@ -120,7 +120,7 @@ class PawLadderReachabilityTest {
         // reading. A threshold under the ceiling of the band below it is earned
         // by the runs it was meant to separate out, so every player clears it
         // and the paw carries no information. That is how the first pass at
-        // these coefficients failed, with the worst completable run landing
+        // these coefficients failed, with the best two-strike run landing
         // above the two-paw line.
         val failures = mutableListOf<String>()
 

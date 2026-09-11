@@ -207,11 +207,21 @@ class ScoringTest {
     }
 
     @Test
-    fun theWorstCompletableRunStillOnlyEarnsOnePaw() {
-        // The genuinely worst run a player can finish: two strikes spent (you
-        // are out at three), every placement past the board's speed window. If
-        // this scores two paws the rating carries no information, which is
-        // exactly what the first pass at these coefficients did.
+    fun theBestTwoStrikeRunStillOnlyEarnsOnePaw() {
+        // The *best* run a two-strike player can finish, which this called the
+        // worst one. Two strikes spent (you are out at three), taken on the
+        // opening placements, every placement past the board's speed window.
+        // Early is the cheapest place to take them: a strike costs the combo,
+        // and at the start of a board there is the least combo to lose. Move
+        // them to the fourth and seventh placements of a 10x10 and the run
+        // scores 0.4445 of par, against a 0.5017 ceiling here.
+        //
+        // Which makes this the right run to assert on, and the label the only
+        // thing that was wrong. The two-paw cut has to sit above everything a
+        // two-strike run can reach, so what it is measured against is the
+        // ceiling of that band, and this is the ceiling. If it scores two paws
+        // the rating carries no information, which is exactly what the first
+        // pass at these coefficients did.
         //
         // The pace is quoted per row so it stays past the window when the window
         // is retuned. It was a flat 30,000ms, which stopped being slow the moment
@@ -268,7 +278,7 @@ class ScoringTest {
         // board, does going faster rate at least as well as going slower, and
         // does a clean run rate at least as well as a struck one? Third: are the
         // two ends nailed down, so a quick clean run always tops out and the
-        // worst completable run always bottoms out?
+        // best two-strike run always bottoms out?
         //
         // Deliberately *not* "this pace earns exactly this rating" in the middle
         // of the ladder. Retuning the rungs is allowed; making one unreachable,
@@ -290,7 +300,7 @@ class ScoringTest {
                     "so the top rating is unreachable there"
             }
             if (worst != Scoring.ONE_PAW) {
-                failures += "$shape: the worst completable run earned $worst"
+                failures += "$shape: the best two-strike run earned $worst"
             }
             if (slow < Scoring.THREE_PAWS) {
                 failures += "$shape: a flawless run earned $slow for being slow, " +

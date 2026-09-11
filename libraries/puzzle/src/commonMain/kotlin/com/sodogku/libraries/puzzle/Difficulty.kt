@@ -72,6 +72,21 @@ object HintFinder {
      * beyond the engine), it falls back to the unique solution and picks the
      * most constrained unresolved row, which is the closest thing to "the cell
      * you were nearest to working out".
+     *
+     * **That fallback cannot be reached on a board the game ships, and is not
+     * dead.** Every level in both packs is verified unique and scored below
+     * [Difficulty.BEYOND_DEDUCTION], and a correct placement only removes
+     * candidates, so a board the engine can finish from empty it can finish
+     * from any partial a player reaches. Measured: zero fallbacks across 4,680
+     * legal partials on 78 generated boards from 4x4 to 10x10. On a
+     * [Difficulty.BEYOND_DEDUCTION] board it fires constantly, and not by the
+     * obvious route — the engine eliminates its way into a contradiction,
+     * because several techniques are sound only where there is one answer, so
+     * it never reaches a placement at all.
+     * `DeductionSoundnessTest.aHintOnABoardDeductionCannotFinishComesFromThe
+     * TightestRowLeft` pins it. Keep it: a sniff is a paid consumable, handing
+     * back nothing is the regression this file has already had once, and tier 5
+     * is one generator change away from shippable.
      */
     fun nextCell(board: Board, placed: Solution): Int? {
         if (placed.isComplete) return null
