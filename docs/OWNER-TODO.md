@@ -722,3 +722,40 @@ resource file gets no `${applicationId}` substitution and the literal would read
 `com.sodogku` while every debug install is `com.sodogku.debug`. An implicit VIEW
 intent against our own `sodogku://` filter was used instead. The fix if it fails
 is a Gradle-generated string holding the real application id.
+
+---
+
+## 19. Say when you want the accessibility pass, and I will do the whole app
+
+Not a thing you have to do. A thing you have to **start**, because it is a whole
+sweep rather than a handful of fixes and it wants doing in one pass with a real
+screen reader rather than piecemeal.
+
+Four concrete faults are already known, found by a review on 2026-09-11 and
+deliberately not fixed one at a time:
+
+- **The booster buttons are read wrong.** The name sits on the outer layout node
+  and the tap sits two nodes below it, so VoiceOver or TalkBack meets a named
+  thing that does nothing and then an unnamed thing that works. Four stops per
+  control. `BoardControl` in `libraries/ui`.
+- **The paw rating is silent.** `PawRating` carries no description, none of its
+  three callers add one, and the win sheet deliberately keeps paws out of its
+  spoken stats. So a blind player never learns how they did on a level.
+- **The win sheet's stat pills read as separate nodes**, so the caption and the
+  number arrive as unrelated items rather than "Score, 1,240". The component's own
+  comment claims it prevents this.
+- **Coach marks appear with no announcement**, so during the tutorial the board
+  vanishes from under the reading cursor in silence.
+
+**What the pass should cover**, beyond those: every screen end to end with a
+screen reader actually running, focus order, touch target sizes against the 44pt
+rule (`docs/reference/large-boards-spike.md` measured this and 8x8 boards and up
+are already under it), colour contrast, and whether the colourblind mode does what
+it claims.
+
+**Why it is worth a pass and not a ticket.** Three of the four faults above are
+the same mistake in three components. A sweep learns the rule once; four separate
+fixes learn it four times and miss the fifth.
+
+**When you want it**, say so and it gets a session of its own. It needs a device,
+because a semantics tree read off a test is not the same as hearing it.

@@ -48,8 +48,7 @@ annoying.
 
 ## Items
 
-<!-- Newest at the bottom. -->
-## SD-6 [P2] — Standing code review, by an agent that did not write the code
+<!-- Newest at the bottom. -->## SD-6 [P2] — Standing code review, by an agent that did not write the code
 
 **Ask:** A recurring review pass looking for better ways of doing things:
 additions worth making, cleanup worth doing, tests worth having. Not a lint run,
@@ -135,6 +134,7 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
+
 ## SD-86 [P2] — `:apps:integration` has failed twice for reasons nobody can reproduce
 
 **Found by:** two separate investigations, 2026-09-10.
@@ -165,95 +165,6 @@ tree is half-removed is a different situation from a walk that skips it.
 
 Reproducing it may mean running the tier in a loop while adding and removing a
 worktree. That is worth an hour: everything else in this repo trusts these guards.
-
-## SD-99 [P1] — Put the booster control's name on the node that takes the tap
-
-**Ask:** A screen reader user should meet each control under the board as one
-button with a name, a count and a working activation. Today
-`libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/components/game/BoardControl.kt:121`
-puts the content description on the outer `Column` and `bounceClick` (a
-`clickable`) on the face `Box` two layout nodes down (line 145). A plain
-`semantics {}` does not merge or hide its children, so the tree holds four stops
-per control: a named node with no action, an unnamed button, the badge text and
-the label text. Activating the named node does nothing. The disabled state of
-the greyed-out refill button is on the unnamed node too.
-
-Also on that line: the name is the hard-coded English `"$label, $count left"`.
-`booster_a11y` in `strings.xml` is the same sentence as a resource and is used
-only by `BoosterButton`, which nothing calls (SD-109).
-
-Scenario: a TalkBack user swipes to "Sniff, 3 left", double-taps, and nothing
-happens; the next swipe lands on "button" with no name, and that one works.
-Inferred from the tree, not run on a device. Confidence high on the structure,
-which is a read of the code.
-
-**Done when:** each `BoardControl` is a single semantics node carrying the label,
-the count, `Role.Button`, the disabled state and the click, and a composition
-test asserts it: `onNodeWithContentDescription("Sniff, 3 left").assertHasClickAction()`
-fails today.
-
-**Hints:** `RuleChip` in `GameHud.kt:248` is the shape that works: the
-`semantics { contentDescription }` and the `bounceClick` on the same modifier
-chain, as the `bounceClick` docblock in `system/BounceClick.kt` explains at
-length. Moving both onto the `Column` makes it a merging node, so the
-`RewardBadge`'s own description ("Watch an ad") merges into the name, which is
-what the sighted badge is saying anyway. Take the string from
-`stringResource(Res.string.booster_a11y, label, count)` and delete
-`BoosterButton` in the same change. The composition tier needs the Robolectric
-block from `libraries/navigation/build.gradle.kts` copied into `:libraries:ui`
-first. Found by the SD-6 review of the `libraries/ui` board and dog slice,
-2026-09-11, against `17a2a6c`.
-
-## SD-100 [P1] — Speak the paw rating
-
-**Ask:** `PawRating`
-(`libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/components/game/GameHud.kt:98`)
-draws its paws in `drawBehind` and declares no semantics. None of its three
-callers adds any: the win sheet (`GameOutcomeSheets.kt:131`), the level list
-(`LevelDrawer.kt:335`) and the daily card (`DailyCard.kt:152`). `winStats` leaves
-paws out of the pills on purpose ("Paws are not a pill. They have their own row
-above, drawn as paws"), so on the win sheet the rating exists only as a drawing.
-
-Scenario: a screen reader user clears a level and hears the verdict title, the
-score, the time and the mistakes, and never how many paws they earned; in the
-level list every cleared row is silent about its rating. `features.md` promises
-that nothing is encoded only visually. Confidence high; this is a read of the
-code and there is no node to find.
-
-**Done when:** `PawRating` carries a content description built from a plural
-resource ("3 of 5 paws"), on a node that merges or clears its drawn children, and
-a composition test finds it. `onNodeWithContentDescription("3 of 5 paws")`
-fails today.
-
-**Hints:** `clearAndSetSemantics { contentDescription = spoken }` on the `Row`;
-the `Row` has no text children so merging is not the concern here, and the
-`bounceClick` docblock's warning about merged nodes with children does not
-apply. Resolve the string in the composable, not in a `semantics` lambda: the
-`BoardCellLabels` trick exists because a hundred cells share one set, and there
-are at most five paws. Found by the SD-6 review of the `libraries/ui` board and
-dog slice, 2026-09-11, against `17a2a6c`.
-
-## SD-101 [P2] — StatPills leaks its caption and value as separate nodes
-
-**Ask:** `StatPills`
-(`libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/components/game/StatPills.kt:67`)
-sets `contentDescription = stat.spoken` with a plain `semantics {}`, which does
-not merge or hide the two `Text` children beneath it. A screen reader gets the
-sentence and then the caption and the value as two more stops: "342 points",
-"SCORE", "342". The docblock at the top of `Stat` says the pill exists to stop
-exactly that ("the caption and value read fine side by side and terribly one
-after the other").
-
-Scenario: every outcome sheet and the achievements screen, nine stops for three
-facts. Inferred from the tree; confidence high on the structure.
-
-**Done when:** each pill is one node. In a composition test with the merged tree,
-`onNodeWithText("SCORE").assertDoesNotExist()` passes; today it fails.
-
-**Hints:** `clearAndSetSemantics { contentDescription = stat.spoken }`. The pill
-is not interactive so there is no click to lose by clearing. Found by the SD-6
-review of the `libraries/ui` board and dog slice, 2026-09-11, against
-`17a2a6c`.
 
 ## SD-102 [P2] — FocusScrim reads its Animatable in composition, and the detekt rule cannot see it
 
@@ -300,30 +211,38 @@ counter on `content` proves the first part.
 SD-6 review of the `libraries/ui` board and dog slice, 2026-09-11, against
 `17a2a6c`.
 
-## SD-103 [P2] — AnimatedDog loops forever under inspection mode
+## SD-103 [P2] — One Dog component, so no call site has to remember the preview fix
 
-**Ask:** `AnimatedDog`
-(`libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/components/dog/AnimatedDog.kt:71`)
-runs `while (true) { delay(83); frame++ }` and reads neither
-`LocalInspectionMode` nor `LocalReduceAnimations`. Its sibling `LoopingDogImpl`
-(line 207) and `BoardControl.beatsForAttention` both stop under inspection, and
-AGENTS.md lists an infinite animation in a preview as a known landmine.
+**Ask:** Owner, 2026-09-11: *"we should have a custom DS component called Dog and
+maybe a few variants of that to render the dogs stills and animated versions.
+That component should check local debug and choose to animate or not and that
+component can be how all dogs are rendered, that way every call site doesn't need
+to reimplement that fix."*
 
-Two costs. `AnimatedDogPreview` and `BoardCellStatesPreview` (it has an
-`Occupied` cell) never settle. And the first composition test that composes a
-`BoardCell` with `state = Occupied` and `animated = true`, which SD-99 through
-SD-101 make likely, inherits a clock that is never idle under `autoAdvance`, and
-the failure will read as a hung test rather than as this.
+**The bug that prompted it.** `AnimatedDog` loops forever under
+`LocalInspectionMode`, so a preview containing one spins until Android Studio
+gives up. `LoopingDog` and `BoardControl` both check the flag and hold a frame.
+`AnimatedDog` does not. That is three call sites and two of them got it right,
+which is the shape that keeps producing this: every new caller has to know.
 
-Confidence high; this is a read of the code.
+**Done when:** there is one `Dog` component in the design system, every dog in
+the app is drawn through it, and the inspection-mode decision lives inside it and
+nowhere else. A preview containing any dog renders to a still.
 
-**Done when:** `AnimatedDog` holds its frame under `LocalInspectionMode`, and the
-board cell preview renders to a still.
+**Hints:** Take the variants from what callers actually need rather than from what
+exists: a still at a pose, a looping idle, and whatever the win and streak screens
+do. `DogPose` already names the poses. `AnimatedDog`, `LoopingDog` and the dog
+inside `BoardControl` are the three shapes to fold in, and the streak hero and
+the recap draw dogs too.
 
-**Hints:** `val playing = playing && !LocalInspectionMode.current` before the
-effect. Reduce-animations is correctly the caller's decision (`BoardCell` swaps
-in `Dog` for it); inspection mode is not. Found by the SD-6 review of the
-`libraries/ui` board and dog slice, 2026-09-11, against `17a2a6c`.
+The check is `LocalInspectionMode.current`, not a debug flag: it is true in
+previews and in composition tests, which is the other place an endless animation
+hurts. `LocalReduceAnimations` is a separate question and both matter, so make the
+component answer both and say which wins.
+
+A guard is worth more than the refactor. Once one component owns it, a test that
+fails when a composable outside the design system references a dog drawable keeps
+it owned.
 
 ## SD-104 [P2] — RuleChip flashes once per rule, not once per strike
 
@@ -426,30 +345,6 @@ each `BoardCellState` against its own phrase. Both mutations above then die.
 
 **Hints:** Both are additions to existing test files. Found by the SD-6 review
 of the `libraries/ui` board and dog slice, 2026-09-11, against `17a2a6c`.
-
-## SD-108 [P2] — A coach mark appears silently to a screen reader
-
-**Ask:** `CoachMark`
-(`libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/components/game/CoachMark.kt:49`)
-declares no live region and requests no focus, and `FocusScrim` hides the
-board underneath it via `coveredByOverlay`. When the tutorial or the empty-board
-warning appears, a TalkBack user whose reading cursor was on a cell has that
-node vanish and hears nothing about why; the card has to be found by swiping.
-The same applies to `SpeechBubble`, which is outside this slice.
-
-Confidence: high that nothing announces (a read of the tree); medium on the
-remedy, which is standard practice for overlays rather than something this repo
-has specified.
-
-**Done when:** the card's title announces on appearance, and a composition test
-asserts `SemanticsProperties.LiveRegion` (or focus) on it. The assertion fails
-today.
-
-**Hints:** `Modifier.semantics { liveRegion = LiveRegionMode.Polite }` on the
-title `Text`, or a `FocusRequester` on the card fired from a `LaunchedEffect`
-keyed on the anchor. Prefer the live region: moving focus fights the reading
-order a user is in. Found by the SD-6 review of the `libraries/ui` board and dog
-slice, 2026-09-11, against `17a2a6c`.
 
 ## SD-109 [P2] — Untidy: dead code, stale comments and one narrow gesture gap in the board and HUD
 
