@@ -72,8 +72,8 @@ class SentryLogTree(
      * `LoggingEngine` scrubs the message and the extras once, before fan-out;
      * a throwable is the one thing it cannot rewrite, so its message comes
      * through [LogEntry.throwableMessage], which scrubs at the read. The
-     * throwable object itself still goes to [Sentry.captureException] whole —
-     * that is what carries the stack trace.
+     * throwable object itself still goes to [Sentry.captureException] whole,
+     * which is what carries the stack trace.
      */
     internal fun renderedMessage(entry: LogEntry): String =
         entry.message ?: entry.throwableMessage ?: DEFAULT_MESSAGE

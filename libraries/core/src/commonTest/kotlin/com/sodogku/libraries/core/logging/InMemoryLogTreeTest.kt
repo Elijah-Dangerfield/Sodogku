@@ -88,7 +88,7 @@ class InMemoryLogTreeTest {
     fun secretsAreScrubbedBeforeTheyEverEnterTheBuffer() {
         // Through `KLog`, not straight into the tree. The scrub moved to the
         // engine so that the two sinks that leave the device get it too, and
-        // what this test is for is the buffer a reporter can attach — so it has
+        // what this test is for is the buffer a reporter can attach, so it has
         // to be asserted over the path a real line takes to reach it.
         val tree = tree(maxLineChars = 500)
         KLog.plant(tree)

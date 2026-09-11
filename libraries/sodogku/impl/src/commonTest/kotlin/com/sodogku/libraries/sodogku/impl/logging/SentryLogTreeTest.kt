@@ -50,7 +50,7 @@ class SentryLogTreeTest {
     /**
      * The breadcrumb trail and the captured event both render through this, and
      * both leave the device. Redaction is the engine's job now, but a throwable
-     * is the one thing it cannot rewrite — so the scrub happens at the read, and
+     * is the one thing it cannot rewrite, so the scrub happens at the read, and
      * a tree that goes back to `entry.throwable?.message` fails here.
      */
     @Test

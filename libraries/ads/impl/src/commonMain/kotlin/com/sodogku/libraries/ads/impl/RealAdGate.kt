@@ -152,7 +152,7 @@ class RealAdGate(
 
         // Monotonic, unlike everything else timed in this class. A rewarded ad
         // is a thirty-second window, and a phone steps its wall clock on network
-        // time sync — often right after regaining connectivity, which is also
+        // time sync, often right after regaining connectivity, which is also
         // when the first ad after an offline stretch is requested. One step
         // during an ad reads back as a negative or hours-long latency, and a
         // single record like that moves the p90 line for the day.
@@ -315,8 +315,8 @@ class RealAdGate(
 
     /**
      * Wall clock, for the two grace windows only. Both of them are calendar
-     * spans measured across process death — "five minutes since the app was
-     * first opened", "twenty minutes since the first gate we could not serve" —
+     * spans measured across process death ("five minutes since the app was
+     * first opened", "twenty minutes since the first gate we could not serve"),
      * so they need a number that survives being written to disk. Nothing else
      * here should reach for it; see the latency measurement in [rewarded].
      */

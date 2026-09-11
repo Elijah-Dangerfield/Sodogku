@@ -24,7 +24,7 @@ import kotlin.time.Clock
  * Writes arrive from any thread, so both ends are synchronized.
  *
  * Nothing is scrubbed here. It used to be, and that was the whole of the app's
- * redaction — `LoggingEngine` now does it once for every tree, so this one is no
+ * redaction. `LoggingEngine` now does it once for every tree, so this one is no
  * longer the only sink that gets a clean line.
  */
 @OptIn(InternalCoroutinesApi::class)

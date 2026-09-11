@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
  * module sees the other.
  *
  * Drift here is silent in both directions. A placement whose id stops matching
- * its config key is simply never gated — `isEnabled` treats an unknown id as
+ * its config key is simply never gated. `isEnabled` treats an unknown id as
  * enabled, on purpose, so the kill switch for that placement stops working and
  * nothing anywhere complains.
  */

@@ -96,7 +96,7 @@ class NoIdentitySeamsTest {
 
     private fun repoRoot(): String =
         System.getProperty("sodogku.repoRoot")
-            ?: error("sodogku.repoRoot is unset — apps/integration/build.gradle.kts supplies it")
+            ?: error("sodogku.repoRoot is unset, apps/integration/build.gradle.kts supplies it")
 
     private companion object {
         /** The declaration, an override, or a call. Any of the three. */

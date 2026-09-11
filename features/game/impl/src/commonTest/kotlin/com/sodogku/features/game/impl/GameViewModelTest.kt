@@ -1732,9 +1732,9 @@ class GameViewModelTest : CoroutineTest() {
         runUnitTest {
             // The literals, not `AdPlacement.x.configId`, because what is under
             // test is the string on the wire. `ads.result` writes these same two
-            // and the obvious question after a bad fill day — of the
+            // and the obvious question after a bad fill day, of the
             // `continue_level` ads that were rewarded, how many actually
-            // refilled the board — is one joined to the other on `placement`.
+            // refilled the board, is one joined to the other on `placement`.
             // It used to answer "all of the ads, none of the refills".
             val vm = viewModel()
             vm.commit(cellFor(row = 0))
@@ -2997,7 +2997,7 @@ class GameViewModelTest : CoroutineTest() {
             // `rehearsing` guards that nothing checked: `game.level_started`,
             // `game.commit` and `game.drag` could all be un-guarded without a
             // single game test moving. What that costs is not an empty panel
-            // but a plausible one — every install's first `game.level_started`
+            // but a plausible one. Every install's first `game.level_started`
             // would be the demo board, at a level id nobody can play and
             // difficulty 0, inside the campaign funnel.
             val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
@@ -3013,7 +3013,7 @@ class GameViewModelTest : CoroutineTest() {
             vm.runScript()
 
             // Everything up to the graduation, because `tutorial.completed` is
-            // immediately followed by level 1 opening — and level 1 emitting
+            // immediately followed by level 1 opening, and level 1 emitting
             // `game.level_started` is the handover working, not a leak.
             val duringRehearsal = events.all.takeWhile { it.first != "tutorial.completed" }
             assertTrue(

@@ -33,7 +33,7 @@ internal fun redactSecrets(line: String): String =
  *
  * Applied once by the engine before fan-out, and deliberately not by each tree.
  * It ran in [InMemoryLogTree] alone for a while, which is the one sink that
- * never leaves the device unless a reporter attaches it — the Sentry breadcrumb
+ * never leaves the device unless a reporter attaches it. The Sentry breadcrumb
  * trail and the Warn-and-above bodies forwarded to Loki both leave, and both saw
  * the same line in the clear. The guard was sitting on the safest of the three
  * exits.
@@ -52,7 +52,7 @@ private fun LogContext.scrubbed(): LogContext {
     return LogContext(
         tags = tags.mapValues { (_, value) -> redactSecrets(value) },
         // The event name is a constant this repo wrote, never a credential, and
-        // it is the one extra on the hot path — every `logEvent` carries it.
+        // it is the one extra on the hot path: every `logEvent` carries it.
         extras = extras.mapValues { (key, value) ->
             if (key == EXTRA_APP_EVENT || value !is String) value else redactSecrets(value)
         },

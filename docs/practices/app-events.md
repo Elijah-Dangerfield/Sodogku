@@ -276,7 +276,7 @@ Two more SPEC §14 names that are deliberately *not* coming, argued elsewhere on
 Emitted by `RealAdGate` (`:libraries:ads:impl`), `RealPaywallCoordinator` and
 `RealEntitlements` (`:libraries:billing:impl`). `placement` is the id from SPEC 5.3
 (`continue_level`, `booster_grant`, `skip_level`, `streak_freeze`), it lives on
-`AdPlacement.configId`, and it is the same string `ads.rewardedPlacements` is keyed on — so a
+`AdPlacement.configId`, and it is the same string `ads.rewardedPlacements` is keyed on, so a
 config change and its effect on the funnel line up without a lookup table. Every event that
 names a placement uses it, including `game.bones_refilled`, which is emitted by the game and
 not by the ad layer.

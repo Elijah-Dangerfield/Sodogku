@@ -9,8 +9,8 @@ import kotlin.test.assertTrue
 /**
  * Redaction is a property of the engine, so it is tested at the engine.
  *
- * It used to be a property of one tree, and the other two — Sentry breadcrumbs
- * and the Warn-and-above bodies forwarded to Loki — carried the same line in the
+ * It used to be a property of one tree, and the other two (Sentry breadcrumbs
+ * and the Warn-and-above bodies forwarded to Loki) carried the same line in the
  * clear. Asserting it here, on what any planted tree receives, is what makes it
  * true for a sink nobody has written yet.
  */

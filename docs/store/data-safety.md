@@ -569,7 +569,7 @@ Written down rather than fixed, per this chunk's scope. Re-checked on 2026-09-10
 7. ~~**`Telemetry.setUser` is a loaded gun, and it is the one scope writer with no guard.**~~
    **Closed 2026-09-10 (SD-46).** It was deleted rather than guarded, along with the unused `email`
    on `captureUserFeedback`, and `NoIdentitySeamsTest` fails the build if either returns. The
-   remaining scope writers — `setCurrentRoute`, `setSession`, `setInstallId`, `setContext` — all
+   remaining scope writers (`setCurrentRoute`, `setSession`, `setInstallId`, `setContext`) all
    still begin with `if (!Sentry.isEnabled()) return`.
 8. **Two KDocs still describe the account era.** `AppCache.kt:154-156` says the install id is
    "sent as X-Install-Id on authenticated requests so the server can associate anonymous accounts

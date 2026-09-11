@@ -178,7 +178,7 @@ class GrafanaLogTreeTest {
     /**
      * The half [samplingIsStablePerSession] cannot see. All-or-nothing is
      * satisfied by a tree that keeps everything and by one that keeps nothing,
-     * so on its own it stays green while the rate does nothing at all — and the
+     * so on its own it stays green while the rate does nothing at all, and the
      * rate is the volume dial the whole Grafana bill hangs off.
      *
      * The two ids were picked once by search and pinned: through

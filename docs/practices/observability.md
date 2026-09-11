@@ -162,7 +162,7 @@ sheet without disturbing the back stack it is meant to describe.
   so there is no stranger's privacy to weigh, and a directive without its logs is
   the one that costs a round trip later).
 
-  Every line is passed through `redactSecrets` **before it reaches any tree** —
+  Every line is passed through `redactSecrets` **before it reaches any tree**,
   once, in `LoggingEngine.submit`, which is the single point every entry passes
   through. It is deliberately narrow: bearer and basic auth headers, JWTs,
   `token=`/`secret=`/`dsn=`-style key-value pairs, and email addresses. Session
@@ -173,8 +173,8 @@ sheet without disturbing the back stack it is meant to describe.
   leaves the device unless a reporter attaches it. Sentry breadcrumbs and the
   Warn-and-above bodies forwarded to Loki saw the same line in the clear, so the
   guard was sitting on the safest of the three exits. A throwable is the one
-  thing the engine cannot rewrite — wrapping it would cost the stack trace — so
-  its message is scrubbed at the read, through `LogEntry.throwableMessage`, and
+  thing the engine cannot rewrite, since wrapping it would cost the stack trace,
+  so its message is scrubbed at the read, through `LogEntry.throwableMessage`, and
   every sink that renders text off a throwable goes through that.
 
   The buffer used to be a field on `SentryLogTree`, which refuses every entry

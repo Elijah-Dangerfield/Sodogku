@@ -23,7 +23,7 @@ enum class AdPlacement(
     /**
      * The one name this placement answers to outside Kotlin: the key
      * `ads.rewardedPlacements` is gated on, and the `placement` attribute on
-     * **every** event that names a placement — the ad events and the
+     * **every** event that names a placement: the ad events, and the
      * `game.bones_refilled` the ad paid for.
      *
      * It lives on the enum rather than on an extension in `:libraries:ads:impl`

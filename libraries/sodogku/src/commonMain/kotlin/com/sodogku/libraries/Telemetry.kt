@@ -2,7 +2,7 @@ package com.sodogku.libraries.sodogku
 
 /**
  * There is deliberately no `setUser` here, and `captureUserFeedback` takes no
- * email. Both existed, both compiled, and neither had a caller — a one-line
+ * email. Both existed, both compiled, and neither had a caller. A one-line
  * `telemetry.setUser(email, …)` is the natural thing to write the day someone
  * adds a contact field to the feedback form, and it would make two published
  * sentences false: `pages/privacy.html` says the app never gives Sentry a name,
