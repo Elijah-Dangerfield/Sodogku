@@ -321,257 +321,6 @@ was.
 
 `DocReferencesResolveTest` will catch a dead file path but not a class name, so
 grep for every symbol it names.
-## SD-73 [P1] — A resumed board nudges the player one second after their first cross
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified with a scratch test
-against `StruggleDetector`, and by reading the wiring in `startAttempt`.
-
-**Ask:** Opening a board that has time on it (a relaunch onto a saved board, or
-coming back to level 7 from the drawer after leaving it half done) must not start
-with the Locate button pulsing. The detector's own KDoc names this as the case it
-avoids: "comes back to the board they left rather than to a button insisting they
-are stuck".
-
-What happens: `startAttempt` calls `struggle.reset()` (GameViewModel.kt:739), which
-sets `lastPlacementAt = 0`, and then feeds the detector the attempt clock, which on
-a resume starts at the saved `elapsedMs` (`elapsedBeforeResume`, line 748). The
-first cross calls `onMarked(300_000)`; on the next tick `droughted` reads
-`now - lastPlacementAt = 301_000 >= 40_000` (StruggleDetector.kt:199-208) and the
-burst starts. With six crosses the allowance is 20 s, so a board resumed at 0:25
-nudges three seconds in. The first pace gap is recorded from zero too
-(StruggleDetector.kt:124), so on a resumed board the median is later pulled to the
-whole pre-resume span and the drought rule goes quiet for far too long in the other
-direction.
-
-Scenario: play level 7 for a minute, tap Levels, open level 3, come back to 7, cross
-one square. One second later the Locate button is beating. Same on every relaunch
-onto a saved board that had more than forty seconds on it.
-
-**Done when:** a board resumed with `elapsedMs = 300_000` is not nudged on the tick
-after its first cross, and its first recorded pace gap is measured from the resume
-and not from zero. Both at the detector level and through `GameViewModel` with a
-`BoardSnapshot`.
-
-**Hints:** `StruggleDetector.reset()` needs a starting time: `reset(at = resume?.elapsedMs ?: 0L)`
-setting `lastPlacementAt` and `lastInputAt` to it, or the ViewModel should seed
-those after `reset()`. `touched` should stay false until the first input either
-way. `StruggleDetectorTest` has no resume case; the two scratch assertions were
-`onMarked(300_000)` then `assertFalse(nudging(301_000))`, and six `onMarked` from
-25_000 then `assertFalse(nudging(28_000))`. Both failed against current code.
-Confidence: high.
-## SD-74 [P2] — Zero bones into the tutorial opens the refill prompt over the first coach mark
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by reading;
-`aPlayerWithNoBonesLeftCanStillBeTaught` (GameViewModelTest:3345) builds exactly
-this fixture and never asserts on `boosterPrompt`.
-
-**Ask:** The rehearsal costs no bones, so it should not ask the player to buy any.
-`startAttempt` sets `boosterPrompt = if (it.livesRemaining <= 0) Consumable.Bone
-else null` (GameViewModel.kt:860) without checking `rehearsal`, and `GameScreen`
-composes `BoosterPrompt` after `TutorialCoachMark` (GameScreen.kt:253, 282), so a
-player who reaches the tutorial at zero bones sees a "watch an ad for bones" dialog
-on top of "This is your starter dog".
-
-Scenario: the test's own comment gives one (Settings, Replay the tutorial, after
-declining the ad at zero bones). Another needs no Settings visit: a new install
-plays the daily first, loses three bones there, then opens level 1.
-
-**Done when:** a rehearsal opened at zero bones has `boosterPrompt == null` and a
-real board opened at zero still has `Consumable.Bone`.
-
-**Hints:** One clause: `if (!rehearsal && it.livesRemaining <= 0)`. Extend
-`aPlayerWithNoBonesLeftCanStillBeTaught` with the assertion, and keep
-`aBoardOpenedAtZeroMeetsTheOfferRatherThanTheNextWrongGuess` as the other side.
-Confidence: high.
-## SD-75 [P2] — The daily route ignores the daily kill switch
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by reading; not
-run on a device.
-
-**Ask:** `daily.enabled` gates the card in the drawer, `PlayDaily`
-(GameViewModel.kt:2211) and the campaign ending's button, but not the route itself.
-`loadDaily` (GameViewModel.kt:636-650) takes `dailyBoard()` and starts an attempt
-whether or not `status.enabled` is true. The home-screen shortcut
-`sodogku://game?daily=true` (`AppShortcuts.DailyChallengeUrl`, registered as a deep
-link in `GameFeatureEntryPoint.kt:38`) lands there directly, so a daily switched
-off from the console is still playable, still writes `daily_result`, and still
-feeds the streak, for anyone arriving by shortcut or by a stale back stack.
-
-`aDailyThatIsSwitchedOffOpensNothing` (GameViewModelTest:3002) covers `PlayDaily`
-only; nothing constructs the ViewModel with `isDaily = true` and a disabled status.
-
-**Done when:** a `GameViewModel(isDaily = true)` whose status has `enabled = false`
-does not start an attempt.
-
-**Hints:** Decide what it shows instead. `NavigateBack` is the cheap answer and is
-what a missing board already does; a `Recap`-shaped "not today" is kinder if the
-shortcut is the way most people reach it. Note the recap path
-(`today.result != null`) should probably still open, since reviewing a spent day
-is not playing one. Confidence: high on the code path, medium on how often the
-shortcut is the entry.
-## SD-76 [P2] — `state.isPro` is read once, so a purchase from Settings does not reach the board until relaunch
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by reading.
-
-**Ask:** `load` snapshots `entitlements.isPro.value` into `GameState.isPro`
-(GameViewModel.kt:552) and nothing observes the flow afterwards, even though
-`Entitlements.isPro` is a `StateFlow` and the init block already argues, for the
-four display settings, that the gear opens a real screen and the player comes
-straight back (GameViewModel.kt:391-414). Settings offers `OpenPaywall` when the
-player is not Pro.
-
-After a purchase and a back-tap: the drawer still has `canJumpAnywhere = false`,
-the booster row still shows Ad badges (`tapPlaysAd`'s first clause reads
-`isPro`), and `SkipOffer.free` is only right because `skipOffer` reads the flow
-live. The ViewModel itself already grants without an ad (`refill`, `refillBones`,
-`goToLevel` all read `entitlements.isPro.value`), so the screen is promising an ad
-the code will not show and locking rows the code would open.
-
-**Done when:** flipping `entitlements.isPro` while a board is open updates
-`state.isPro` without a relaunch, and a test says so.
-
-**Hints:** Collect `entitlements.isPro` in `init` the way the display settings
-are collected, into a `ProChanged` action, and carry it in `startAttempt` as now.
-The test fixture already has `ProEntitlements` and `FreeEntitlementsFake`; a
-`MutableStateFlow`-backed fake would do. Confidence: high.
-## SD-77 [P2] — Bones refilled through the pill are reported under the wrong event
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by reading the
-two paths and `docs/practices/app-events.md`.
-
-**Ask:** There are two ways to trade an ad for bones and they emit different
-events. The standing offer under the board and the lose sheet send `RefillBones`,
-handled by `refillBones()` (GameViewModel.kt:2052-2096), which emits
-`game.bones_refilled` with `placement`. The bones pill in the header sends
-`BoosterTapped(Bone)` (GameScreen.kt:171), which always opens the prompt
-(GameViewModel.kt:2353); for a bone the prompt's only button is `onWatchAd`
-(BoosterPrompt.kt:84-93), which sends `BoosterRefillRequested(Bone)` and lands in
-`refill()` (GameViewModel.kt:2378-2407). That path emits
-`game.booster_refilled { booster = bone }` with no placement and never
-`game.bones_refilled`.
-
-`app-events.md:175` calls `game.bones_refilled` "the one way back from zero" and
-describes an `ads.result` join on `placement`; `refillBones`'s own KDoc says "the
-one way back from zero, and the reason there is only one". Every refill taken
-through the pill is missing from that join.
-
-**Done when:** a bone refill from the pill and one from the standing offer produce
-the same event with the same attributes, and `refill()` is no longer reachable
-with `Consumable.Bone`.
-
-**Hints:** Route `BoosterRefillRequested(Bone)` to `refillBones()` in
-`handleAction`, and make `refill()` a sniff-and-treat function (its `Bone` branch
-at line 2397 sets `phase = Playing` on a board that is already playing, which is
-another sign it was never the bone path). `aRefillNamesItsPlacementTheWayTheAdEventsDo`
-is the test to extend. Confidence: high.
-## SD-78 [P2] — Eight fields `startAttempt` carries have no test that fails if they are dropped
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by mutation:
-each field below was replaced with its default in the `GameState(...)` at
-GameViewModel.kt:838-926 and the suite stayed at 376 green.
-
-**Ask:** `playStreak` was dropped from this constructor and blanked the flame for
-a session; the fix added the field and a test, but the pattern that let it happen
-is still open. Fields whose carry nothing guards: `autoMarkVisible` (line 888),
-`colorblind`, `haptics`, `reduceAnimations` (885-887), `showAchievements` (889),
-`refillTo` (902), `isPro` (904), `explainedBoosters` (884), `records` (905).
-
-`theSettingSurvivesStartingTheBoardOver` (GameViewModelTest:232) is the test that
-looks like it covers the first one and cannot: it uses `puristCache()` (crosses
-off) and asserts they stay off after a retry, and `GameState.autoMarkVisible`
-defaults to `false`, so dropping the field is indistinguishable from "still off".
-It catches a reset to `true` (the historical bug) and not the field going missing
-(the bug the comment above it describes).
-
-What each drop would look like: `refillTo` at 0 disables the standing bone offer
-on every board and puts "Refill to 0" on the lose sheet; `isPro` locks the drawer
-for Pro after the first retry; `showAchievements` brings the trophy back for a
-player who turned badges off; `explainedBoosters` re-explains a booster after a
-retry. `records` is benign (reloaded when the drawer opens) and can stay
-uncovered.
-
-**Done when:** a test fails when any field that is not about the board is dropped
-from the constructor, including fields that do not exist yet.
-
-**Hints:** One test rather than eight. Build a board with every non-default
-setting on (Pro, colorblind, haptics off, reduce animations, badges off, refillTo
-from config, a booster explained), retry, and assert the projection of `state`
-that excludes board fields is equal before and after. Written as
-`state.copy(<board fields reset>)` on both sides, a new `GameState` field is
-covered the day it is added, and the author has to decide whether it is a board
-field. Flip `theSettingSurvivesStartingTheBoardOver` to an assisted cache as well,
-so the assertion is on something the default cannot satisfy. Confidence: high.
-## SD-79 [P2] — The empty-board note's "once" is a field write nothing tests
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by mutation.
-
-**Ask:** `noteEmptyBoard` sets `emptyBoardNoteSeen = true` before writing the flag
-(GameViewModel.kt:2667), and the comment explains it is the answer that does not
-lag. Delete the line and all 376 tests stay green. Without it the card comes back
-on the tick after every dismissal, until the player touches the board, because
-`alreadySeen` is read from the field alone.
-
-`theEmptyBoardIsExplainedOnceAndNeverAgain` (GameViewModelTest:1068) checks a
-*second ViewModel*, which re-reads the flag from disk in `load`, so it is a test
-of the cache write. `anEmptyBoardSaysSoOnceThePlayerHasHadTimeToLookAtIt`
-(GameViewModelTest:1046) dismisses the card and stops.
-
-**Done when:** dismissing the note and ticking again on the same board leaves
-`warning == null`, and deleting the field write makes that test fail.
-
-**Hints:** Two lines on the end of the first test: `clock += Reading; vm.tick();
-assertNull(vm.state.warning)`. Confidence: high.
-## SD-80 [P2] — Nothing tests that the last level offers no skip, and without the guard the ending sheet covers a lost board
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by mutation and
-by tracing the path.
-
-**Ask:** `skipOffer` returns null for `level.id >= LevelPacks.lastCampaignLevelId`
-(GameViewModel.kt:1991). Remove the line and the suite stays green. It is
-load-bearing: with it gone, losing level 1000 after enough attempts offers Skip,
-`skipLevel` calls `nextLevel`, `nextLevel` asks `endsTheCampaign` (line 2111) and
-sets `campaignComplete = true, phase = Won`, so the campaign ending, with its
-"999 of 1000" pill, is drawn over a level that was lost. The four skip tests all
-run on an early level.
-
-**Done when:** losing `lastCampaignLevelId` with the skip threshold met produces
-`skip == null`, and there is a test for it.
-
-**Hints:** The fixture for `clearingTheLastLevelEndsTheCampaignInsteadOfTheApp`
-already opens the last level; lose it instead of clearing it. Confidence: high.
-## SD-81 [P2] — Three tests pass against the bug their name describes
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by mutation.
-
-**Ask:** Each of these stays green when the behaviour it is named for is removed.
-
-- `theStandingAdOfferRefillsBonesWithoutEverReducingThem` (GameViewModelTest:2632)
-  refills at three bones with `refillTo` at three, so `topped = refillTo()` passes
-  it. The claim needs a holding above the floor. The treat and Pro versions
-  (`aRefillToppedUpByAnAdNeverReducesAHolding`, `theProFloorNeverTakesAStashAway`)
-  hold five and nine and do catch their mutations.
-- `everyRestartCountsAsAnotherAttempt` (GameViewModelTest:2192) counts the
-  repository's attempts, which `onAttemptStarted` bumps. The ViewModel's own
-  `attemptNumber++` in `restart` (GameViewModel.kt:2321) can be deleted without
-  moving it, and that number is `attempt_number` on `game.level_started`,
-  `game.level_completed`, `game.level_failed` and `game.level_skipped`.
-- `theLastBoneWarningFiresOnceOnTheEdgeIntoOneLife` (GameViewModelTest:2137)
-  never checks the "once". Dropping `&& !warnedAboutLastBone`
-  (GameViewModel.kt:1540) changes nothing it asserts. Within one ViewModel the
-  guard is also unreachable as a difference: the only ways back to two bones
-  (`refillBones`, `refill`) reset the flag. It only matters when another board's
-  `BonesChanged` echo raises the count, and whether the warning should fire again
-  then is a question worth answering in the test rather than leaving the flag as
-  decoration.
-
-**Done when:** each of the three mutations above turns its test red, or the guard
-in the third is deleted with a comment saying why the cross-board case does not
-need it.
-
-**Hints:** For the first, set `bones = 5` on disk or `boosters.refillTo` to 2. For
-the second, `RecordingEvents` already exists; assert `attempt_number == 2` on the
-`game.level_started` after a retry. Confidence: high.
-
 ## SD-85 [P2] — A second Skip on the tutorial logs a duplicate completion
 
 **Found by:** the SD-82 agent, 2026-09-10, while disproving the claim that the
@@ -597,3 +346,34 @@ tapped.
 exists on the other terminal paths out of the rehearsal before fixing only this
 one. `DashboardQueryContractTest` will hold the event's registry row if you touch
 its attributes.
+
+## SD-86 [P2] — `:apps:integration` has failed twice for reasons nobody can reproduce
+
+**Found by:** two separate investigations, 2026-09-10.
+
+`ConfigValuesAreReadTest` failed once and passed on re-run with no change. The
+SD-37 agent went looking, disproved the obvious explanation (`FileTreeWalk` does
+not throw when a file vanishes underneath it), fixed the wasteful walk anyway,
+and reported that **the original failure still has no explanation.**
+
+Then `DocReferencesResolveTest.everyCitedSectionExists` failed once immediately
+after a merge and passed on eight consecutive re-runs afterwards. Its `.claude`
+exclusion is correct and matches the relative path. No explanation either.
+
+Two unexplained single failures in one tier is a pattern rather than two
+coincidences, and this is the tier that holds every source-scanning guard in the
+repo. A guard that fails at random gets re-run instead of read, which is how a
+guard stops being one.
+
+**Done when:** either the cause is found, or the tier runs enough times under
+adversarial conditions to say honestly that it does not flake.
+
+**Hints:** The common shape is a test that reads the working tree at runtime while
+something else writes to it. Both failures happened while agent worktrees under
+`.claude/worktrees/` were being created or removed. The tests exclude that
+directory; the Gradle `inputs.files` declarations in
+`apps/integration/build.gradle.kts` may not, and an input snapshot taken while a
+tree is half-removed is a different situation from a walk that skips it.
+
+Reproducing it may mean running the tier in a loop while adding and removing a
+worktree. That is worth an hour: everything else in this repo trusts these guards.
