@@ -35,16 +35,11 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.streak_calendar_title
 import sodogku.libraries.resources.generated.resources.streak_celebrate_body
-import sodogku.libraries.resources.generated.resources.streak_celebrate_title
-import sodogku.libraries.resources.generated.resources.streak_current_days
-import sodogku.libraries.resources.generated.resources.streak_current_none
 import sodogku.libraries.resources.generated.resources.streak_empty_body
 import sodogku.libraries.resources.generated.resources.streak_day_label
 import sodogku.libraries.resources.generated.resources.streak_keep_it_today
 import sodogku.libraries.resources.generated.resources.streak_longest
 import sodogku.libraries.resources.generated.resources.streak_longest_none
-import sodogku.libraries.resources.generated.resources.streak_off_body
-import sodogku.libraries.resources.generated.resources.streak_off_title
 import sodogku.libraries.resources.generated.resources.streak_title
 
 /**

@@ -50,7 +50,6 @@
 
     <string name="game_level_label">Level</string>
     <string name="game_score_label">Score</string>
-    <string name="game_dogs_progress">%1$d / %2$d</string>
     <string name="game_rule_one_per_region">1 dog per color</string>
     <string name="game_rule_one_per_line">1 dog per row &amp; column</string>
     <string name="game_rule_no_touching">Dogs cannot touch</string>
@@ -188,7 +187,6 @@
     <string name="settings_privacy">Privacy policy</string>
     <string name="settings_terms">Terms of service</string>
     <string name="settings_feedback">Send feedback</string>
-    <string name="settings_version">Version %1$s</string>
     <string name="settings_version_label">Version</string>
     <string name="settings_section_play">Playing</string>
     <string name="settings_section_about">About</string>
@@ -749,13 +747,6 @@
          split was avoiding. -->
     <string name="streak_title">Streak</string>
 
-    <!-- The circular button. `label` is what it is, `days` / `none` is what it says. -->
-    <string name="streak_indicator_label">Streak</string>
-    <string name="streak_indicator_days">%1$d day streak</string>
-    <string name="streak_indicator_none">No streak yet</string>
-
-    <string name="streak_current_days">%1$d day streak</string>
-    <string name="streak_current_none">No streak yet</string>
     <string name="streak_longest">Longest run: %1$d days</string>
     <string name="streak_longest_none">No run to beat yet</string>
     <string name="streak_calendar_title">The last five weeks</string>
@@ -764,7 +755,6 @@
     <!-- One per day cell. Spoken, not printed: the grid itself shows a colour. -->
     <string name="streak_day_completed">Played</string>
     <string name="streak_day_bridged">Covered</string>
-    <string name="streak_day_failed">Out of bones</string>
     <string name="streak_day_missed">Missed</string>
     <string name="streak_day_future">Not yet</string>
     <string name="streak_day_today">%1$s, today</string>
@@ -777,12 +767,7 @@
     <string name="streak_weekday_sat">S</string>
     <string name="streak_weekday_sun">S</string>
 
-    <string name="streak_off_title">The daily is not running</string>
-    <string name="streak_off_body">Streaks come from the daily puzzle. Nothing you have already played is lost.</string>
-
-    <string name="streak_celebrate_title">%1$d days in a row</string>
     <string name="streak_celebrate_body">Same time tomorrow.</string>
-    <string name="streak_celebrate_done">Nice</string>
 
     <!-- The question above the number, which is the number's answer. Asked
          rather than asserted, because a page that opens by telling somebody

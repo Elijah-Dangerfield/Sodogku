@@ -2,15 +2,17 @@ package com.sodogku.integration.copy
 
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
  * House style for the words a player actually reads.
  *
- * Two rules, both of which had already been broken by the time this was written,
- * and both of which are the kind of thing that is invisible in review because
- * each individual instance looks fine. It is only across a whole screen that
- * seven em dashes read as one voice and "colour" next to "color" reads as two.
+ * Two style rules to begin with, both of which had already been broken by the
+ * time this was written, and both of which are the kind of thing that is
+ * invisible in review because each individual instance looks fine. It is only
+ * across a whole screen that seven em dashes read as one voice and "colour" next
+ * to "color" reads as two.
  *
  * **No em dashes.** They are the default connector when prose is drafted quickly
  * and they pile up: `rules_body`, both tutorial cards, the sniff explainer, both
@@ -23,8 +25,12 @@ import kotlin.test.assertTrue
  * drifted British. A player who sees both in one session notices, even if they
  * could not say what they noticed.
  *
- * This deliberately checks only `<string>` bodies. The comments in that file are
- * for whoever edits it next and are not held to either rule.
+ * The style rules deliberately check only `<string>` bodies. The comments in that
+ * file are for whoever edits it next and are not held to either.
+ *
+ * The rest of the file is about what the batch **costs**, which is a per-string,
+ * per-language price paid by a person: one file to send rather than several, and
+ * nothing in it that no player will ever read.
  */
 class UserFacingCopyStyleTest {
 
@@ -136,6 +142,92 @@ class UserFacingCopyStyleTest {
         )
     }
 
+    @Test
+    fun everyStringIsRenderedBySomething() {
+        // Same cost as the rule above, from the other end: a key nothing draws
+        // is still a row in the batch, still priced per language, and still a
+        // decision a translator has to make. Twelve were in the file when this
+        // was written, among them copy for a `StreakDayState` that does not
+        // exist and a second spelling of the dogs counter.
+        val used = referencedKeys()
+        val orphans = keys().filterNot { it in used || it in KEPT }
+
+        assertTrue(
+            orphans.isEmpty(),
+            "Nothing renders these, so they would be paid for in every language and read in none. " +
+                "Delete them, or add them to KEPT with the reason:\n" +
+                orphans.joinToString("\n") { "  $it" },
+        )
+    }
+
+    @Test
+    fun theReferenceScanTellsAUseFromAnImport() {
+        // The guard against that guard, and the half that is easy to get wrong.
+        // `Res.string.foo` is an extension property, so it needs `foo` imported
+        // by name: an import is where a dead key hides rather than evidence
+        // anything draws it. `StreakScreen` imported five of the twelve and read
+        // none of them, and detekt cannot say so because the default rule sets
+        // are turned off.
+        val used = referencedKeys()
+
+        assertTrue("streak_title" in used, "a string the streak page draws is missing from the scan")
+        assertTrue(
+            GENERATED_IMPORT.matches("import sodogku.libraries.resources.generated.resources.streak_title"),
+            "the import filter has stopped recognising an import, so every import counts as a use",
+        )
+        assertFalse(
+            GENERATED_IMPORT.matches("text = stringResource(Res.string.streak_title),"),
+            "the import filter is eating uses, so every string would read as dead",
+        )
+    }
+
+    /** Every key a translator is handed: `<plurals>` is a row like any other. */
+    private fun keys(): List<String> =
+        Regex("""<(?:string|plurals) name="([^"]+)"""")
+            .findAll(sharedStrings().readText())
+            .map { it.groupValues[1] }
+            .toList()
+
+    /**
+     * Every word the app's Kotlin says, minus the resource imports.
+     *
+     * Word-matched rather than parsed, because both spellings of a reference
+     * (`Res.string.foo` and a bare `foo` under a wildcard import) contain the
+     * key and nothing else in the tree is named like one. The cost is that a
+     * key named in a comment reads as used, which is a false negative and the
+     * safe direction: this test deletes copy.
+     *
+     * `apps/integration` is left out on purpose. This file names keys in its own
+     * assertions, and a scan that counted its own prose would vouch for whatever
+     * it happened to mention.
+     */
+    private fun referencedKeys(): Set<String> {
+        val root = File(repoRoot())
+        val files = listOf("libraries", "features", "apps")
+            .map { File(root, it) }
+            .flatMap { tree ->
+                tree.walkTopDown()
+                    .onEnter { it.name !in setOf("build", ".git", ".claude") }
+                    .filter { it.isFile && it.extension == "kt" }
+                    .toList()
+            }
+            .filterNot { it.startsWith(File(root, HARNESS)) }
+
+        assertTrue(files.size >= MIN_KOTLIN_FILES, "only found ${files.size} Kotlin files, so the walk is broken")
+
+        return files.flatMapTo(mutableSetOf()) { file ->
+            file.readLines()
+                .filterNot { GENERATED_IMPORT.matches(it.trim()) }
+                .flatMap { line -> WORD.findAll(line).map { it.value } }
+        }
+    }
+
+    private fun sharedStrings(): File {
+        val file = File(repoRoot(), SHARED_STRINGS)
+        assertTrue(file.isFile, "no strings at ${file.absolutePath}")
+        return file
+    }
+
     /**
      * Every `strings.xml` under a `composeResources` folder, in any module.
      *
@@ -174,18 +266,10 @@ class UserFacingCopyStyleTest {
     }
 
     /** Every `<string name="...">body</string>` in the shared resources. */
-    private fun strings(): List<Pair<String, String>> {
-        val file = File(
-            repoRoot(),
-            "libraries/resources/src/commonMain/composeResources/values/strings.xml",
-        )
-        assertTrue(file.isFile, "no strings at ${file.absolutePath}")
-
-        return Regex("""<string name="([^"]+)"[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL)
-            .findAll(file.readText())
+    private fun strings(): List<Pair<String, String>> =
+        STRING.findAll(sharedStrings().readText())
             .map { it.groupValues[1] to it.groupValues[2] }
             .toList()
-    }
 
     private fun repoRoot(): String =
         System.getProperty("sodogku.repoRoot")
@@ -204,6 +288,31 @@ class UserFacingCopyStyleTest {
 
         /** The one module that owns player-facing copy. */
         const val OWNER = "libraries/resources/src/commonMain/composeResources"
+
+        const val SHARED_STRINGS = "$OWNER/values/strings.xml"
+
+        /** This module: the scan must not be able to vouch for itself. */
+        const val HARNESS = "apps/integration"
+
+        /**
+         * Keys kept without a caller, and why.
+         *
+         * Empty, and the burden is on whoever adds the first entry: a string
+         * here is one a translator is paid for and no player ever sees, so the
+         * reason has to be better than "we might need it". Copy for a feature
+         * that is not built yet belongs in the branch that builds it.
+         */
+        val KEPT = emptySet<String>()
+
+        /**
+         * A floor under the Kotlin walk, so a walk that found nothing reports
+         * it rather than declaring every string dead and deleting the lot.
+         */
+        const val MIN_KOTLIN_FILES = 500
+
+        val GENERATED_IMPORT = Regex("""import\s+[\w.]+\.generated\.resources\.\w+""")
+
+        val WORD = Regex("""\w+""")
 
         /**
          * The shared file plus the Android app's own `res/values/strings.xml`,
