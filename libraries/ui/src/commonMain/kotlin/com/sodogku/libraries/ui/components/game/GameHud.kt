@@ -201,6 +201,13 @@ fun RuleChipGroup(
  * of unfilled ones reads as *selected* — as though the player had turned that
  * rule on — and these are not controls. An outline reads as a pointer, which is
  * the only thing this ever means: the rule you just ran into.
+ *
+ * [flashKey] says *when*, where [highlighted] says *which*. A nonce rather than
+ * the boolean alone, so the same rule can be broken twice running: the second
+ * strike leaves [highlighted] true and would otherwise leave the flash alone,
+ * so the one piece of feedback that names the rule would be the one that goes
+ * quiet while the cell shakes and the board flinches. Those two are keyed on
+ * the same nonce for the same reason.
  */
 @Composable
 fun RuleChip(
@@ -208,6 +215,7 @@ fun RuleChip(
     label: String,
     modifier: Modifier = Modifier,
     highlighted: Boolean = false,
+    flashKey: Int = 0,
     onClick: () -> Unit = {},
 ) {
     val diagramColor = AppTheme.colors.text.color
@@ -227,7 +235,7 @@ fun RuleChip(
     // useful after the flash. Somebody who looks down a second later should
     // still be able to see which rule they hit.
     val flash = remember { Animatable(0f) }
-    LaunchedEffect(highlighted, still) {
+    LaunchedEffect(highlighted, flashKey, still) {
         if (!highlighted) {
             flash.animateTo(0f, tween(RuleChipFadeMillis))
             return@LaunchedEffect

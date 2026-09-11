@@ -569,12 +569,14 @@ private fun HeaderStat(
 @Composable
 private fun RuleChips(state: GameState, onExplain: () -> Unit) {
     val broken = brokenRule(state)
+    val flashKey = ruleChipFlashKey(broken, state.strikeNonce)
     RuleChipGroup {
         RuleChip(
             diagram = RuleDiagram.OnePerRegion,
             label = stringResource(Res.string.game_rule_one_per_region),
             modifier = Modifier.weight(WEIGHT_FILL),
             highlighted = broken == RuleDiagram.OnePerRegion,
+            flashKey = flashKey,
             onClick = onExplain,
         )
         RuleChip(
@@ -582,6 +584,7 @@ private fun RuleChips(state: GameState, onExplain: () -> Unit) {
             label = stringResource(Res.string.game_rule_one_per_line),
             modifier = Modifier.weight(WEIGHT_FILL),
             highlighted = broken == RuleDiagram.OnePerLine,
+            flashKey = flashKey,
             onClick = onExplain,
         )
         RuleChip(
@@ -589,10 +592,26 @@ private fun RuleChips(state: GameState, onExplain: () -> Unit) {
             label = stringResource(Res.string.game_rule_no_touching),
             modifier = Modifier.weight(WEIGHT_FILL),
             highlighted = broken == RuleDiagram.NoTouching,
+            flashKey = flashKey,
             onClick = onExplain,
         )
     }
 }
+
+/**
+ * When the chips last had something to say, as a nonce.
+ *
+ * `brokenRule` answers *which* rule, and on a second wrong guess against the
+ * same rule it answers the same thing twice — so a chip keyed on that alone
+ * flashes once per rule rather than once per strike. This is the *when*, and it
+ * is the strike nonce the cell shake and the board flinch already use.
+ *
+ * Zero when no rule was broken, so a wrong guess that ran into none of the
+ * three leaves the chips undisturbed rather than restarting three effects to
+ * animate nothing.
+ */
+internal fun ruleChipFlashKey(broken: RuleDiagram?, strikeNonce: Int): Int =
+    if (broken == null) 0 else strikeNonce
 
 /**
  * Which of the three rules the player's last wrong guess ran into, or null when
