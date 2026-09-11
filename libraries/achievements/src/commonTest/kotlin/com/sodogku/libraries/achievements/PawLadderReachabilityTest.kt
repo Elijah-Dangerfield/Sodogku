@@ -5,6 +5,8 @@ import com.sodogku.libraries.levels.LevelShape
 import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
 import com.sodogku.libraries.scoring.ScoringConfig
+import com.sodogku.libraries.scoring.Standing
+import com.sodogku.libraries.scoring.standingFor
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -75,6 +77,37 @@ class PawLadderReachabilityTest {
             val worst = rating(shape, placements, SLOW_MS_PER_ROW, ScoringConfig.MAX_LIVES - 1)
             if (worst != Scoring.ONE_PAW) {
                 failures += "$name: the best run a two-strike player can finish earned $worst"
+            }
+        }
+
+        assertTrue(failures.isEmpty(), failures.joinToString("\n") + table())
+    }
+
+    @Test
+    fun everyVerdictCanBeEarnedOnEveryShapeTheGameShips() {
+        // The same question the sweep above asks of the paws, asked of the
+        // words, because they are cut from the same par and fail the same way.
+        // `Standing.Sharp` was the fourth instance: it was five paws' worth of
+        // score with a bone lost, and `ScoringConfig`'s own KDoc says a clean
+        // run is necessary for five paws, so the two sentences defined it as
+        // empty. "Sharp work" was a shipped string that never rendered.
+        //
+        // The paw sweep could not have caught it and still cannot. Paws and
+        // verdicts read the same thresholds but not the same way: only the
+        // verdict reads lives, so a rung can be perfectly reachable while the
+        // verdict cut from it is not.
+        //
+        // Swept over the same grid rather than pinned pace by pace. Which pace
+        // earns which word is a tuning and is allowed to move; a word no run on
+        // this board can produce is not.
+        val failures = mutableListOf<String>()
+
+        shippedShapes().forEach { (shape, placements) ->
+            val earned = BANDS.map { band -> verdict(shape, placements, band) }.toSet()
+            val missing = Standing.entries - earned
+            if (missing.isNotEmpty()) {
+                failures += "${describe(shape, placements)}: no run earns $missing there, " +
+                    "at any pace from ${FAST_MS_PER_ROW}ms to ${SLOW_MS_PER_ROW}ms a row"
             }
         }
 
@@ -160,6 +193,18 @@ class PawLadderReachabilityTest {
         score(shape, placements, band.msPerRow, band.strikes).toDouble() /
             Scoring.parScore(shape.size, shape.difficulty, placements)
 
+    private fun verdict(shape: LevelShape, placements: Int, band: Band): Standing =
+        checkNotNull(
+            Scoring.standingFor(
+                score(shape, placements, band.msPerRow, band.strikes),
+                shape.size,
+                shape.difficulty,
+                completed = true,
+                livesRemaining = ScoringConfig.MAX_LIVES - band.strikes,
+                placements = placements,
+            ),
+        ) { "a finished run has no verdict" }
+
     private fun rating(shape: LevelShape, placements: Int, msPerRow: Long, strikes: Int): Int =
         Scoring.paws(
             score(shape, placements, msPerRow, strikes),
@@ -242,6 +287,17 @@ class PawLadderReachabilityTest {
         const val SLOW_MS_PER_ROW = 6_000L
 
         const val PERCENT = 100
+
+        /**
+         * Every way a run can go that this file measures: three paces by three
+         * strike counts. The two ends are load-bearing — a clean fast run is
+         * the top of what the formula pays and a two-strike run past the window
+         * is the bottom — and the middle is there so a rung or a word that only
+         * a sprint can reach shows up as one that nothing ordinary reaches.
+         */
+        val BANDS = listOf(FAST_MS_PER_ROW, UNHURRIED_MS_PER_ROW, SLOW_MS_PER_ROW).flatMap { pace ->
+            (0 until ScoringConfig.MAX_LIVES).map { strikes -> Band(strikes, pace) }
+        }
 
         val CUTS = listOf(
             Cut(

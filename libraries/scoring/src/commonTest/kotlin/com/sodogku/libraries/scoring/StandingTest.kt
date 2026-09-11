@@ -1,5 +1,6 @@
 package com.sodogku.libraries.scoring
 
+import kotlin.math.floor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -30,14 +31,16 @@ class StandingTest {
                     val standing = Scoring.standingFor(score, size, difficulty, completed = true)
                     checked++
                     // Bands rather than single values, because the verdict has
-                    // four rungs and the rating now has five: Solid covers the
-                    // two middle paws. What must never happen is the two
+                    // four rungs and the rating has five: the two cuts the
+                    // verdict makes are the two-paw and three-paw lines, so
+                    // everything above the second of them is one word and three
+                    // rungs. What must never happen is the two
                     // disagreeing about direction, which is what a reordering of
                     // the shared thresholds would produce.
                     val allowed = when (standing) {
-                        Standing.Flawless, Standing.Sharp -> Scoring.MAX_PAWS..Scoring.MAX_PAWS
-                        Standing.Solid -> Scoring.THREE_PAWS..Scoring.FOUR_PAWS
-                        Standing.Scraped -> Scoring.ONE_PAW..Scoring.TWO_PAWS
+                        Standing.Flawless, Standing.Sharp -> Scoring.THREE_PAWS..Scoring.MAX_PAWS
+                        Standing.Solid -> Scoring.TWO_PAWS..Scoring.TWO_PAWS
+                        Standing.Scraped -> Scoring.ONE_PAW..Scoring.ONE_PAW
                         null -> error("a completed run has no verdict")
                     }
                     assertTrue(
@@ -67,12 +70,25 @@ class StandingTest {
         // varies: how fast they move and how many bones they spend. Hand-picked
         // runs would need re-picking every time a coefficient moves, and picking
         // them is how the last version of this ended up proving nothing.
+        //
+        // **And the paces start at 900ms a row, not 1ms a move.** That is the
+        // second hole this test had and the one that hid `Sharp` for as long as
+        // it did: the sweep opened at one millisecond a move, which is not a
+        // pace, it is the formula's ceiling with the clock switched off. `Sharp`
+        // was reachable there and nowhere a person could go — 2.3 seconds a move
+        // on a 10x10 tier 4, and not at all on the starter-dog tier-4 boards —
+        // and this test stayed green through all of it. Reachable has to mean
+        // reachable by somebody holding the phone.
+        //
+        // Per row rather than per move, because a move on a 10x10 is not the
+        // same amount of work as one on a 4x4, and it is the unit the speed
+        // window is quoted in.
         val seen = buildSet {
             for (size in 4..10) {
                 for (difficulty in 1..4) {
-                    for (perMoveMs in listOf(1L, 1_000L, 3_000L, 10_000L, 60_000L)) {
+                    for (msPerRow in HUMAN_PACES_MS_PER_ROW) {
                         for (strikes in 0 until ScoringConfig.MAX_LIVES) {
-                            add(play(size, difficulty, perMoveMs, strikes))
+                            add(play(size, difficulty, msPerRow * size, strikes))
                         }
                     }
                 }
@@ -96,8 +112,16 @@ class StandingTest {
     fun aBoneSpentCostsTheFlawlessVerdictAndNothingElse() {
         // Flawless is the only verdict that reads lives. A strike should drop
         // this run one step, not to the bottom.
-        val clean = play(size = 8, difficulty = 3, perMoveMs = 250)
-        val struck = play(size = 8, difficulty = 3, perMoveMs = 250, strikes = 1)
+        //
+        // At a considered pace, not a sprint. This asserted the same pair at
+        // 250ms a move on an 8x8, which is 31ms a row, and at that speed a
+        // one-strike run clears any threshold the ladder could plausibly hold —
+        // so it passed while `Sharp` was empty for every real player. The pace
+        // here is the one `ScoringConfig` calls considered, and the assertion
+        // only means something because a run at it is not close to the ceiling.
+        val pace = UNHURRIED_MS_PER_ROW * 8
+        val clean = play(size = 8, difficulty = 3, perMoveMs = pace)
+        val struck = play(size = 8, difficulty = 3, perMoveMs = pace, strikes = 1)
 
         assertEquals(Standing.Flawless, clean)
         assertEquals(Standing.Sharp, struck)
@@ -147,6 +171,57 @@ class StandingTest {
     }
 
     @Test
+    fun aScoreExactlyOnACutEarnsTheVerdictAboveIt() {
+        // Both cuts are `>=`, so the first score that reaches one is inside the
+        // band it names. Nothing pinned that, and turning either into `>` is
+        // invisible under the shipped fractions: `par * 0.53` and `par * 0.64`
+        // are whole numbers on 3 of the 224 rungs the campaign ships, so on the
+        // other 221 there is no score that ties and the two operators agree.
+        //
+        // Hence the quarter fractions. They are exact in binary, so `par * f`
+        // lands on an integer whenever par divides, and the tie this is about
+        // actually exists to be asserted. The shipped ladder is the thing being
+        // protected, not the thing being measured: what has to hold is that a
+        // player who scores precisely what `nearMiss` told them to score gets
+        // the rung they were promised, on whatever ladder is configured.
+        val exact = ScoringConfig(
+            twoPawFraction = 0.25,
+            threePawFraction = 0.5,
+            fourPawFraction = 0.75,
+            fivePawFraction = 1.0,
+        )
+        var ties = 0
+
+        for (size in 4..10) {
+            for (difficulty in 1..4) {
+                val par = Scoring.parScore(size, difficulty, config = exact)
+                listOf(
+                    Standing.Sharp to exact.threePawFraction,
+                    Standing.Solid to exact.twoPawFraction,
+                ).forEach { (expected, fraction) ->
+                    val cut = par * fraction
+                    if (cut != floor(cut)) return@forEach
+                    ties++
+                    assertEquals(
+                        expected,
+                        Scoring.standingFor(
+                            score = cut.toInt(),
+                            size = size,
+                            difficulty = difficulty,
+                            completed = true,
+                            livesRemaining = ScoringConfig.MAX_LIVES - 1,
+                            config = exact,
+                        ),
+                        "${cut.toInt()} is exactly $fraction of par on a ${size}x$size tier $difficulty",
+                    )
+                }
+            }
+        }
+
+        assertTrue(ties > 0, "no cut landed on a whole number, so nothing was tied and nothing was tested")
+    }
+
+    @Test
     fun anUnfinishedRunGetsNoVerdict() {
         // Not "the worst verdict". A judgement on the lose sheet is the last
         // thing anybody needs, and returning Scraped there would put one on it.
@@ -189,5 +264,21 @@ class StandingTest {
     private companion object {
         /** 7 sizes by 4 tiers by 131 steps, less a margin for arithmetic. */
         const val SWEEP_FLOOR = 3_000
+
+        /** A considered pace, in milliseconds per row of board per placement. */
+        const val UNHURRIED_MS_PER_ROW = 2_500L
+
+        /**
+         * Paces a person can actually play at, in milliseconds per row per
+         * placement. The quickest is 900, which `ScoringTest` calls fast for the
+         * board and works out at nine seconds a move on a 10x10; the slowest is
+         * past the speed window on every size, so it is the floor of what any
+         * finished run can score.
+         *
+         * Nothing faster belongs here. A verdict only reachable above this range
+         * is a verdict nobody earns, and a sweep that opens at 1ms a move cannot
+         * tell the difference.
+         */
+        val HUMAN_PACES_MS_PER_ROW = listOf(900L, UNHURRIED_MS_PER_ROW, 6_000L, 20_000L)
     }
 }
