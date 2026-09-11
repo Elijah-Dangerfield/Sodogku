@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -123,7 +125,12 @@ fun BoxScope.LevelDrawer(
 ) {
     val slide = animateFloatAsState(if (open) 1f else 0f, Motion.Pop)
 
-    if (slide.value <= 0f) return
+    // Keeping the `State` is only half of dropping the `by`: read here it still
+    // subscribes the pane — every level row, every record, the whole list — to
+    // each frame of the spring. The gate is one bit, so derive the bit.
+    val onScreen by remember(slide) { derivedStateOf { slide.value > 0f } }
+
+    if (!onScreen) return
 
     Box(
         modifier = Modifier

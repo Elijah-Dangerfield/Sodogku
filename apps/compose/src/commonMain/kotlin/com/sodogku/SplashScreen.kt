@@ -74,7 +74,7 @@ fun SplashOverlay(
         }
     }
 
-    SplashContent(screenAlpha = screenAlpha.value, boneAlpha = boneAlpha.value)
+    SplashContent(screenAlpha = { screenAlpha.value }, boneAlpha = { boneAlpha.value })
 }
 
 /**
@@ -83,19 +83,24 @@ fun SplashOverlay(
  * Centred and nothing else on screen. The previous version laid out the whole
  * welcome column and drew only its dog, so the two screens could not drift; with
  * the dog gone there is nothing to keep in step, and this is just a box.
+ *
+ * The alphas arrive as lambdas rather than floats so the read happens in the
+ * draw phase. Passed as values, the caller had to unwrap its `Animatable` in
+ * composition, which recomposed the overlay and everything under it on every
+ * frame of the fade — for two numbers that only a `graphicsLayer` ever sees.
  */
 @Composable
-private fun SplashContent(screenAlpha: Float, boneAlpha: Float) {
+private fun SplashContent(screenAlpha: () -> Float, boneAlpha: () -> Float) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(AppTheme.colors.background.color)
-            .graphicsLayer { this.alpha = screenAlpha },
+            .graphicsLayer { this.alpha = screenAlpha() },
         contentAlignment = Alignment.Center,
     ) {
         BoneLoader(
             label = stringResource(Res.string.splash_loading),
-            modifier = Modifier.graphicsLayer { this.alpha = boneAlpha },
+            modifier = Modifier.graphicsLayer { this.alpha = boneAlpha() },
         )
     }
 }
@@ -104,6 +109,6 @@ private fun SplashContent(screenAlpha: Float, boneAlpha: Float) {
 @Composable
 private fun PreviewSplashOverlay() {
     PreviewContent {
-        SplashContent(screenAlpha = 1f, boneAlpha = 1f)
+        SplashContent(screenAlpha = { 1f }, boneAlpha = { 1f })
     }
 }

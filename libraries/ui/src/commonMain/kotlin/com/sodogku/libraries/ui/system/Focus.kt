@@ -1,6 +1,7 @@
 package com.sodogku.libraries.ui.system
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -186,13 +188,35 @@ fun BoxScope.FocusScrim(
     content: @Composable (Rect) -> Unit = {},
 ) {
     val registry = LocalFocusRegistry.current
-    val progress = remember { Animatable(0f) }
 
-    LaunchedEffect(spotlight) {
-        progress.animateTo(if (spotlight == null) 0f else 1f, Motion.Pop)
+    // Bounded, because `Motion.Pop` is a bouncy spring and this is a *gate*
+    // rather than a scale. Springing to zero, it bottoms out at about -0.16 and
+    // comes back over: unbounded, the scrim leaves composition and re-enters at
+    // an alpha nobody can see, with a fresh `pointerInput` and fresh
+    // `AccessibleHole` semantics nodes each time. A screen-reader player
+    // dismissing the last-bone warning hears the lit control flicker back into
+    // the tree; a sighted one sees nothing. `MotionTest` pins the overshoot.
+    val progress = remember { Animatable(0f).apply { updateBounds(0f, 1f) } }
+
+    // Keyed on the setting rather than on the spec: `Motion.fade()` builds a new
+    // tween per call, so a spec in the key list would restart the animation on
+    // every recomposition.
+    val reduceAnimations = LocalReduceAnimations.current
+
+    LaunchedEffect(spotlight, reduceAnimations) {
+        progress.animateTo(
+            targetValue = if (spotlight == null) 0f else 1f,
+            animationSpec = focusScrimSpecFor(reduceAnimations),
+        )
     }
 
-    if (progress.value <= 0f) return
+    // `derivedStateOf`, not `progress.value > 0f` directly. Reading the
+    // `Animatable` here would subscribe this whole composable — the `Box`, the
+    // `AccessibleHole` nodes, the `content` lambda's scope — to every frame of
+    // the spring. Derived, it recomposes twice: on, and off.
+    val visible by remember { derivedStateOf { progress.value > 0f } }
+
+    if (!visible) return
 
     val lit = spotlight?.targets
         ?.mapNotNull { key -> registry.bounds[key]?.let { key to it } }
@@ -258,6 +282,20 @@ fun BoxScope.FocusScrim(
         content(lit.map { it.second }.union())
     }
 }
+
+/**
+ * How the scrim arrives and leaves, given the player's reduce-animations
+ * setting.
+ *
+ * A plain fade when it is on, not a shortened spring — the same call the dialog
+ * makes in `ModalDialogDefaults.animationSpecFor`, for the same reason: the
+ * setting is for players who find movement unpleasant, and a fast bounce is
+ * still a bounce. The scrim used to spring either way.
+ *
+ * Not a composable, so the choice can be checked without a composition.
+ */
+internal fun focusScrimSpecFor(reduceAnimations: Boolean): AnimationSpec<Float> =
+    if (reduceAnimations) Motion.fade() else Motion.Pop
 
 /**
  * An invisible, named, activatable node sitting exactly over a lit rectangle.

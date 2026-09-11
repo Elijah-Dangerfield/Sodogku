@@ -6,8 +6,17 @@ import dev.detekt.api.Finding
 import dev.detekt.api.Rule
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
+import org.jetbrains.kotlin.psi.KtLambdaArgument
+import org.jetbrains.kotlin.psi.KtLambdaExpression
+import org.jetbrains.kotlin.psi.KtNameReferenceExpression
+import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtPropertyDelegate
+import org.jetbrains.kotlin.psi.KtValueArgument
+import org.jetbrains.kotlin.psi.psiUtil.anyDescendantOfType
+import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import org.jetbrains.kotlin.psi.psiUtil.forEachDescendantOfType
+import org.jetbrains.kotlin.psi.psiUtil.parents
 
 /**
  * > **Needs detekt `2.0.0-alpha.6` or later.** On `2.0.0-alpha.5` a rule of this
@@ -26,8 +35,9 @@ import org.jetbrains.kotlin.psi.KtPropertyDelegate
  * > suspect the detekt version before the rule, and verify by making it report
  * > unconditionally rather than by trusting a clean run.
  *
- * Flags `val x by animateFloatAsState(...)`, and its siblings, inside a
- * composable.
+ * Flags animated state read during composition, in the two spellings that
+ * reach it: `val x by animateFloatAsState(...)`, and a plain `x.value` read of
+ * an animation held as a `State` or an `Animatable`.
  *
  * The `by` delegate unwraps the `State<T>` **during composition**, which
  * subscribes the enclosing composable to a value that changes every animation
@@ -71,6 +81,31 @@ import org.jetbrains.kotlin.psi.KtPropertyDelegate
  * form, so a shadow driven by an animated value has no phase-deferred
  * equivalent. A per-frame recomposition that is genuinely required is fine; one
  * nobody noticed is what causes ANRs.
+ *
+ * ### The second spelling, and why matching `by` alone was not enough
+ *
+ * `by` is the readable version of the bug and not the common one. The shape
+ * that hid from this rule in three separate files was the early return:
+ *
+ * ```kotlin
+ * val progress = remember { Animatable(0f) }
+ * if (progress.value <= 0f) return
+ * ```
+ *
+ * No delegate, so nothing to match, and it *looks* like the fix — the `State`
+ * is kept, and the draw lambdas below it read `.value` exactly as they should.
+ * The read on the gate line is the whole composable's subscription to a value
+ * that moves every frame, and the `LevelDrawer` instance got there by following
+ * this rule's own advice to drop the `by` and then reading the result in
+ * composition anyway.
+ *
+ * So the second pass tracks locals in a `@Composable` that hold an animation —
+ * a kept `State` from `ANIMATION_PRODUCERS`, or a `remember { Animatable(…) }` —
+ * and reports `.value` reads of them that are not inside a lambda belonging to
+ * `PHASE_DEFERRED`, which is the draw, layout, effect and derivation callees
+ * where reading is the point. Names only, with no type resolution: a local that
+ * is not visibly built from an animation in the same function is invisible
+ * here, which is the price of not reporting every `.value` in the codebase.
  */
 class AnimatedStateReadInComposition(config: Config) : Rule(
     config,
@@ -94,6 +129,89 @@ class AnimatedStateReadInComposition(config: Config) : Rule(
                     "emit), wrap the narrower condition in `derivedStateOf`.",
             ),
         )
+    }
+
+    override fun visitNamedFunction(function: KtNamedFunction) {
+        super.visitNamedFunction(function)
+        if (function.annotationEntries.none { it.shortName?.asString() == COMPOSABLE }) return
+        val animated = function.animatedLocals()
+        if (animated.isEmpty()) return
+
+        function.bodyExpression?.forEachDescendantOfType<KtDotQualifiedExpression> { read ->
+            if (read.selectorExpression?.text != VALUE) return@forEachDescendantOfType
+            val name = (read.receiverExpression as? KtNameReferenceExpression)
+                ?.getReferencedName()
+                ?.takeIf { it in animated }
+                ?: return@forEachDescendantOfType
+            if (read.isPhaseDeferredWithin(function)) return@forEachDescendantOfType
+            report(
+                Finding(
+                    Entity.from(read),
+                    "`$name.$VALUE` is read during composition, so everything in `${function.name}` " +
+                        "recomposes on every animation frame — including the whole subtree when the " +
+                        "read is a gate that decides what to emit. Move the read into the " +
+                        "graphicsLayer/drawBehind/offset lambda that uses it, or wrap the narrower " +
+                        "condition composition actually needs in " +
+                        "`remember { derivedStateOf { $name.$VALUE … } }`.",
+                ),
+            )
+        }
+    }
+
+    /**
+     * Names of locals in this function that hold something animated: a `State`
+     * kept from an `animate*AsState` call, or an `Animatable` built inside a
+     * `remember`.
+     *
+     * Delegated properties are absent by construction — they have no initializer
+     * — which is what keeps the `by` form from being reported twice.
+     */
+    private fun KtNamedFunction.animatedLocals(): Set<String> =
+        collectDescendantsOfType<KtProperty>()
+            .filter { property ->
+                property.initializer?.anyDescendantOfType<KtCallExpression> { call ->
+                    call.calleeExpression?.text in ANIMATION_HOLDERS
+                } == true
+            }
+            .mapNotNull { it.name }
+            .toSet()
+
+    /**
+     * Whether this read sits inside a lambda that runs somewhere other than
+     * composition.
+     *
+     * Every lambda between the read and the function is checked rather than only
+     * the innermost, so a `drawBehind { lit.forEach { … progress.value … } }`
+     * is still recognised as a draw-phase read.
+     */
+    private fun KtDotQualifiedExpression.isPhaseDeferredWithin(function: KtNamedFunction): Boolean =
+        parents
+            .takeWhile { it != function }
+            .filterIsInstance<KtLambdaExpression>()
+            .any { it.owningCallee() in PHASE_DEFERRED || it.isBareReadOf(this) }
+
+    /**
+     * Whether this lambda exists only to hand the read on unevaluated —
+     * `SplashContent(alpha = { fade.value })`, against an `alpha: () -> Float`.
+     *
+     * The callee is somebody's own composable, so there is no name to allow-list
+     * and no type resolution to say whether the parameter is `() -> Float` or
+     * `@Composable () -> Unit`. The shape decides instead: a lambda whose whole
+     * body is the read cannot be emitting content, because a bare `State` value
+     * is not a composable, and passing a read on as a lambda is the idiom for
+     * deferring it. One statement, and it is this one.
+     */
+    private fun KtLambdaExpression.isBareReadOf(read: KtDotQualifiedExpression): Boolean =
+        bodyExpression?.statements?.singleOrNull() == read
+
+    /** The name of the function this lambda was passed to, trailing or not. */
+    private fun KtLambdaExpression.owningCallee(): String? {
+        val call = when (val parent = parent) {
+            is KtLambdaArgument -> parent.parent as? KtCallExpression
+            is KtValueArgument -> parent.parent?.parent as? KtCallExpression
+            else -> null
+        } ?: return null
+        return call.calleeExpression?.text
     }
 
     /**
@@ -151,5 +269,56 @@ class AnimatedStateReadInComposition(config: Config) : Rule(
             // add yours here as you write them.
             "animateColorResourceAsState",
         )
+
+        /**
+         * What a local has to be built from before its `.value` is worth
+         * reporting. The producers above, plus `Animatable`, which is the
+         * hand-driven form and the one the early-return gates were written
+         * against.
+         *
+         * `mutableStateOf` is deliberately absent. Reading ordinary state in
+         * composition is how Compose works; it is only a bug when the thing
+         * behind it moves sixty times a second.
+         */
+        val ANIMATION_HOLDERS = ANIMATION_PRODUCERS + "Animatable"
+
+        /**
+         * Lambdas whose body is not composition, so a read inside one is the
+         * fix rather than the bug.
+         *
+         * The draw and layout ones are where the value belongs. The effects and
+         * `pointerInput` run in a coroutine, `derivedStateOf` is the narrowing
+         * this rule recommends, and `remember` is the block that built the
+         * thing in the first place.
+         *
+         * Matched by callee name with no receiver check, so a project function
+         * that happens to be called `layout` or `offset` also exempts its
+         * lambda. That is the direction to err in: a rule that reports the
+         * correct code gets a blanket suppression and then catches nothing.
+         */
+        val PHASE_DEFERRED = setOf(
+            "graphicsLayer",
+            "drawBehind",
+            "Canvas",
+            "drawWithContent",
+            "drawWithCache",
+            "onDrawBehind",
+            "onDrawWithContent",
+            "offset",
+            "absoluteOffset",
+            "layout",
+            "pointerInput",
+            "derivedStateOf",
+            "remember",
+            "snapshotFlow",
+            "produceState",
+            "LaunchedEffect",
+            "DisposableEffect",
+            "SideEffect",
+        )
+
+        const val COMPOSABLE = "Composable"
+
+        const val VALUE = "value"
     }
 }

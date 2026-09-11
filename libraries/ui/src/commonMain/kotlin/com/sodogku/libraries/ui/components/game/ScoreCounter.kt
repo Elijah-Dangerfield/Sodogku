@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -220,7 +221,13 @@ fun FloatingPoints(
         progress.animateTo(1f, tween(durationMillis = TotalMillis))
     }
 
-    if (progress.value >= 1f) return
+    // Derived rather than read straight, so the text inside this box is built
+    // once per award instead of once per frame of the float. Rebuilding text
+    // every frame is the exact shape that thrashed Skia's glyph cache
+    // downstream.
+    val flying by remember { derivedStateOf { progress.value < 1f } }
+
+    if (!flying) return
 
     Box(
         contentAlignment = Alignment.Center,
