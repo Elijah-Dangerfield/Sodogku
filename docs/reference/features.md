@@ -1416,8 +1416,12 @@ shippable-but-hideable feature, so anything can be dark-launched.
 `:libraries:config`, which is why `:apps:integration` is the only place that can see the whole
 declared set at once.
 
-One key sits outside the registry: `config.refreshThrottleMs` (5 minutes) is declared next to
-the repository that reads it and is in neither completeness test.
+**`config.*`**: `refreshThrottleMs` (5 minutes), the minimum gap between config fetches.
+Declared in `:libraries:config:impl` next to the repository it throttles, because a key about
+refreshing config cannot live in the module that knows nothing about refreshing it. It was in
+neither completeness test for exactly that reason, and that hole is now held shut from the
+other end: `ConfigDeclarationsAreEnumeratedTest` reads every `override val path` out of the
+source tree and fails on one no enumeration names.
 
 ### What stays in the binary, and why
 

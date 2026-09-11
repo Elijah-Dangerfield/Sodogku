@@ -66,5 +66,7 @@
 
   { "path": "telemetry.appEventsEnabled", "type": "boolean", "default": true, "description": "Kill switch for shipping app events to Grafana Cloud." },
   { "path": "telemetry.appEventsSampleRate", "type": "double", "default": 1.0, "description": "Per-session sampling rate for app events, 0.0..1.0." },
-  { "path": "telemetry.klogForwardingEnabled", "type": "boolean", "default": true, "description": "Forwards Warn+ KLog lines to Grafana Cloud as OTLP logs." }
+  { "path": "telemetry.klogForwardingEnabled", "type": "boolean", "default": true, "description": "Forwards Warn+ KLog lines to Grafana Cloud as OTLP logs." },
+
+  { "path": "config.refreshThrottleMs", "type": "long", "default": 300000, "description": "Minimum gap between config fetches. The app refreshes on every foreground and skips if less than this has passed. 0 refetches every foreground, which is what the dev environment sets." }
 ]

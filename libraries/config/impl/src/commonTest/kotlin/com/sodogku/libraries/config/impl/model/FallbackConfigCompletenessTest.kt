@@ -1,6 +1,9 @@
 package com.sodogku.libraries.config.impl.model
 
+import com.sodogku.libraries.config.AppConfigMap
+import com.sodogku.libraries.config.ConfiguredValue
 import com.sodogku.libraries.config.getValueForPath
+import com.sodogku.libraries.config.impl.ConfigRefreshThrottleMs
 import com.sodogku.libraries.config.values.SodogkuConfigValues
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,8 +17,8 @@ import kotlin.test.assertTrue
  *
  * The runtime source of truth for "every declared key" is the graph's
  * `Set<QaConfigValue>` multibinding, which a unit test has no way to resolve —
- * there is no app and no DI. [SodogkuConfigValues] is the second enumeration of
- * the same set, hand-maintained next to the value classes, and this test holds it
+ * there is no app and no DI. [declaredValues] is the second enumeration of the
+ * same set, hand-maintained next to the value classes, and this test holds it
  * against [BundledConfigDefaults].
  *
  * A key with no fallback fails silently in production: the value resolves to its
@@ -24,7 +27,7 @@ import kotlin.test.assertTrue
  */
 class FallbackConfigCompletenessTest {
 
-    private val declared = SodogkuConfigValues.all(BasicMapAppConfig(emptyMap<String, Any>()))
+    private val declared = declaredValues(BasicMapAppConfig(emptyMap<String, Any>()))
 
     @Test
     fun everyDeclaredKeyHasABundledFallback() {
@@ -45,7 +48,7 @@ class FallbackConfigCompletenessTest {
     fun bundledFallbackAgreesWithEveryDeclaredDefault() {
         val fallbackMap = BasicMapAppConfig(BundledConfigDefaults)
 
-        val disagreements = SodogkuConfigValues.all(fallbackMap)
+        val disagreements = declaredValues(fallbackMap)
             .zip(declared)
             .filter { (fromFallback, fromDefault) -> fromFallback.value != fromDefault.value }
             .map { (fromFallback, fromDefault) ->
@@ -97,6 +100,22 @@ class FallbackConfigCompletenessTest {
         )
     }
 }
+
+/**
+ * Every declared value this module can construct: [SodogkuConfigValues], plus the
+ * ones declared outside `:libraries:config` that it can still reach.
+ *
+ * [ConfigRefreshThrottleMs] is declared here in `:libraries:config:impl`, next to
+ * the repository that reads it, because a key that controls config refresh cannot
+ * sit in the module that knows nothing about refreshing. That put it outside
+ * `SodogkuConfigValues` and therefore outside this test, where it stayed for
+ * exactly as long as nobody looked. Naming it here is the same hand-maintained
+ * seam as the `telemetry.*` paths below; the guard against the seam itself is
+ * `ConfigDeclarationsAreEnumeratedTest` in `:apps:integration`, which reads every
+ * `override val path` in the repository and fails on one no enumeration names.
+ */
+private fun declaredValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>> =
+    SodogkuConfigValues.all(appConfigMap) + ConfigRefreshThrottleMs(appConfigMap)
 
 /**
  * Dotted leaf paths of a nested config map. A leaf is anything that is not a

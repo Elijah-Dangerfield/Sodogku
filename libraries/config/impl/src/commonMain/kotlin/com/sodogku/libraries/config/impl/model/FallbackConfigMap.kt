@@ -63,9 +63,9 @@ open class FallbackConfigMap @Inject constructor(
  * value quietly resolves to its own default and nobody finds out the map was
  * incomplete.
  *
- * The `telemetry.*` block is carried here even though those values are declared
- * in `:libraries:telemetry:impl`: the fallback map has to be complete across the
- * whole app, not just the keys this module can see.
+ * The `telemetry.*` and `config.*` blocks are carried here even though neither is
+ * declared in `:libraries:config`: the fallback map has to be complete across the
+ * whole app, not just the keys that module can see.
  */
 internal val BundledConfigDefaults: Map<String, Any> = mapOf(
     "ads" to mapOf(
@@ -151,5 +151,8 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
         "appEventsEnabled" to true,
         "appEventsSampleRate" to 1.0,
         "klogForwardingEnabled" to true,
+    ),
+    "config" to mapOf(
+        "refreshThrottleMs" to 5L * 60L * 1000L,
     ),
 )

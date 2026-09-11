@@ -10,9 +10,6 @@ import com.sodogku.libraries.config.LongConfigValue
 import com.sodogku.libraries.config.StringConfigValue
 import com.sodogku.libraries.config.impl.model.BasicMapAppConfig
 import com.sodogku.libraries.config.values.SodogkuConfigValues
-import com.sodogku.libraries.telemetry.impl.AppEventsEnabled
-import com.sodogku.libraries.telemetry.impl.AppEventsSampleRate
-import com.sodogku.libraries.telemetry.impl.KlogForwardingEnabled
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -48,28 +45,20 @@ import kotlin.test.fail
  * message prints the exact JSON line to paste, so fixing a drift is the same
  * copy-and-paste a generator would have done, without the extra target.
  *
- * **The limitation, stated honestly.** "Every declared value" means every value
- * in [SodogkuConfigValues.all] plus the three `telemetry.*` classes named below.
- * Neither list is derived from the DI graph's `Set<QaConfigValue>` — no unit test
- * can resolve that without an app — so a value class that is contributed to DI
- * but added to neither list stays invisible here, exactly as
- * `SodogkuConfigValues`' own KDoc warns. The telemetry three are spelled out
- * because they live in `:libraries:telemetry:impl` and `:libraries:config`
- * cannot depend on it; this module can, so their paths, types and defaults are
- * read from the real classes rather than pinned as literals. A *fourth*
- * telemetry value would need adding here by hand.
+ * **The limitation, and what now covers it.** "Every declared value" means
+ * whatever [declaredConfigValues] returns: [SodogkuConfigValues.all], plus the
+ * classes declared in impl modules that `:libraries:config` cannot depend on and
+ * this module can. None of it is derived from the DI graph's
+ * `Set<QaConfigValue>` — no unit test can resolve that without an app — so the
+ * list is a transcription and a new value class added to DI and not to it is
+ * still invisible *here*. It is no longer invisible everywhere:
+ * `ConfigDeclarationsAreEnumeratedTest` reads the declarations out of the source
+ * tree and fails on one the list omits.
  */
 class ConfigManifestRegistryDriftTest {
 
-    private val declared: List<DeclaredValue> = run {
-        val noConfig = BasicMapAppConfig(emptyMap<String, Any>())
-        val telemetry = listOf(
-            AppEventsEnabled(noConfig),
-            AppEventsSampleRate(noConfig),
-            KlogForwardingEnabled(noConfig),
-        )
-        (SodogkuConfigValues.all(noConfig) + telemetry).map { it.asDeclaredValue() }
-    }
+    private val declared: List<DeclaredValue> =
+        declaredConfigValues(BasicMapAppConfig(emptyMap<String, Any>())).map { it.asDeclaredValue() }
 
     private val registry: List<RegistryEntry> = readRegistry()
 
