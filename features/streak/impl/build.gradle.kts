@@ -24,6 +24,11 @@ kotlin {
             implementation(projects.libraries.ui)
             implementation(projects.libraries.navigation)
             implementation(projects.libraries.flowroutines)
+            // Including this feature's own copy. It used to live in a
+            // composeResources folder here, on the argument that nothing
+            // outside the feature renders it and a shared file is a shared
+            // merge conflict. Translation won that argument: one file is one
+            // batch to send out and one file to get back.
             implementation(projects.libraries.resources)
 
             implementation(compose.runtime)
@@ -42,11 +47,4 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
     }
-}
-
-// The streak's copy lives in this module rather than in `:libraries:resources`.
-// Nothing outside the feature renders it, and a shared string file is a shared
-// merge conflict.
-compose.resources {
-    packageOfResClass = "sodogku.features.streak.impl.generated.resources"
 }

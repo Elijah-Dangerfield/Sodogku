@@ -9,20 +9,7 @@ import com.sodogku.libraries.ui.components.streak.StreakCellState
 import kotlinx.datetime.number
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import sodogku.features.streak.impl.generated.resources.Res
-import sodogku.features.streak.impl.generated.resources.streak_day_bridged
-import sodogku.features.streak.impl.generated.resources.streak_day_completed
-import sodogku.features.streak.impl.generated.resources.streak_day_future
-import sodogku.features.streak.impl.generated.resources.streak_day_missed
-import sodogku.features.streak.impl.generated.resources.streak_day_today
-import sodogku.features.streak.impl.generated.resources.streak_weekday_fri
-import sodogku.features.streak.impl.generated.resources.streak_weekday_mon
-import sodogku.features.streak.impl.generated.resources.streak_weekday_sat
-import sodogku.features.streak.impl.generated.resources.streak_weekday_sun
-import sodogku.features.streak.impl.generated.resources.streak_weekday_thu
-import sodogku.features.streak.impl.generated.resources.streak_weekday_tue
-import sodogku.features.streak.impl.generated.resources.streak_weekday_wed
-import sodogku.libraries.resources.generated.resources.Res as SharedRes
+import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.daily_date
 import sodogku.libraries.resources.generated.resources.month_short_1
 import sodogku.libraries.resources.generated.resources.month_short_10
@@ -36,6 +23,18 @@ import sodogku.libraries.resources.generated.resources.month_short_6
 import sodogku.libraries.resources.generated.resources.month_short_7
 import sodogku.libraries.resources.generated.resources.month_short_8
 import sodogku.libraries.resources.generated.resources.month_short_9
+import sodogku.libraries.resources.generated.resources.streak_day_bridged
+import sodogku.libraries.resources.generated.resources.streak_day_completed
+import sodogku.libraries.resources.generated.resources.streak_day_future
+import sodogku.libraries.resources.generated.resources.streak_day_missed
+import sodogku.libraries.resources.generated.resources.streak_day_today
+import sodogku.libraries.resources.generated.resources.streak_weekday_fri
+import sodogku.libraries.resources.generated.resources.streak_weekday_mon
+import sodogku.libraries.resources.generated.resources.streak_weekday_sat
+import sodogku.libraries.resources.generated.resources.streak_weekday_sun
+import sodogku.libraries.resources.generated.resources.streak_weekday_thu
+import sodogku.libraries.resources.generated.resources.streak_weekday_tue
+import sodogku.libraries.resources.generated.resources.streak_weekday_wed
 
 /**
  * Turning the repository's days into the design system's squares.
@@ -52,7 +51,7 @@ import sodogku.libraries.resources.generated.resources.month_short_9
 @Composable
 internal fun StreakDay.toCell(): StreakCell {
     val date = stringResource(
-        SharedRes.string.daily_date,
+        Res.string.daily_date,
         stringResource(MonthNames[date.month.number - 1]),
         date.day,
     )
@@ -101,18 +100,18 @@ internal val WeekdayInitials = listOf(
 )
 
 private val MonthNames = listOf(
-    SharedRes.string.month_short_1,
-    SharedRes.string.month_short_2,
-    SharedRes.string.month_short_3,
-    SharedRes.string.month_short_4,
-    SharedRes.string.month_short_5,
-    SharedRes.string.month_short_6,
-    SharedRes.string.month_short_7,
-    SharedRes.string.month_short_8,
-    SharedRes.string.month_short_9,
-    SharedRes.string.month_short_10,
-    SharedRes.string.month_short_11,
-    SharedRes.string.month_short_12,
+    Res.string.month_short_1,
+    Res.string.month_short_2,
+    Res.string.month_short_3,
+    Res.string.month_short_4,
+    Res.string.month_short_5,
+    Res.string.month_short_6,
+    Res.string.month_short_7,
+    Res.string.month_short_8,
+    Res.string.month_short_9,
+    Res.string.month_short_10,
+    Res.string.month_short_11,
+    Res.string.month_short_12,
 )
 
 /**

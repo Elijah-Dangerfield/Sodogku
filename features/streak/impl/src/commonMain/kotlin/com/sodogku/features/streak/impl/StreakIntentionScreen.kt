@@ -28,11 +28,11 @@ import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import sodogku.features.streak.impl.generated.resources.Res
-import sodogku.features.streak.impl.generated.resources.streak_day_label
-import sodogku.features.streak.impl.generated.resources.streak_intention_body
-import sodogku.features.streak.impl.generated.resources.streak_intention_cta
-import sodogku.features.streak.impl.generated.resources.streak_intention_title
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.streak_day_label
+import sodogku.libraries.resources.generated.resources.streak_intention_body
+import sodogku.libraries.resources.generated.resources.streak_intention_cta
+import sodogku.libraries.resources.generated.resources.streak_intention_title
 
 /**
  * The one moment in the app that will not let the player past.

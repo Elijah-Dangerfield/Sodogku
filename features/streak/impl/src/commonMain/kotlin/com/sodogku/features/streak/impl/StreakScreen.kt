@@ -32,20 +32,20 @@ import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import sodogku.features.streak.impl.generated.resources.Res
-import sodogku.features.streak.impl.generated.resources.streak_calendar_title
-import sodogku.features.streak.impl.generated.resources.streak_celebrate_body
-import sodogku.features.streak.impl.generated.resources.streak_celebrate_title
-import sodogku.features.streak.impl.generated.resources.streak_current_days
-import sodogku.features.streak.impl.generated.resources.streak_current_none
-import sodogku.features.streak.impl.generated.resources.streak_empty_body
-import sodogku.features.streak.impl.generated.resources.streak_day_label
-import sodogku.features.streak.impl.generated.resources.streak_keep_it_today
-import sodogku.features.streak.impl.generated.resources.streak_longest
-import sodogku.features.streak.impl.generated.resources.streak_longest_none
-import sodogku.features.streak.impl.generated.resources.streak_off_body
-import sodogku.features.streak.impl.generated.resources.streak_off_title
-import sodogku.features.streak.impl.generated.resources.streak_title
+import sodogku.libraries.resources.generated.resources.Res
+import sodogku.libraries.resources.generated.resources.streak_calendar_title
+import sodogku.libraries.resources.generated.resources.streak_celebrate_body
+import sodogku.libraries.resources.generated.resources.streak_celebrate_title
+import sodogku.libraries.resources.generated.resources.streak_current_days
+import sodogku.libraries.resources.generated.resources.streak_current_none
+import sodogku.libraries.resources.generated.resources.streak_empty_body
+import sodogku.libraries.resources.generated.resources.streak_day_label
+import sodogku.libraries.resources.generated.resources.streak_keep_it_today
+import sodogku.libraries.resources.generated.resources.streak_longest
+import sodogku.libraries.resources.generated.resources.streak_longest_none
+import sodogku.libraries.resources.generated.resources.streak_off_body
+import sodogku.libraries.resources.generated.resources.streak_off_title
+import sodogku.libraries.resources.generated.resources.streak_title
 
 /**
  * The run, the record, and the last five weeks.
