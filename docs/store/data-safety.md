@@ -7,7 +7,15 @@ where to look, because a guess here is a policy violation rather than a typo.
 
 First derived 2026-09-08. **Re-derived 2026-09-10** against the tree at that date, and every
 citation below was re-opened rather than carried over. **Re-derive it whenever a network call, an
-SDK, or a telemetry attribute changes.** The four things most likely to invalidate a row:
+SDK, or a telemetry attribute changes.**
+
+**Do not fill a store form straight out of this file.** The forms have been filed once already, so
+every future use of this document is a use against a tree it was not written for. Treat the code
+citations as a map of where to look and re-open them; treat §6 and §7, which are policy reasoning
+rather than code facts, as the part that keeps its value between derivations. §8 is the section
+that goes stale first, because it lists code defects and code defects get fixed.
+
+The four things most likely to invalidate a row:
 
 - a new `logEvent` attribute (`docs/practices/app-events.md`),
 - a new SDK, which now means two catalogues and not one: `gradle/libs.versions.toml` for Android
@@ -545,35 +553,25 @@ flow in plain words, which is the part that is definitely required either way. *
 
 ## 8. Findings for whoever owns the code
 
-Written down rather than fixed, per this chunk's scope. Re-checked on 2026-09-10.
+Written down rather than fixed, per this chunk's scope. Re-checked on 2026-09-10, after the
+account-era cleanup landed.
 
-1. ~~**`allowBackup="true"` contradicts a user-facing promise.**~~ Fixed: backup is off, see §7.1.
-2. ~~**No reachable Restore purchases control.**~~ Fixed: Settings shows one whether or not the
-   player is Pro, with the App Review reasoning in a comment (`SettingsScreen.kt:197-205`).
-3. ~~**The camera permission on the listing.**~~ Withdrawn: it was never declared, see §7.2.
-4. **The feedback path ships a session log the player is not told about, and now also ships the
-   message three times.** `AppTelemetry.kt:248` attaches `session-log.txt` (Debug and above in
+One is still open:
+
+1. **The feedback path ships a session log the player is not told about, and also ships the message
+   three times.** `AppTelemetry.captureUserFeedback` attaches `session-log.txt` (Debug and above in
    release) to every submission, because `includeLogs` defaults to true
    (`FeedbackRepository.kt:30`) and neither player-facing caller sets it. Only the tester panel
    exposes a switch. That is defensible and probably necessary, but the feedback screen's copy does
    not mention it and the privacy policy has to. Users generally read "send feedback" as "send my
    message".
-5. **Dead auth-era rate limits on the server.** `apps/server/.../plugins/RateLimits.kt:23-24` still
-   registers `DELETE_ACCOUNT_LIMIT` and `PLAYER_REPORT_LIMIT`, with comments about App Store review
-   of a deletion endpoint. Both endpoints were deleted in C0.
-6. **Supabase references survive in the shipped Android manifest.**
-   `AndroidManifest.xml:43-46` describes `sodogku://auth/confirmed` and `sodogku://login-callback`
-   as Supabase OAuth return trips, and `apps/ios/iosApp/Info.plist:72-80` says the same in its
-   comment above `CFBundleURLTypes`. Comments only, but a store reviewer reading the manifest sees
-   an auth flow the app does not have.
-7. ~~**`Telemetry.setUser` is a loaded gun, and it is the one scope writer with no guard.**~~
-   **Closed 2026-09-10 (SD-46).** It was deleted rather than guarded, along with the unused `email`
-   on `captureUserFeedback`, and `NoIdentitySeamsTest` fails the build if either returns. The
-   remaining scope writers (`setCurrentRoute`, `setSession`, `setInstallId`, `setContext`) all
-   still begin with `if (!Sentry.isEnabled()) return`.
-8. **Two KDocs still describe the account era.** `AppCache.kt:154-156` says the install id is
-   "sent as X-Install-Id on authenticated requests so the server can associate anonymous accounts
-   from the same install", and the `UserScopedClearer` KDoc below `AppData` describes resetting
-   account-scoped fields on sign-out and account switch. Both describe machinery removed in C0.
-   Harmless at runtime, misleading to anyone deriving a privacy answer from them, which is exactly
-   what this file does.
+
+Seven are closed, and the list is kept short rather than kept whole on purpose: a finding is a
+claim about code, code moves, and a closed finding left in place reads as an open one. The
+reasoning behind each answer lives in the section that owns it, not here. `allowBackup` is off
+(§7.1); Settings has a Restore purchases control; the camera permission was never declared and the
+finding was withdrawn (§7.2); the server's `DELETE_ACCOUNT_LIMIT` and `PLAYER_REPORT_LIMIT` are
+gone; the Supabase deep-link comments in `AndroidManifest.xml` and `Info.plist` now say the flows
+went with accounts rather than describing them as live; `Telemetry.setUser` was deleted outright rather than
+guarded, along with the unused `email` on `captureUserFeedback`, and `NoIdentitySeamsTest` fails
+the build if either returns; and the two account-era KDocs on `AppData` have been rewritten.
