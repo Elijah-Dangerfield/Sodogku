@@ -2686,57 +2686,54 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(GamePhase.Lost, vm.state.phase)
         assertTrue(daily.writes.isEmpty(), "the revive is still on the table")
 
-        vm.takeAction(GameAction.Leave)
+        vm.takeAction(GameAction.LevelsOpened)
 
         assertTrue(daily.writes.isEmpty(), "walking away is not a forfeit")
         assertEquals(null, daily.status().result, "and the day is still open")
     }
 
+    /**
+     * SD-49. There is no longer *any* sequence a lost daily offers that spends
+     * the day: the one control that did — Give up on today — is gone, and every
+     * one that replaced it writes nothing. Only a clear ends a day now.
+     */
     @Test
-    fun aLostDailyIsSpentOnlyWhenThePlayerSaysSo() = runUnitTest {
-        // Writing the loss the moment the bones run out would lock the day
-        // against the clear an ad revive could still earn — `daily_result` takes
-        // one row per date and never updates it. So the write waits, and the
-        // only thing that fires it is the player choosing to.
+    fun nothingOnALostDailySheetSpendsTheDay() = runUnitTest {
         val daily = FakeDaily(levelId = DailyLevel)
         val vm = viewModel(isDaily = true, daily = daily)
         loseCurrent(vm)
 
-        vm.takeAction(GameAction.ForfeitDailyRequested)
-        assertTrue(vm.state.forfeitPrompt, "an irreversible write asks first")
-        assertTrue(daily.writes.isEmpty(), "and asking is not doing")
+        vm.takeAction(GameAction.LevelsOpened)
+        vm.takeAction(GameAction.LevelsClosed)
+        vm.takeAction(GameAction.Retry)
+        loseCurrent(vm)
+        vm.takeAction(GameAction.RefillBones)
 
-        vm.takeAction(GameAction.ForfeitDailyConfirmed)
-
-        val written = daily.writes.single()
-        assertEquals(DailyOutcome.Failed, written.outcome)
-        assertEquals(DailyDate, written.date)
+        assertTrue(daily.writes.isEmpty(), "a day is spent by finishing it and by nothing else")
+        assertEquals(null, daily.status().result)
+        assertTrue(vm.state.daily?.playable == true, "and the card still offers it")
     }
 
+    /**
+     * The lose sheet's only exit is the level pane, and it has to be drawn
+     * *over* the sheet rather than instead of it. `NavigateBack` pops the start
+     * destination, and on the campaign the start destination is the board, so
+     * the one control offered to a player who had just lost closed the app.
+     */
     @Test
-    fun backingOutOfTheForfeitWritesNothing() = runUnitTest {
-        val daily = FakeDaily(levelId = DailyLevel)
-        val vm = viewModel(isDaily = true, daily = daily)
+    fun losingAndTappingLevelsOpensTheDrawerRatherThanTheDoor() = runUnitTest {
+        val vm = viewModel()
+        val events = eventsOf(vm)
         loseCurrent(vm)
 
-        vm.takeAction(GameAction.ForfeitDailyRequested)
-        vm.takeAction(GameAction.DismissForfeitPrompt)
+        vm.takeAction(GameAction.LevelsOpened)
 
-        assertFalse(vm.state.forfeitPrompt)
-        assertTrue(daily.writes.isEmpty())
-    }
-
-    @Test
-    fun aDailyCannotBeForfeitedFromABoardStillInPlay() = runUnitTest {
-        // The confirmation is only ever reachable from the lose sheet, but the
-        // action is public and a stale tap must not spend a day the player is
-        // still winning.
-        val daily = FakeDaily(levelId = DailyLevel)
-        val vm = viewModel(isDaily = true, daily = daily)
-
-        vm.takeAction(GameAction.ForfeitDailyConfirmed)
-
-        assertTrue(daily.writes.isEmpty())
+        assertTrue(vm.state.drawerOpen, "the pane is the whole way off this sheet")
+        assertEquals(GamePhase.Lost, vm.state.phase, "and the sheet stays up behind it")
+        assertTrue(
+            events.none { it == GameEvent.NavigateBack },
+            "losing still walked the player out of the app",
+        )
     }
 
     @Test
@@ -2752,7 +2749,7 @@ class GameViewModelTest : CoroutineTest() {
         loseCurrent(first)
         val red = first.state.wrongGuesses
         val placed = first.state.placedCells
-        first.takeAction(GameAction.Leave)
+        first.takeAction(GameAction.LevelsOpened)
 
         val reopened = viewModel(isDaily = true, daily = daily, cache = cache)
 
@@ -2799,19 +2796,28 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(3, vm.state.paws)
     }
 
+    /**
+     * Nothing writes a `Failed` row any more, but rows written by the build that
+     * had Give up on today are on players' disks. The recap still has to read
+     * them, or the fold quietly drops days out of somebody's history.
+     */
     @Test
-    fun aForfeitedDailyReopensOnTheForfeit() = runUnitTest {
-        val cache = InMemoryAppCache()
-        val daily = FakeDaily(levelId = DailyLevel)
-        val first = viewModel(isDaily = true, daily = daily, cache = cache)
-        loseCurrent(first)
-        first.takeAction(GameAction.ForfeitDailyConfirmed)
-        assertEquals(null, cache.get().boardInProgress, "a spent day holds no slot")
+    fun aDayForfeitedByAnOlderBuildStillOpensOnItsResult() = runUnitTest {
+        val givenUp = DailyResult(
+            date = DailyDate,
+            levelIndex = DailyLevel - 1,
+            outcome = DailyOutcome.Failed,
+            score = 0,
+            paws = 0,
+            timeMs = 45_000,
+        )
+        val vm = viewModel(
+            isDaily = true,
+            daily = FakeDaily(levelId = DailyLevel, result = givenUp),
+        )
 
-        val reopened = viewModel(isDaily = true, daily = daily, cache = cache)
-
-        assertEquals(GamePhase.Recap, reopened.state.phase)
-        assertEquals(DailyOutcome.Failed, reopened.state.dailyRecap?.outcome)
+        assertEquals(GamePhase.Recap, vm.state.phase)
+        assertEquals(DailyOutcome.Failed, vm.state.dailyRecap?.outcome)
     }
 
     @Test
@@ -2842,14 +2848,98 @@ class GameViewModelTest : CoroutineTest() {
         assertTrue(vm.state.drawerOpen, "and the pane stays put rather than closing on nothing")
     }
 
+    /**
+     * SD-49, and the reversal it rests on. Start over used to be the one control
+     * the daily withheld, on the grounds that a second run would be a run at a
+     * board whose score was committed to a date. It never was: a lost daily has
+     * written nothing, and a day that *has* written something opens on its recap
+     * instead of its board.
+     */
     @Test
-    fun aDailyCannotBeRestarted() = runUnitTest {
-        val vm = viewModel(isDaily = true, daily = FakeDaily(levelId = DailyLevel))
+    fun aLostDailyCanBeStartedFromTheBeginning() = runUnitTest {
+        val daily = FakeDaily(levelId = DailyLevel)
+        val vm = viewModel(isDaily = true, daily = daily)
+        val board = assertNotNull(vm.state.level)
+        vm.commit(board.board.cellAt(0, board.solution[0]))
+        loseCurrent(vm)
+        assertTrue(vm.state.placedCells.isNotEmpty(), "there is a position to throw away")
+
+        vm.takeAction(GameAction.Retry)
+
+        assertEquals(GamePhase.Playing, vm.state.phase, "the board has to come back")
+        assertEquals(DailyLevel, vm.state.level?.id, "and it is still today's board")
+        assertTrue(vm.state.placedCells.isEmpty(), "from the beginning means from nothing")
+        assertTrue(vm.state.wrongGuesses.isEmpty())
+    }
+
+    @Test
+    fun restartingTheDailyWritesNoResultAndTheClearStillWritesOne() = runUnitTest {
+        // The trap worth checking. `daily_result` is insert-only with the date
+        // as its key, so a restart that wrote anything would lock the day
+        // against the clear the restart exists to make possible.
+        val daily = FakeDaily(levelId = DailyLevel)
+        val vm = viewModel(isDaily = true, daily = daily)
+        loseCurrent(vm)
+
+        vm.takeAction(GameAction.Retry)
+        assertTrue(daily.writes.isEmpty(), "starting over is not a result")
+
+        solveCurrent(vm)
+
+        val written = daily.writes.single()
+        assertEquals(DailyOutcome.Completed, written.outcome, "one attempt per day, and it counted")
+        assertEquals(DailyDate, written.date)
+    }
+
+    @Test
+    fun restartingTheDailyMovesNeitherStreak() = runUnitTest {
+        // The streak folds over `play_day` and counts any finished board, so a
+        // restart is no longer the question it was when the daily fed it. It
+        // writes to neither table, and both numbers have to hold still.
+        val streak = SilentStreak(current = 6)
+        val daily = FakeDaily(levelId = DailyLevel, streak = OpeningStreak)
+        val vm = viewModel(isDaily = true, daily = daily, streak = streak)
         loseCurrent(vm)
 
         vm.takeAction(GameAction.Retry)
 
-        assertEquals(GamePhase.Lost, vm.state.phase, "a second run at today's board is a replay")
+        assertEquals(6, vm.state.playStreak, "turning up today already counted")
+        assertEquals(0, streak.boardsRecorded, "and a restart is not a finished board")
+        assertEquals(OpeningStreak, daily.status().streak, "the daily's own run is untouched")
+    }
+
+    /**
+     * Found by the test above. `startAttempt` builds a fresh `GameState` rather
+     * than copying one, so a field it does not name is silently reset — and
+     * nothing puts this one back, because `streak.observe()` is
+     * `distinctUntilChanged` over a repository that only re-emits on a finished
+     * board or at midnight. Every Start over, every Next level and every jump
+     * from the pane blanked the flame for the rest of the session.
+     */
+    @Test
+    fun startingABoardOverKeepsTheFlameInThePane() = runUnitTest {
+        val vm = viewModel(streak = SilentStreak(current = 9))
+        assertEquals(9, vm.state.playStreak)
+        loseCurrent(vm)
+
+        vm.takeAction(GameAction.Retry)
+
+        assertEquals(9, vm.state.playStreak, "a new attempt is not a new day")
+    }
+
+    @Test
+    fun aSpentDailyHasNothingToStartOver() = runUnitTest {
+        // The recap draws the day's board as a backdrop. Restarting from there
+        // would put a playable board under a result that is already written.
+        val vm = viewModel(
+            isDaily = true,
+            daily = FakeDaily(levelId = DailyLevel, result = completedToday()),
+        )
+        assertEquals(GamePhase.Recap, vm.state.phase)
+
+        vm.takeAction(GameAction.Retry)
+
+        assertEquals(GamePhase.Recap, vm.state.phase, "a finished day is not an attempt")
     }
 
     @Test
@@ -2858,7 +2948,7 @@ class GameViewModelTest : CoroutineTest() {
         val vm = viewModel(daily = daily)
 
         repeat(ScoringConfig.MAX_LIVES) { vm.commit(wrongCellIn(row = it)) }
-        vm.takeAction(GameAction.Leave)
+        vm.takeAction(GameAction.LevelsOpened)
 
         assertTrue(daily.writes.isEmpty())
     }
@@ -5080,10 +5170,6 @@ class GameViewModelTest : CoroutineTest() {
             write(date, DailyOutcome.Completed, score, paws, timeMs)
         }
 
-        override suspend fun onFailed(date: LocalDate, timeMs: Long) {
-            write(date, DailyOutcome.Failed, score = 0, paws = 0, timeMs = timeMs)
-        }
-
         override suspend fun useFreeze(): FreezeResult {
             freezesRequested++
             if (freezeThrows) error("no ad service")
@@ -5136,6 +5222,8 @@ class GameViewModelTest : CoroutineTest() {
         private val prompt: StreakPrompt = StreakPrompt.None,
         /** The record the leaderboard is fed, which nothing else here reads. */
         longest: Int = 0,
+        /** The run in progress, for anything asserting the board leaves it alone. */
+        current: Int = 0,
     ) : StreakRepository {
         val shown = mutableListOf<StreakPrompt>()
         override fun observe(): Flow<StreakSummary> = flowOf(empty)
@@ -5152,7 +5240,7 @@ class GameViewModelTest : CoroutineTest() {
         override suspend fun reset() = Unit
 
         private val empty = StreakSummary(
-            current = 0,
+            current = current,
             longest = longest,
             today = LocalDate(2026, 1, 1),
             days = emptyList(),

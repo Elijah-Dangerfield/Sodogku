@@ -433,15 +433,6 @@ data class GameState(
     val dailyRecap: DailyResult? = null,
 
     /**
-     * True while the "give up on today" confirmation is up.
-     *
-     * Forfeiting writes an insert-only row and cannot be undone, so it asks.
-     * That is the whole point of R16: the day is spent by a decision, never by
-     * navigating away.
-     */
-    val forfeitPrompt: Boolean = false,
-
-    /**
      * The Skip option, or null when this attempt has not earned one. Set on the
      * loss that qualifies, and gone again the moment a fresh attempt opens.
      */
@@ -677,7 +668,6 @@ data class GameState(
             drawerOpen ||
             boosterPrompt != null ||
             freezeMessage != null ||
-            forfeitPrompt ||
             phase == GamePhase.Won ||
             phase == GamePhase.Lost ||
             phase == GamePhase.Recap
@@ -856,10 +846,13 @@ sealed interface GameAction {
     data class BoosterRefillRequested(val consumable: Consumable) : GameAction
 
     data object DismissBoosterPrompt : GameAction
-    data object Retry : GameAction
 
-    /** Back to wherever this board was opened from. Never spends anything. */
-    data object Leave : GameAction
+    /**
+     * Throw this attempt away and open the board again from nothing.
+     *
+     * On the daily too, since SD-49. See `GameViewModel.restart`.
+     */
+    data object Retry : GameAction
     data object DismissWarning : GameAction
 
     /** Keep the squares the sniff proposed, as the player's own crosses. */
@@ -877,19 +870,21 @@ sealed interface GameAction {
     /** The persisted bone count moved, here or on another open board. */
     data class BonesChanged(val bones: Int) : GameAction
 
-    /** "Give up on today" was tapped. Opens the confirmation, writes nothing. */
-    data object ForfeitDailyRequested : GameAction
-
-    /** Confirmed: spend the day, then leave. */
-    data object ForfeitDailyConfirmed : GameAction
-
-    data object DismissForfeitPrompt : GameAction
-
     /** Trade an ad for the level, after enough attempts have failed. */
     data object SkipLevel : GameAction
     data object NextLevel : GameAction
 
-    /** The drawer was opened, so its per-level records need reading. */
+    /**
+     * The drawer was opened, so its per-level records need reading.
+     *
+     * **Every control labelled Levels sends this**, on the board and on all four
+     * outcome sheets alike. The sheets used to send a `Leave` that popped the
+     * back stack, and the board is the start destination, so the one control
+     * offered to a player who had just lost closed the app instead (SD-54).
+     * There is no longer an action that can do that: the pane is drawn over
+     * whichever sheet is up, so opening it is always a screen rather than an
+     * exit.
+     */
     data object LevelsOpened : GameAction
 
     data object LevelsClosed : GameAction

@@ -110,6 +110,17 @@
     <string name="game_stat_mistakes">Mistakes</string>
     <string name="game_stat_mistakes_spoken">%1$d mistakes</string>
 
+    <!-- The lose sheet's half of the same row. Two pills, and the two the win
+         sheet has that are missing here are the decision: mistakes is the full
+         set of bones on every loss ever, and the score of a lost attempt is
+         banked nowhere. What is left answers the question the sheet is really
+         asking, which is whether to start over or move on.
+
+         Time gets its own spoken form because the win sheet's says "Finished
+         in", and nobody finished this one. -->
+    <string name="game_stat_dogs">Dogs</string>
+    <string name="game_stat_time_spent_spoken">%1$s on the board</string>
+
     <!-- The end of the campaign, in the same register as the win sheet: the
          run reported as facts. Two things it deliberately does not say. It does
          not promise more levels, because the pack in the binary is all there
@@ -348,12 +359,10 @@
     <string name="daily_resets_hours">New board in %1$dh %2$dm</string>
     <string name="daily_resets_minutes">New board in %1$dm</string>
     <string name="daily_review">See today’s result</string>
-    <string name="daily_forfeit_cta">Give up on today</string>
-    <string name="daily_forfeit_note">Leave and today’s board is waiting where you left it.</string>
-    <string name="daily_forfeit_title">Give up on today’s board?</string>
-    <string name="daily_forfeit_body">Today counts as played and the board closes. There is one board a day, so this one will not come back.</string>
-    <string name="daily_forfeit_confirm">Give up</string>
-    <string name="daily_forfeit_cancel">Keep today open</string>
+    <!-- daily_forfeit_* are gone with the control they belonged to. Giving up on
+         the day wrote a row that could never be taken back, in exchange for
+         nothing the player wanted, and Start over now covers the case it was
+         standing in for. See decisions.md, 2026-09-10. -->
     <string name="daily_freeze_cta">Save your streak</string>
     <string name="daily_freeze_remaining">%1$d left this month</string>
     <string name="daily_freeze_applied_title">Streak saved</string>

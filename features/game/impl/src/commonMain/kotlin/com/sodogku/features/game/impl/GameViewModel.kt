@@ -454,7 +454,6 @@ class GameViewModel(
             is GameAction.BoosterRefillRequested -> action.refill(action.consumable)
             GameAction.DismissBoosterPrompt -> action.updateState { it.copy(boosterPrompt = null) }
             GameAction.Retry -> action.restart()
-            GameAction.Leave -> sendEvent(GameEvent.NavigateBack)
             GameAction.DismissWarning -> action.updateState {
                 it.copy(warning = null, hintCells = emptySet(), hintReason = null)
             }
@@ -466,9 +465,6 @@ class GameViewModel(
             is GameAction.BonesChanged -> action.updateState {
                 it.copy(livesRemaining = action.bones)
             }
-            GameAction.ForfeitDailyRequested -> action.updateState { it.copy(forfeitPrompt = true) }
-            GameAction.ForfeitDailyConfirmed -> action.forfeitDaily()
-            GameAction.DismissForfeitPrompt -> action.updateState { it.copy(forfeitPrompt = false) }
             GameAction.SkipLevel -> action.skipLevel()
             GameAction.NextLevel -> action.nextLevel()
             GameAction.LevelsOpened -> action.loadRecords()
@@ -890,6 +886,15 @@ class GameViewModel(
                 records = it.records,
                 unlockedThrough = campaignFrontier(unlocked, level.id),
                 daily = it.daily,
+                // Carried for the same reason as `adsEnabled` above, and it is
+                // the one where the reset was visible. The play streak is days
+                // in a row with a finished board, so it is not about this
+                // attempt at all — but `streak.observe()` is
+                // `distinctUntilChanged` over a repository that only re-emits on
+                // a finished board or at midnight, so nothing puts the number
+                // back once a fresh state drops it. Starting a board over blanked
+                // the flame in the level pane for the rest of the session.
+                playStreak = it.playStreak,
                 isDaily = isDaily,
                 // Carried, because this builds a fresh GameState rather than
                 // copying one: anything not named here is silently reset. The
@@ -2006,40 +2011,6 @@ class GameViewModel(
     }
 
     /**
-     * Gives today's board up, which is the **only** way a lost daily is spent.
-     *
-     * It used to be [GameAction.Leave], and that is the bug: tapping Levels on a
-     * lost daily wrote `onFailed`, which spends the day, so a player who wanted
-     * to go and look at something landed in the campaign with the daily closed
-     * behind them. `daily_result` is insert-only and the write is final, so the
-     * decision has to be one the player makes on purpose — hence the
-     * confirmation in front of this, and a plain [GameAction.Leave] that writes
-     * nothing at all.
-     *
-     * The saved board goes with it. Nothing will ever resume a day that is
-     * spent, and a snapshot left behind holds the one in-progress slot against
-     * whatever board the player opens next.
-     */
-    private suspend fun GameAction.forfeitDaily() {
-        val date = dailyDate
-        val level = state.level
-        if (!isDaily || date == null || level == null) return
-        if (state.phase != GamePhase.Lost) return
-
-        val dogsPlaced = state.placed.placedCount
-        Catching { daily.onFailed(date, elapsedMs()) }
-            .logOnFailure { "Failed to record the daily loss for $date" }
-        logger.logEvent(
-            "daily.forfeited",
-            "date" to date.toString(),
-            "dogs_placed" to dogsPlaced,
-        )
-        clearSavedBoard(level.id)
-        updateState { it.copy(forfeitPrompt = false) }
-        sendEvent(GameEvent.NavigateBack)
-    }
-
-    /**
      * Trades an ad for a full set of bones and puts the board back in play.
      *
      * **The one way back from zero**, and the reason there is only one. The lose
@@ -2294,11 +2265,37 @@ class GameViewModel(
         updateState { it.copy(freezeMessage = message) }
     }
 
+    /**
+     * Throws the attempt away and opens the same board from nothing.
+     *
+     * **The daily restarts too**, which reverses the refusal that used to sit
+     * here. The reason given for it was that a second run would be a run at a
+     * board whose score is committed to a date, and that was never true of a
+     * board you can still reach this from. `daily_result` takes one row per date
+     * and a run only writes one when it *ends*: `onCompleted` on a clear, and
+     * nothing at all on a loss. A day with a row never opens on a board in the
+     * first place — [loadDaily] renders [GamePhase.Recap] over it — so every
+     * restart this can reach happens on a day with nothing written against it,
+     * and the eventual clear still writes exactly one row.
+     *
+     * Which makes it the same shape as the ad revive directly above it on the
+     * sheet, and that has always been allowed. One-attempt-per-day is enforced
+     * by `insertIfAbsent` rather than by which controls the sheet offers, so
+     * refusing this was a second, weaker copy of a rule the table already keeps.
+     *
+     * It costs the position and nothing else. A lost daily is the one board
+     * `saveBoard` keeps through a loss, so walking away preserves it — and
+     * asking to start from the beginning is asking for that to go. It does not
+     * cost bones, which do not come back here, and it moves neither streak: the
+     * daily's is folded from `daily_result`, which this does not touch, and the
+     * play streak is folded from `play_day`, which only a finished board writes
+     * to.
+     */
     private suspend fun GameAction.restart() {
         val level = state.level ?: return
-        // One attempt per day. Starting over would be a second run at a board
-        // whose score is already committed to a date.
-        if (isDaily) return
+        // A day that is already spent has no attempt to throw away, and its
+        // board is a backdrop rather than a game.
+        if (state.phase == GamePhase.Recap) return
         attemptNumber++
         // No resume. Retry is the one path that deliberately throws the board
         // away, and handing it back would make the button do nothing.

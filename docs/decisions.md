@@ -6,6 +6,111 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-10 — giving up on the daily is deleted, and starting over replaces it
+
+The owner, twice in one session. On the lose sheet: *"I'm also not really sure
+that we should have levels as an option on this dialogue. It seems kind of
+stupid... Maybe the user should be able to restart from zero on this puzzle."*
+And on the daily: *"I don't think the user should be able to give up. I don't
+know if there should be a total failure state. I think you should probably
+always be able to just start from the beginning."*
+
+**Give up on today is removed rather than softened.** This reverses
+2026-09-08, which introduced it, and the reason is that the control was
+load-bearing for nothing. Look at what it did: it wrote a `Failed` row, which
+spends the day, ends the daily streak the moment tomorrow's walk reaches it, and
+cannot afterwards be frozen or restored, because `missedDayBefore` returns null
+on a `Failed` and a day you attempted is not a day you missed. The player got
+nothing back for any of that. It was a button whose entire effect was to destroy
+something of theirs.
+
+It existed because *leaving* used to forfeit, and a deliberate control was the
+right answer to an accidental one. But the same change also made leaving free, so
+from that day on the only thing Give up did was let somebody spend a resource by
+choice that they could otherwise keep for nothing. Nobody wants that, which is
+what the owner noticed.
+
+**Non-permanent was the alternative, and it is worse.** Making a forfeit
+undoable means an update or a delete path on `daily_result`, which is
+insert-only with the date as its primary key (2026-09-07) and has deliberately
+had no update path since. Reopening that table to buy back a feature nobody
+asked for is a bad trade.
+
+So `daily_forfeit_*`, `ForfeitDailyDialog`, three `GameAction`s,
+`GameState.forfeitPrompt` and `DailyRepository.onFailed` are all gone.
+`DailyOutcome.Failed` **stays**. Rows carrying it are on players' disks, and
+dropping the name would make `toResult` refuse them and silently shorten
+somebody's history. It is now a legacy reading: nothing writes one, the recap
+sheet still draws one, and the folds still stop on one.
+
+**A lost daily can be restarted.** The refusal in `restart` said a second run
+would be a run at a board whose score is committed to a date. That was never
+true of a board this is reachable from. `daily_result` takes one row per date and
+only a *clear* writes one; a day that has a row opens on `GamePhase.Recap` rather
+than on a playable board. So every restart it can reach happens on a day with
+nothing written against it, and the eventual clear still writes exactly one row.
+That is the same shape as the ad revive sitting directly above it on the sheet,
+which has always been allowed. One attempt per day is enforced by
+`insertIfAbsent`, and
+refusing this was a second, weaker copy of a rule the table already keeps.
+
+What a restart actually costs is the position, and nothing else. Neither streak
+moves: the daily's is folded from `daily_result`, which a restart does not touch,
+and the play streak is folded from `play_day`, which only `onBoardCompleted`
+writes to. That second one is the part that changed under this feature. The
+streak counts any finished board now, so the daily is no longer the thing feeding
+it, and a restarted daily is not the streak question it was when the two were one
+idea. Bones do not come back either, which is what stops this being a way to farm
+a better clock.
+
+**The lose sheet reports the run, and refuses two of the four facts.** It is the
+win sheet's sibling now: a row of pills instead of a stack of buttons under a
+title. Dogs placed and time on the board are in; score and mistakes are out.
+Mistakes is the full set of bones on every loss ever played, so the pill would
+read the same every time and spend its space telling the player off. Score is
+whatever `Scoring.strike` left and `lifetimeScore` banks none of it, so showing
+it is the sheet inventing a result. Both surviving pills drop out at zero rather
+than drawing a nought, because "Dogs 0/16" is the one case where the honest
+number really is rubbing it in.
+
+The choice is `lossFacts`, a pure function, because it is the only part of the
+sheet with a decision in it and there is no way to test a composable here
+(SD-34).
+
+## 2026-09-10 — every control that says Levels opens the pane, and `Leave` is deleted
+
+`GameAction.Leave` sent `GameEvent.NavigateBack`, which pops the back stack, and
+`AppViewModel` makes the board the start destination, because the puzzle is the
+home screen. So popping it closed the app. That was diagnosed once, as "finishing the
+campaign closes the app", and fixed for that one button by having the last
+level's sheet stay up. The mechanism stayed wired to three more: Levels on the
+lose sheet, Levels on the daily's win sheet, and Levels on the daily recap.
+
+The daily ones were not safe by being pushed over a campaign board, which is the
+reading that would have let them stand. `AppShortcuts.DailyChallengeUrl` is a
+deep link straight onto `GameRoute(daily = true)`, so the daily is sometimes the
+start destination itself.
+
+All three now send `GameAction.LevelsOpened`, which is what the campaign ending
+already did and for the same stated reason: the pane draws *over* the sheet, so
+picking a level starts an attempt and the sheet goes with it, and picking nothing
+leaves the sheet where it was.
+
+**`GameAction.Leave` is deleted outright**, rather than left with no callers. Its
+only effect was to close the app, it was one wire away from any future button
+labelled with a destination, and it has now been that button three times. The
+error paths that genuinely have nothing to render, a level id not in the pack or
+a daily board that will not resolve, still send `NavigateBack` directly. Those
+are bailouts rather than controls.
+
+**A bug found while testing it.** `startAttempt` builds a fresh `GameState`
+rather than copying one, so a field it does not name is silently reset, and it
+did not name `playStreak`. Nothing puts that back: `StreakRepository.observe()`
+is `distinctUntilChanged` over a repository that only re-emits on a finished
+board or at local midnight. So Start over, Next level and every jump from the
+level pane blanked the flame in that pane for the rest of the session. Same class
+as the `adsEnabled` note three lines above it in the same constructor.
+
 ## 2026-09-10 — the auth seam goes, and the network client keeps one HTTP client
 
 **Decision:** `AuthGate` and its `AuthRequirement` / `AuthReason` / `AuthVerdict`

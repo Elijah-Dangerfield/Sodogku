@@ -278,13 +278,6 @@ fun GameScreen(
             )
         }
 
-        if (state.forfeitPrompt) {
-            ForfeitDailyDialog(
-                onConfirm = { onAction(GameAction.ForfeitDailyConfirmed) },
-                onDismiss = { onAction(GameAction.DismissForfeitPrompt) },
-            )
-        }
-
         state.boosterPrompt?.let { booster ->
             BoosterPrompt(
                 consumable = booster,

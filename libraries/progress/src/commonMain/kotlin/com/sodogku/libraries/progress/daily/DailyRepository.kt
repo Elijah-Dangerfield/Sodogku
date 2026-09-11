@@ -44,12 +44,16 @@ interface DailyRepository {
      *
      * A second call for a date that already has a result is ignored — that is
      * the one-attempt rule, and it is enforced here rather than by hiding the
-     * card.
+     * card. It is also the *only* thing enforcing it: restarting a lost daily is
+     * allowed (SD-49) precisely because the rule lives on this table rather than
+     * in the controls the game offers.
+     *
+     * **The only writer of a played day.** A run that ends out of bones writes
+     * nothing at all, so the day stays open and can still be revived, restarted
+     * or simply left. There used to be an `onFailed` beside this for Give up on
+     * today; that control is gone and so is the write. See `decisions.md`.
      */
     suspend fun onCompleted(date: LocalDate, score: Int, paws: Int, timeMs: Long)
-
-    /** Records a run out of bones. Spends the day exactly like a clear does. */
-    suspend fun onFailed(date: LocalDate, timeMs: Long)
 
     /**
      * Trades a rewarded ad for the freeze in [DailyStatus.freezeOffer], covering

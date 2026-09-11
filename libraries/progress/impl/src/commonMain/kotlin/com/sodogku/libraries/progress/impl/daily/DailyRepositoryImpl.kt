@@ -80,10 +80,6 @@ class DailyRepositoryImpl(
         write(date, DailyOutcome.Completed, score = score, paws = paws, timeMs = timeMs)
     }
 
-    override suspend fun onFailed(date: LocalDate, timeMs: Long) {
-        write(date, DailyOutcome.Failed, score = 0, paws = 0, timeMs = timeMs)
-    }
-
     override suspend fun useFreeze(): FreezeResult {
         val today = today()
         val results = dao.all().toResults()

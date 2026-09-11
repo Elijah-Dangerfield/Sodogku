@@ -157,17 +157,23 @@ class DailyRepositoryImplTest : CoroutineTest() {
     }
 
     @Test
-    fun aFailedDailySpendsTheDayToo() = runUnitTest {
+    fun aDayFailedByAnOlderBuildStaysFailed() = runUnitTest {
+        // Nothing writes `Failed` any more — SD-49 removed Give up on today and
+        // `onFailed` with it, and a run that merely goes out of bones writes
+        // nothing so the day stays open. Rows written by the build that had it
+        // are on players' disks, and they still spend the day: the primary key
+        // refuses the later clear exactly as it refuses a second one.
         val repo = repository()
         val today = repo.status().date
+        dao.put(today, DailyOutcome.Failed)
 
-        repo.onFailed(today, timeMs = 45_000)
         repo.onCompleted(today, score = 900, paws = 3, timeMs = 30_000)
 
         val status = repo.status()
         assertEquals(DailyOutcome.Failed, status.result?.outcome)
-        assertEquals(0, status.result?.score, "losing then 'winning' the same day cannot rewrite it")
+        assertEquals(0, status.result?.score, "a day already on disk cannot be rewritten")
         assertTrue(!status.playable)
+        assertEquals(emptyList(), ledger.calls, "and the refused write banks nothing")
     }
 
     @Test

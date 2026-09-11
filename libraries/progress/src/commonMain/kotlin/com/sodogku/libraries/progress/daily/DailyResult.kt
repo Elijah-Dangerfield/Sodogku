@@ -12,7 +12,16 @@ import kotlinx.datetime.LocalDate
 enum class DailyOutcome {
     Completed,
 
-    /** Played and ran out of bones. The day is spent either way. */
+    /**
+     * Played and given up on. **Nothing writes this any more** (SD-49): the
+     * control that did was Give up on today, and a run that merely goes out of
+     * bones leaves the day open so it can be revived or restarted.
+     *
+     * It stays because rows carrying it are on players' disks and the fold has
+     * to keep reading them — deleting the name would make those rows unparseable
+     * and `toResult` would drop them, which silently shortens somebody's
+     * history. Every rule below that names it is about that history.
+     */
     Failed,
 
     /** Never played; a rewarded ad bridged the gap so the streak survives it. */
