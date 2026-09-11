@@ -3416,6 +3416,10 @@ class GameViewModelTest : CoroutineTest() {
                 set(AppData(hasCompletedTutorial = false, bones = 0))
             }
             val vm = viewModel(levelId = FirstGuidedLevel, cache = cache, achievements = achievements)
+            // The rehearsal costs nothing, so it has nothing to sell. `BoosterPrompt`
+            // composes above `TutorialCoachMark`, so the zero-bones offer a real
+            // board opens with would sit on top of "This is your starter dog".
+            assertNull(vm.state.boosterPrompt, "the tutorial opened behind an ad prompt")
             vm.driveTo(TutorialStep.TryAWrongOne)
 
             vm.commit(vm.state.tutorialCells.first())

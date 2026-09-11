@@ -873,7 +873,12 @@ class GameViewModel(
                 // away rather than on the guess that ends it. The prompt's
                 // refill goes through the same fail-open ad path as every other
                 // one, so this is a wall with a door in it and never a lock.
-                boosterPrompt = if (it.livesRemaining <= 0) Consumable.Bone else null,
+                //
+                // Never on the rehearsal, which spends no bones: its wrong guess
+                // is a lesson rather than a strike, so there is no wall to warn
+                // about. `BoosterPrompt` composes above `TutorialCoachMark`, so
+                // the offer would land on top of the first coach mark.
+                boosterPrompt = if (!rehearsal && it.livesRemaining <= 0) Consumable.Bone else null,
                 score = resume?.let { saved ->
                     ScoreCard(
                         total = saved.score,
