@@ -63,11 +63,20 @@ class PlacementPulseTest {
      * A restore, an undo or a board being loaded moves several squares at once.
      * There is no single line to celebrate, and picking one arbitrarily would
      * point the player at a deduction nobody made.
+     *
+     * Asserted over the whole board rather than at one square. Probing a single
+     * cell is not enough to refuse an arbitrary pick: this used to check cell 7
+     * alone, and `singleOrNull` weakened to `firstOrNull` left it green, because
+     * the pick would be cell 1 and cell 7 is on neither of cell 1's lines. A
+     * sweep has nowhere for a false origin to hide.
      */
     @Test
     fun severalSquaresAppearingAtOnceIsNotAPlacement() {
         val restored = PlacementPulse.between(emptySet(), setOf(1, 7, 13), size, nonce = 2)
-        assertEquals(PlacementRole.None, restored.roleOf(7))
+
+        val reacting = (0 until size * size).filter { restored.roleOf(it) != PlacementRole.None }
+        assertEquals(emptyList(), reacting, "a restore of three squares lit $reacting")
+        assertEquals(PlacementPulse.None, restored)
     }
 
     @Test

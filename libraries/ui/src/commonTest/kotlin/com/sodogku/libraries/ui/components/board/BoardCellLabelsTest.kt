@@ -90,16 +90,44 @@ class BoardCellLabelsTest {
     }
 
     /**
-     * Four states, four different things to say. Asserted as *distinct* rather
-     * than one by one: the failure worth catching is two states collapsing onto
-     * one phrase, which leaves a player unable to tell a square they crossed off
-     * from one that cost them a bone.
+     * Five states, five different things to say. This catches two states
+     * collapsing onto one phrase, which leaves a player unable to tell a square
+     * they crossed off from one that cost them a bone.
+     *
+     * Distinctness is all it catches, which is not much on its own —
+     * [eachCellStateSaysItsOwnPhrase] is the test that says which phrase goes
+     * where.
      */
     @Test
     fun everyCellStateSaysSomethingDifferent() {
         val spoken = BoardCellState.entries.map(labels::stateOf)
         assertEquals(BoardCellState.entries.size, spoken.toSet().size, "states share a phrase: $spoken")
         assertTrue(spoken.none { it.isBlank() }, "a state has no phrase: $spoken")
+    }
+
+    /**
+     * Which phrase belongs to which state, which nothing pinned before.
+     *
+     * Distinctness alone survives the states being crossed over: swapping
+     * `Marked` and `Wrong` in `stateOf` leaves five distinct phrases and a
+     * player who crosses a square off hearing "wrong guess, cost a bone" for a
+     * bone they never spent.
+     *
+     * Asserted as one whole map so a sixth state cannot be added and left
+     * unspoken for; the expected map would not mention it and this goes red.
+     */
+    @Test
+    fun eachCellStateSaysItsOwnPhrase() {
+        assertEquals(
+            mapOf(
+                BoardCellState.Empty to labels.empty,
+                BoardCellState.Marked to labels.marked,
+                BoardCellState.Wrong to labels.wrong,
+                BoardCellState.Proposed to labels.proposed,
+                BoardCellState.Occupied to labels.dog,
+            ),
+            BoardCellState.entries.associateWith(labels::stateOf),
+        )
     }
 
     /** A translation may reorder or drop arguments; the numbers still have to follow theirs. */
