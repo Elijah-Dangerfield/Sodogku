@@ -301,26 +301,6 @@ reason copy does. It has to be dismissible and must not fire on the rehearsal
 board, which always has a dog.
 
 Provenance: Sentry SODOGKU-7, session `95dd30d1`, 2026-09-10.
-## SD-55 [P2] — `TopDog` still unlocks at the halfway point
-
-**Found by:** the SD-13 agent, 2026-09-10.
-
-The achievement fired at 500 cleared levels, which used to mean "you finished the
-campaign". The campaign is now a thousand, so it means "you are halfway".
-
-**Not simply raised to 1000, and the reason is the interesting part.** The
-achievement log recomputes from counters, so moving the threshold would
-*un-unlock* it for anybody already holding it. An achievement that disappears is
-worse than one that arrives early.
-
-**Done when:** finishing the campaign unlocks something that says so, and nobody
-loses an achievement they already have.
-
-**Hints:** A second achievement at 1000 leaves the existing one alone and is the
-cheap answer, but then `TopDog` is an award for being halfway and its name says
-otherwise. Renaming what a player already earned is its own small betrayal.
-Decide which of those two you would rather explain. `AchievementCounters` and
-`Stat` are where it lives.
 ## SD-56 [P2] — An Android shortcut may be pointing at a package that is not installed
 
 **Found by:** the SD-25 agent, 2026-09-10, which flagged it rather than shipping
@@ -341,47 +321,6 @@ both entries appeared and launched.
 **If they did not**, this is the cause, and the fix is a Gradle-generated
 `@string/` holding the real application id rather than a literal in the resource.
 Nothing else in the change would explain the entries being absent or dead.
-## SD-58 [P2] — The ad funnel filters on an outcome nothing emits
-
-**Found by:** the SD-39 agent, 2026-09-10, while confirming that enum `.name`
-survives R8.
-
-`ad-funnel.json` filters `outcome=~"Rewarded|Completed"`, and `AdShowResult` has
-no `Completed` value. No interstitial path emits one either.
-
-Milder than SD-39, because the panel is not empty: `Rewarded` matches and the
-chart draws. But it counts less than its title claims, and nobody reading the
-number would know. `docs/practices/app-events.md` repeats the error, so the two
-places somebody would check agree with each other and disagree with the code.
-
-**Done when:** the filter names only values `AdShowResult` can produce, or
-`Completed` exists and something emits it.
-
-**Hints:** Decide which before editing either. If interstitials were meant to
-report a completion distinct from a reward, that is a missing emit rather than a
-stale filter, and deleting the alternation would quietly close the question.
-`DashboardQueryContractTest` checks that attribute *names* agree across the two
-sides and does not check that filtered *values* are producible, which is the hole
-this fell through. SD-39 added a value check for the `iap.*` events; widening it
-to every event with a closed value set is the guard.
-## SD-59 [P2] — `Modifier.pulsate` is dead and does not respect reduce-animations
-
-**Found by:** the SD-52 agent, 2026-09-10, while looking for the booster pulse.
-
-`libraries/ui/.../system/Pulsate.kt` has zero call sites. The booster nudge is
-`BoardControl(attention = ...)`, which drives its own `Animatable`. So the brief
-for SD-52 pointed at the wrong thing, and so would the next person's.
-
-It also ignores `LocalReduceAnimations`, which `BoardControl` respects. That is
-harmless while nothing calls it and is a trap the moment somebody does, because
-it looks like the obvious tool for the job.
-
-**Done when:** it is deleted, or it respects reduce-animations and something uses
-it.
-
-**Hints:** Deleting is the answer unless somebody wants it. It is named in
-`docs/SPEC.md`, which SD-22 is deleting anyway, so do this after that or take
-the reference out in the same pass.
 ## SD-60 [P2] — The treat no-op emits nothing, so the panel splitting by booster is half a chart
 
 **Found by:** the SD-44 agent, 2026-09-10, which fixed the words rather than the
@@ -401,32 +340,6 @@ or somebody writes down why a treat cannot no-op.
 **Hints:** `GameViewModel.kt:2490`. Small. Check first whether a treat genuinely
 can no-op: if the answer is that it always has something to give, the fix is a
 sentence rather than an emit, and the panel should say one booster on purpose.
-## SD-61 [P1] — `:apps:server:test` is red on main and CI cannot see it
-
-**Found by:** two agents independently on 2026-09-10, each of which stashed its
-own work to confirm the failure predates it.
-
-`DatabaseSchemaTest.migrationsCreateAppConfigTable` asserts `app_config_values`
-is empty after migrations. `V4__app_config.sql:25` seeds three kill-switch rows
-into it. So the test fails deterministically on any machine with Docker running.
-
-**The reason nobody noticed is the worse half.** The test is skipped via JUnit
-`Assume` when Docker is absent, and CI has no Docker, so it has never run there.
-A test that is red everywhere it executes and skipped everywhere it is watched
-is not a test, and it has been in that state since C0.
-
-**Done when:** the assertion matches what the migrations actually do, and either
-CI runs this suite with Docker or the suite says out loud that it did not run.
-
-**Hints:** Decide which side is wrong before editing either. If `app_config_values`
-is meant to ship seeded, the assertion is stale and the seed is the contract. If
-it is meant to be empty, `V4` is seeding production data in a migration, which is
-a different and larger problem.
-
-The skip-when-absent behavior is worth keeping, but a green build that silently
-skipped its only schema test is a lie either way. A count of skipped tests in the
-CI summary is the cheap version.
-
 ## SD-62 [P2] — `FloatingWindowHost` never took androidx's fix for an entry popped before it composed
 
 **Found by:** the SD-48 agent, 2026-09-10, while ruling the floating windows out
@@ -454,3 +367,45 @@ bookkeeping is what put SD-26 on the wrong trail for a day.
 `navigation-compose` version actually on the classpath rather than against
 memory. Decide the `pushWithTransition` question separately; it may be
 deliberate, and the git history will say.
+
+## SD-63 [P2] — A badge added to the catalog later arrives already stale
+
+**Found by:** the SD-55 agent, 2026-09-10, while checking its new badge against
+the achievements page.
+
+`AchievementEngine.apply` stamps a backfilled badge with the **historical**
+`finishedAt` that crossed its threshold, not with the moment it was granted. The
+achievements page decides "just earned" by comparing `unlockedAt` against the
+`achievementsSeenAt` watermark, so a badge added to the catalog today and
+immediately backfilled onto an existing player is stamped with a date from weeks
+ago and lands older than the watermark.
+
+The result is a badge that toasts and then is not on the "Just earned" shelf when
+the player opens the page the toast sent them to. Pre-existing, exposed rather
+than caused by `HalfwayHound`, and it will happen to **every** badge added to the
+catalog from now on.
+
+**Done when:** a badge granted for the first time reads as new on the page it
+points at, however old the play that earned it.
+
+**Hints:** The historical stamp is not wrong for what it is. "When did you cross
+this line" is the true answer and the recap and the log both want it. What the
+shelf needs is a different fact, "when did we tell you", so this is likely a
+second column rather than a changed one. Check what else reads `unlockedAt`
+before moving it.
+
+## SD-64 [P2] — `proposals.md` item 4 argues entirely from a 500-level campaign
+
+**Found by:** the SD-55 agent, 2026-09-10.
+
+Proposal 4 is the reasoning behind the campaign ending, and every number in it is
+a number about a 500-level pack. The campaign is a thousand now and the ending
+shipped, so the proposal is both stale and superseded by the thing it argued for.
+
+**Done when:** it is deleted, or it says what it decided and points at the commit
+that did it.
+
+**Hints:** Deleting is probably right. `decisions.md` is where a decision lives
+once it is made, and the ending's commit message already carries the reasoning
+and what it rejected. A proposal kept past the proposal is a second, worse copy
+of a decision. Check nothing else cross-references item 4 first.
