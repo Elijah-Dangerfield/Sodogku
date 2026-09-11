@@ -2242,6 +2242,36 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun theLastBoneWarningIsNotRepeatedAfterAnotherBoardTopsTheCountUp() = runUnitTest {
+        // The "once" the test above is named for cannot be reached from inside
+        // one attempt: both routes back above one bone, `refillBones` and the
+        // booster refill, clear `warnedAboutLastBone` on the way through. The
+        // case the flag is actually for is the other board. The daily opens on
+        // its own route over a campaign board, so two live ViewModels share one
+        // count, and a refill over there arrives here as a `BonesChanged` echo
+        // that raises the number without going near the flag.
+        //
+        // Answered deliberately rather than left as decoration: the sentence
+        // has already been read on this board, and a card that comes back a
+        // second time is the thing this warning must not become.
+        val cache = InMemoryAppCache()
+        val vm = viewModel(cache = cache)
+        repeat(2) { vm.commit(tappableWrongCell(vm)) }
+        assertEquals(GameWarning.LastBone, vm.state.warning)
+        vm.takeAction(GameAction.DismissWarning)
+        settle()
+
+        cache.update { it.copy(bones = ConsumableRefillTo) }
+        settle()
+        assertEquals(ConsumableRefillTo, vm.state.livesRemaining, "the echo never reached the board")
+
+        repeat(2) { vm.commit(tappableWrongCell(vm)) }
+
+        assertEquals(1, vm.state.livesRemaining, "the fixture has to come back down to one bone")
+        assertNull(vm.state.warning, "the same board said it twice")
+    }
+
+    @Test
     fun refillingBonesFromAnAdRestoresEveryLife() = runUnitTest {
         val vm = viewModel()
         repeat(ScoringConfig.MAX_LIVES) { vm.commit(tappableWrongCell(vm)) }
@@ -2280,13 +2310,28 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun everyRestartCountsAsAnotherAttempt() = runUnitTest {
-        val progress = InMemoryProgress()
-        val vm = viewModel(progress = progress)
+    fun everyRestartCountsAsAnotherAttempt() = recordingEvents { events ->
+        runUnitTest {
+            // Two counters, and only the repository's was checked. The
+            // ViewModel keeps its own `attemptNumber`, and that is the one on
+            // the wire: `attempt_number` rides `game.level_started`,
+            // `game.level_completed`, `game.level_failed` and
+            // `game.level_skipped`, so with the increment in `restart` gone
+            // every retry in the funnel reports as a first attempt while the
+            // repository count kept this test green.
+            val progress = InMemoryProgress()
+            val vm = viewModel(progress = progress)
 
-        vm.takeAction(GameAction.Retry)
+            vm.takeAction(GameAction.Retry)
+            settle()
 
-        assertEquals(2, progress.record(PlainLevel).attempts)
+            assertEquals(2, progress.record(PlainLevel).attempts)
+            assertEquals(
+                listOf(1, 2),
+                events.attributesOf("game.level_started").map { it["attempt_number"] },
+                "the retry was reported as another first attempt",
+            )
+        }
     }
 
     @Test
@@ -2751,19 +2796,28 @@ class GameViewModelTest : CoroutineTest() {
 
     @Test
     fun theStandingAdOfferRefillsBonesWithoutEverReducingThem() = runUnitTest {
-        val vm = viewModel()
-        repeat(2) { vm.commit(wrongCellIn(row = it)) }
-        assertTrue(
-            vm.state.livesRemaining < ScoringConfig.MAX_LIVES,
-            "the fixture has to actually cost lives",
-        )
+        // A holding *above* the floor, because that is the only one the two
+        // readings of this disagree about. This used to top up at three with a
+        // floor of three, where `maxOf(held, refillTo())` and a plain
+        // assignment give the same answer — so the half of the name after the
+        // "without" was never tested at all, on the one path where a stash from
+        // level rewards is the normal state.
+        val cache = InMemoryAppCache().apply { set(AppData(bones = Stash)) }
+        val vm = viewModel(cache = cache)
+        assertEquals(Stash, vm.state.livesRemaining, "the fixture has to open above the floor")
 
         vm.takeAction(GameAction.RefillBones)
-        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+        settle()
+        assertEquals(Stash, vm.state.livesRemaining, "watching an ad cost the player bones")
+        assertEquals(Stash, cache.get().bones, "and the smaller number reached disk")
 
-        // Already full: the ad may still play, but it must not take anything away.
+        // The other half: from below the floor it still fills.
+        repeat(Stash - 1) { vm.commit(wrongCellIn(row = it)) }
+        assertEquals(1, vm.state.livesRemaining, "the fixture has to actually cost lives")
+
         vm.takeAction(GameAction.RefillBones)
-        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining)
+        settle()
+        assertEquals(ConsumableRefillTo, vm.state.livesRemaining)
     }
 
     @Test
@@ -5421,6 +5475,12 @@ class GameViewModelTest : CoroutineTest() {
          * coincidence.
          */
         const val HighScore = 1_000_000
+
+        /**
+         * A holding above the refill floor, which is where level rewards leave
+         * a player and the only place a floor can be told from an assignment.
+         */
+        const val Stash = 5
 
         /** Past `StruggleDetector`'s idle window, with room to spare. */
         val Staring = 12.seconds
