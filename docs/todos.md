@@ -321,32 +321,6 @@ was.
 
 `DocReferencesResolveTest` will catch a dead file path but not a class name, so
 grep for every symbol it names.
-## SD-85 [P2] — A second Skip on the tutorial logs a duplicate completion
-
-**Found by:** the SD-82 agent, 2026-09-10, while disproving the claim that the
-`skipTutorial` fall-through was unreachable. It is reachable, and this is what
-arrives through it.
-
-`TutorialCoachMark` holds its card through the scrim's fade, and `FocusScrim`
-keeps rendering content while `progress.value > 0f`, so the Skip button stays
-live for a few frames after the first tap has already run `leaveRehearsal`. A
-second tap lands with `rehearsing == false` and `skipTutorial` calls
-`completeTutorial` unconditionally, so it logs a second `tutorial.completed`
-with `last_step = "none"`.
-
-Harmless to the player and not harmless to the number. `tutorial.completed` is
-how we would ever know what fraction of players finish onboarding, and a
-double-tapped Skip inflates it.
-
-**Done when:** a tutorial reports its completion once however many times Skip is
-tapped.
-
-**Hints:** The fall-through is a real code path and should stay; the fix is that
-`completeTutorial` is not idempotent and should be. Check whether the same shape
-exists on the other terminal paths out of the rehearsal before fixing only this
-one. `DashboardQueryContractTest` will hold the event's registry row if you touch
-its attributes.
-
 ## SD-86 [P2] — `:apps:integration` has failed twice for reasons nobody can reproduce
 
 **Found by:** two separate investigations, 2026-09-10.
@@ -377,3 +351,30 @@ tree is half-removed is a different situation from a walk that skips it.
 
 Reproducing it may mean running the tier in a loop while adding and removing a
 worktree. That is worth an hour: everything else in this repo trusts these guards.
+
+## SD-87 [P2] — `onboarding.completed` has the same non-idempotent shape SD-85 fixed
+
+**Found by:** the SD-85 agent, 2026-09-10, after fixing the tutorial's version and
+checking whether the shape existed elsewhere.
+
+`OnboardingViewModel.finish` logs `onboarding.completed` unconditionally, and
+`exitedToHome` is only read in `onCleared`. The buttons are gated on
+`state.isFinishing`, which makes this much harder to reach than the tutorial's
+was, but `updateState` lags the state flow by one dispatch, so two taps inside a
+single frame can both land in the channel before the disabled state renders.
+
+Same consequence as SD-85: `onboarding.completed` is how we would know what
+fraction of installs get through onboarding, and a double tap inflates it.
+
+**Done when:** onboarding reports its completion once however many times the
+button is tapped.
+
+**Hints:** The fix SD-85 took is the shape to copy, and the reason it went where
+it did is the lesson: a guard on the button would have left the other door open.
+Put it on the thing that logs.
+
+A `SEAViewModel` test can drive two actions through the channel without a UI
+harness, which is how SD-85's test reached its second tap. Check the other
+one-shot completion events in the same pass rather than fixing the third one
+later: `tutorial.completed` and `onboarding.completed` were both written the same
+way, so a third probably was too.
