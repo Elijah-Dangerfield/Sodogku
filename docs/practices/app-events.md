@@ -57,6 +57,22 @@ or per-flow-emission — and add the event here in the same change. Client event
 intent/funnel/abandonment questions; the backend DB stays source-of-truth for anything already in
 a ledger.
 
+**Never spell an attribute value with `::class.simpleName`.** Android release builds are minified
+and R8 renames anything it is not told to keep, so a class name is not a string the dashboards can
+rely on. A release `mapping.txt` had `PurchaseOutcome$Success -> ta.l`, which is what
+`iap.purchase_result` was reporting as its `outcome` while `paywall-conversion.json` filtered on
+`Success`: the paywall board read zero on Android through a Play release that was selling, and
+nothing errored anywhere. iOS is not minified, so the same build looks correct there, which is the
+part that makes it hard to spot.
+
+Use a value R8 cannot touch. An enum's `.name` qualifies — the constant fields get renamed but the
+string in `<clinit>` does not, which is why `ads.result` is safe — as does a declared `val name`
+carrying a literal, which is what `PurchaseOutcome` and `RestoreOutcome` do. Throwable names are
+also safe, but only because `proguard-rules.pro` keeps them for readable crash reports; route one
+through a classifier like `NetworkCall.classifyForLog()` rather than reading `simpleName` at the
+emit site, so the dependency on that keep rule stays in one place.
+`DashboardQueryContractTest.noAttributeIsSpelledWithAClassNameR8CanRename` enforces this.
+
 ## Engagement & session shape
 
 | Event | Attributes | Fires |
@@ -280,8 +296,8 @@ reordering the stamping, and fix `ops/grafana/ad-funnel.json` in the same change
 | `ads.result` | `placement`, `outcome`, `latency_ms`, `error_kind`, `reason`, `grace_levels_used` | Every terminal state of a gate. `outcome` is an `AdShowResult` name (`Rewarded` / `Dismissed` / `Completed` / `NoFill` / `Offline` / `NotShown` / `Failed`) **or** the synthetic `granted_without_ad`, which carries `reason` (`pro`, `ads_disabled`, `placement_disabled`, `new_user_grace`). `latency_ms` spans prepare-plus-load-plus-watch, so it is dominated by how long the player watched — read its floor, not its mean |
 | `ads.offline_block` | `placement`, `grace_levels_used` | The offline grace is spent and the block screen is requested. One per gate past the grace, so a repeat count is a player stuck offline rather than a bug |
 | `iap.paywall_shown` | `trigger` | An offer the coordinator **accepted** (`continue_level` / `skip_level` / `direct`), or an offline block. Refusals — capped, disabled, already Pro — emit nothing, so the ratio of this to `ads.gate_shown` is the offer rate rather than the attempt rate |
-| `iap.purchase_result` | `outcome`, `error_kind`, `trigger` | `outcome` is the `PurchaseOutcome` class name (`Success` / `Cancelled` / `AlreadyOwned` / `Unavailable` / `Failed`); `error_kind` is present only on `Failed` and is the store's own code (`billing_6`, `storekit_2`, `purchase_pending`) |
-| `iap.restore_result` | `outcome` | `Restored` / `NothingToRestore` / `Failed`. A rise in `Failed` is a store-reachability signal, not a customer-support one — it means we could not ask, and the cached entitlement was left alone |
+| `iap.purchase_result` | `outcome`, `error_kind`, `trigger` | `outcome` is `PurchaseOutcome.name` (`Success` / `Cancelled` / `AlreadyOwned` / `Unavailable` / `Failed`); `error_kind` is present only on `Failed` and is the store's own code (`billing_6`, `storekit_2`, `purchase_pending`) |
+| `iap.restore_result` | `outcome` | `RestoreOutcome.name`: `Restored` / `NothingToRestore` / `Failed`. A rise in `Failed` is a store-reachability signal, not a customer-support one — it means we could not ask, and the cached entitlement was left alone |
 
 The ad funnel is `ads.gate_shown` → `ads.result`, split by `placement` and platform.
 `outcome=NoFill` is the number to watch: every one of those is a reward given away, and

@@ -114,7 +114,7 @@ class RealEntitlements(
 
         logger.logEvent(
             "iap.purchase_result",
-            "outcome" to result::class.simpleName,
+            "outcome" to result.name,
             "error_kind" to (result as? PurchaseOutcome.Failed)?.kind,
             "trigger" to trigger,
         )
@@ -143,7 +143,7 @@ class RealEntitlements(
             StoreOwnership.Unknown -> RestoreOutcome.Failed("store_unreachable")
         }
 
-        logger.logEvent("iap.restore_result", "outcome" to result::class.simpleName)
+        logger.logEvent("iap.restore_result", "outcome" to result.name)
         return result
     }
 

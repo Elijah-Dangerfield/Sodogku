@@ -8,19 +8,59 @@ import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
-/** What buying Pro can do. Sealed per operation rather than thrown, like the rest of the app. */
+/**
+ * What buying Pro can do. Sealed per operation rather than thrown, like the rest of the app.
+ *
+ * [name] is what `iap.purchase_result` reports as its `outcome`, and it is a
+ * literal here rather than `::class.simpleName` because R8 renames these classes
+ * in a Play build. A release `mapping.txt` has `PurchaseOutcome$Success -> ta.l`,
+ * so `simpleName` was arriving in Loki as `l` while `paywall-conversion.json`
+ * filtered on `Success`. The board read zero on Android with Play Console showing
+ * sales, and nothing anywhere errored.
+ *
+ * Keep these spellings and the dashboard's in step. A `-keepnames` rule would
+ * also work and is worse: the contract belongs where somebody renaming one of
+ * these will see it, not in a ProGuard file nobody opens.
+ */
 sealed interface PurchaseOutcome {
-    data object Success : PurchaseOutcome
-    data object Cancelled : PurchaseOutcome
-    data object AlreadyOwned : PurchaseOutcome
-    data object Unavailable : PurchaseOutcome
-    data class Failed(val kind: String) : PurchaseOutcome
+    val name: String
+
+    data object Success : PurchaseOutcome {
+        override val name = "Success"
+    }
+
+    data object Cancelled : PurchaseOutcome {
+        override val name = "Cancelled"
+    }
+
+    data object AlreadyOwned : PurchaseOutcome {
+        override val name = "AlreadyOwned"
+    }
+
+    data object Unavailable : PurchaseOutcome {
+        override val name = "Unavailable"
+    }
+
+    data class Failed(val kind: String) : PurchaseOutcome {
+        override val name = "Failed"
+    }
 }
 
+/** [name] is the `outcome` on `iap.restore_result`; see [PurchaseOutcome]. */
 sealed interface RestoreOutcome {
-    data object Restored : RestoreOutcome
-    data object NothingToRestore : RestoreOutcome
-    data class Failed(val kind: String) : RestoreOutcome
+    val name: String
+
+    data object Restored : RestoreOutcome {
+        override val name = "Restored"
+    }
+
+    data object NothingToRestore : RestoreOutcome {
+        override val name = "NothingToRestore"
+    }
+
+    data class Failed(val kind: String) : RestoreOutcome {
+        override val name = "Failed"
+    }
 }
 
 /**

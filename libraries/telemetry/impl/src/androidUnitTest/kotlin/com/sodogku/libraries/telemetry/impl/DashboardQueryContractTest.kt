@@ -121,6 +121,85 @@ class DashboardQueryContractTest {
         )
     }
 
+    /**
+     * The same failure as the two tests above, one layer down: the attribute is
+     * spelled right at the emit site and the *value* is what changes.
+     *
+     * Android release builds are minified. `::class.simpleName` reads the class
+     * name out of the dex at runtime, so R8 renaming the class silently rewrites
+     * the value — `PurchaseOutcome$Success -> ta.l` in a real `mapping.txt`, which
+     * made `iap.purchase_result` report `outcome=l` while the paywall board
+     * filtered on `Success`. Purchases were happening; the panel read zero; nothing
+     * errored. The spelling check above cannot see it, because the spelling is
+     * fine, and iOS cannot see it either, because iOS is not obfuscated.
+     *
+     * So no attribute value may be written as a class name. The alternatives that
+     * survive R8 are an enum's `.name` (the constant fields get renamed, the
+     * string in `<clinit>` does not) and a declared `val name` holding a literal.
+     *
+     * **What it proves, precisely.** That no `logEvent` argument list *contains*
+     * the text. A class name laundered through a helper function called on the
+     * argument is still invisible here — `NetworkCall.classifyForLog()` is exactly
+     * that, and it is deliberate, because it returns a Throwable name and
+     * `proguard-rules.pro` keeps those. Pinning the rule at the emit site is what
+     * keeps the reliance on that keep rule down to the one place that documents it.
+     */
+    @Test
+    fun noAttributeIsSpelledWithAClassNameR8CanRename() {
+        val offenders = emitted.flatMap { (event, attributes) ->
+            attributes.flatMap { (key, values) ->
+                values.filter { CLASS_NAME_VALUE.containsMatchIn(it) }
+                    .map { "$event · $key is emitted as `$it`" }
+            }
+        }.distinct().sorted()
+
+        assertTrue(
+            offenders.isEmpty(),
+            "These attributes are fed from a class name, and R8 renames classes in the Play " +
+                "build — the dashboards filtering on them go quietly empty on Android while iOS " +
+                "looks fine:\n" + offenders.joinToString("\n") { "  $it" } +
+                "\n\nGive the type a `val name` holding a literal, or use an enum's `.name`. " +
+                "See docs/practices/app-events.md.",
+        )
+    }
+
+    /**
+     * The other half of the same contract: the `outcome` values the paywall board
+     * filters on have to be values the app can actually produce.
+     *
+     * The test above stops the emit site reaching for a name R8 can rewrite. This
+     * one stops the literal that replaced it drifting away from the query — which
+     * is the same empty panel arriving by a different route, and the reason the
+     * names live on the sealed types rather than in a keep rule.
+     *
+     * Only the `iap.*` events, because they are the only ones whose vocabulary is
+     * declared in one readable place. `ads.result` mixes an enum with a synthetic
+     * `granted_without_ad` and is not extractable this way.
+     */
+    @Test
+    fun everyIapOutcomeTheDashboardsFilterOnIsOneTheAppCanEmit() {
+        val declared = declaredOutcomeNames()
+        val unknown = dashboards.flatMap { dashboard ->
+            dashboard.queries.flatMap { query ->
+                query.events.mapNotNull { event -> IAP_OUTCOME_EVENTS[event]?.let { event to it } }
+                    .flatMap { (event, type) ->
+                        val names = declared[type].orEmpty()
+                        query.equalities["outcome"].orEmpty()
+                            .filter { it !in names }
+                            .map { "${dashboard.file} · $event: outcome=\"$it\" (emits $names)" }
+                    }
+            }
+        }.distinct().sorted()
+
+        assertTrue(
+            unknown.isEmpty(),
+            "These panels filter on an `outcome` the event's sealed type does not declare, so " +
+                "they render empty:\n" + unknown.joinToString("\n") { "  $it" } +
+                "\n\nEither the query drifted or a `name` in libraries/billing/.../Entitlements.kt " +
+                "was renamed without its dashboard.",
+        )
+    }
+
     @Test
     fun everyDashboardTargetsTheRealLokiDatasourceAndService() {
         val problems = dashboards.flatMap { dashboard ->
@@ -210,6 +289,28 @@ class DashboardQueryContractTest {
         empty.absorbLogEventCalls("fun main() { println(\"logEventually\") }")
         assertTrue(empty.isEmpty(), "the scan invented an event out of a file with no logEvent call")
 
+        // The class-name detector, against the emit site as it was actually
+        // written before SD-39. A regex that matches nothing reports no
+        // offenders, which is indistinguishable from a clean tree.
+        val renameable = mutableMapOf<String, MutableMap<String, MutableList<String>>>()
+        renameable.absorbLogEventCalls(
+            """logger.logEvent("iap.restore_result", "outcome" to result::class.simpleName)""",
+        )
+        assertEquals(
+            listOf("result::class.simpleName"),
+            renameable.getValue("iap.restore_result").getValue("outcome"),
+        )
+        assertTrue(
+            renameable.getValue("iap.restore_result").getValue("outcome")
+                .all { CLASS_NAME_VALUE.containsMatchIn(it) },
+            "the class-name detector does not match the expression that caused SD-39",
+        )
+        assertTrue(
+            listOf("result.name", "outcome.result.name", "\"granted_without_ad\"", "step.name")
+                .none { CLASS_NAME_VALUE.containsMatchIn(it) },
+            "the class-name detector rejects values that survive minification",
+        )
+
         val parsed = parseQuery(
             "quantile_over_time(0.5, {service_name=\"sodogku-client\"} | event_name=\"game.level_completed\" " +
                 "| mode=\"campaign\" | unwrap duration_ms [1d]) by (difficulty)",
@@ -218,6 +319,23 @@ class DashboardQueryContractTest {
         assertEquals(setOf("game.level_completed"), parsed.events)
         assertEquals(setOf("mode", "duration_ms", "difficulty"), parsed.attributes)
         assertEquals(setOf("duration_ms"), parsed.unwrapped)
+        assertEquals(mapOf("mode" to setOf("campaign")), parsed.equalities)
+
+        // A negation is not a claim that anything emits the value, so it must not
+        // reach the vocabulary check — recorded, it would fail a correct query.
+        val negated = parseQuery(
+            "sum(count_over_time({service_name=\"sodogku-client\"} | event_name=\"ads.result\" " +
+                "| error_kind!=\"\" | outcome=~\"NoFill|Offline\" [1d]))",
+            legendFormat = null,
+        )
+        assertEquals(mapOf("outcome" to setOf("NoFill", "Offline")), negated.equalities)
+
+        val outcomes = declaredOutcomeNames()
+        assertEquals(
+            setOf("Success", "Cancelled", "AlreadyOwned", "Unavailable", "Failed"),
+            outcomes["PurchaseOutcome"],
+        )
+        assertEquals(setOf("Restored", "NothingToRestore", "Failed"), outcomes["RestoreOutcome"])
 
         val rejected = runCatching {
             parseQuery("sum(count_over_time({service_name=\"sodogku-client\"} | json | level=\"x\" [1d]))", null)
@@ -287,6 +405,14 @@ private data class Query(
     val events: Set<String>,
     val attributes: Set<String>,
     val unwrapped: Set<String>,
+    /**
+     * Attribute → the values it is matched *positively* against (`=` and `=~`).
+     *
+     * `!=` and `!~` are left out on purpose: excluding a value is not a claim
+     * that anything ever emits it, so holding a negation against the emitted
+     * vocabulary would fail on a query that is perfectly correct.
+     */
+    val equalities: Map<String, Set<String>>,
 )
 
 private fun readDashboards(): List<Dashboard> {
@@ -354,6 +480,7 @@ private fun parseQuery(expr: String, legendFormat: String?): Query {
     val events = mutableSetOf<String>()
     val attributes = mutableSetOf<String>()
     val unwrapped = mutableSetOf<String>()
+    val equalities = mutableMapOf<String, MutableSet<String>>()
 
     var i = 0
     while (i < expr.length) {
@@ -394,7 +521,14 @@ private fun parseQuery(expr: String, legendFormat: String?): Query {
                 val end = expr.indexOf('"', i + 1)
                 require(end > 0) { "unterminated string in: $expr" }
                 val value = expr.substring(i + 1, end)
-                if (key.value == "event_name") events += value.split("|") else attributes += key.value
+                if (key.value == "event_name") {
+                    events += value.split("|")
+                } else {
+                    attributes += key.value
+                    if (operator == "=" || operator == "=~") {
+                        equalities.getOrPut(key.value) { mutableSetOf() } += value.split("|")
+                    }
+                }
                 end + 1
             } else {
                 val number = NUMBER.matchAt(expr, i) ?: error("`${key.value}` compared to something unreadable in: $expr")
@@ -414,6 +548,7 @@ private fun parseQuery(expr: String, legendFormat: String?): Query {
         events = events,
         attributes = attributes - AMBIENT_KEYS,
         unwrapped = unwrapped - AMBIENT_KEYS,
+        equalities = equalities - AMBIENT_KEYS,
     )
 }
 
@@ -443,6 +578,66 @@ private fun String.withoutComments(): String = COMMENT_LINE.replace(this, "")
 private val LOG_EVENT_CALL = Regex("""logEvent\s*\(""")
 private val ATTRIBUTE_PAIR = Regex("""^\s*"([a-z0-9_]+)"\s+to\s+(.+)$""", RegexOption.DOT_MATCHES_ALL)
 private val STRINGY_VALUE = Regex("""^"|\.name\b|\.toString\(\)|simpleName|\.lowercase\(\)""")
+
+/**
+ * Every way of reading a class name that R8 is free to rewrite.
+ *
+ * `qualifiedName` and the `::class.java` forms are here even though nothing uses
+ * them, because they are the obvious next reach for someone who finds
+ * `simpleName` rejected and they fail in exactly the same way.
+ */
+private val CLASS_NAME_VALUE = Regex("""::class(\.java)?\.(simpleName|qualifiedName|name\b)""")
+
+/** The event each sealed type reports its `name` on. */
+private val IAP_OUTCOME_EVENTS = mapOf(
+    "iap.purchase_result" to "PurchaseOutcome",
+    "iap.restore_result" to "RestoreOutcome",
+)
+
+private const val ENTITLEMENTS_PATH =
+    "libraries/billing/src/commonMain/kotlin/com/sodogku/libraries/billing/Entitlements.kt"
+
+private val DECLARED_NAME = Regex("""override val name = "([A-Za-z_]+)"""")
+private val SEALED_TYPE = Regex("""(?m)^sealed interface (\w+)""")
+
+/**
+ * The `outcome` vocabulary, per sealed type, read from the file that declares it.
+ *
+ * Read as text rather than by reflection because `:libraries:billing` is not on
+ * this module's classpath — the same reason [scanLogEventCalls] is a source scan.
+ *
+ * **Per type, not pooled.** Both types have a `Failed`, and a single flat set of
+ * every name in the file hid that: renaming only `PurchaseOutcome.Failed` left
+ * `Failed` in the set via `RestoreOutcome`, so the mutation survived and the
+ * "Purchase failures by store code" panel would have gone empty unnoticed.
+ */
+private fun declaredOutcomeNames(): Map<String, Set<String>> {
+    val root = System.getProperty(REPO_ROOT_PROPERTY)
+        ?: error("$REPO_ROOT_PROPERTY is unset — libraries/telemetry/impl/build.gradle.kts should supply it")
+    val source = File(root, ENTITLEMENTS_PATH)
+    require(source.isFile) { "$ENTITLEMENTS_PATH has moved; this test reads the outcome names out of it" }
+    val text = source.readText()
+
+    val starts = SEALED_TYPE.findAll(text).toList()
+    val byType = starts.mapIndexed { index, match ->
+        val end = starts.getOrNull(index + 1)?.range?.first ?: text.length
+        match.groupValues[1] to DECLARED_NAME.findAll(text.substring(match.range.first, end))
+            .map { it.groupValues[1] }
+            .toSet()
+    }.toMap()
+
+    IAP_OUTCOME_EVENTS.values.forEach { type ->
+        val names = byType[type].orEmpty()
+        require(names.size >= MINIMUM_NAMES_PER_TYPE) {
+            "only found $names for $type in $ENTITLEMENTS_PATH, so the reader is broken and " +
+                "every query would pass"
+        }
+    }
+    return byType
+}
+
+/** `RestoreOutcome` is the smaller of the two, with three. */
+private const val MINIMUM_NAMES_PER_TYPE = 3
 
 private fun String.looksLikeAString(): Boolean = STRINGY_VALUE.containsMatchIn(this)
 
