@@ -134,38 +134,6 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
-## SD-103 [P2] — One Dog component, so no call site has to remember the preview fix
-
-**Ask:** Owner, 2026-09-11: *"we should have a custom DS component called Dog and
-maybe a few variants of that to render the dogs stills and animated versions.
-That component should check local debug and choose to animate or not and that
-component can be how all dogs are rendered, that way every call site doesn't need
-to reimplement that fix."*
-
-**The bug that prompted it.** `AnimatedDog` loops forever under
-`LocalInspectionMode`, so a preview containing one spins until Android Studio
-gives up. `LoopingDog` and `BoardControl` both check the flag and hold a frame.
-`AnimatedDog` does not. That is three call sites and two of them got it right,
-which is the shape that keeps producing this: every new caller has to know.
-
-**Done when:** there is one `Dog` component in the design system, every dog in
-the app is drawn through it, and the inspection-mode decision lives inside it and
-nowhere else. A preview containing any dog renders to a still.
-
-**Hints:** Take the variants from what callers actually need rather than from what
-exists: a still at a pose, a looping idle, and whatever the win and streak screens
-do. `DogPose` already names the poses. `AnimatedDog`, `LoopingDog` and the dog
-inside `BoardControl` are the three shapes to fold in, and the streak hero and
-the recap draw dogs too.
-
-The check is `LocalInspectionMode.current`, not a debug flag: it is true in
-previews and in composition tests, which is the other place an endless animation
-hurts. `LocalReduceAnimations` is a separate question and both matter, so make the
-component answer both and say which wins.
-
-A guard is worth more than the refactor. Once one component owns it, a test that
-fails when a composable outside the design system references a dog drawable keeps
-it owned.
 ## SD-110 [P2] — The level drawer still flickers as it dismisses
 
 **Found by:** the SD-102 agent, 2026-09-11, which fixed the other half and said
