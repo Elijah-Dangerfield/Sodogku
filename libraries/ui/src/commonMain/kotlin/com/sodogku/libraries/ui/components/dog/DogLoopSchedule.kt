@@ -35,27 +35,43 @@ internal class DogLoopSchedule(
      * Never the same clip twice running, which is the one thing a viewer
      * reliably notices. With a single clip there is nothing to vary and the
      * caller gets it back every time.
+     *
+     * Each turn is folded against the one before it, so answering for turn N
+     * means walking the chain from zero. Walk it, don't recurse it: [turn] is a
+     * clock and has no ceiling, and a dog left composed long enough will ask for
+     * a turn deeper than the stack can hold. It took about forty hours on the
+     * JVM, less on iOS, which is latent rather than impossible.
      */
     fun clipAt(turn: Int): Int {
+        require(turn >= 0) { "a turn is a count, not an offset: $turn" }
         if (clipCount == 1) return 0
-        val previous = if (turn == 0) NoClip else clipAt(turn - 1)
-        val choice = noise(turn, ClipSalt).mod(clipCount - 1)
-        // Fold the previous clip out of the range rather than re-rolling, so the
-        // remaining clips stay equally likely instead of the one just after it
-        // getting a second chance.
-        return if (previous == NoClip || choice < previous) choice else choice + 1
+        var clip = NoClip
+        for (step in 0..turn) {
+            val choice = noise(step, ClipSalt).mod(clipCount - 1)
+            // Fold the previous clip out of the range rather than re-rolling, so
+            // the remaining clips stay equally likely instead of the one just
+            // after it getting a second chance.
+            clip = if (clip == NoClip || choice < clip) choice else choice + 1
+        }
+        return clip
     }
 
     /**
      * How many frame-lengths to sit on the first frame before turn [turn] plays.
      *
-     * Zero about half the time, so the dog does not visibly pause between every
-     * gesture, which would be its own metronome.
+     * Zero half the time, so the dog does not visibly pause between every
+     * gesture, which would be its own metronome. The other half is spread over
+     * `1..`[maxHoldTurns], one roll each.
+     *
+     * The roll is taken over twice the range and the top half collapses to zero,
+     * which is what buys the even split. Collapsing at `>= maxHoldTurns` instead
+     * is the off-by-one this had until 2026-09: it costs the longest hold
+     * entirely and drags zero up to two turns in three.
      */
     fun holdTurnsAt(turn: Int): Int {
         if (maxHoldTurns == 0) return 0
         val roll = noise(turn, HoldSalt).mod(maxHoldTurns * 2)
-        return if (roll >= maxHoldTurns) 0 else roll
+        return if (roll > maxHoldTurns) 0 else roll
     }
 
     /**

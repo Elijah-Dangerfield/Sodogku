@@ -68,6 +68,49 @@ class DogLoopScheduleTest {
     }
 
     @Test
+    fun everyHoldLengthIncludingTheLongestComesUp() {
+        // `maxHoldTurns` has to be reachable or the name is a lie, and the roll
+        // is taken over twice the range precisely so that zero lands on half the
+        // turns rather than most of them. Collapsing the top half one step early
+        // loses the longest hold and pushes zero to two turns in three, which
+        // the range check above cannot see.
+        val schedule = DogLoopSchedule(seed = 11, clipCount = 3)
+        val holds = (0 until LongRun).map { schedule.holdTurnsAt(it) }
+
+        assertEquals(
+            (0..MaxHold).toSet(),
+            holds.toSet(),
+            "these hold lengths never came up: ${(0..MaxHold).toSet() - holds.toSet()}",
+        )
+        val zeroShare = holds.count { it == 0 }.toDouble() / holds.size
+        assertTrue(
+            zeroShare > 0.45 && zeroShare < 0.55,
+            "the dog held still on ${1 - zeroShare} of its turns, which is not half",
+        )
+    }
+
+    @Test
+    fun aDogLeftComposedOvernightStillGetsAClip() {
+        // Each turn folds against the one before it, so the answer for turn N is
+        // a walk from zero. As a recursion that walk was the stack: it returned
+        // at 50,000 and overflowed at 100,000, which is roughly forty hours of
+        // one dog on one screen, and less than that on iOS.
+        val schedule = DogLoopSchedule(seed = 9, clipCount = 4)
+
+        val late = schedule.clipAt(DeepTurn)
+
+        assertTrue(late in 0 until 4, "clip $late is not a clip")
+        assertTrue(late != schedule.clipAt(DeepTurn - 1), "the fold stopped holding this far out")
+    }
+
+    @Test
+    fun aTurnBeforeTheFirstOneIsRefused() {
+        // There is no turn -1 to fold against, and the walk would silently
+        // return the sentinel rather than a clip.
+        assertTrue(runCatching { DogLoopSchedule(seed = 0, clipCount = 3).clipAt(-1) }.isFailure)
+    }
+
+    @Test
     fun thePausesAreSpreadAcrossTheClips() {
         // A dog that only ever pauses before the same gesture has a tell.
         //
@@ -118,6 +161,12 @@ class DogLoopScheduleTest {
     private companion object {
         const val Turns = 200
         const val MaxHold = 3
+
+        /** Enough turns for a four-way split to settle. */
+        const val LongRun = 6_000
+
+        /** Past where the recursive form used to overflow the JVM stack. */
+        const val DeepTurn = 1_000_000
 
         /** No clip may own more than this share of the pauses. */
         const val SkewCeiling = 0.6
