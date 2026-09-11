@@ -172,3 +172,24 @@ the owner typed is gone and only they know what it was.
 
 **Worth a look only if it happens again** on a build from 2026-09-10 or later. If
 it does, it is a live capture bug and belongs in `todos.md`, not here.
+
+## SD-57 [P2] — The speed window scales linearly and difficulty does not
+
+**Found by:** the SD-47 agent, 2026-09-10, after doubling the window.
+
+`Scoring.speedWindowMsFor` grows the speed window in proportion to the grid, so
+a 10x10 gets two and a half times a 4x4's allowance per placement. That made the
+median run land inside the window again, which was the fix SD-47 needed.
+
+But a board's actual difficulty grows faster than its side length. Deduction
+depth is what makes a board hard, and it does not scale with the grid the way
+cell count does. So the linear law is a convenient approximation rather than a
+measured one.
+
+**Not worth acting on yet, and that is the point of filing it here.** The
+magnitude is right now, and the scaling law only matters if it is wrong at the
+edges. If telemetry later shows big-board runs bunching at the bottom of the
+ladder again, the law is the next thing to look at rather than the magnitude,
+and that is the thing worth knowing in advance.
+
+**Look at this if:** paw distributions by grid size diverge in the field.

@@ -650,42 +650,6 @@ the policy already describes.
 
 **Hints:** `Telemetry.kt`, `AppTelemetry.kt`, `FeedbackRepository.kt`. No Swift caller:
 `grep setUser apps/ios` is empty. Filed by the SD-6 telemetry review, 2026-09-10.
-## SD-47 [P1] — Five paws looks unreachable on a run that deserves it
-
-**Ask:** Owner, 2026-09-10, two reports ninety seconds apart on `GameRoute`:
-*"I don't know how I possibly could've earned five paws. I did this in five
-seconds with no mistakes"* and *"yeah, I am crushing these puzzles, but still not
-getting five paws."*
-
-Both were filed on `f182418`, which is after `f42d76d` took the ladder from
-three paws to five. So this is the new top rung, not the old one, and a clean
-five-second solve is not reaching it.
-
-**This is the failure mode `ScoringConfig`'s own KDoc warns about, twice.** Once
-at the bottom, where gentle multipliers left the worst completed run at 63% of
-par and one paw was unreachable. Once at the top, where a flat `speedWindowMs`
-pinned the speed multiplier at 1.0 on every board above 6x6, so a clean run
-scored a fixed 73% of par however fast it was played and the third paw at 0.85
-could not be earned. Going from two thresholds to four halves the gaps between
-them, which is exactly when a compressed range stops being survivable.
-
-**Done when:** a perfect run, meaning every placement correct, no strikes, no
-boosters and fast for the board being played, earns five paws on every grid size
-in the campaign, and the five rungs are reachable in proportions somebody has
-looked at rather than assumed.
-
-**Hints:** Measure before touching a number. Sweep every grid size and a range of
-play speeds through `Scoring`, report what fraction of par each run lands at, and
-put the table in the commit. `twoPawFraction` 0.60, `threePawFraction` 0.70,
-`fourPawFraction` 0.78 and `fivePawFraction` 0.85 are four fractions of par
-inside a 25-point band, so check whether the achievable range is even wide enough
-to hold four cuts before deciding the cuts are in the wrong place. If it is not,
-the answer is the multipliers, not the thresholds.
-
-`Scoring.parScore` prices speed at the maximum, so what "100% of par" means is
-itself part of the question. The three `Stat.BestScore` achievements derive from
-`parScore` and must stay reachable. Provenance: Sentry SODOGKU-B and SODOGKU-C,
-session `fd9affc0`, 2026-09-10.
 ## SD-48 [P1] — A rewarded ad is a way to reproduce SD-26
 
 **Ask:** Owner, 2026-09-10, on `GameRoute`: *"both the levels button and the start
@@ -857,7 +821,6 @@ cheap answer, but then `TopDog` is an award for being halfway and its name says
 otherwise. Renaming what a player already earned is its own small betrayal.
 Decide which of those two you would rather explain. `AchievementCounters` and
 `Stat` are where it lives.
-
 ## SD-56 [P2] — An Android shortcut may be pointing at a package that is not installed
 
 **Found by:** the SD-25 agent, 2026-09-10, which flagged it rather than shipping

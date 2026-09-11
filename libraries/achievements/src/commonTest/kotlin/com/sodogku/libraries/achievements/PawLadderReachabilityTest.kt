@@ -74,10 +74,16 @@ class PawLadderReachabilityTest {
         // pack. A `campaignShape` that came back empty, or a `distinct()` that
         // collapsed it to one entry, would make every assertion above vacuous
         // and green.
-        val sizes = LevelCurve.campaign.map { it.size }
+        //
+        // Counted by distinct *size* rather than by band, because a size can be
+        // declared by several bands and is: levels 501 to 1000 are five more
+        // 10x10 bands, so six of them share that size. An earlier version of
+        // this guard asserted one band per size and went red the moment the
+        // campaign grew, which made it a tripwire for the pack rather than for
+        // itself.
+        val sizes = LevelCurve.campaign.map { it.size }.toSet()
 
         assertTrue(sizes.size >= 2, "the campaign declares only $sizes")
-        assertEquals(sizes.toSet().size, sizes.size, "a grid size appears in two bands: $sizes")
         assertTrue(
             shippedShapes().size >= sizes.size * 2,
             "every size should contribute a full board and a starter-dog board",
