@@ -12,6 +12,11 @@ import com.sodogku.libraries.billing.PurchaseOutcome
 import com.sodogku.libraries.billing.RestoreOutcome
 import com.sodogku.libraries.config.AppConfigMap
 import com.sodogku.libraries.core.AppState
+import com.sodogku.libraries.core.logging.EXTRA_APP_EVENT
+import com.sodogku.libraries.core.logging.KLog
+import com.sodogku.libraries.core.logging.LogEntry
+import com.sodogku.libraries.core.logging.LogId
+import com.sodogku.libraries.core.logging.LogTree
 import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.ProgressRepository
 import com.sodogku.libraries.sodogku.Session
@@ -44,6 +49,9 @@ class FakeAdNetwork(
     var prepareCalls = 0
     var showCallsBeforePrepare = 0
 
+    /** Runs while the ad is on screen, for tests about what time does during one. */
+    var whileShowing: () -> Unit = {}
+
     override suspend fun prepare() {
         prepareCalls++
     }
@@ -51,6 +59,7 @@ class FakeAdNetwork(
     override suspend fun show(format: AdFormat): AdShowOutcome {
         if (prepareCalls == 0) showCallsBeforePrepare++
         shown += format
+        whileShowing()
         return outcome
     }
 
@@ -171,7 +180,41 @@ class MutableClock(private var millis: Long = 1_700_000_000_000L) : Clock {
         millis += minutes * 60_000L
     }
 
-    fun advanceSeconds(seconds: Long) {
+    fun advanceSeconds(seconds: Long) = stepBySeconds(seconds)
+
+    /** A wall clock does not only go forward: a time sync steps it either way. */
+    fun stepBySeconds(seconds: Long) {
         millis += seconds * 1_000L
+    }
+}
+
+/** Every app event emitted while it is planted, as name to attributes. */
+class RecordingEvents : LogTree() {
+
+    private val captured = mutableListOf<Pair<String, Map<String, Any?>>>()
+
+    override fun log(entry: LogEntry): LogId? {
+        val name = entry.context.extras[EXTRA_APP_EVENT] as? String ?: return null
+        captured += name to entry.context.extras.filterKeys { it != EXTRA_APP_EVENT }
+        return null
+    }
+
+    fun single(name: String): Map<String, Any?> {
+        val matches = captured.filter { it.first == name }
+        check(matches.size == 1) {
+            "expected exactly one $name, got ${matches.size}. All events: ${captured.map { it.first }}"
+        }
+        return matches.single().second
+    }
+}
+
+/** Runs [block] with a planted [RecordingEvents], uprooting it afterwards. */
+inline fun <T> recordingEvents(block: (RecordingEvents) -> T): T {
+    val events = RecordingEvents()
+    KLog.plant(events)
+    return try {
+        block(events)
+    } finally {
+        KLog.uproot(events)
     }
 }

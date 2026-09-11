@@ -29,6 +29,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.TimeSource
 
 /**
  * The real [AdGate]: every rule about *whether* an ad may be shown, and the one
@@ -75,6 +76,7 @@ class RealAdGate(
     private val session: AdSession,
     private val appScope: AppCoroutineScope,
     private val clock: Clock,
+    private val timeSource: TimeSource.WithComparableMarks,
     private val adsEnabled: AdsEnabled,
     private val newUserGraceLevels: AdsNewUserGraceLevels,
     private val newUserGraceMinutes: AdsNewUserGraceMinutes,
@@ -148,14 +150,20 @@ class RealAdGate(
         // the offline path has its own block screen to put up instead.
         val offered = placement.paywallTrigger?.let { paywall.requestOffer(it) } == true
 
-        val started = now()
+        // Monotonic, unlike everything else timed in this class. A rewarded ad
+        // is a thirty-second window, and a phone steps its wall clock on network
+        // time sync — often right after regaining connectivity, which is also
+        // when the first ad after an offline stretch is requested. One step
+        // during an ad reads back as a negative or hours-long latency, and a
+        // single record like that moves the p90 line for the day.
+        val started = timeSource.markNow()
         network.prepare()
         val outcome = network.show(placement.format)
         logger.logEvent(
             "ads.result",
             "placement" to placement.configId,
             "outcome" to outcome.result.name,
-            "latency_ms" to (now() - started),
+            "latency_ms" to started.elapsedNow().inWholeMilliseconds,
             "error_kind" to outcome.errorKind,
         )
 
@@ -305,6 +313,13 @@ class RealAdGate(
         return levelsSpent || timeSpent
     }
 
+    /**
+     * Wall clock, for the two grace windows only. Both of them are calendar
+     * spans measured across process death — "five minutes since the app was
+     * first opened", "twenty minutes since the first gate we could not serve" —
+     * so they need a number that survives being written to disk. Nothing else
+     * here should reach for it; see the latency measurement in [rewarded].
+     */
     private fun now(): Long = clock.now().toEpochMilliseconds()
 
     private companion object {

@@ -20,6 +20,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
+import kotlin.time.TestTimeSource
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * [RealAdGate], which owns two things worth testing separately.
@@ -50,6 +52,7 @@ class RealAdGateTest : CoroutineTest() {
     private val cache = FakeAdStateCache()
     private val sessions = FakeSessionTracker()
     private val clock = MutableClock()
+    private val elapsed = TestTimeSource()
 
     // ------------------------------------------------------------------
     // Fail open
@@ -444,6 +447,27 @@ class RealAdGateTest : CoroutineTest() {
         assertEquals(emptyList(), paywall.standIns)
     }
 
+    @Test
+    fun theAdClockDoesNotFollowThePhoneClock() = recordingEvents { events ->
+        runUnitTest {
+            // The phone syncs network time while the ad is on screen. That is
+            // not a contrived moment: a sync commonly lands just after
+            // connectivity returns, which is exactly when the first ad after an
+            // offline stretch is requested. Measured on the wall clock this
+            // reported an hour of negative latency, and the ad-funnel board
+            // unwraps `latency_ms` into a p90 by placement, so one such record
+            // in a day is enough to move the line.
+            network.whileShowing = {
+                elapsed += 12.seconds
+                clock.stepBySeconds(-3_600)
+            }
+
+            gate().showRewarded(AdPlacement.BoosterGrant)
+
+            assertEquals(12_000L, events.single("ads.result")["latency_ms"])
+        }
+    }
+
     // ------------------------------------------------------------------
 
     /**
@@ -468,6 +492,7 @@ class RealAdGateTest : CoroutineTest() {
             session = AdSession(sessions),
             appScope = AppCoroutineScope(dispatchers),
             clock = clock,
+            timeSource = elapsed,
             adsEnabled = AdsEnabled(map),
             newUserGraceLevels = AdsNewUserGraceLevels(map),
             newUserGraceMinutes = AdsNewUserGraceMinutes(map),
