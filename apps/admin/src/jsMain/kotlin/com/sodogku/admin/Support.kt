@@ -191,8 +191,8 @@ internal fun conditionsSentence(c: RuleConditions): String {
         c.maxVersionCode?.let { add("build ≤ $it") }
         c.countries?.let { add("country in ${it.joinToString("/")}") }
         c.locales?.let { add("locale in ${it.joinToString("/")}") }
-        c.userAllow?.let { add("user in allowlist (${it.size})") }
-        c.userDeny?.let { add("user not in denylist (${it.size})") }
+        c.userAllow?.let { add("install in allowlist (${it.size})") }
+        c.userDeny?.let { add("install not in denylist (${it.size})") }
         c.rolloutPercent?.let { add("rollout $it%") }
     }
     return if (parts.isEmpty()) "everyone" else parts.joinToString(" and ")

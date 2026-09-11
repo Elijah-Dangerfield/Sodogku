@@ -48,11 +48,11 @@ internal class RuleDraft {
 }
 
 /** Seed a draft from the current lens so "for this target" is one click. */
-private fun draftForTarget(row: FlagRow, target: TargetState): RuleDraft = RuleDraft().apply {
+internal fun draftForTarget(row: FlagRow, target: TargetState): RuleDraft = RuleDraft().apply {
     if (target.platform.isNotBlank()) platforms = target.platform
     if (target.country.isNotBlank()) countries = target.country
     if (target.locale.isNotBlank()) locales = target.locale
-    if (target.userId.isNotBlank()) userAllow = target.userId
+    if (target.installId.isNotBlank()) userAllow = target.installId
     // A version lens defaults to "this version and up".
     if (target.appVersion.isNotBlank()) minAppVersion = target.appVersion
     // Default the value to the opposite of the baked default, the common intent.
@@ -118,10 +118,10 @@ internal fun RuleEditor(
             TextInput(current.countries) { onInput { current.countries = it.value }; placeholder("US,CA") }
             Label { Text("locales") }
             TextInput(current.locales) { onInput { current.locales = it.value }; placeholder("en,es") }
-            Label { Text("user allow") }
-            TextInput(current.userAllow) { onInput { current.userAllow = it.value }; placeholder("uuid,uuid") }
-            Label { Text("user deny") }
-            TextInput(current.userDeny) { onInput { current.userDeny = it.value }; placeholder("uuid,uuid") }
+            Label { Text("install allow") }
+            TextInput(current.userAllow) { onInput { current.userAllow = it.value }; placeholder("install id,install id") }
+            Label { Text("install deny") }
+            TextInput(current.userDeny) { onInput { current.userDeny = it.value }; placeholder("install id,install id") }
             Label { Text("build code min") }
             TextInput(current.minVersionCode) { onInput { current.minVersionCode = it.value }; placeholder("e.g. 42") }
             Label { Text("build code max") }

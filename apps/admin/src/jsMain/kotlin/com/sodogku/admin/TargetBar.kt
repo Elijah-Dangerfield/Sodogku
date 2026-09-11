@@ -24,7 +24,6 @@ internal class TargetState {
     var buildNumber by mutableStateOf("")
     var country by mutableStateOf("")
     var locale by mutableStateOf("")
-    var userId by mutableStateOf("")
     var installId by mutableStateOf("")
 
     fun toRequest(): ResolveRequest = ResolveRequest(
@@ -33,7 +32,6 @@ internal class TargetState {
         buildNumber = buildNumber.trim().toIntOrNull(),
         countryCode = country.trim().ifBlank { null },
         locale = locale.trim().ifBlank { null },
-        userId = userId.trim().ifBlank { null },
         installId = installId.trim().ifBlank { null },
     )
 }
@@ -48,7 +46,7 @@ private fun TargetState.summary(): String = listOfNotNull(
     } ?: buildNumber.trim().ifBlank { null }?.let { "build $it" },
     country.trim().ifBlank { null },
     locale.trim().ifBlank { null },
-    userId.trim().ifBlank { null }?.let { "user ${it.take(8)}…" },
+    installId.trim().ifBlank { null }?.let { "install ${it.take(8)}…" },
 ).joinToString(" · ").ifBlank { "any client" }
 
 /**
@@ -113,10 +111,11 @@ internal fun TargetBar(
             TextInput(target.country) { onInput { target.country = it.value }; placeholder("US") }
             Label { Text("locale") }
             TextInput(target.locale) { onInput { target.locale = it.value }; placeholder("en") }
-            Label { Text("user id") }
-            TextInput(target.userId) { onInput { target.userId = it.value }; placeholder("uuid (for allow/deny + rollout)") }
             Label { Text("install id") }
-            TextInput(target.installId) { onInput { target.installId = it.value }; placeholder("uuid (for rollout)") }
+            TextInput(target.installId) {
+                onInput { target.installId = it.value }
+                placeholder("uuid (for allow/deny + rollout)")
+            }
         }
 
         Div(attrs = { classes("row"); style { property("margin-top", "10px") } }) {

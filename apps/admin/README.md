@@ -55,7 +55,7 @@ way.
 ## Using the tool
 
 - **Target lens.** Set a synthetic client — platform, app version, country,
-  locale, user id, install id — and hit *Resolve*. The flag table then shows,
+  locale, install id — and hit *Resolve*. The flag table then shows,
   per flag: **in-code default → DB base → which rule won → resolved value** for
   that target. This is how you answer "what does a 9.1 / US user actually get."
 - **Flags.** Each flag expands to a detail view: edit the base value, see its
@@ -63,8 +63,10 @@ way.
   brand-new flag by dotted path at the bottom.
 - **Rules / targeting.** Per flag, ordered rules (first match wins, else base):
   platform, **semantic app-version bounds** (`> 1.0.1`), build-code range,
-  country, locale, user-id allow/deny, staged rollout %. "Add rule for this
-  target" pre-fills the conditions from the lens above.
+  country, locale, install-id allow/deny, staged rollout %. "Add rule for this
+  target" pre-fills the conditions from the lens above. The stored condition
+  keys are still spelled `userAllow` / `userDeny`, from before accounts were
+  dropped; they hold install ids and are matched against `X-Install-Id`.
 - **Versions.** What a captured build shipped with — the in-code defaults per
   app version (see the manifest section below).
 - **Audit.** Every change, newest first, with before/after diffs.

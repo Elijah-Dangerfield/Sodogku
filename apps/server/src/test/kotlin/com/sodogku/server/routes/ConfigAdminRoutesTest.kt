@@ -218,6 +218,50 @@ class ConfigAdminRoutesTest {
         }
     }
 
+    /**
+     * The preview's identity axis is the install id, because that is what the
+     * engine matches an allow list against. The console used to offer a "user
+     * id" box beside it whose value this endpoint parsed and dropped, so a rule
+     * seeded from that box previewed as not matching and looked broken.
+     */
+    @Test
+    fun resolve_matchesAnAllowlistRuleOnTheInstallId() = runTest {
+        val allowRule = TargetingRule(
+            id = UUID.randomUUID(),
+            flagPath = "social.enabled",
+            priority = 0,
+            value = JsonPrimitive(true),
+            conditions = RuleConditions(userAllow = setOf("install-abc")),
+            enabled = true,
+            description = "One install",
+        )
+        val repo = FakeRepo().apply {
+            flags += ConfigFlagRecord("social.enabled", JsonPrimitive(false), 0, listOf(allowRule))
+        }
+        testApp(repo) { client ->
+            suspend fun resolved(body: String): String {
+                val resp = client.post("/v1/admin/config/resolve") {
+                    header("X-Admin-Token", token)
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
+                assertEquals(HttpStatusCode.OK, resp.status)
+                val flag = Json.parseToJsonElement(resp.bodyAsText())
+                    .jsonObject["flags"]!!.jsonArray
+                    .single { (it.jsonObject["path"] as JsonPrimitive).content == "social.enabled" }
+                    .jsonObject
+                return (flag["resolved"] as JsonPrimitive).content
+            }
+
+            assertEquals("true", resolved("""{"platform": "android", "installId": "install-abc"}"""))
+            assertEquals("false", resolved("""{"platform": "android", "installId": "install-xyz"}"""))
+            assertEquals("false", resolved("""{"platform": "android"}"""))
+            // A stale console bundle still posts the axis that was removed. It
+            // resolves as if it were not there, which is what it already did.
+            assertEquals("false", resolved("""{"platform": "android", "userId": "install-abc"}"""))
+        }
+    }
+
     @Test
     fun upsertFlag_rejectsWrongType_acceptsRightType() = runTest {
         testApp(FakeRepo(), schemaManifest()) { client ->

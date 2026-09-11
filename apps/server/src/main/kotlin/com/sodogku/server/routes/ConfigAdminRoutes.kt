@@ -402,7 +402,6 @@ private data class ResolveRequest(
     val buildNumber: Int? = null,
     val countryCode: String? = null,
     val locale: String? = null,
-    val userId: String? = null,
     val installId: String? = null,
 )
 

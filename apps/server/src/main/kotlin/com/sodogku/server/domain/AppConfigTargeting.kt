@@ -24,11 +24,15 @@ import java.util.UUID
  *  - [countries] — ISO 3166-1 alpha-2, uppercase (matches `X-Country-Code`).
  *  - [locales] — primary language subtags, lowercase (`"en"`, `"es"`); matches
  *    if any of the client's preferred locales shares a primary subtag.
- *  - [userAllow] / [userDeny] — user-id (UUID string) allow / deny lists.
- *    Deny is a hard veto; allow requires the caller to be a known user in the set.
+ *  - [userAllow] / [userDeny] — **install-id** allow / deny lists, matched
+ *    against `X-Install-Id`. Deny is a hard veto; allow requires the caller to
+ *    send an install id that is in the set, so a client too old to send one
+ *    never matches an allowlist. The `user` spelling is account-era and stays
+ *    because the keys are persisted in stored rule JSON; renaming them is a
+ *    migration, not an edit.
  *  - [rolloutPercent] — 0–100 staged rollout. Deterministic per
- *    (bucket-key, flag): the same user/install always lands in the same bucket,
- *    so ramping the percentage only ever *adds* users, never reshuffles them.
+ *    (bucket-key, flag): the same install always lands in the same bucket,
+ *    so ramping the percentage only ever *adds* installs, never reshuffles them.
  */
 @Serializable
 data class RuleConditions(

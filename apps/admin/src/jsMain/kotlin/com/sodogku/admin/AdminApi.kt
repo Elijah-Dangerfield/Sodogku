@@ -35,6 +35,11 @@ data class RuleConditions(
     val maxAppVersionInclusive: Boolean = true,
     val countries: Set<String>? = null,
     val locales: Set<String>? = null,
+    /**
+     * Install ids, despite the name. The server matches both against
+     * `X-Install-Id`; the account-era spelling survives because these keys are
+     * persisted in stored rule JSON and renaming them needs a migration.
+     */
     val userAllow: Set<String>? = null,
     val userDeny: Set<String>? = null,
     val rolloutPercent: Int? = null,
@@ -127,7 +132,6 @@ data class ResolveRequest(
     val buildNumber: Int? = null,
     val countryCode: String? = null,
     val locale: String? = null,
-    val userId: String? = null,
     val installId: String? = null,
 )
 
