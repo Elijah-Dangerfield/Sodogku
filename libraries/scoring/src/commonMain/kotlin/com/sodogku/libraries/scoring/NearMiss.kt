@@ -1,5 +1,7 @@
 package com.sodogku.libraries.scoring
 
+import kotlin.math.ceil
+
 /**
  * How close a run came to the next paw, when it is worth saying.
  *
@@ -59,7 +61,21 @@ fun Scoring.nearMiss(
         else -> return null
     }
 
-    val needed = (par * nextFraction).toInt()
+    // Rounded up, because `paws` awards on `score >= par * fraction` and
+    // compares the Double. The smallest *score* that clears the rung is
+    // therefore the ceiling of the product, and this used to take the floor.
+    //
+    // That is not a rounding quibble, it is wrong twice, and on 221 of the 224
+    // (size, tier, placements, rung) combinations the campaign ships, because
+    // `par * fraction` is a whole number on only 3 of them. A score sitting
+    // exactly on the floor does not earn the paw, and the old arithmetic made
+    // `short` zero there, so the closest possible miss in the whole game got no
+    // line at all. And every gap that *was* reported was one point light: a run
+    // told it needed 10 more scored 10 more and stayed on the same rung.
+    //
+    // The number is the only thing this file offers, and a number the player can
+    // act on and be wrong about is worse than no number.
+    val needed = ceil(par * nextFraction).toInt()
     val short = needed - score
     if (short <= 0) return null
     if (short > par * NearMissFraction) return null
