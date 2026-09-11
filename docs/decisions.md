@@ -6,6 +6,81 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-10: the spec is deleted, and the two reversals it was the last copy of
+
+The spec doc is gone, replaced by `docs/reference/features.md`. Almost
+everything in it that was a genuine reversal already has an entry here, which is
+the point of this log working. Two did not, and this entry is them.
+
+The rest of the spec's reversals are accounted for and need no rescuing: bones
+going global, the single-bone revive, the give-up control, the `upgrade.*`
+naming, the mistyped boolean, Play Billing 8, the deleted ad formats, the
+blocking gate being a screen rather than a sheet, the throwaway tutorial board,
+the touch-target floor, the sprite sheets, the derived streak, and the
+auto-mark default all have dated entries below. The treat schedule's move off a
+flat every-fifth rule, the compressed scoring multipliers, the skip's
+forward-only day, and the level pane showing every level instead of silhouettes
+are all argued in code KDoc that outlives the file.
+
+### Leaderboards reverse a stated v1 non-goal, and the reversal is now complete
+
+The spec listed "no social features, no friends, no leaderboards" as a v1
+non-goal, and `proposals.md` refused them for a reason that was correct at the
+time: identity was deleted rather than disabled, and anything that ranks players
+needs to know who they are.
+
+The 2026-09-08 entry below took the first bite, on the grounds that Game Center
+is the exception on exactly that axis. It ends by saying a weekly board "is the
+real gap, and it is not built". It is built now, on both the missing halves it
+named: `score_event` gives `:libraries:progress` a "points banked since a date"
+it did not have, and Game Center's recurring occurrence supplies the window, so
+the device never decides where a week starts.
+
+Android arrived at the same time through Play Games Services, which reverses the
+non-goal a second time and on weaker ground than Game Center did, because Play
+Games is not as clean a boundary as Apple's. It is still nothing we host and
+nothing we store per player, so the cost stays "a platform account the player
+already has or does not".
+
+**What is actually different from the non-goal, and what is not.** The non-goal
+was about *us* running a social system. Three boards later there is still no
+account here, no server that receives a per-player result, no friends graph and
+no display name we own or moderate. The line held; what moved is the assumption
+that a leaderboard requires crossing it.
+
+Play Games has no recurring board, so the weekly one is iOS-only. That is a real
+asymmetry and it is deliberate rather than unfinished: the alternative is a
+window we compute ourselves, which is the thing the Game Center entry rejected
+for the daily and for the same reason.
+
+### The pack ships its answers, and the reason it was safe has changed
+
+`LevelDefinition` justifies shipping each level's solution inside the binary with
+"for a single-player game with no leaderboard that is worth nothing". Every word
+of the trade still holds except its premise, and this is the one place in the
+codebase where a leaderboard changed an argument that was made without one.
+
+**It stays, and the KDoc says why in narrower terms.** The boards are not
+defensible against someone who unzips the app, and are not claimed to be. What a
+board ranks is a fraction of par, and par prices every placement at full combo
+and a zero-millisecond tap, so a run still has to be *played*: knowing where the
+dogs go skips the reasoning, not the pace, not the clock and not the bones. A
+cheat worth having means a modified client, and no client-side secret survives
+one.
+
+**What was rejected.** Encrypting or obfuscating the pack buys nothing against
+the only attacker who matters and costs the property that makes it worth
+shipping, which is that a tap is an array lookup rather than a solve on the cold
+path of every move. Server-side verification needs a server that receives
+results, which is the non-goal itself. Dropping the boards to protect the packs
+trades a feature people use for a threat nobody has demonstrated.
+
+The honest position is that these boards are for the players who want one, not a
+competitive ladder, and the first time somebody tops one with an implausible
+number is when that gets revisited.
+
+---
+
 ## 2026-09-10: Top Dog is moved to 1,000 rather than left at halfway
 
 The campaign grew from 500 levels to 1,000 today. `TopDog` stayed at 500, so a

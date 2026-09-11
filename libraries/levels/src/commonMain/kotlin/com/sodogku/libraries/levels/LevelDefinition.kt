@@ -10,9 +10,16 @@ enum class PackKind { Campaign, Daily }
  * One shipped level: the board, its verified answer, and how hard it is.
  *
  * The solution ships with the level. A determined player can unzip the app and
- * read it, which for a single-player game with no leaderboard is worth nothing,
- * and having it makes checking a tap an array lookup instead of a solve on the
- * cold path of every single move.
+ * read it, and having it makes checking a tap an array lookup instead of a
+ * solve on the cold path of every single move.
+ *
+ * That trade was originally argued from "no leaderboard", and there are three
+ * now, so the honest version is narrower: the boards are not defensible and are
+ * not claimed to be. The score a leaderboard ranks is a fraction of par that
+ * still has to be *played*, on a clock, without losing bones, so knowing the
+ * answer skips the reasoning and not the pace. A cheat that mattered would need
+ * a modified client, which no client-side secret survives anyway. See
+ * `docs/decisions.md`.
  *
  * There is deliberately no par score or paw threshold here. Those are derived at
  * runtime from [size] and [difficulty] with coefficients that live in remote

@@ -7,11 +7,11 @@ import kotlin.test.assertTrue
 /**
  * A doc reference in a KDoc or in another doc has to point at something that exists.
  *
- * This is the guard `docs/SPEC.md` never had. Around 145 `SPEC <n>` citations were
- * scattered through KDoc, tests, string resources and other docs, and every one of
- * them was a link nothing could check. When the sections behind them stopped being
- * true nothing failed, and when the file was finally deleted they would all have
- * gone on reading as though it were still there.
+ * This is the guard the deleted spec doc never had. Around 200 `SPEC <n>`
+ * citations were scattered through KDoc, tests, string resources and other docs,
+ * and every one of them was a link nothing could check. When the sections behind
+ * them stopped being true nothing failed, and when the file was finally deleted
+ * they would all have gone on reading as though it were still there.
  *
  * Two rules, and the second is the one that matters.
  *
@@ -183,6 +183,7 @@ class DocReferencesResolveTest {
 
     private fun File.isScannable(): Boolean {
         if (!isFile || extension !in SCANNED_EXTENSIONS) return false
+        if (toRelativeString(File(repoRoot())) in NOT_SCANNED) return false
         // `.claude` holds agent worktrees, which are full checkouts of this repo.
         return path.split(File.separatorChar).none { it == "build" || it == ".claude" }
     }
@@ -213,6 +214,16 @@ class DocReferencesResolveTest {
         val CROSS_REPO = setOf("docs/PORT-CANDIDATES.md")
         val SCANNED_ROOTS = listOf("docs", "libraries", "features", "apps", "ops", "tools")
         val SCANNED_EXTENSIONS = setOf("kt", "kts", "md", "swift", "xml")
+
+        /**
+         * The two queues, and the only files here allowed to name a doc that
+         * does not exist.
+         *
+         * A work item's whole job is to describe work not done yet, so it names
+         * the file it is asking somebody to write. Scanning them would mean a
+         * ticket could not say what it wants until after it was finished.
+         */
+        val NOT_SCANNED = setOf("docs/todos.md", "docs/backlog.md")
 
         /**
          * Floors, not counts. They exist so a scan that silently matches nothing
