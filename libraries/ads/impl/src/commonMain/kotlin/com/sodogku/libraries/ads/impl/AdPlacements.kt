@@ -3,7 +3,6 @@ package com.sodogku.libraries.ads.impl
 import com.sodogku.libraries.ads.AdFormat
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.billing.PaywallTrigger
-import com.sodogku.libraries.config.values.AdsRewardedPlacements
 
 /** Which SDK format a placement asks the network for. SPEC 5.3. */
 internal val AdPlacement.format: AdFormat
@@ -13,20 +12,6 @@ internal val AdPlacement.format: AdFormat
         AdPlacement.SkipLevel,
         AdPlacement.StreakFreeze,
         -> AdFormat.Rewarded
-    }
-
-/**
- * The `ads.rewardedPlacements` key, and the `placement` attribute on every
- * `ads.*` event. `level_complete` has no entry in that map — it is an
- * interstitial, gated by frequency rather than by an enable switch — but it
- * still needs a stable name for telemetry.
- */
-internal val AdPlacement.configId: String
-    get() = when (this) {
-        AdPlacement.ContinueLevel -> AdsRewardedPlacements.CONTINUE_LEVEL
-        AdPlacement.BoosterGrant -> AdsRewardedPlacements.BOOSTER_GRANT
-        AdPlacement.SkipLevel -> AdsRewardedPlacements.SKIP_LEVEL
-        AdPlacement.StreakFreeze -> AdsRewardedPlacements.STREAK_FREEZE
     }
 
 /**

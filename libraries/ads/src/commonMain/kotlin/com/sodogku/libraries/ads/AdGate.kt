@@ -19,18 +19,31 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * impressions and cost nothing to delete, and leaving it would have meant the
  * one ad nobody asked for was a single call site away from shipping by accident.
  */
-enum class AdPlacement {
+enum class AdPlacement(
+    /**
+     * The one name this placement answers to outside Kotlin: the key
+     * `ads.rewardedPlacements` is gated on, and the `placement` attribute on
+     * **every** event that names a placement — the ad events and the
+     * `game.bones_refilled` the ad paid for.
+     *
+     * It lives on the enum rather than on an extension in `:libraries:ads:impl`
+     * because the game emits a placement too and cannot see an impl module. It
+     * reached for `.name` instead, so the refill said `ContinueLevel` where the
+     * ad said `continue_level` and one query could not have both.
+     */
+    val configId: String,
+) {
     /** Third strike: restore a life and keep the board. */
-    ContinueLevel,
+    ContinueLevel("continue_level"),
 
     /** Earn a Sniff or a Treat. */
-    BoosterGrant,
+    BoosterGrant("booster_grant"),
 
     /** Skip the level, after two failed attempts. */
-    SkipLevel,
+    SkipLevel("skip_level"),
 
     /** Cover a missed daily and keep the streak. */
-    StreakFreeze,
+    StreakFreeze("streak_freeze"),
 }
 
 /** How a rewarded ad ended. */

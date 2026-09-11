@@ -162,7 +162,7 @@ a session join.
 | `daily.reviewed` | `date`, `outcome` | A day that was already played was reopened on its result. Deliberately not `daily.started`: a visit to a finished day is not an attempt, and folding it into the start event would inflate every daily funnel |
 | `daily.freeze_used` | `streak` | A rewarded ad covered a missed day |
 | `daily.streak_restored` | `days`, `streak` | A rewarded ad bridged a whole run of missed days. Shares the `streak_freeze` ad placement with `daily.freeze_used`, so these two events are the only way to tell the two products apart in reporting. `days` is what makes that worth doing: a restore is priced the same as a freeze and buys two or three times as much, so its rate against the freeze's is the number that says whether the reach is set anywhere near right |
-| `game.bones_refilled` | `level_id`, `to`, `placement` | The one way back from zero: the standing ad offer on the board, or the revive on the lose sheet. `to` is the resulting holding, not the amount granted — the refill never reduces, so the two differ above the floor. `placement` distinguishes the two call sites (`ContinueLevel` from the lose sheet, `BoosterGrant` from the board), which is the split the rewarded-placement config gates on. Replaced `game.continued`, whose button granted a single bone for the same ad and is gone |
+| `game.bones_refilled` | `level_id`, `to`, `placement` | The one way back from zero: the standing ad offer on the board, or the revive on the lose sheet. `to` is the resulting holding, not the amount granted — the refill never reduces, so the two differ above the floor. `placement` is the id the ad events carry, not the enum name: `continue_level` from the lose sheet, `booster_grant` from the standing offer on the board. That is the split `ads.rewardedPlacements` gates on, and it is what lets "of the `continue_level` ads that were rewarded, how many actually refilled the board" be `ads.result` joined to this on one literal. Replaced `game.continued`, whose button granted a single bone for the same ad and is gone |
 | `game.booster_used` | `booster` (`sniff`/`treat`), `level_id` | A charge is actually spent |
 | `game.booster_no_op` | `booster`, `level_id`, `difficulty` | A booster was asked for and **declined to spend**, because it had nothing to show. Should be rare; a rise means the hint engine is running out of things to say earlier than it should, which is a difficulty-calibration signal and not a UI one |
 | `game.booster_refilled` | `booster`, `to` | An ad topped a consumable up. `to` is the resulting holding, not the amount granted — refills never reduce, so the two differ for anyone above the floor |
@@ -272,9 +272,11 @@ Two more SPEC §14 names that are deliberately *not* coming, argued elsewhere on
 
 Emitted by `RealAdGate` (`:libraries:ads:impl`), `RealPaywallCoordinator` and
 `RealEntitlements` (`:libraries:billing:impl`). `placement` is the id from SPEC 5.3
-(`level_complete`, `continue_level`, `booster_grant`, `skip_level`, `streak_freeze`) and is
-the same string `ads.rewardedPlacements` is keyed on, so a config change and its effect on
-the funnel line up without a lookup table.
+(`continue_level`, `booster_grant`, `skip_level`, `streak_freeze`), it lives on
+`AdPlacement.configId`, and it is the same string `ads.rewardedPlacements` is keyed on — so a
+config change and its effect on the funnel line up without a lookup table. Every event that
+names a placement uses it, including `game.bones_refilled`, which is emitted by the game and
+not by the ad layer.
 
 **There is no event for an ad the gate declined to show.** Suppressions are the normal
 case — a player in the new-user grace generates one per level — and at that volume the

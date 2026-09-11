@@ -1728,6 +1728,33 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun aRefillNamesItsPlacementTheWayTheAdEventsDo() = recordingEvents { events ->
+        runUnitTest {
+            // The literals, not `AdPlacement.x.configId`, because what is under
+            // test is the string on the wire. `ads.result` writes these same two
+            // and the obvious question after a bad fill day — of the
+            // `continue_level` ads that were rewarded, how many actually
+            // refilled the board — is one joined to the other on `placement`.
+            // It used to answer "all of the ads, none of the refills".
+            val vm = viewModel()
+            vm.commit(cellFor(row = 0))
+            repeat(ScoringConfig.MAX_LIVES) { vm.commit(tappableWrongCell(vm)) }
+            assertEquals(GamePhase.Lost, vm.state.phase)
+
+            vm.takeAction(GameAction.RefillBones)
+            settle()
+            vm.takeAction(GameAction.RefillBones)
+            settle()
+
+            assertEquals(
+                listOf("continue_level", "booster_grant"),
+                events.attributesOf("game.bones_refilled").map { it["placement"] },
+                "the revive and the standing offer must name their placements the way the ad does",
+            )
+        }
+    }
+
+    @Test
     fun aPlayerAtZeroWithNoNetworkIsNeverStuck() = runUnitTest {
         // The load-bearing rule of the whole ad layer, and since bones went
         // global it is the only thing standing between a player at zero and a

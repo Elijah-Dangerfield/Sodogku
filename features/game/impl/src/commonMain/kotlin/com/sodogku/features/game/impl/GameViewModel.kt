@@ -2093,7 +2093,12 @@ class GameViewModel(
             "game.bones_refilled",
             "level_id" to levelId,
             "to" to topped,
-            "placement" to placement.name,
+            // `configId`, not `name`. This is the other half of the ad the
+            // refill was paid for, and "of the continue_level ads that were
+            // rewarded, how many actually refilled the board" is `ads.result`
+            // joined to this on `placement`. An enum name here makes that join
+            // return the ad side and zero refills.
+            "placement" to placement.configId,
         )
     }
 
