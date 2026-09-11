@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "`ads.gate_shown` → `ads.result`, by placement and platform (SPEC §14).\n\n**Watch no-fill.** Every no-fill is a reward given away, and SPEC 5.3 says that is the *correct* behaviour — so this board is measuring cost, not faults. The same goes for `outcome=Rewarded` with an `error_kind` set: SPEC 4.2 requires that an ad failure never costs the player the reward, so that combination is expected.\n\n**There is no event for an ad the gate declined to show.** Suppressed interstitials are the normal case — a player inside the new-user grace generates one per level — and at that volume the funnel would be mostly noise. They log at debug and stay out of Loki. The one suppression worth counting is `outcome=granted_without_ad`, which is here, because it means a reward was paid for nothing.\n\n**Use `device_offline`, not `is_offline`, on `ads.gate_shown`.** Every record carries an `is_offline` stamped by the export tree, and that is the app-wide banner signal — true when our *backend* is unreachable as well as when the device is. The offline grace reads the OS signal alone, so the event carries it under its own name. They were briefly the same key, and which one won was decided by the order of two lines in the log forwarder.\n\n**Loki-backed, so nothing here can see past Grafana Cloud's log retention.** Widening the time picker does not widen the answer.\n\n**Delivery is at-least-once.** A record can rarely ship twice (export acknowledged, process died before the buffer delete), so read raw counts as approximate. Panels that count *installs* rather than records are immune to it by construction — a duplicate lands in the same `install_id` series and collapses.",
+  "description": "`ads.gate_shown` → `ads.result`, by placement and platform (SPEC §14).\n\n**Watch no-fill.** Every no-fill is a reward given away, and SPEC 5.3 says that is the *correct* behaviour — so this board is measuring cost, not faults. The same goes for `outcome=Rewarded` with an `error_kind` set: SPEC 4.2 requires that an ad failure never costs the player the reward, so that combination is expected.\n\n**There is no event for an ad the gate declined to show.** Suppressed gates are the normal case — a player inside the new-user grace generates one per level — and at that volume the funnel would be mostly noise. They log at debug and stay out of Loki. The one suppression worth counting is `outcome=granted_without_ad`, which is here, because it means a reward was paid for nothing.\n\n**Use `device_offline`, not `is_offline`, on `ads.gate_shown`.** Every record carries an `is_offline` stamped by the export tree, and that is the app-wide banner signal — true when our *backend* is unreachable as well as when the device is. The offline grace reads the OS signal alone, so the event carries it under its own name. They were briefly the same key, and which one won was decided by the order of two lines in the log forwarder.\n\n**Loki-backed, so nothing here can see past Grafana Cloud's log retention.** Widening the time picker does not widen the answer.\n\n**Delivery is at-least-once.** A record can rarely ship twice (export acknowledged, process died before the buffer delete), so read raw counts as approximate. Panels that count *installs* rather than records are immune to it by construction — a duplicate lands in the same `install_id` series and collapses.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -39,7 +39,7 @@
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "description": "Every `ads.gate_shown`: a rewarded gate entered, or an interstitial that passed all three frequency gates.\n\nThe denominator for this board and its floor. Suppressed interstitials are deliberately **not** counted — they are the normal case and would drown the funnel in noise.",
+      "description": "Every `ads.gate_shown`: a rewarded gate the player entered. Since `b3cac22` that is the only kind there is.\n\nThe denominator for this board and its floor. Suppressed gates are deliberately **not** counted — they are the normal case and would drown the funnel in noise.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -102,7 +102,7 @@
         "type": "mixed",
         "uid": "-- Mixed --"
       },
-      "description": "Ads that actually played, over gates reached.\n\n`Rewarded` and `Completed` are both a watched ad — the first is the rewarded callback, the second the interstitial's. Everything missing from 100% is a reward the player got without the network paying for it.",
+      "description": "Ads that actually played, over gates reached.\n\n`Rewarded` is the only outcome that means the network served one and the player watched it. This panel also counted `Completed`, the interstitial's callback, until `b3cac22` deleted the interstitial and `AdShowResult.Completed` with it; the alternation outlived the value by two days and nothing looked wrong, because `Rewarded` still matched. Everything missing from 100% is a reward the player got without the network paying for it.",
       "fieldConfig": {
         "defaults": {
           "decimals": 1,
@@ -156,7 +156,7 @@
             "uid": "grafanacloud-logs"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({service_name=\"sodogku-client\", deployment_environment=\"$env\"} | event_name=\"ads.result\" | outcome=~\"Rewarded|Completed\" [$__range]))",
+          "expr": "sum(count_over_time({service_name=\"sodogku-client\", deployment_environment=\"$env\"} | event_name=\"ads.result\" | outcome=\"Rewarded\" [$__range]))",
           "refId": "A",
           "queryType": "instant"
         },

@@ -3,6 +3,7 @@ package com.sodogku.libraries.telemetry.impl
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 import kotlinx.serialization.json.Json
@@ -203,39 +204,89 @@ class DashboardQueryContractTest {
     }
 
     /**
-     * The other half of the same contract: the `outcome` values the paywall board
-     * filters on have to be values the app can actually produce.
+     * The other half of the same contract: the values a panel filters on have to
+     * be values the app can actually produce.
      *
      * The test above stops the emit site reaching for a name R8 can rewrite. This
-     * one stops the literal that replaced it drifting away from the query — which
-     * is the same empty panel arriving by a different route, and the reason the
-     * names live on the sealed types rather than in a keep rule.
+     * one stops the vocabulary that replaced it drifting away from the query —
+     * the same empty panel arriving by a different route.
      *
-     * Only the `iap.*` events, because they are the only ones whose vocabulary is
-     * declared in one readable place. `ads.result` mixes an enum with a synthetic
-     * `granted_without_ad` and is not extractable this way.
+     * It started life covering only the `iap.*` events. `ads.result` was left out
+     * as "an enum mixed with a synthetic literal, not extractable this way", and
+     * that exemption is what let `outcome=~"Rewarded|Completed"` survive the
+     * deletion of `AdShowResult.Completed` (SD-58). The panel did not even go
+     * empty, which is worse: `Rewarded` still matched, so the number kept drawing
+     * and kept being half of what its title claimed. The mix is the ordinary
+     * case, so it is handled rather than excused — see [producibleValues].
      */
     @Test
-    fun everyIapOutcomeTheDashboardsFilterOnIsOneTheAppCanEmit() {
-        val declared = declaredOutcomeNames()
+    fun everyFilteredValueIsOneTheAppCanEmit() {
         val unknown = dashboards.flatMap { dashboard ->
             dashboard.queries.flatMap { query ->
-                query.events.mapNotNull { event -> IAP_OUTCOME_EVENTS[event]?.let { event to it } }
-                    .flatMap { (event, type) ->
-                        val names = declared[type].orEmpty()
-                        query.equalities["outcome"].orEmpty()
-                            .filter { it !in names }
-                            .map { "${dashboard.file} · $event: outcome=\"$it\" (emits $names)" }
+                query.events.flatMap { event ->
+                    query.equalities.flatMap { (attribute, values) ->
+                        val producible = producibleValues(event, attribute) ?: return@flatMap emptyList()
+                        values.filter { it !in producible }
+                            .map { "${dashboard.file} · $event: $attribute=\"$it\" (emits ${producible.sorted()})" }
                     }
+                }
             }
         }.distinct().sorted()
 
         assertTrue(
             unknown.isEmpty(),
-            "These panels filter on an `outcome` the event's sealed type does not declare, so " +
-                "they render empty:\n" + unknown.joinToString("\n") { "  $it" } +
-                "\n\nEither the query drifted or a `name` in libraries/billing/.../Entitlements.kt " +
-                "was renamed without its dashboard.",
+            "These panels filter on a value the emitting code cannot produce, so they count less " +
+                "than their title claims and nothing anywhere errors:\n" +
+                unknown.joinToString("\n") { "  $it" } +
+                "\n\nEither the query drifted or the vocabulary was edited without its dashboard. " +
+                "The emitting code wins.",
+        )
+    }
+
+    /**
+     * The guard on the guard above: a value check is only worth anything on the
+     * pairs it actually covers, and [producibleValues] returns null — checks
+     * nothing — for any pair whose emit sites it cannot read.
+     *
+     * Left implicit, that is a check that quietly switches itself off. An emit
+     * site refactored from `outcome.result.name` to a local `val label` would
+     * take `ads.result` out of the value check with no diff anywhere near a test.
+     * So every filtered pair has to be readable, or be listed in
+     * [OPEN_VALUE_ATTRIBUTES] with the reason it cannot be. Stale exemptions are
+     * reported too, so the list shrinks as emit sites get more legible.
+     */
+    @Test
+    fun everyFilteredAttributeIsCheckableOrSaysWhyNot() {
+        val filtered = dashboards.flatMap { dashboard ->
+            dashboard.queries.flatMap { query ->
+                query.events.flatMap { event -> query.equalities.keys.map { event to it } }
+            }
+        }.distinct()
+
+        val unreadable = filtered
+            .filter { it !in OPEN_VALUE_ATTRIBUTES && producibleValues(it.first, it.second) == null }
+            .map { (event, attribute) -> "$event · $attribute (emits ${emitted[event].orEmpty()[attribute].orEmpty()})" }
+            .sorted()
+
+        assertTrue(
+            unreadable.isEmpty(),
+            "A dashboard filters these on a value, and the emit site does not spell the vocabulary " +
+                "in a way this test can read, so nothing checks the filter:\n" +
+                unreadable.joinToString("\n") { "  $it" } +
+                "\n\nEmit a string literal or an enum's `.name` and register the declaring type in " +
+                "VALUE_SOURCES, or add the pair to OPEN_VALUE_ATTRIBUTES with the reason.",
+        )
+
+        val stale = OPEN_VALUE_ATTRIBUTES
+            .filter { it in filtered && producibleValues(it.first, it.second) != null }
+            .map { (event, attribute) -> "$event · $attribute" }
+            .sorted()
+
+        assertTrue(
+            stale.isEmpty(),
+            "These are exempt from the value check and no longer need to be:\n" +
+                stale.joinToString("\n") { "  $it" } +
+                "\n\nDrop them from OPEN_VALUE_ATTRIBUTES.",
         )
     }
 
@@ -387,12 +438,73 @@ class DashboardQueryContractTest {
         )
         assertEquals(mapOf("outcome" to setOf("NoFill", "Offline")), negated.equalities)
 
-        val outcomes = declaredOutcomeNames()
         assertEquals(
             setOf("Success", "Cancelled", "AlreadyOwned", "Unavailable", "Failed"),
-            outcomes["PurchaseOutcome"],
+            vocabularyOf(VALUE_SOURCES.getValue("iap.purchase_result" to "outcome")),
         )
-        assertEquals(setOf("Restored", "NothingToRestore", "Failed"), outcomes["RestoreOutcome"])
+        assertEquals(
+            setOf("Restored", "NothingToRestore", "Failed"),
+            vocabularyOf(VALUE_SOURCES.getValue("iap.restore_result" to "outcome")),
+        )
+        assertEquals(
+            setOf("Rewarded", "Dismissed", "NoFill", "Offline", "NotShown", "Failed"),
+            vocabularyOf(VALUE_SOURCES.getValue("ads.result" to "outcome")),
+            "the enum reader lost or invented an AdShowResult entry",
+        )
+
+        // The enum body is mostly KDoc, and KDoc is prose, and prose has commas
+        // in it. Split before the comments come out and every sentence fragment
+        // is an entry.
+        assertEquals(
+            setOf("Rewarded", "Dismissed"),
+            readEnumEntries(
+                """
+                enum class Fixture {
+                    /** Watched, in full, to the end. */
+                    Rewarded,
+
+                    // Closed early, on purpose, by the player.
+                    Dismissed,
+                }
+                """.trimIndent(),
+                "Fixture",
+            ),
+        )
+
+        // `granted_without_ad` is emitted as a literal and belongs to no enum, so
+        // a reader that only knew about enums would report the panel counting it
+        // as broken.
+        val adOutcomes = assertNotNull(producibleValues("ads.result", "outcome"))
+        assertTrue(
+            "granted_without_ad" in adOutcomes && "Rewarded" in adOutcomes,
+            "ads.result mixes an enum with a synthetic literal and the reader has to hold both, " +
+                "found $adOutcomes",
+        )
+        assertTrue(
+            "Completed" !in adOutcomes,
+            "the reader still believes in AdShowResult.Completed, deleted with the interstitial",
+        )
+        assertEquals(
+            null,
+            producibleValues("game.level_completed", "mode"),
+            "`mode` is emitted from a local, so nothing can be proved about it and the value " +
+                "check has to stand down rather than fail a correct query",
+        )
+
+        val checkedValues = dashboards.sumOf { d ->
+            d.queries.sumOf { q ->
+                q.events.sumOf { event ->
+                    q.equalities.entries.sumOf { (attribute, values) ->
+                        if (producibleValues(event, attribute) == null) 0 else values.size
+                    }
+                }
+            }
+        }
+        assertTrue(
+            checkedValues >= MINIMUM_CHECKED_VALUES,
+            "only $checkedValues filtered values were held against a vocabulary, so the value " +
+                "check is reading nothing",
+        )
 
         val rejected = runCatching {
             parseQuery("sum(count_over_time({service_name=\"sodogku-client\"} | json | level=\"x\" [1d]))", null)
@@ -403,6 +515,41 @@ class DashboardQueryContractTest {
                 "nothing from it and report no violations",
         )
     }
+
+    /**
+     * Every value the app can put in `attribute` on `event`, or null when that
+     * cannot be established from the emit sites.
+     *
+     * One event's vocabulary is usually not one thing. `ads.result` writes
+     * `outcome` from three expressions: `outcome.result.name`, an
+     * `AdShowResult.Offline.name` on the offline path, and the bare literal
+     * `"granted_without_ad"` when the reward is free. The union of what those can
+     * produce is the answer, so a literal contributes itself and a `.name`
+     * contributes whatever [VALUE_SOURCES] says the declaring type holds.
+     *
+     * **Null rather than an empty set, and the difference matters.** An empty set
+     * would fail every query against the attribute; null means "no claim", and
+     * the check stands down. Anything else — a local, a helper call, a `when`
+     * inlined into the argument — is unreadable from here, and one unreadable
+     * expression poisons the pair, because the values it can produce are exactly
+     * the ones a stale filter would be hiding behind.
+     * [everyFilteredAttributeIsCheckableOrSaysWhyNot] is what stops that turning
+     * into a silent exemption.
+     */
+    private fun producibleValues(event: String, attribute: String): Set<String>? {
+        val expressions = emitted[event].orEmpty()[attribute].orEmpty().ifEmpty { return null }
+        val values = mutableSetOf<String>()
+        expressions.forEach { expression ->
+            when {
+                STRING_LITERAL.matches(expression) -> values += expression.trim('"')
+                expression.endsWith(NAME_SUFFIX) ->
+                    values += vocabularyOf(VALUE_SOURCES[event to attribute] ?: return null)
+
+                else -> return null
+            }
+        }
+        return values
+    }
 }
 
 private const val REPO_ROOT_PROPERTY = "sodogku.repoRoot"
@@ -412,6 +559,7 @@ private const val REGISTRY_PROPERTY = "sodogku.appEventsRegistry"
 /** Floors, not real counts — see [DashboardQueryContractTest.bothReadersCanActuallyFail]. */
 private const val MINIMUM_EMITTED_EVENTS = 25
 private const val MINIMUM_CHECKED_PAIRS = 40
+private const val MINIMUM_CHECKED_VALUES = 8
 private const val MINIMUM_SOURCE_FILES = 200
 private const val MINIMUM_REGISTERED_EVENTS = 25
 
@@ -682,55 +830,128 @@ private val STRINGY_VALUE = Regex("""^"|\.name\b|\.toString\(\)|simpleName|\.low
  */
 private val CLASS_NAME_VALUE = Regex("""::class(\.java)?\.(simpleName|qualifiedName|name\b)""")
 
-/** The event each sealed type reports its `name` on. */
-private val IAP_OUTCOME_EVENTS = mapOf(
-    "iap.purchase_result" to "PurchaseOutcome",
-    "iap.restore_result" to "RestoreOutcome",
-)
+/** Where a closed vocabulary is written down, and in which of the two shapes. */
+private data class ValueSource(val path: String, val type: String, val declaredNames: Boolean)
 
 private const val ENTITLEMENTS_PATH =
     "libraries/billing/src/commonMain/kotlin/com/sodogku/libraries/billing/Entitlements.kt"
+private const val AD_NETWORK_PATH =
+    "libraries/ads/src/commonMain/kotlin/com/sodogku/libraries/ads/AdNetwork.kt"
+private const val TUTORIAL_PATH =
+    "features/game/impl/src/commonMain/kotlin/com/sodogku/features/game/impl/Tutorial.kt"
+
+/**
+ * The type behind each `.name` an emit site writes into an attribute a dashboard
+ * filters on.
+ *
+ * Only `.name` expressions need an entry: a string literal at the emit site is
+ * already its own vocabulary and the scan has it verbatim. The expression cannot
+ * name its own type (`result.name` says nothing about `PurchaseOutcome`), which
+ * is the whole reason this table is written by hand instead of derived.
+ */
+private val VALUE_SOURCES: Map<Pair<String, String>, ValueSource> = mapOf(
+    ("iap.purchase_result" to "outcome") to ValueSource(ENTITLEMENTS_PATH, "PurchaseOutcome", declaredNames = true),
+    ("iap.restore_result" to "outcome") to ValueSource(ENTITLEMENTS_PATH, "RestoreOutcome", declaredNames = true),
+    ("ads.result" to "outcome") to ValueSource(AD_NETWORK_PATH, "AdShowResult", declaredNames = false),
+    ("tutorial.step_viewed" to "step") to ValueSource(TUTORIAL_PATH, "TutorialStep", declaredNames = false),
+)
+
+/**
+ * Filtered pairs whose vocabulary is not written anywhere a text scan can find,
+ * with the reason, checked for staleness by
+ * [DashboardQueryContractTest.everyFilteredAttributeIsCheckableOrSaysWhyNot].
+ *
+ * All five are the same shape: the emit site passes a local, so the values live
+ * in an expression somewhere above the `logEvent` call rather than in a type.
+ * Both vocabularies are two-valued and neither has changed since it was written,
+ * so the cost of not checking them is low — but they are here rather than
+ * silently skipped, because the pair that goes unchecked without anybody
+ * deciding it should is how SD-58 lasted.
+ */
+private val OPEN_VALUE_ATTRIBUTES = setOf(
+    // `modeName`, a `daily`/`campaign` getter on GameViewModel.
+    "game.level_started" to "mode",
+    "game.level_completed" to "mode",
+    "game.level_failed" to "mode",
+    // Booleans, stringified by the log tree.
+    "tutorial.completed" to "skipped",
+    "onboarding.completed" to "skipped_tutorial",
+)
+
+private val STRING_LITERAL = Regex(""""[^"]*"""")
+private const val NAME_SUFFIX = ".name"
 
 private val DECLARED_NAME = Regex("""override val name = "([A-Za-z_]+)"""")
 private val SEALED_TYPE = Regex("""(?m)^sealed interface (\w+)""")
+private val ENUM_ENTRY = Regex("""^[A-Z][A-Za-z0-9_]*$""")
+private val BLOCK_COMMENT = Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL)
+private val LINE_COMMENT = Regex("""//[^\n]*""")
 
 /**
- * The `outcome` vocabulary, per sealed type, read from the file that declares it.
+ * The vocabulary a [ValueSource] declares.
  *
- * Read as text rather than by reflection because `:libraries:billing` is not on
+ * Read as text rather than by reflection because none of these modules is on
  * this module's classpath — the same reason [scanLogEventCalls] is a source scan.
- *
- * **Per type, not pooled.** Both types have a `Failed`, and a single flat set of
- * every name in the file hid that: renaming only `PurchaseOutcome.Failed` left
- * `Failed` in the set via `RestoreOutcome`, so the mutation survived and the
- * "Purchase failures by store code" panel would have gone empty unnoticed.
  */
-private fun declaredOutcomeNames(): Map<String, Set<String>> {
+private fun vocabularyOf(source: ValueSource): Set<String> {
     val root = System.getProperty(REPO_ROOT_PROPERTY)
         ?: error("$REPO_ROOT_PROPERTY is unset — libraries/telemetry/impl/build.gradle.kts should supply it")
-    val source = File(root, ENTITLEMENTS_PATH)
-    require(source.isFile) { "$ENTITLEMENTS_PATH has moved; this test reads the outcome names out of it" }
-    val text = source.readText()
+    val file = File(root, source.path)
+    require(file.isFile) { "${source.path} has moved; this test reads ${source.type} out of it" }
+    val text = file.readText()
 
-    val starts = SEALED_TYPE.findAll(text).toList()
-    val byType = starts.mapIndexed { index, match ->
-        val end = starts.getOrNull(index + 1)?.range?.first ?: text.length
-        match.groupValues[1] to DECLARED_NAME.findAll(text.substring(match.range.first, end))
-            .map { it.groupValues[1] }
-            .toSet()
-    }.toMap()
-
-    IAP_OUTCOME_EVENTS.values.forEach { type ->
-        val names = byType[type].orEmpty()
-        require(names.size >= MINIMUM_NAMES_PER_TYPE) {
-            "only found $names for $type in $ENTITLEMENTS_PATH, so the reader is broken and " +
-                "every query would pass"
-        }
+    val names = if (source.declaredNames) readDeclaredNames(text, source.type) else readEnumEntries(text, source.type)
+    require(names.size >= MINIMUM_NAMES_PER_TYPE) {
+        "only found $names for ${source.type} in ${source.path}, so the reader is broken and " +
+            "every query would pass"
     }
-    return byType
+    return names
 }
 
-/** `RestoreOutcome` is the smaller of the two, with three. */
+/**
+ * **Per type, not pooled.** `PurchaseOutcome` and `RestoreOutcome` both have a
+ * `Failed`, and a single flat set of every name in the file hid that: renaming
+ * only `PurchaseOutcome.Failed` left `Failed` in the set via `RestoreOutcome`, so
+ * the mutation survived and the "Purchase failures by store code" panel would
+ * have gone empty unnoticed.
+ */
+private fun readDeclaredNames(text: String, type: String): Set<String> {
+    val starts = SEALED_TYPE.findAll(text).toList()
+    val start = starts.firstOrNull { it.groupValues[1] == type } ?: return emptySet()
+    val end = starts.firstOrNull { it.range.first > start.range.first }?.range?.first ?: text.length
+    return DECLARED_NAME.findAll(text.substring(start.range.first, end)).map { it.groupValues[1] }.toSet()
+}
+
+/**
+ * Comments come out before the body is split on commas, for the same reason
+ * [COMMENT_LINE] exists: these enums are mostly KDoc, and a sentence with commas
+ * in it splits into entries that look plausible enough to widen the vocabulary
+ * and let a wrong filter through.
+ */
+private fun readEnumEntries(text: String, type: String): Set<String> {
+    val declaration = Regex("""enum class $type\b""").find(text) ?: return emptySet()
+    val open = text.indexOf('{', declaration.range.last)
+    if (open < 0) return emptySet()
+
+    var depth = 0
+    var index = open
+    while (index < text.length) {
+        when (text[index]) {
+            '{' -> depth++
+            '}' -> if (--depth == 0) break
+        }
+        index++
+    }
+
+    val body = LINE_COMMENT.replace(BLOCK_COMMENT.replace(text.substring(open + 1, index), ""), "")
+    return body.substringBefore(';')
+        .split(',')
+        .map { it.trim() }
+        .filter { it.matches(ENUM_ENTRY) }
+        .toSet()
+}
+
+/** `RestoreOutcome` is the smallest of them, with three. */
 private const val MINIMUM_NAMES_PER_TYPE = 3
 
 private fun String.looksLikeAString(): Boolean = STRINGY_VALUE.containsMatchIn(this)

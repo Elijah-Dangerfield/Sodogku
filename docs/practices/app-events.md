@@ -252,6 +252,14 @@ row here, or a row here that nothing emits, fails it too. The page can still be 
 row says*, which is the half a test cannot read. It can no longer be wrong about which events
 exist.
 
+It also holds the *values* a panel filters on against the vocabulary the emitting type declares,
+wherever the emit site spells one the scan can follow: a string literal, or an enum or sealed
+type's `name` with the declaring type registered in `VALUE_SOURCES`. A panel that filters on a
+value nothing can produce does not go empty when there are other values in the same alternation,
+which is how `outcome=~"Rewarded|Completed"` outlived `AdShowResult.Completed` looking healthy. The
+pairs it cannot read are listed with their reason rather than skipped, so the number of unchecked
+filters is a thing somebody decided rather than a thing that happened.
+
 **Nothing on the boards is missing an attribute today.** Two entries used to sit here and both are
 closed: `trigger` on `iap.purchase_result` is emitted (`RealEntitlements.purchase()` takes it from
 `PaywallRoute` through `PaywallViewModel`), so conversion by trigger is a real split rather than
@@ -282,14 +290,14 @@ not by the ad layer.
 
 **There is no event for an ad the gate declined to show.** Suppressions are the normal
 case — a player in the new-user grace generates one per level — and at that volume the
-funnel would be mostly noise. A suppressed interstitial logs at debug with its reason and
+funnel would be mostly noise. A suppressed gate logs at debug with its reason and
 stays out of Loki. `ads.result` with `outcome=granted_without_ad` covers the one case
 where a suppression is still interesting, because it means a reward was paid for nothing.
 
 | Event | Attributes | Fires |
 |---|---|---|
 | `ads.gate_shown` | `placement`, `device_offline` | A rewarded gate is entered. `device_offline` is the **device** signal (`AppState.isDeviceOffline`), not the banner one, because our backend being down is not an ad-network outage. No `level_id`: the gate is called from the game and the daily and does not know which |
-| `ads.result` | `placement`, `outcome`, `latency_ms`, `error_kind`, `reason`, `grace_levels_used` | Every terminal state of a gate. `outcome` is an `AdShowResult` name (`Rewarded` / `Dismissed` / `Completed` / `NoFill` / `Offline` / `NotShown` / `Failed`) **or** the synthetic `granted_without_ad`, which carries `reason` (`pro`, `ads_disabled`, `placement_disabled`, `new_user_grace`). `latency_ms` spans prepare-plus-load-plus-watch, so it is dominated by how long the player watched — read its floor, not its mean. It is measured on a monotonic `TimeSource`, not on the wall clock: a rewarded ad is a thirty-second window and a phone steps its clock on network time sync, often right after connectivity returns, which is when the first ad after an offline stretch is asked for |
+| `ads.result` | `placement`, `outcome`, `latency_ms`, `error_kind`, `reason`, `grace_levels_used` | Every terminal state of a gate. `outcome` is an `AdShowResult` name (`Rewarded` / `Dismissed` / `NoFill` / `Offline` / `NotShown` / `Failed`) **or** the synthetic `granted_without_ad`, which carries `reason` (`pro`, `ads_disabled`, `placement_disabled`, `new_user_grace`). `latency_ms` spans prepare-plus-load-plus-watch, so it is dominated by how long the player watched — read its floor, not its mean. It is measured on a monotonic `TimeSource`, not on the wall clock: a rewarded ad is a thirty-second window and a phone steps its clock on network time sync, often right after connectivity returns, which is when the first ad after an offline stretch is asked for |
 | `ads.offline_block` | `placement`, `grace_levels_used` | The offline grace is spent and the block screen is requested. One per gate past the grace, so a repeat count is a player stuck offline rather than a bug |
 | `ads.stand_in` | `placement`, `reason`, `shown` | A rewarded ad the player asked for could not be served, so Pro was offered in the space the ad was going to occupy. `reason` is why the ad failed (`no_fill`, `offline`, `not_shown`, or the SDK's own error kind) and `shown` is whether the coordinator accepted. It refuses for a Pro player, for a disabled stand-in, and past the session cap, so the false rate here is the cap doing its job. Not emitted at all when the gate already offered Pro on the way in |
 | `iap.paywall_shown` | `trigger`, and `placement` + `reason` on the ad stand-in only | An offer the coordinator **accepted** (`continue_level` / `skip_level` / `direct`), an offline block, or the ad stand-in (`ad_unavailable`). Refusals (capped, disabled, already Pro) emit nothing, so the ratio of this to `ads.gate_shown` is the offer rate rather than the attempt rate. `ad_unavailable` is the one trigger nobody chose: it fires on an ad network having no inventory, which is why it carries the `placement` and the `reason` the ad failed for, and why splitting by trigger matters before reading a conversion number |
