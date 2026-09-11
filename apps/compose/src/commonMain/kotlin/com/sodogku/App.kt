@@ -161,7 +161,11 @@ fun App(appComponent: AppComponent) {
                 viewModel = appComponent.devFeedbackViewModel,
                 fabCache = appComponent.devFeedbackFabCache,
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                // The root is the only place that sees every press and also
+                // reads the host's own lifecycle owner. A press landing here
+                // while that lifecycle is below STARTED is SD-26 happening, and
+                // nothing else in the app can notice it.
+                Box(modifier = Modifier.fillMaxSize().reportingTapsThatGoNowhere()) {
                     // Stage 1: null until the async AppData read resolves — the
                     // platform splash (keyed on appViewModel.isReady) covers the
                     // gap. Stage 2: the Compose boot gate holds a loading screen
