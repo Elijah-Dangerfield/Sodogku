@@ -179,7 +179,7 @@ google-ump = { module = "com.google.android.ump:user-messaging-platform", versio
 # Center through the GameKit platform bindings and needs nothing here.
 google-play-services-games = { module = "com.google.android.gms:play-services-games-v2", version.ref = "playServicesGames" }
 
-# Play Billing. SPEC 5.2 says "Play Billing 7"; 8.x is what Play actually
+# Play Billing. The spec said "Play Billing 7"; 8.x is what Play actually
 # accepts for new releases now, and the migration is `QueryProductDetailsResult`
 # plus `PendingPurchasesParams` — both already used in `PlayStoreBilling`.
 android-billing = { module = "com.android.billingclient:billing", version.ref = "playBilling" }

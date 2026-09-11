@@ -29,7 +29,8 @@
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3940256099942544~1458002511</string>
 	<!--
-	  The App Tracking Transparency prompt, SPEC 7.2. Shown before the first ad
+	  The App Tracking Transparency prompt, `features.md#audience-and-consent`.
+	  Shown before the first ad
 	  request rather than at launch, so the player is asked at a moment where
 	  the answer means something. Apple rejects builds that request the IDFA
 	  without this key.

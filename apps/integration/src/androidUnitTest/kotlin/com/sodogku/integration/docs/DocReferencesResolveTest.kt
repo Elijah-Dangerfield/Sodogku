@@ -221,8 +221,20 @@ class DocReferencesResolveTest {
          * whole value of this test is that it has no quiet exceptions.
          */
         val CROSS_REPO = setOf("docs/PORT-CANDIDATES.md")
-        val SCANNED_ROOTS = listOf("docs", "libraries", "features", "apps", "ops", "tools")
-        val SCANNED_EXTENSIONS = setOf("kt", "kts", "md", "swift", "xml", "json")
+        val SCANNED_ROOTS =
+            listOf("docs", "libraries", "features", "apps", "ops", "tools", "gradle")
+
+        /**
+         * Every file type in this repo that has been caught holding a doc
+         * reference, which is a longer list than it sounds.
+         *
+         * The last two found in the spec sweep were in a version catalogue and
+         * an `Info.plist`, both cited a section, and both were missed by a
+         * search that only read the obvious extensions. Adding a type here is
+         * cheap; the hole it closes is not.
+         */
+        val SCANNED_EXTENSIONS =
+            setOf("kt", "kts", "md", "swift", "xml", "json", "toml", "plist")
 
         /**
          * The two queues, and the only files here allowed to name a doc that

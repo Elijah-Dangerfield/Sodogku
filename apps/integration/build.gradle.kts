@@ -149,10 +149,12 @@ tasks.withType<Test>().configureEach {
     // by the trees above. Overlapping with them is free; a gap is not.
     inputs.files(
         rootProject.fileTree(repo) {
-            for (dir in listOf("docs", "libraries", "features", "apps", "ops", "tools")) {
+            for (dir in listOf("docs", "libraries", "features", "apps", "ops", "tools", "gradle")) {
                 include("$dir/**/*.md", "$dir/**/*.kt", "$dir/**/*.kts")
                 include("$dir/**/*.swift", "$dir/**/*.xml", "$dir/**/*.json")
+                include("$dir/**/*.toml", "$dir/**/*.plist")
             }
+            include("*.md")
             exclude("**/build/**", "**/xcuserdata/**")
         },
     ).withPropertyName("docReferenceScan")
