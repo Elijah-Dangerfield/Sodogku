@@ -470,17 +470,25 @@ class ScoringTest {
      * the speed window is quoted in, so the same number is the same fraction of
      * the window on every board.
      */
-    private fun runAt(size: Int, difficulty: Int, placements: Int, msPerRow: Long, strikes: Int): Int {
+    private fun runAt(
+        size: Int,
+        difficulty: Int,
+        placements: Int,
+        msPerRow: Long,
+        strikes: Int,
+        config: ScoringConfig = ScoringConfig.Default,
+    ): Int {
         var card = ScoreCard.Empty
         repeat(placements) { index ->
             if (index in 1..strikes) card = Scoring.strike(card)
-            card = Scoring.placement(card, size, millisSinceLastPlacement = msPerRow * size).card
+            card = Scoring.placement(card, size, msPerRow * size, config).card
         }
         return Scoring.complete(
             card,
             size,
             difficulty,
             livesRemaining = ScoringConfig.MAX_LIVES - strikes,
+            config = config,
         ).total
     }
 
@@ -636,6 +644,118 @@ class ScoringTest {
     }
 
     @Test
+    fun configRejectsCoefficientsWithNoCeiling() {
+        // Every one of these constructed and got played. The floors were the
+        // half of the problem anybody had thought about; an operator typing a
+        // zero too many into the console is the other half, and it lands in the
+        // same place — a rating that runs backwards, with a clean run on one paw
+        // and a two-strike run on five.
+        //
+        // Named one at a time rather than swept, because the value of this list
+        // is that a new coefficient added without a ceiling is a line somebody
+        // has to notice is missing.
+        listOf(
+            "runaway combo step" to { ScoringConfig(comboStep = 1e9) },
+            "runaway combo max" to { ScoringConfig(comboMax = 1e12) },
+            "runaway lives rate" to { ScoringConfig(livesBonusRate = 1e8) },
+            "runaway difficulty rate" to { ScoringConfig(difficultyBonusRate = 1e8) },
+            "runaway speed multiplier" to { ScoringConfig(speedMaxMultiplier = 1e9) },
+            "runaway speed window" to { ScoringConfig(speedWindowMs = Long.MAX_VALUE) },
+            "runaway praise cutoff" to { ScoringConfig(nicePraiseAt = 1e9) },
+            // Above 1.0 is above par, and par is the formula's exact ceiling, so
+            // the rung is not merely hard, it is arithmetically unreachable.
+            // That is the compression bug arriving from the console. The
+            // ascending check does not catch it: 5.0 is still above 0.77.
+            "paw fraction above par" to { ScoringConfig(fivePawFraction = 5.0) },
+            "negative praise cutoff" to { ScoringConfig(perfectPraiseAt = -1.0) },
+            "overflowing base" to { ScoringConfig(basePerPlacement = ScoringConfig.MAX_POINT_VALUE + 1) },
+            "overflowing completion" to { ScoringConfig(completionPerCell = ScoringConfig.MAX_POINT_VALUE + 1) },
+        ).forEach { (name, build) ->
+            assertTrue(runCatching(build).isFailure, "$name must not be constructible")
+        }
+    }
+
+    @Test
+    fun configRejectsValuesThatAreNotNumbers() {
+        // Infinity and NaN arrive the same way every other bad number does, and
+        // neither is stopped by a floor. Infinity saturates every placement at
+        // `Int.MAX_VALUE` and the total wraps negative; NaN makes every
+        // comparison in `paws` false, so every run bottoms out at one paw.
+        //
+        // There is no `isFinite()` in the guard and there does not need to be:
+        // a range check rejects both, because every comparison with NaN is false
+        // and Infinity fails the ceiling. This is what says that stays true.
+        listOf(
+            "infinite speed multiplier" to { ScoringConfig(speedMaxMultiplier = Double.POSITIVE_INFINITY) },
+            "infinite lives rate" to { ScoringConfig(livesBonusRate = Double.POSITIVE_INFINITY) },
+            "infinite combo max" to { ScoringConfig(comboMax = Double.POSITIVE_INFINITY) },
+            "not-a-number combo step" to { ScoringConfig(comboStep = Double.NaN) },
+            "not-a-number paw fraction" to { ScoringConfig(fivePawFraction = Double.NaN) },
+            "not-a-number booster rate" to { ScoringConfig(boosterPenaltyRate = Double.NaN) },
+        ).forEach { (name, build) ->
+            assertTrue(runCatching(build).isFailure, "$name must not be constructible")
+        }
+    }
+
+    @Test
+    fun everyLegalConfigIsOneAPlayerCouldPlayOn() {
+        // The ceilings only mean something if the corner under them is still
+        // arithmetic. This walks it: every coefficient at its limit at once, on
+        // the biggest board at the deepest tier, which is the largest par the
+        // guards permit.
+        //
+        // `theLargestLegalConfigStillScoresPositively` checked the two Ints at
+        // their ceiling and nothing else, so it passed while a `comboMax` of 1e9
+        // wrapped par negative beside it. The ceiling on the Ints came down from
+        // a million to ten thousand for exactly this: at a million the corner
+        // reaches 137 billion against an `Int.MAX_VALUE` of 2.15 billion, and no
+        // amount of guarding the Ints alone fixes that, because what overflows
+        // is the product with the multipliers.
+        val extreme = ScoringConfig(
+            basePerPlacement = ScoringConfig.MAX_POINT_VALUE,
+            completionPerCell = ScoringConfig.MAX_POINT_VALUE,
+            comboStep = ScoringConfig.MAX_RATE,
+            comboMax = ScoringConfig.MAX_RATE,
+            speedWindowMs = ScoringConfig.MAX_SPEED_WINDOW_MS,
+            speedMaxMultiplier = ScoringConfig.MAX_RATE,
+            livesBonusRate = ScoringConfig.MAX_RATE,
+            difficultyBonusRate = ScoringConfig.MAX_RATE,
+        )
+
+        val par = Scoring.parScore(BIGGEST_BOARD, MAX_DIFFICULTY, config = extreme)
+        assertTrue(par > 0, "the largest legal par came out $par")
+        assertTrue(
+            Scoring.placement(ScoreCard.Empty, BIGGEST_BOARD, null, extreme).points > 0,
+            "a placement under the largest legal config scored nothing",
+        )
+        assertTrue(
+            Scoring.completionBonus(BIGGEST_BOARD, MAX_DIFFICULTY, ScoringConfig.MAX_LIVES, extreme) > 0,
+            "the completion bonus under the largest legal config came out negative",
+        )
+
+        // And it still rates in order, which is the property the guards are
+        // actually for. A config that scores positive and rates backwards is the
+        // incident, not the near miss.
+        val failures = mutableListOf<String>()
+        everyShape { size, difficulty, placements, shape ->
+            val ratings = listOf(0, 1, ScoringConfig.MAX_LIVES - 1).map { strikes ->
+                Scoring.paws(
+                    runAt(size, difficulty, placements, SLOW_MS_PER_ROW, strikes, extreme),
+                    size,
+                    difficulty,
+                    completed = true,
+                    placements = placements,
+                    config = extreme,
+                )
+            }
+            if (ratings != ratings.sortedDescending()) {
+                failures += "$shape: a strike rated better than the clean run beside it ($ratings)"
+            }
+        }
+        assertTrue(failures.isEmpty(), failures.joinToString("\n"))
+    }
+
+    @Test
     fun aWorseRunIsNeverRatedBetterUnderAnyLegalConfig() {
         // The property the guards exist to protect, stated directly rather than
         // as a list of forbidden numbers. This is what a negative rate broke: an
@@ -661,19 +781,6 @@ class ScoringTest {
         val lives = ScoringConfig.MAX_LIVES - strikes
         card = Scoring.complete(card, size, difficulty = 3, livesRemaining = lives)
         return Scoring.paws(card.total, size, difficulty = 3, completed = true)
-    }
-
-    @Test
-    fun theLargestLegalConfigStillScoresPositively() {
-        // The ceiling is only worth having if everything under it is safe, so
-        // check the corner rather than trusting the arithmetic.
-        val extreme = ScoringConfig(
-            basePerPlacement = ScoringConfig.MAX_POINT_VALUE,
-            completionPerCell = ScoringConfig.MAX_POINT_VALUE,
-        )
-
-        assertTrue(Scoring.parScore(BIGGEST_BOARD, MAX_DIFFICULTY, config = extreme) > 0)
-        assertTrue(Scoring.placement(ScoreCard.Empty, BIGGEST_BOARD, null, extreme).points > 0)
     }
 
     @Test

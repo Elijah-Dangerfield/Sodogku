@@ -219,29 +219,63 @@ data class ScoringConfig(
     val perfectPraiseAt: Double = 2.9,
 ) {
     init {
-        // Every field that scales a score is guarded, because the whole set
-        // arrives from remote config and `ConfiguredScoring` only falls back to
-        // the shipped values when this block *throws*. A bad number that
-        // constructs is a bad number that gets played.
+        // Every field that scales a score is guarded at **both** ends, because
+        // the whole set arrives from remote config and `ConfiguredScoring` only
+        // falls back to the shipped values when this block *throws*. A bad
+        // number that constructs is a bad number that gets played.
         //
-        // The comment here used to say these two Ints "were the only fields
-        // unguarded", which was wrong: the three rates below had nothing on
-        // them. A `livesBonusRate` of -0.5 constructs happily and inverts the
-        // rating, because par's lives factor goes negative while the player's
-        // stays positive, so a two-strike run scores *better* against it. That
-        // is the same shape as the incident these guards were added for, where a
-        // dropped minus sign gave every player three paws for scoring zero.
-        require(basePerPlacement > 0) { "basePerPlacement must be positive" }
-        require(completionPerCell > 0) { "completionPerCell must be positive" }
-        require(comboStep >= 0.0) { "comboStep must not be negative" }
-        require(livesBonusRate >= 0.0) { "livesBonusRate must not be negative" }
-        require(difficultyBonusRate >= 0.0) { "difficultyBonusRate must not be negative" }
-        require(basePerPlacement <= MAX_POINT_VALUE && completionPerCell <= MAX_POINT_VALUE) {
-            "point values must be at most $MAX_POINT_VALUE, so scoring cannot overflow"
+        // Both ends is the part that was missing, and the floors alone stopped
+        // about half of what an operator typo can do. Every multiplier was
+        // unbounded above, and all of these constructed and got played:
+        // `livesBonusRate = 1e8` drove a clean 10x10 run to -2,147,480,930 with
+        // par negative beside it, so the clean run rated one paw and a
+        // two-strike run rated five; `speedMaxMultiplier = 1e9` saturated every
+        // placement at `Int.MAX_VALUE` and wrapped the total to -10, handing
+        // everyone five paws for the completion bonus alone; `speedWindowMs =
+        // Long.MAX_VALUE` overflowed `speedWindowMs * size` negative and killed
+        // the speed term outright. That inverted rating is the exact shape of
+        // the incident these guards were added for, where a dropped minus sign
+        // gave every player three paws for scoring zero — reached from the
+        // console this time instead of from a diff.
+        //
+        // A range check is also how non-finite values are rejected, and why
+        // there is no `isFinite()` pass below: `x in 0.0..MAX_RATE` is false for
+        // both `NaN` and `Infinity`, because every comparison with `NaN` is
+        // false and `Infinity` simply fails the ceiling.
+        //
+        // Infinity is reachable from the console, if not by the obvious route.
+        // The config `Json` leaves `allowSpecialFloatingPointValues` off, so a
+        // bare `Infinity` token fails to parse and takes the whole blob down
+        // with it. But `JsonElement.toAny` falls through to `toDoubleOrNull`,
+        // and `1e400` is a perfectly well-formed JSON number that parses to
+        // `Double.POSITIVE_INFINITY`. So is every value in this list: they are
+        // one console edit away, not a code change away.
+        require(basePerPlacement in 1..MAX_POINT_VALUE) {
+            "basePerPlacement must be between 1 and $MAX_POINT_VALUE"
         }
-        require(comboMax >= 1.0) { "comboMax must be at least 1.0" }
-        require(speedMaxMultiplier >= 1.0) { "speedMaxMultiplier must be at least 1.0" }
-        require(speedWindowMs > 0) { "speedWindowMs must be positive" }
+        require(completionPerCell in 1..MAX_POINT_VALUE) {
+            "completionPerCell must be between 1 and $MAX_POINT_VALUE"
+        }
+        require(comboStep in 0.0..MAX_RATE) { "comboStep must be between 0 and $MAX_RATE" }
+        require(livesBonusRate in 0.0..MAX_RATE) { "livesBonusRate must be between 0 and $MAX_RATE" }
+        require(difficultyBonusRate in 0.0..MAX_RATE) {
+            "difficultyBonusRate must be between 0 and $MAX_RATE"
+        }
+        require(comboMax in 1.0..MAX_RATE) { "comboMax must be between 1.0 and $MAX_RATE" }
+        require(speedMaxMultiplier in 1.0..MAX_RATE) {
+            "speedMaxMultiplier must be between 1.0 and $MAX_RATE"
+        }
+        require(speedWindowMs in 1..MAX_SPEED_WINDOW_MS) {
+            "speedWindowMs must be between 1 and $MAX_SPEED_WINDOW_MS"
+        }
+        // Cosmetic rather than scoring, so the ceiling is only there to keep the
+        // value in the range the thing it is compared against can reach. Below
+        // zero is the one that shows: every placement fires the top word, and a
+        // "Perfect" on an ordinary tap is the praise meaning nothing.
+        val praiseCutoffs = listOf(nicePraiseAt, greatPraiseAt, excellentPraiseAt, perfectPraiseAt)
+        require(praiseCutoffs.all { it in 0.0..MAX_COMBINED_MULTIPLIER }) {
+            "praise cutoffs must be between 0 and $MAX_COMBINED_MULTIPLIER"
+        }
         val pawFractions = listOf(twoPawFraction, threePawFraction, fourPawFraction, fivePawFraction)
         require(pawFractions.all { it in 0.0..1.0 }) {
             "paw fractions must be between 0 and 1"
@@ -276,16 +310,54 @@ data class ScoringConfig(
         const val SPEED_WINDOW_REFERENCE_SIZE: Int = 4
 
         /**
-         * Ceiling on the two Int point values. `ScoreCard` multiplies them by
-         * the board size as Ints before widening to Double, so a value in the
-         * hundreds of millions wraps negative. A million is four orders of
-         * magnitude above anything a tuning pass would plausibly want.
+         * Ceiling on every multiplier and rate.
          *
-         * [completionPerCell] multiplies by the size *twice*, so the widest
-         * intermediate is a million cells' worth of a 10x10, a hundred million,
-         * and the largest legal par is a little under a billion.
+         * Not a number with a meaning, which is the point: it is far enough
+         * above any of the shipped values (the largest is [comboMax] at 2.0)
+         * that no tuning pass meets it, and low enough that the corner of the
+         * legal space is still arithmetic rather than an overflow. A retune
+         * wanting more than ten times the shipped spread is a retune that wants
+         * a conversation, not a console edit.
          */
-        const val MAX_POINT_VALUE: Int = 1_000_000
+        const val MAX_RATE: Double = 10.0
+
+        /**
+         * The widest a combined placement multiplier can legally get, which is
+         * [comboMax] times [speedMaxMultiplier]. The praise cutoffs are compared
+         * against exactly that product, so this is the top of the only range
+         * they can meaningfully sit in.
+         */
+        const val MAX_COMBINED_MULTIPLIER: Double = MAX_RATE * MAX_RATE
+
+        /** Ten minutes for one placement. Nobody is thinking for longer. */
+        const val MAX_SPEED_WINDOW_MS: Long = 600_000
+
+        /**
+         * Ceiling on the two Int point values, chosen so that the *largest legal
+         * config* still scores inside an Int rather than so that the shipped one
+         * does.
+         *
+         * It used to be a million, on the reasoning that `ScoreCard` multiplies
+         * these by the board size as Ints and a value in the hundreds of
+         * millions wraps negative. True as far as it went, and it did not go far
+         * enough to earn the "so scoring cannot overflow" it was labelled with,
+         * because the multipliers it gets multiplied *by* had no ceiling at all.
+         * A million-point placement at a `comboMax` of 1e9 overflows whatever
+         * this constant says.
+         *
+         * With [MAX_RATE] in place the corner is computable, so it is computed.
+         * The worst legal par is a 10x10 at tier 5 with every rate at the
+         * ceiling: `size` placements of `value * size * comboMax *
+         * speedMaxMultiplier`, plus `value * size² * (1 + 4 * MAX_RATE) *
+         * (1 + MAX_LIVES * MAX_RATE)`, which is 137,100 times this number. At
+         * ten thousand that is 1.37 billion against an `Int.MAX_VALUE` of 2.15
+         * billion. At the old million it was 137 billion, sixty-four times over.
+         *
+         * Ten thousand is still a thousand times [basePerPlacement] and two and
+         * a half thousand times [completionPerCell], so it remains a guard
+         * against a typo rather than a constraint on tuning.
+         */
+        const val MAX_POINT_VALUE: Int = 10_000
 
         val Default: ScoringConfig = ScoringConfig()
     }
