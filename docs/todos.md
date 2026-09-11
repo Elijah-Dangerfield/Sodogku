@@ -291,7 +291,6 @@ have.
 named here, since the same pass that left these probably left others. `--` inside
 an XML comment fails the resource build with an error naming no file and no line,
 so be careful editing them.
-
 ## SD-72 [P2] — `docs/practices/testing.md` describes a test suite that does not exist
 
 **Found by:** the SD-67 agent, 2026-09-10, while correcting the parts of it that
@@ -322,7 +321,6 @@ was.
 
 `DocReferencesResolveTest` will catch a dead file path but not a class name, so
 grep for every symbol it names.
-
 ## SD-73 [P1] — A resumed board nudges the player one second after their first cross
 
 **Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified with a scratch test
@@ -361,7 +359,6 @@ way. `StruggleDetectorTest` has no resume case; the two scratch assertions were
 `onMarked(300_000)` then `assertFalse(nudging(301_000))`, and six `onMarked` from
 25_000 then `assertFalse(nudging(28_000))`. Both failed against current code.
 Confidence: high.
-
 ## SD-74 [P2] — Zero bones into the tutorial opens the refill prompt over the first coach mark
 
 **Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by reading;
@@ -386,7 +383,6 @@ real board opened at zero still has `Consumable.Bone`.
 `aPlayerWithNoBonesLeftCanStillBeTaught` with the assertion, and keep
 `aBoardOpenedAtZeroMeetsTheOfferRatherThanTheNextWrongGuess` as the other side.
 Confidence: high.
-
 ## SD-75 [P2] — The daily route ignores the daily kill switch
 
 **Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by reading; not
@@ -413,7 +409,6 @@ shortcut is the way most people reach it. Note the recap path
 (`today.result != null`) should probably still open, since reviewing a spent day
 is not playing one. Confidence: high on the code path, medium on how often the
 shortcut is the entry.
-
 ## SD-76 [P2] — `state.isPro` is read once, so a purchase from Settings does not reach the board until relaunch
 
 **Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by reading.
@@ -439,7 +434,6 @@ the code will not show and locking rows the code would open.
 are collected, into a `ProChanged` action, and carry it in `startAttempt` as now.
 The test fixture already has `ProEntitlements` and `FreeEntitlementsFake`; a
 `MutableStateFlow`-backed fake would do. Confidence: high.
-
 ## SD-77 [P2] — Bones refilled through the pill are reported under the wrong event
 
 **Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by reading the
@@ -470,7 +464,6 @@ with `Consumable.Bone`.
 at line 2397 sets `phase = Playing` on a board that is already playing, which is
 another sign it was never the bone path). `aRefillNamesItsPlacementTheWayTheAdEventsDo`
 is the test to extend. Confidence: high.
-
 ## SD-78 [P2] — Eight fields `startAttempt` carries have no test that fails if they are dropped
 
 **Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by mutation:
@@ -508,7 +501,6 @@ that excludes board fields is equal before and after. Written as
 covered the day it is added, and the author has to decide whether it is a board
 field. Flip `theSettingSurvivesStartingTheBoardOver` to an assisted cache as well,
 so the assertion is on something the default cannot satisfy. Confidence: high.
-
 ## SD-79 [P2] — The empty-board note's "once" is a field write nothing tests
 
 **Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by mutation.
@@ -529,7 +521,6 @@ of the cache write. `anEmptyBoardSaysSoOnceThePlayerHasHadTimeToLookAtIt`
 
 **Hints:** Two lines on the end of the first test: `clock += Reading; vm.tick();
 assertNull(vm.state.warning)`. Confidence: high.
-
 ## SD-80 [P2] — Nothing tests that the last level offers no skip, and without the guard the ending sheet covers a lost board
 
 **Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by mutation and
@@ -548,7 +539,6 @@ run on an early level.
 
 **Hints:** The fixture for `clearingTheLastLevelEndsTheCampaignInsteadOfTheApp`
 already opens the last level; lose it instead of clearing it. Confidence: high.
-
 ## SD-81 [P2] — Three tests pass against the bug their name describes
 
 **Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by mutation.
@@ -582,123 +572,28 @@ need it.
 the second, `RecordingEvents` already exists; assert `attempt_number == 2` on the
 `game.level_started` after a retry. Confidence: high.
 
-## SD-82 [P2] — Dead code and stale comments in `GameViewModel`
+## SD-85 [P2] — A second Skip on the tutorial logs a duplicate completion
 
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by grep and
-reading; none of these changes behaviour.
+**Found by:** the SD-82 agent, 2026-09-10, while disproving the claim that the
+`skipTutorial` fall-through was unreachable. It is reachable, and this is what
+arrives through it.
 
-**Ask:** Six small things, each the kind this file has produced before.
+`TutorialCoachMark` holds its card through the scrim's fade, and `FocusScrim`
+keeps rendering content while `progress.value > 0f`, so the Skip button stays
+live for a few frames after the first tap has already run `leaveRehearsal`. A
+second tap lands with `rehearsing == false` and `skipTutorial` calls
+`completeTutorial` unconditionally, so it logs a second `tutorial.completed`
+with `last_step = "none"`.
 
-- `clearSavedBoard` (GameViewModel.kt:2778-2789) has no callers.
-- `GameState.adBeforeNextLevel` (GameContract.kt:313) is never set. `WonSheet`
-  reads it (GameOutcomeSheets.kt:229) behind a comment saying C7 will wire it;
-  the class KDoc says C7 shipped. Wire it or delete the field and the badge branch.
-- `skipTutorial`'s fall-through `updateState { it.copy(tutorial = null, ...) }`
-  (GameViewModel.kt:1040) is unreachable: `tutorial.begin` only runs with
-  `rehearsal = true`, so a non-null `state.tutorial` implies `rehearsing`.
-- `refill(Consumable.Bone)` sets `phase = GamePhase.Playing` (GameViewModel.kt:2397)
-  on a board `boosterTapped` has already required to be playing. Goes away with
-  SD-77.
-- `DismissWarning` also clears `hintCells` and `hintReason` (GameViewModel.kt:473-475).
-  The two overlays are mutually exclusive by construction (`shouldNoteEmptyBoard`
-  refuses over a hint; a strike cannot land while a hint is up). Either say why or
-  drop it.
-- The `clockPaused` KDoc (GameViewModel.kt:266-275) says the attempt mark "is also
-  the baseline for the speed bonus". It is not: `place` measures `since` from
-  `lastPlacementAt` (line 1406), which `holdClock` does not pause, so the first
-  placement after a phone call earns no speed bonus. Fix the comment, and decide
-  whether that is intended.
+Harmless to the player and not harmless to the number. `tutorial.completed` is
+how we would ever know what fraction of players finish onboarding, and a
+double-tapped Skip inflates it.
 
-**Done when:** each item is deleted, wired, or has a comment that states the
-reason it stays.
+**Done when:** a tutorial reports its completion once however many times Skip is
+tapped.
 
-**Hints:** All in the slice. `clearSavedBoard` and `adBeforeNextLevel` are safe
-deletes; the others are one-liners with a decision attached. Confidence: high.
-
-## SD-83 [P2] — Two orderings in the tutorial path that are correct by coincidence
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Read, not reproduced; both
-are latent.
-
-**Ask:** Neither is a bug today. Both are one script change away.
-
-- `place` calls `advanceTutorial` and then `if (placed.isComplete && !rehearsing)
-  win(level, scored.card)` (GameViewModel.kt:1460-1477). When the placement is the
-  script's last step, `advanceTutorial` runs `leaveRehearsal`, which flips
-  `rehearsing` to false and starts level 1, and only then does `place` read
-  `rehearsing`. `level` and `placed` are still the tutorial board's. The comment
-  says the rehearsal cannot get here because the script places three dogs on a
-  five-row board, which is true and is the only thing holding it. A step that
-  placed the fifth dog would credit level 0 with a clear. Capture
-  `val rehearsal = rehearsing` at the top of `place` and use it at the bottom.
-- `advanceTutorial` suspends on `delay(Tutorial.settleMillis(trigger))`
-  (GameViewModel.kt:1002) inside `handleAction`, which stalls the whole action
-  loop for up to `PlacementPulseMillis` (460 ms). `tap` stamps `lastTapAt` when
-  the action is dequeued (line 1151), not when the finger landed, so two single
-  taps 400 ms apart that straddle a settle are dequeued together and read as a
-  commit. Rehearsal-only today, and forgiven there, but it is the first
-  suspension in a handler in this file and nothing warns the next person. A
-  comment on `advanceTutorial` saying the loop is blocked, or stamping actions at
-  arrival, would do.
-
-Also worth a line while there: `lose` computes `Scoring.strike(state.score)`
-(GameViewModel.kt:1943) on a `state` that may or may not already carry the
-strike's own `Scoring.strike` (line 1515), depending on whether the dispatch has
-landed. It is correct only because `strike` is idempotent (`combo = 0`). A
-comment saves the next reader the trace.
-
-**Done when:** `place` reads the rehearsal flag it started with, and the settle
-delay is either documented at the call site or moved out of the handler.
-
-**Hints:** All three are in the slice. `TutorialBoardTest` walks the script and is
-where an "the script never completes the board" assertion belongs if the first
-item is fixed by assertion rather than by capture. Confidence: high that the
-code is as described, medium that either will ever bite.
-
-## SD-84 [P2] — A resumed board brings back the auto-marks the player tapped away
-
-**Found by:** the SD-6 GameViewModel slice, 2026-09-11. Verified by reading
-`saveBoard` against `BoardSnapshot`.
-
-**Ask:** `GameState.clearedMarks` (GameContract.kt:112) is how a player removes an
-auto-mark, and it is deliberately an exclusion because auto-marks are recomputed.
-`BoardSnapshot` does not carry it (GameViewModel.kt:2735-2750 writes placements,
-manual marks and wrong guesses), so after a relaunch or a trip through the drawer
-every cross the player tapped off is back. Rare, and only with auto-mark on, but
-it is the one piece of the player's own bookkeeping the snapshot drops.
-
-**Done when:** a cleared auto-mark survives a `BoardSnapshot` round trip.
-
-**Hints:** Add `clearedMarks` to `BoardSnapshot` (in `:libraries:sodogku`, with a
-default so old snapshots still decode), write it in `saveBoard`, read it in
-`startAttempt`. `anAttemptSurvivesTheProcessBeingKilled` is the test to extend.
-Confidence: high.
-
----
-
-## What is fine, and was checked
-
-- **The lag.** Every handler was traced for a `state.` read after an
-  `updateState` in the same action. `useTreat` then `place` reads only fields the
-  treat update did not touch; `strike` then `lose` reads `state.score` through an
-  idempotent function; `useSniff` and `refill` read counts that `markExplained`
-  does not move; everything else captures inside the transform. The comments
-  saying "read before the update lands" are accurate at every site I checked.
-- **`startAttempt`'s constructor** names every field a new board should carry.
-  Mutating fifteen of them found no field that is currently dropped; SD-78 is
-  about which of them a test would notice, not about a missing one.
-- **The recent predicates** each have a test that goes red when bent:
-  `endsTheCampaign` (both the `>=` and the daily clause), `paceAgainst` (the tie),
-  every clause of `shouldNoteEmptyBoard`, the detector's untouched guard and
-  drought multiple, `boostersAskingForAttention`'s cover gate, `bonesRefillable`'s
-  recap gate, `beatBestTime`'s phase gate, the starter-dog band, the skip
-  threshold, the level reward's first-clear gate, `isFirstClear`, the lost daily's
-  snapshot, the recap's restart refusal, the campaign totals count, and the win's
-  `unlockedThrough` widening.
-- **The rehearsal guards** on `game.level_started`, `game.commit`, `game.drag`,
-  the snapshot write, the strike count and the headline score are all caught.
-- **Order between the two ViewModels** (daily over campaign) through the
-  `BonesChanged` echo is sound; the echo writes the value state already holds.
-- **`holdClock`** is idempotent in both directions and tested that way.
-- **`restart` on a won daily** is not reachable: the won sheet offers only Levels,
-  and `goToLevel` on the daily route emits `OpenLevel` rather than restarting.
+**Hints:** The fall-through is a real code path and should stay; the fix is that
+`completeTutorial` is not idempotent and should be. Check whether the same shape
+exists on the other terminal paths out of the rehearsal before fixing only this
+one. `DashboardQueryContractTest` will hold the event's registry row if you touch
+its attributes.
