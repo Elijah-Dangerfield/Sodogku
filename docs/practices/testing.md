@@ -244,10 +244,19 @@ while the test passes on its own.
 places. It does not prove the code path runs: a `logEvent` in dead code counts
 as emitted. That is the trade, it is deliberate, and each of these tests says so
 in its own docblock. When you want the stronger claim, assert on behaviour
-instead. `RecordingEvents` (`:features:game:impl` `commonTest`) plants a
-`LogTree` so a test can assert on the events a board actually emitted, which is
+instead. `RecordingEvents` (`:libraries:flowroutines:testing`) plants a
+`LogTree` so a test can assert on the events a screen actually emitted, which is
 how an inverted `game.commit.on_marked` was finally caught after every
 name-level check had passed it.
+
+It started in `:features:game:impl`'s `commonTest` and moved out when the same
+question came up in a second module. A name scan also cannot see an event going
+out *twice*, and the duplicate one-shot completion turned out not to be a
+game-screen shape: `tutorial.completed`, `onboarding.completed` and
+`game.campaign_completed` were each written to log unconditionally on a control
+whose only guard was state that lags a dispatch behind the tap (SD-85, SD-87).
+Reaching the second tap needs no UI harness. `SEAViewModel` drains one channel
+in one loop, so two `takeAction` calls and a settle are two full handler runs.
 
 ## The integration harness (`:apps:integration`)
 

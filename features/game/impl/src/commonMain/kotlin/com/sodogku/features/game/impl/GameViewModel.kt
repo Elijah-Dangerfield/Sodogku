@@ -398,6 +398,28 @@ class GameViewModel(
     private var tutorialEnded = false
 
     /**
+     * Whether *this arrival* at the end of the campaign has been reported.
+     *
+     * Cleared by [startAttempt], because `game.campaign_completed` is per
+     * arrival and not once per player: the drawer draws over the ending sheet,
+     * so picking the last level again is a second genuine finish and the
+     * registry says it counts. Anything that replays a board goes through
+     * [startAttempt], so that is the one place that re-arms this.
+     *
+     * Within one arrival [nextLevel] reported unconditionally, and the Next
+     * button is what leads there. That button is not gated at all: it goes away
+     * because `campaignComplete` swaps the sheet, and `state` lags [updateState]
+     * by a dispatch, so two taps inside one frame are two actions in the channel
+     * before the ending sheet renders. Worse than the tutorial's version: a
+     * settled second `NextLevel` logged again too, since the handler reads only
+     * `state.level` and [endsTheCampaign], and neither changes.
+     *
+     * It matters because this is the only measurement of how many players ever
+     * finish the campaign, which the ending's own proposal could not answer.
+     */
+    private var campaignEndingReported = false
+
+    /**
      * The level's history as it stood *before* this attempt touched it.
      *
      * Read at the start, because `onCompleted` overwrites it and the achievement
@@ -794,6 +816,11 @@ class GameViewModel(
         lastTapAt = null
         stroke = null
         warnedAboutLastBone = false
+        // A board opening is the only thing that can lead to the ending again,
+        // and the drawer opens one over the ending sheet itself. Re-arming here
+        // is what keeps `game.campaign_completed` per arrival rather than per
+        // ViewModel, which is what the registry promises.
+        campaignEndingReported = false
         sniffsUsed = resume?.sniffsUsed ?: 0
         treatsUsed = resume?.treatsUsed ?: 0
         strikesThisAttempt = resume?.strikesTaken ?: 0
@@ -2226,6 +2253,13 @@ class GameViewModel(
         // thing a player who finished the campaign should get is the app
         // disappearing, so the sheet stays up and changes what it says.
         if (endsTheCampaign(current.id, isDaily)) {
+            // Everything below is already true by the time a second Next lands,
+            // so the whole branch drops rather than only the event: the ending
+            // sheet is on screen, and `campaignTotals` is a disk read for a
+            // state write that would not change anything. See
+            // [campaignEndingReported] for which door this covers.
+            if (campaignEndingReported) return
+            campaignEndingReported = true
             val totals = campaignTotals()
             logger.logEvent("game.campaign_completed", "level_id" to current.id)
             updateState {

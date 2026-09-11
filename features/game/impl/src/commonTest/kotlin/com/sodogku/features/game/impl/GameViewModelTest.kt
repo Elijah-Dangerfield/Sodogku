@@ -38,6 +38,7 @@ import com.sodogku.libraries.config.values.ScoringFourPawFraction
 import com.sodogku.libraries.config.values.ScoringThreePawFraction
 import com.sodogku.libraries.config.values.ScoringTwoPawFraction
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
+import com.sodogku.libraries.flowroutines.testing.recordingEvents
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.sodogku.libraries.levels.LevelDefinition
 import com.sodogku.libraries.levels.LevelPacks
@@ -2526,6 +2527,93 @@ class GameViewModelTest : CoroutineTest() {
         assertTrue(vm.state.campaignComplete)
         assertNull(vm.state.campaignTotals, "unreadable records must not become zeroes")
         assertTrue(events.none { it == GameEvent.NavigateBack })
+    }
+
+    @Test
+    fun hammeringTheWinningSquareReportsOneClear() = recordingEvents { events ->
+        runUnitTest {
+            // The clear is the other terminal event on this screen, and unlike
+            // the campaign ending it needs no flag of its own, which is worth
+            // pinning rather than leaving somebody to re-derive when they meet
+            // the next SD-87-shaped item.
+            //
+            // Four taps on the last square is two commits, not one: `tap` clears
+            // `lastTappedCell` when it commits, so taps three and four arm and
+            // fire a second one. Two independent guards stop the second
+            // reaching `win`, and either alone is enough: deleting them one at
+            // a time leaves this green and deleting both turns it red. The dog
+            // is on that square by then, so `tap` nudges instead of committing;
+            // and the phase is `Won` by then, so `tap` returns at the top.
+            //
+            // `game.level_completed` feeds every clear-rate panel and
+            // `daily.completed` is the streak's own funnel.
+            val vm = viewModel(isDaily = true, daily = FakeDaily(levelId = DailyLevel))
+            val open = assertNotNull(vm.state.level)
+            val lastRow = open.size - 1
+            (0 until lastRow).forEach { row ->
+                vm.commit(open.board.cellAt(row, open.solution[row]))
+            }
+
+            val winner = open.board.cellAt(lastRow, open.solution[lastRow])
+            repeat(4) { vm.takeAction(GameAction.CellTapped(winner)) }
+            settle()
+
+            assertEquals(1, events.attributesOf("game.level_completed").size)
+            assertEquals(1, events.attributesOf("daily.completed").size)
+        }
+    }
+
+    @Test
+    fun aSecondNextDoesNotReportASecondCampaignEnding() = recordingEvents { events ->
+        runUnitTest {
+            // The Next button is not gated at all. It goes away because
+            // `campaignComplete` swaps the win sheet for the ending sheet, and
+            // `state` lags `updateState` by a dispatch, so two taps inside one
+            // frame are two actions in the channel before the swap renders,
+            // and `nextLevel` reads only `state.level` and `endsTheCampaign`,
+            // neither of which a second arrival changes. This is the only
+            // measurement of how many players ever finish the campaign.
+            val vm = viewModel(levelId = LevelPacks.lastCampaignLevelId)
+            solveCurrent(vm)
+
+            vm.takeAction(GameAction.NextLevel)
+            vm.takeAction(GameAction.NextLevel)
+            settle()
+
+            assertEquals(
+                1,
+                events.attributesOf("game.campaign_completed").size,
+                "the second Next reported its own ending",
+            )
+            assertTrue(vm.state.campaignComplete, "the guard swallowed the ending itself")
+        }
+    }
+
+    @Test
+    fun replayingTheLastLevelReportsTheEndingAgain() = recordingEvents { events ->
+        runUnitTest {
+            // The other side of the guard, and the reason it is not a plain
+            // once-per-ViewModel flag. The drawer draws over the ending sheet,
+            // so picking the last level again is a second genuine finish.
+            // `app-events.md` says this event fires per arrival and that
+            // distinct installs are what you count.
+            val vm = viewModel(levelId = LevelPacks.lastCampaignLevelId)
+            solveCurrent(vm)
+            vm.takeAction(GameAction.NextLevel)
+            settle()
+
+            vm.takeAction(GameAction.GoToLevel(LevelPacks.lastCampaignLevelId))
+            settle()
+            solveCurrent(vm)
+            vm.takeAction(GameAction.NextLevel)
+            settle()
+
+            assertEquals(
+                2,
+                events.attributesOf("game.campaign_completed").size,
+                "a replayed finish went unreported",
+            )
+        }
     }
 
     @Test

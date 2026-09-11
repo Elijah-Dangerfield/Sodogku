@@ -22,6 +22,8 @@ kotlin {
             api(kotlin("test-annotations-common"))
             api(kotlin("test-common"))
             api(projects.libraries.flowroutines)
+            // `RecordingEvents` plants a `LogTree` to capture app events.
+            api(projects.libraries.core)
         }
         androidMain.dependencies {
             api(kotlin("test-junit"))

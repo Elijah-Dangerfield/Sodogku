@@ -50,10 +50,10 @@ kotlin {
         }
 
         commonTest.dependencies {
+            // Carries `RecordingEvents`, which plants a `LogTree` to capture
+            // the `game.*` events this screen emits. The dashboards read all
+            // twelve of them.
             implementation(projects.libraries.flowroutines.testing)
-            // `RecordingEvents` plants a `LogTree` to capture the `game.*`
-            // events this screen emits. Nothing here asserted on an event
-            // before, and the dashboards read all twelve of them.
             implementation(projects.libraries.core)
             implementation(projects.libraries.sodogku)
             implementation(projects.libraries.levels)

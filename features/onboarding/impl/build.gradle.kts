@@ -31,6 +31,8 @@ kotlin {
 
         commonTest.dependencies {
             implementation(projects.libraries.config)
+            // Carries `RecordingEvents`, which plants a `LogTree` so a test can
+            // assert that `onboarding.completed` goes out once (SD-87).
             implementation(projects.libraries.flowroutines.testing)
             implementation(projects.features.onboarding)
             implementation(projects.libraries.core)

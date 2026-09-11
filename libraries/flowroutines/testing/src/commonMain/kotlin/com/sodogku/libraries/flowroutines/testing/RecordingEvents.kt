@@ -1,4 +1,4 @@
-package com.sodogku.features.game.impl
+package com.sodogku.libraries.flowroutines.testing
 
 import com.sodogku.libraries.core.logging.EXTRA_APP_EVENT
 import com.sodogku.libraries.core.logging.KLog
@@ -7,18 +7,24 @@ import com.sodogku.libraries.core.logging.LogId
 import com.sodogku.libraries.core.logging.LogTree
 
 /**
- * Captures the app events the board emits, so a test can assert on them.
+ * Captures the app events a screen emits, so a test can assert on them.
  *
- * Nothing in this module asserted on a single emitted event before this existed.
- * Twelve `game.*` events feed six Grafana dashboards, and the only thing holding
- * them was `DashboardQueryContractTest`, which scans source text for names — it
- * proves an event is *spelled* the way a panel queries it, and its own docblock
- * says so. It cannot see an attribute that is missing on one branch, or present
- * and computing the wrong thing.
+ * Nothing in this codebase asserted on a single emitted event before this
+ * existed. The `game.*` events alone feed six Grafana dashboards, and the only
+ * thing holding them was `DashboardQueryContractTest`, which scans source text
+ * for names. It proves an event is *spelled* the way a panel queries it, and
+ * its own docblock says so. It cannot see an attribute that is missing on one
+ * branch, or present and computing the wrong thing, and it cannot see the same
+ * event going out twice.
  *
- * `game.commit.on_marked` is why this is here. It was inverted, and pinned
+ * `game.commit.on_marked` is why this was written. It was inverted, and pinned
  * inverted: a commit is the second of two taps, so reading the mark state at the
  * commit site reports what the *first* tap just did. Every existing check passed.
+ *
+ * It lives here rather than in one feature's `commonTest` because the duplicate
+ * one-shot completion is not a `:features:game:impl` shape. `tutorial.completed`
+ * and `onboarding.completed` were written the same way in two different modules
+ * (SD-85, SD-87), and each needed the same recorder to prove it fires once.
  *
  * Planting a tree rather than injecting a logger keeps production code alone —
  * `logEvent` goes through `KLog`, and this is the seam the logging library

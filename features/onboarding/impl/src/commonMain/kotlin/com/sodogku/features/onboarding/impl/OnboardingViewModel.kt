@@ -38,6 +38,24 @@ class OnboardingViewModel(
 
     private var exitedToHome = false
 
+    /**
+     * Whether the welcome screen has already reported its ending.
+     *
+     * Play and Skip both funnel through [finish], and either can be tapped
+     * twice. `isFinishing` disables both buttons, but it is state and `state`
+     * lags [updateState] by a dispatch, so two taps inside one frame are two
+     * actions in the channel before the disabled pass renders, and [finish] ran
+     * whole for each of them.
+     *
+     * It matters because `onboarding.completed` is how we would know what
+     * fraction of installs get through onboarding, and a double tap inflated
+     * it. The `hasUserOnboarded` write and the navigation are idempotent
+     * already; the event is not, so the guard goes around all three rather than
+     * on either button. That is the lesson SD-85 left: a guard on the control
+     * only ever covers the door it is nailed to.
+     */
+    private var completionReported = false
+
     init {
         takeAction(OnboardingAction.ResolveEntry)
     }
@@ -64,6 +82,8 @@ class OnboardingViewModel(
     }
 
     private suspend fun OnboardingAction.finish(skippedTutorial: Boolean) {
+        if (completionReported) return
+        completionReported = true
         updateState { it.copy(isFinishing = true) }
         exitedToHome = true
         logger.logEvent(
