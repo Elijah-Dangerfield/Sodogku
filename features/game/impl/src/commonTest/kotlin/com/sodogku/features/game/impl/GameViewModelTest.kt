@@ -1657,7 +1657,7 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(GamePhase.Won, vm.state.phase)
         assertEquals(1, badges.recorded.single().strikes, "the wrong guess still happened")
         assertEquals(1, vm.state.strikesThisAttempt)
-        assertEquals(ConsumableRefillTo - 1, vm.state.bonesUnspent, "and the share card says so")
+        assertEquals(ConsumableRefillTo - 1, vm.state.bonesUnspent, "the refill buys no clean sheet")
     }
 
     @Test

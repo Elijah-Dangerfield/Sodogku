@@ -289,14 +289,16 @@ The one thing a board genuinely cannot have is a two-series `by (booster)` split
 run dry. The argument is above the table. The panel keeps the split so the day that changes it
 draws itself, and its title names the sniff so nobody reads the single series as half a chart.
 
-Specced once and emitted by nothing at all: `achievement.unlocked`, `share.tapped`,
-`legal.terms_prompt_shown`, `legal.terms_accepted`, `game.level_abandoned`. The first two belong to
+Specced once and emitted by nothing at all: `achievement.unlocked`,
+`legal.terms_prompt_shown`, `legal.terms_accepted`, `game.level_abandoned`. The first belongs to
 C10's UI half and the legal pair to C11; `game.level_abandoned` has no trigger on the client, since
 leaving a board is a navigation event and not a state transition the view model is told about. None
 of them has a panel, because a panel for an event nothing emits is a chart that lies.
 
-Two more specced names that are deliberately *not* coming, argued elsewhere on this page:
-`daily.streak_broken` and `tutorial.skipped`.
+Three more specced names that are deliberately *not* coming: `daily.streak_broken` and
+`tutorial.skipped`, both argued elsewhere on this page, and `share.tapped`, which lost its
+subject when sharing was deleted (`features.md#what-the-game-does-not-have`). Nothing in the app
+can be tapped to fire it.
 
 ## Advertising and purchases
 

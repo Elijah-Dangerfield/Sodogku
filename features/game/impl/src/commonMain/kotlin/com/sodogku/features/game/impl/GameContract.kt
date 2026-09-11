@@ -475,8 +475,8 @@ data class GameState(
 
     /**
      * What this attempt would bank: what it earned, less the boosters it spent.
-     * The win sheet and the share text both show this rather than [score],
-     * because it is the number that reaches the player's record.
+     * The win sheet shows this rather than [score], because it is the number
+     * that reaches the player's record.
      */
     val attemptScore: Int
         get() = Scoring.afterBoosters(score.total, boostersUsed, boosterPenaltyRate)
@@ -523,11 +523,14 @@ data class GameState(
         get() = phase == GamePhase.Won && paceAgainst(elapsedMs, targetTimeMs) == Pace.Inside
 
     /**
-     * Bones this attempt did not spend, which is what the share card draws.
+     * Bones this attempt did not spend: how cleanly the run went, as opposed to
+     * how many bones the player is holding.
      *
      * Derived from [strikesThisAttempt] rather than read off [livesRemaining],
-     * because the holding is global: a player who refilled mid-board would
-     * otherwise share three intact bones after a run that cost them three.
+     * because the holding is global and an ad refill moves it. A player who
+     * refilled mid-board would otherwise read as a clean sheet after a run that
+     * cost them three. `GameViewModel.win` prices the completion bonus and the
+     * standing on the same expression, for that reason.
      */
     val bonesUnspent: Int
         get() = (ScoringConfig.MAX_LIVES - strikesThisAttempt).coerceAtLeast(0)

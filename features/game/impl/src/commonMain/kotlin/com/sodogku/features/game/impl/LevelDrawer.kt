@@ -358,7 +358,7 @@ private fun LevelRow(
     }
 }
 
-/** Short month names, indexed by month number minus one. Also the share title's. */
+/** Short month names, indexed by month number minus one. */
 internal val MonthNames = listOf(
     Res.string.month_short_1,
     Res.string.month_short_2,

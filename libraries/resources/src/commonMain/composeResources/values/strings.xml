@@ -389,7 +389,8 @@
     <string name="daily_restore_out_of_reach_title">Too long ago</string>
     <string name="daily_restore_out_of_reach_body">A restore reaches back a few days, not a few weeks. Today’s board starts a new streak.</string>
 
-    <!-- Short month names, for the daily card and the share sheet. -->
+    <!-- Short month names, for the daily card on the level pane, the daily
+         recap sheet, and the streak calendar. -->
     <string name="month_short_1">Jan</string>
     <string name="month_short_2">Feb</string>
     <string name="month_short_3">Mar</string>
@@ -669,8 +670,8 @@
     <string name="dogs_a11y">%1$d of %2$d dogs found</string>
 
     <!-- The clock on a board that was finished, and the best of the finished
-         runs on a level pane row. Both take a time already formatted as m:ss,
-         so the sheet, the pane and the share card all read the same. Only ever
+         runs on a level pane row. Both take a time already formatted as m:ss by
+         elapsedLabel, so the sheet and the pane always read the same. Only ever
          shown against a clear: a board nobody solved has no "solved in". -->
     <string name="game_time_taken">Solved in %1$s</string>
     <string name="levels_best_time">Best %1$s</string>
