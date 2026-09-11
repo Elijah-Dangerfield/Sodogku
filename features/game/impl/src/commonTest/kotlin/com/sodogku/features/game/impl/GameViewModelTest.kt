@@ -237,14 +237,24 @@ class GameViewModelTest : CoroutineTest() {
         // a retry, the next level and a jump from the pane all happen long after
         // that flow has settled and `distinctUntilChanged` will not re-emit, so
         // a setting dropped here comes back on and nothing else notices.
-        val vm = viewModel(cache = puristCache())
+        //
+        // The assisted cache, and it has to be. `GameState.autoMarkVisible`
+        // defaults to false, so a purist fixture asserting the crosses are off
+        // after a retry cannot tell the setting being carried from the field
+        // going missing altogether — which is the failure this is here for, and
+        // the one it could not see for as long as it took the purist.
+        val vm = viewModel(cache = assistedCache())
 
         vm.takeAction(GameAction.Retry)
         settle()
         vm.commit(cellFor(row = 0))
 
         assertTrue(vm.state.autoMarks.isNotEmpty(), "the fresh board deduced nothing")
-        assertTrue(vm.state.visibleAutoMarks.isEmpty(), "starting over turned the crosses back on")
+        assertEquals(
+            vm.state.autoMarks,
+            vm.state.visibleAutoMarks,
+            "starting over turned the crosses back off",
+        )
     }
 
     @Test
@@ -3296,6 +3306,102 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(9, vm.state.playStreak, "a new attempt is not a new day")
     }
 
+    /**
+     * The generalisation of the test above, and the reason it exists at all.
+     *
+     * `playStreak` was found by hand, one field at a time, and the eight the
+     * same sweep turned up next — `autoMarkVisible`, `colorblind`, `haptics`,
+     * `reduceAnimations`, `showAchievements`, `refillTo`, `isPro`,
+     * `explainedBoosters` — could each be deleted from `startAttempt` with the
+     * whole suite green. A test per field would have covered those eight and
+     * gone stale on the ninth, which is exactly how this happened.
+     *
+     * So the assertion is a projection: everything that is not about *this
+     * attempt at this board*, either side of a Start over. A field added to
+     * [GameState] tomorrow is in the comparison the day it lands.
+     *
+     * A campaign board, so a field only a daily ever sets — `showDailyIntro` is
+     * the one today — is equal here for the wrong reason and needs its own
+     * fixture. Everything else `load` reads is moved off its default below.
+     */
+    @Test
+    fun startingABoardOverCarriesEverythingThatIsNotAboutTheBoard() = runUnitTest {
+        val raisedRefillTo = 4
+        val heldSniffs = 7
+        val heldTreats = 9
+        val cache = InMemoryAppCache().apply {
+            set(
+                AppData(
+                    hasCompletedTutorial = true,
+                    autoMarkEnabled = true,
+                    colorblindMode = true,
+                    hapticsEnabled = false,
+                    reduceAnimations = true,
+                    achievementsVisible = false,
+                    explainedBoosters = setOf(Consumable.Sniff.name),
+                    bones = Stash,
+                    sniffs = heldSniffs,
+                    treats = heldTreats,
+                ),
+            )
+        }
+        val progress = InMemoryProgress()
+        progress.onCompleted(StarterDogLevel, score = 900, paws = 3, timeMs = 4_000)
+        val vm = viewModel(
+            cache = cache,
+            progress = progress,
+            entitlements = ProEntitlements(),
+            streak = SilentStreak(current = 9),
+            achievements = RecordingAchievements(
+                unlocked = mapOf(AchievementId.FirstSteps to Unlock(FreshUnlockAt)),
+            ),
+            config = configOf(
+                "boosters.refillTo" to raisedRefillTo,
+                "boosters.treatSchedule" to everyN(SEVEN),
+                "features.achievements" to false,
+                "features.boosters" to false,
+                "ads.enabled" to false,
+            ),
+        )
+        // The pane's rows are carried too, and they are the one field here that
+        // is never loaded until something asks for them.
+        vm.takeAction(GameAction.LevelsOpened)
+        settle()
+        // A board with play on it, so the fields the projection drops genuinely
+        // differ across the retry. Without this the exclusion list would be
+        // decoration and nobody adding a field would be made to think about it.
+        vm.commit(cellFor(row = 0))
+        vm.note(freeCell(vm))
+        vm.commit(wrongCellIn(row = 1))
+        val before = vm.state
+
+        // The fixture's own inventory, not the assertion. Every settings read
+        // in `load` has to land somewhere off its default, or the comparison
+        // below would hold just as well for a board that never had any of them.
+        assertTrue(before.autoMarkVisible)
+        assertTrue(before.colorblind)
+        assertFalse(before.haptics)
+        assertTrue(before.reduceAnimations)
+        assertFalse(before.showAchievements)
+        assertFalse(before.achievementsEnabled)
+        assertFalse(before.boostersEnabled)
+        assertFalse(before.adsEnabled)
+        assertEquals(raisedRefillTo, before.refillTo)
+        assertTrue(before.isPro)
+        assertEquals(setOf(Consumable.Sniff), before.explainedBoosters)
+        assertTrue(before.records.isNotEmpty())
+        assertEquals(9, before.playStreak)
+        assertEquals(heldSniffs, before.sniffs)
+        assertEquals(heldTreats, before.treats)
+        assertTrue(before.treatBands.isNotEmpty())
+        assertEquals(1, before.newBadgeCount)
+
+        vm.takeAction(GameAction.Retry)
+        settle()
+
+        assertEquals(before.withoutTheBoard(), vm.state.withoutTheBoard())
+    }
+
     @Test
     fun aSpentDailyHasNothingToStartOver() = runUnitTest {
         // The recap draws the day's board as a backdrop. Restarting from there
@@ -4119,6 +4225,62 @@ class GameViewModelTest : CoroutineTest() {
         }
         assertEquals(step, state.tutorial, "never reached $step")
     }
+
+    /**
+     * [GameState] with everything about *this attempt at this board* taken out,
+     * leaving what a new attempt has to be handed.
+     *
+     * An exclusion list rather than a list of what to compare, and that is the
+     * whole shape of it. `startAttempt` builds a fresh `GameState` instead of
+     * copying one, so a field it forgets to name is silently reset to a default
+     * — and a projection that named the fields it checks would cover today's
+     * and go stale on the next one. Written this way a new field is compared
+     * the day it is added, and whoever adds it either finds it carried or comes
+     * here and says, by putting it below, that a fresh attempt starts without
+     * it.
+     *
+     * The rule for the list: a field belongs here when two attempts at the same
+     * board can honestly disagree about it. Not "a field `startAttempt` writes"
+     * — it writes `unlockedThrough` and `targetTimeMs` too, and those must come
+     * out the same both times.
+     */
+    private fun GameState.withoutTheBoard(): GameState = copy(
+        placed = Blank.placed,
+        autoMarks = Blank.autoMarks,
+        manualMarks = Blank.manualMarks,
+        clearedMarks = Blank.clearedMarks,
+        wrongGuesses = Blank.wrongGuesses,
+        strikesThisAttempt = Blank.strikesThisAttempt,
+        score = Blank.score,
+        paws = Blank.paws,
+        nearMiss = Blank.nearMiss,
+        standing = Blank.standing,
+        treatAwarded = Blank.treatAwarded,
+        elapsedMs = Blank.elapsedMs,
+        boostersUsed = Blank.boostersUsed,
+        strikeNonce = Blank.strikeNonce,
+        strikeCell = Blank.strikeCell,
+        shakeNonce = Blank.shakeNonce,
+        shakeCell = Blank.shakeCell,
+        pointsNonce = Blank.pointsNonce,
+        lastPoints = Blank.lastPoints,
+        lastPraise = Blank.lastPraise,
+        phase = Blank.phase,
+        boosterPrompt = Blank.boosterPrompt,
+        warning = Blank.warning,
+        hintCells = Blank.hintCells,
+        hintReason = Blank.hintReason,
+        nudgeBoosters = Blank.nudgeBoosters,
+        newBadges = Blank.newBadges,
+        drawerOpen = Blank.drawerOpen,
+        skip = Blank.skip,
+        campaignComplete = Blank.campaignComplete,
+        campaignTotals = Blank.campaignTotals,
+        tutorial = Blank.tutorial,
+        tutorialCells = Blank.tutorialCells,
+        dailyStreak = Blank.dailyStreak,
+        freezeMessage = Blank.freezeMessage,
+    )
 
     /** A square on the open board that a tap would actually write a note on. */
     private fun freeCell(vm: GameViewModel): Int {
@@ -5481,6 +5643,9 @@ class GameViewModelTest : CoroutineTest() {
          * a player and the only place a floor can be told from an assignment.
          */
         const val Stash = 5
+
+        /** The defaults [withoutTheBoard] projects the played board onto. */
+        val Blank = GameState()
 
         /** Past `StruggleDetector`'s idle window, with room to spare. */
         val Staring = 12.seconds
