@@ -2769,25 +2769,6 @@ class GameViewModel(
         }.logOnFailure { "Failed to save the board" }
     }
 
-    /**
-     * Drops the saved board, but only if it is this one's.
-     *
-     * There is one slot for the whole app, so a ViewModel that cleared it
-     * blindly would throw away whatever board another route had left in it.
-     */
-    private suspend fun clearSavedBoard(levelId: Int) {
-        Catching {
-            appCache.update { data ->
-                val held = data.boardInProgress
-                if (held?.levelId == levelId && held.isDaily == isDaily) {
-                    data.copy(boardInProgress = null)
-                } else {
-                    data
-                }
-            }
-        }.logOnFailure { "Failed to clear the saved board" }
-    }
-
     private val modeName: String get() = if (isDaily) "daily" else "campaign"
 
     private companion object {
