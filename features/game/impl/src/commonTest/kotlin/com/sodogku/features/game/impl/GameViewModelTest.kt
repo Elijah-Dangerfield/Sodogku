@@ -1090,6 +1090,16 @@ class GameViewModelTest : CoroutineTest() {
         vm.takeAction(GameAction.DismissWarning)
         settle()
         assertNull(vm.state.warning, "the card could not be dismissed")
+
+        // And it stays dismissed on this board, which is a different claim from
+        // the one the test below makes. That one builds a second ViewModel, so
+        // it re-reads the flag from disk and proves the write; the field is what
+        // answers the next tick, and `state` lags `updateState` by a dispatch —
+        // so with the field write gone the card comes straight back here, every
+        // tick, until the player touches the board.
+        clock += Reading
+        vm.tick()
+        assertNull(vm.state.warning, "the same board explained itself twice")
     }
 
     @Test
