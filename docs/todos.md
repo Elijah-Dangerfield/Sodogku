@@ -225,32 +225,6 @@ both entries appeared and launched.
 **If they did not**, this is the cause, and the fix is a Gradle-generated
 `@string/` holding the real application id rather than a literal in the resource.
 Nothing else in the change would explain the entries being absent or dead.
-## SD-67 [P2] — Three things nothing calls, and one config key no test can see
-
-**Found by:** the SD-22 agent, 2026-09-10, while deriving the features doc from
-code.
-
-Four small ones, grouped because each is a line or two and they are all the same
-kind of rot:
-
-- **`config.refreshThrottleMs` is declared outside `SodogkuConfigValues` and has
-  no `FallbackConfigMap` entry**, so neither completeness test sees it. Benign
-  today and a real hole in the guard that is supposed to make config keys
-  impossible to forget. Fix this one first; the others are tidying and this is a
-  blind spot.
-- **`features/home` is dead at runtime.** `HomeScreen` is a hardcoded dev
-  launcher with three level buttons and a no-op ViewModel. Only the bug-report
-  screen in that module is live.
-- **`GameViewModel.clearSavedBoard` has no callers.**
-- **`AppData.resetAccountScoped()` has no callers**, which is an account-era
-  leftover SD-32 missed.
-
-**Done when:** the config key is visible to both completeness tests, and each of
-the other three is either deleted or has a caller.
-
-**Hints:** Check `features/home` carefully before deleting it. A dev launcher
-that nobody ships is still the thing somebody reaches for when they need to jump
-to a level, and the QA panel may or may not have replaced it.
 ## SD-69 [P1] — The store screenshots show a feature that no longer exists
 
 **Found by:** the SD-65 agent, 2026-09-10, while sweeping the listing.
@@ -311,3 +285,34 @@ have.
 named here, since the same pass that left these probably left others. `--` inside
 an XML comment fails the resource build with an error naming no file and no line,
 so be careful editing them.
+
+## SD-72 [P2] — `docs/practices/testing.md` describes a test suite that does not exist
+
+**Found by:** the SD-67 agent, 2026-09-10, while correcting the parts of it that
+named things it was deleting.
+
+It cites `HomeViewModelTest`, a `HomeScenario` harness under
+`features/home/impl/commonTest/harness/`, a JWT auth plugin, `IntegrationAuth`,
+`HttpProfileApi` and `ProfileRepositoryImpl`. None of them exist.
+`features/home/impl` has no `commonTest` directory at all. Most died with the
+accounts deletion in C0.
+
+This is the document a new contributor reads to learn how to test in this repo,
+which makes it the worst place in the tree to be wrong. Somebody following it
+would spend an afternoon looking for a harness that was deleted a year ago.
+
+The parts naming deleted code have been corrected, so it is no longer actively
+lying about the things SD-67 touched. The rest has not been read against reality.
+
+**Done when:** every file, class and directory it names exists, and the practices
+it describes are the ones the repo actually follows.
+
+**Hints:** There is a lot to add as well as remove. The composition test tier
+landed on 2026-09-10 and is documented, but mutation testing is the house rule
+this repo actually runs on and the doc barely mentions it. So does the rule about
+pushing decisions out of composables into pure functions, which is why several
+bugs were catchable at all. Write down what is true now rather than patching what
+was.
+
+`DocReferencesResolveTest` will catch a dead file path but not a class name, so
+grep for every symbol it names.
