@@ -137,6 +137,26 @@ tasks.withType<Test>().configureEach {
         },
     ).withPropertyName("androidResourceScan")
 
+    // `DocReferencesResolveTest` reads markdown twice over: once as a place a
+    // doc citation can be written, and once as the thing one resolves against.
+    // Renaming a heading in `docs/reference/features.md`
+    // touches no Kotlin, so without this the task stays UP-TO-DATE and every KDoc
+    // pointing at the old name goes green. Same hole as the iOS, strings and skill
+    // scans around it, and the same fix.
+    //
+    // Declared as the exact set the test walks rather than only the markdown half,
+    // because it also reads Swift and XML for citations and neither is fully covered
+    // by the trees above. Overlapping with them is free; a gap is not.
+    inputs.files(
+        rootProject.fileTree(repo) {
+            for (dir in listOf("docs", "libraries", "features", "apps", "ops", "tools")) {
+                include("$dir/**/*.md", "$dir/**/*.kt", "$dir/**/*.kts")
+                include("$dir/**/*.swift", "$dir/**/*.xml")
+            }
+            exclude("**/build/**", "**/xcuserdata/**")
+        },
+    ).withPropertyName("docReferenceScan")
+
     // Same again for the agent skills. `FeedbackTriageQueryContractTest` holds
     // the triage skill's Sentry queries against the enum that produces the tag
     // values — and the enum half is covered by the `*.kt` tree above while the

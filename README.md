@@ -76,6 +76,8 @@ Architecture rules (enforced at Gradle configuration time), the ViewModel/DI/nav
 |---|---|
 | [SETUP.md](SETUP.md) | Init → running app → first release, step by step |
 | [AGENTS.md](AGENTS.md) | Architecture, conventions, auth model, sync, testing rules |
+| [docs/reference/features.md](docs/reference/features.md) | What the game offers: every player-facing feature, its rules, its config keys, where it lives |
+| [docs/decisions.md](docs/decisions.md) | Why anything non-obvious is the way it is. Newest first |
 | [docs/practices/testing.md](docs/practices/testing.md) | Which layer catches which bug; fakes; the integration harness |
 | [docs/practices/observability.md](docs/practices/observability.md) | The session_id pivot; finding one session across Sentry/Loki/Tempo |
 | [docs/practices/app-events.md](docs/practices/app-events.md) | The structured-event registry + `logEvent` discipline |
