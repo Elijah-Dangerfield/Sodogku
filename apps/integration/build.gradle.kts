@@ -182,6 +182,19 @@ tasks.withType<Test>().configureEach {
         },
     ).withPropertyName("testFileHeaderScan")
 
+    // And the artwork. `DogsAreDrawnByTheDesignSystemTest` reads the dog
+    // drawable *file names* off disk rather than listing them, so that a sprite
+    // sheet added tomorrow is covered by a rule written today — which means
+    // adding one is a change to this task's inputs. The `*.kt` trees above see
+    // none of it: a commit that adds a sheet and a call site reaching straight
+    // for it would leave the task UP-TO-DATE on the half that matters.
+    inputs.files(
+        rootProject.fileTree(repo) {
+            include("**/composeResources/**/drawable/**")
+            exclude("**/build/**", ".claude/**")
+        },
+    ).withPropertyName("drawableArtScan")
+
     // Same again for the agent skills. `FeedbackTriageQueryContractTest` holds
     // the triage skill's Sentry queries against the enum that produces the tag
     // values — and the enum half is covered by the `*.kt` tree above while the

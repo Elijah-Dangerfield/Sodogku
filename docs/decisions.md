@@ -2354,7 +2354,7 @@ on my part (`features.check("webp_anim")` is not a real feature name); Pillow re
 fine.
 
 **Cost:** the sheet's frame count and grid are duplicated between the script's arguments and
-`AnimatedDog.kt`'s constants. A mismatch shows up as a visibly wrong animation rather than a
+`DogSprite.kt`'s constants. A mismatch shows up as a visibly wrong animation rather than a
 build failure, which is why both are documented in `features.md#the-dog`.
 
 ## 2026-09-07 — Haptics go through one object, not through call sites

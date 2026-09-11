@@ -1245,7 +1245,18 @@ A spotlight can declare its targets live, which is what "only the correct cell i
 means in a guided lesson, and can carry a label, which is what makes the hole reachable by a
 screen reader.
 
-**Where it lives:** `libraries/ui/.../components/dog/Dog.kt`, `AnimatedDog.kt`,
+**One component draws every dog.** `Dog(pose = …, motion = …)` is the only way a screen gets
+one, and it is what decides whether the dog may move: never under `LocalInspectionMode`, which
+covers previews and composition tests, and never when the player has asked for fewer
+animations. Inspection wins if the two ever disagree, because a preview that cannot reach idle
+is a broken tool rather than a taste. A dog that was asked to move and refused holds the first
+frame of the clip it was about to play, so a preview shows the art that ships; a dog that was
+never going to move draws the pose the caller named. This used to be three composables making
+the decision separately and one of them getting it wrong, which is why
+`DogsAreDrawnByTheDesignSystemTest` fails the build if anything outside the component names a
+dog drawable.
+
+**Where it lives:** `libraries/ui/.../components/dog/Dog.kt`, `DogSprite.kt`,
 `DogLoopSchedule.kt`, `libraries/ui/.../system/Focus.kt`. Source art and the sheet-building
 script live in `art/` and `scripts/`.
 

@@ -14,6 +14,7 @@ import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.board.BoardCell
 import com.sodogku.libraries.ui.components.board.BoardCellState
 import com.sodogku.libraries.ui.components.dog.Dog
+import com.sodogku.libraries.ui.components.dog.DogMotion
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.game.RewardBadge
 import com.sodogku.libraries.ui.components.game.RewardButton
@@ -90,15 +91,22 @@ fun BoardCellCatalog(modifier: Modifier = Modifier) {
 }
 
 /**
- * Every dog pose. Board poses ship at 192px and hero poses at 512px — putting a
- * hero pose in a grid cell is roughly 28MB of decoded bitmap for one puzzle,
- * which is why `DogPose` carries the weight rather than the call site choosing.
+ * Every dog pose, then the two that move. Board poses ship at 192px and hero
+ * poses at 512px — putting a hero pose in a grid cell is roughly 28MB of decoded
+ * bitmap for one puzzle, which is why `DogPose` carries the weight rather than
+ * the call site choosing.
+ *
+ * The moving pair hold still on this page under a preview or a composition test
+ * and move in the running catalog, which is the whole of `Dog`'s contract in one
+ * screen.
  */
 @Composable
 fun DogCatalog(modifier: Modifier = Modifier) {
     CatalogPage(
         title = "Dog",
-        description = "Dog(pose = DogPose.X). Never reference a dog drawable directly.",
+        description = "Dog(pose = DogPose.X, motion = DogMotion.X). Never reference a dog " +
+            "drawable directly: Dog decides whether a dog is allowed to move, so that no " +
+            "call site has to remember that a preview cannot wait out a loop.",
         modifier = modifier,
     ) {
         DogPose.entries.chunked(CHUNK).forEach { row ->
@@ -112,6 +120,18 @@ fun DogCatalog(modifier: Modifier = Modifier) {
                             color = AppTheme.colors.textSecondary,
                         )
                     }
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D400)) {
+            listOf(DogMotion.Settled, DogMotion.Alive).forEach { motion ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Dog(size = Dimension.D1900, motion = motion)
+                    Text(
+                        text = motion.name,
+                        typography = AppTheme.typography.Caption.C300,
+                        color = AppTheme.colors.textSecondary,
+                    )
                 }
             }
         }

@@ -26,8 +26,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sodogku.libraries.ui.PreviewContent
-import com.sodogku.libraries.ui.components.dog.AnimatedDog
 import com.sodogku.libraries.ui.components.dog.Dog
+import com.sodogku.libraries.ui.components.dog.DogMotion
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.game.drawStarburst
 import com.sodogku.libraries.ui.system.color.BoardMark
@@ -312,16 +312,21 @@ fun BoardCell(
                 scaleY = pop.value
                 alpha = pop.value.coerceIn(0f, 1f)
             }
-            if (animated) {
-                AnimatedDog(
-                    size = size * DogFraction,
-                    frameOffset = animationOffset,
-                    variant = animationOffset,
-                    modifier = dogModifier,
-                )
-            } else {
-                Dog(pose = DogPose.Still, size = size * DogFraction, modifier = dogModifier)
-            }
+            // No inspection-mode branch here, and none anywhere else either:
+            // `Dog` owns that, and a caller that had to remember it is what
+            // SD-103 removed.
+            //
+            // `animated` still picks the variant, because a caller saying "this
+            // board is a picture" is not the same claim as a tool saying "I
+            // cannot wait for a loop". The drawer's thumbnails say the first and
+            // want the resting pose, which is what they have always drawn.
+            Dog(
+                modifier = dogModifier,
+                pose = DogPose.Still,
+                size = size * DogFraction,
+                motion = if (animated) DogMotion.Settled else DogMotion.None,
+                seed = animationOffset,
+            )
         }
     }
 }

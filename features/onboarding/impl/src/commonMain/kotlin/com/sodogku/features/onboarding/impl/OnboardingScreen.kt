@@ -48,10 +48,10 @@ import com.sodogku.libraries.ui.components.button.ButtonAccent
 import com.sodogku.libraries.ui.components.button.ButtonGhost
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.button.ButtonSize
-import com.sodogku.libraries.ui.components.dog.LoopingDog
+import com.sodogku.libraries.ui.components.dog.Dog
+import com.sodogku.libraries.ui.components.dog.DogMotion
 import com.sodogku.libraries.ui.components.game.drawPaw
 import com.sodogku.libraries.ui.components.text.Text
-import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
@@ -85,14 +85,7 @@ fun OnboardingScreen(
     state: OnboardingState,
     onAction: (OnboardingAction) -> Unit,
 ) {
-    WelcomeContent(
-        state = state,
-        onAction = onAction,
-        // The one place the loop is switched off for a player who asked for
-        // stills. `LoopingDog` holds frame 0, so reduce-animations gets a
-        // composed screen rather than an empty hole where the dog was.
-        dogPlaying = !LocalReduceAnimations.current,
-    )
+    WelcomeContent(state = state, onAction = onAction)
 }
 
 /**
@@ -113,7 +106,6 @@ fun OnboardingScreen(
 private fun WelcomeContent(
     state: OnboardingState,
     onAction: (OnboardingAction) -> Unit,
-    dogPlaying: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Screen(
@@ -123,10 +115,7 @@ private fun WelcomeContent(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            DogField(
-                playing = dogPlaying,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            )
+            DogField(modifier = Modifier.fillMaxWidth().weight(1f))
             WelcomeCard(state = state, onAction = onAction)
         }
     }
@@ -144,9 +133,9 @@ private fun WelcomeContent(
  * The dog is sized against the field rather than fixed, and it has to be. Its
  * `Modifier.size` is clamped by whatever constraints it is handed, so on a short
  * phone a fixed 240dp square arrives as a 240 by 190 rectangle, and
- * `AnimatedDog` draws the frame into exactly the box it is given: a stretched
- * dog, not a cropped one. Taking the smaller of the two up front means the
- * fallback is a smaller dog at the proportions it was drawn at.
+ * `Dog` draws the frame into exactly the box it is given: a stretched dog, not
+ * a cropped one. Taking the smaller of the two up front means the fallback is a
+ * smaller dog at the proportions it was drawn at.
  *
  * A fifth of the sprite's frame is transparent above the ears, so a dog that
  * exactly fills the field still has margin. That is why the cap is the whole
@@ -157,10 +146,7 @@ private fun WelcomeContent(
  * runs edge to edge and under the clock while the dog stays out from behind it.
  */
 @Composable
-private fun DogField(
-    playing: Boolean,
-    modifier: Modifier = Modifier,
-) {
+private fun DogField(modifier: Modifier = Modifier) {
     val field = AppTheme.colors.accentBrand.color
     val texture = ColorResource.White.withAlpha(FieldTextureAlpha).color
 
@@ -185,12 +171,14 @@ private fun DogField(
                 .windowInsetsPadding(statusBar),
             contentAlignment = Alignment.Center,
         ) {
-            // Hero weight, so 320px frames rather than the board's 128px: this
-            // draws at 240dp, and the old sheet was a five-times upscale. Also
-            // the reason it is `LoopingDog` and not `AnimatedDog` — one clip on
-            // repeat stops being seen after about three passes, and this dog is
+            // `Alive` and not `Settled`: hero weight, so 320px frames rather
+            // than the board's 128px, and a changing repertoire rather than one
+            // clip, which stops being seen after about three passes. This dog is
             // the screen.
-            LoopingDog(size = dogSize, playing = playing)
+            //
+            // Nothing here reads the reduce-animations setting any more. `Dog`
+            // does, which is the whole point of there being one of them.
+            Dog(size = dogSize, motion = DogMotion.Alive)
         }
     }
 }
