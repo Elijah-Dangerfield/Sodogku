@@ -72,7 +72,24 @@ class AchievementEngineTest {
             result(finishedAt = 1_700_000_000_000),
         ).state
 
-        assertEquals(1_700_000_000_000, state.unlocked[AchievementId.FirstSteps])
+        assertEquals(Unlock(1_700_000_000_000), state.unlocked[AchievementId.FirstSteps])
+    }
+
+    /**
+     * The fold has no way to know a catalog changed between two attempts, so it
+     * reports the crossing attempt as the announcement too. That is the honest
+     * limit of a pure function over the log, and it is why the stored unlock
+     * table overrides it — see `AchievementsRepositoryImpl.record`.
+     */
+    @Test
+    fun theFoldAnnouncesABadgeAtTheMomentItCrosses() {
+        val state = AchievementEngine.apply(
+            AchievementState.Empty,
+            result(finishedAt = 1_700_000_000_000),
+        ).state
+
+        val unlock = state.unlocked.getValue(AchievementId.FirstSteps)
+        assertEquals(unlock.unlockedAt, unlock.announcedAt)
     }
 
     @Test
@@ -89,7 +106,11 @@ class AchievementEngineTest {
         val after = AchievementEngine.replay(history, catalog = withNewOne)
 
         assertTrue(after.isUnlocked(AchievementId.GoodDog), "the tenth clear already earned it")
-        assertEquals(10L, after.unlocked[AchievementId.GoodDog], "dated to the attempt that earned it")
+        assertEquals(
+            10L,
+            after.unlocked[AchievementId.GoodDog]?.unlockedAt,
+            "dated to the attempt that earned it",
+        )
     }
 
     @Test

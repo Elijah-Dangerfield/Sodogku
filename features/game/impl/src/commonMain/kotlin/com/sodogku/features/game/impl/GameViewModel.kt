@@ -90,16 +90,20 @@ import me.tatarka.inject.annotations.Inject
 internal const val LevelRewardTreats: Int = 1
 
 /**
- * Badges unlocked strictly after [seenAt], which is what the board's trophy
+ * Badges announced strictly after [seenAt], which is what the board's trophy
  * counts.
  *
  * A comparison of timestamps rather than a stored count, so the number is
  * derived from the log on every read and there is no second copy of it to drift.
- * Strictly after, because [seenAt] is itself an unlock time: the badge the
+ * Strictly after, because [seenAt] is itself an announcement time: the badge the
  * player was last shown is not a badge they have not seen.
+ *
+ * Announcement rather than the historical unlock date, because a badge the
+ * catalog gained today off a play from last month is one the player has not been
+ * shown, and dating it by the play would put it behind the watermark.
  */
 internal fun AchievementState.badgesSince(seenAt: Long): Int =
-    unlocked.count { (_, unlockedAt) -> unlockedAt > seenAt }
+    unlocked.count { (_, unlock) -> unlock.announcedAt > seenAt }
 
 /**
  * The lifetime total split in two: everything banked, and the slice of it this

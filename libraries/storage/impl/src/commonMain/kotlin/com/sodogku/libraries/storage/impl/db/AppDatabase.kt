@@ -9,6 +9,7 @@ import androidx.room.TypeConverters
 import com.sodogku.libraries.achievements.db.AchievementDao
 import com.sodogku.libraries.achievements.db.AchievementFactEntity
 import com.sodogku.libraries.achievements.db.AchievementUnlockEntity
+import com.sodogku.libraries.achievements.db.AnnouncedAtBackfill
 import com.sodogku.libraries.progress.db.DailyResultDao
 import com.sodogku.libraries.progress.db.DailyResultEntity
 import com.sodogku.libraries.progress.db.LevelProgressDao
@@ -30,7 +31,7 @@ import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataEntity
         AchievementUnlockEntity::class,
         PlayDayEntity::class,
     ],
-    version = 10,
+    version = 11,
     /**
      * Every bump from [FIRST_PLAYER_DATA_VERSION] on has to be listed here.
      *
@@ -39,15 +40,19 @@ import com.sodogku.libraries.sodogku.storage.db.ExampleUserDataEntity
      * their phone. A destructive fallback is a silent, unrecoverable wipe on
      * the next release that happens to add a column.
      *
-     * Every addition so far is a new table, which Room can migrate on its own.
-     * A change it cannot — a renamed or retyped column — will fail the build
-     * here rather than at runtime, which is the point.
+     * Most additions are a new table or a defaulted column, which Room can
+     * migrate on its own. A change it cannot — a renamed or retyped column —
+     * will fail the build here rather than at runtime, which is the point. A
+     * spec is for the cases where the *default* is wrong: 10 → 11 adds
+     * `achievement_unlock.announcedAt`, whose only harmless starting value is
+     * the row's own `unlockedAt`, and no static default can say that.
      */
     autoMigrations = [
         AutoMigration(from = 6, to = 7),
         AutoMigration(from = 7, to = 8),
         AutoMigration(from = 8, to = 9),
         AutoMigration(from = 9, to = 10),
+        AutoMigration(from = 10, to = 11, spec = AnnouncedAtBackfill::class),
     ],
     exportSchema = true
 )

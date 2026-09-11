@@ -62,6 +62,7 @@ import com.sodogku.libraries.achievements.AchievementsRepository
 import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.achievements.Stat
+import com.sodogku.libraries.achievements.Unlock
 import com.sodogku.libraries.leaderboards.Leaderboard
 import com.sodogku.libraries.leaderboards.Leaderboards
 import com.sodogku.libraries.leaderboards.NoLeaderboards
@@ -4416,8 +4417,8 @@ class GameViewModelTest : CoroutineTest() {
     fun theTrophyCountsOnlyTheBadgesEarnedSinceTheGridWasLastOpened() = runUnitTest {
         val badges = RecordingAchievements(
             unlocked = mapOf(
-                AchievementId.FirstSteps to SeenUnlockAt,
-                AchievementId.GoodDog to FreshUnlockAt,
+                AchievementId.FirstSteps to Unlock(SeenUnlockAt),
+                AchievementId.GoodDog to Unlock(FreshUnlockAt),
             ),
         )
         val cache = InMemoryAppCache().apply { set(AppData(achievementsSeenAt = SeenUnlockAt)) }
@@ -4425,6 +4426,23 @@ class GameViewModelTest : CoroutineTest() {
         val vm = viewModel(cache = cache, achievements = badges)
 
         assertEquals(1, vm.state.newBadgeCount, "the one earned since the last look, not both")
+    }
+
+    @Test
+    fun theTrophyCountsABadgeBackFilledOntoAPlayFromBeforeTheLastLook() = runUnitTest {
+        // A badge the catalog gained today, granted off a play that predates the
+        // last time the grid was opened. Counted by when it was handed over, not
+        // by when the play happened, or the trophy never lights for it.
+        val badges = RecordingAchievements(
+            unlocked = mapOf(
+                AchievementId.GoodDog to Unlock(unlockedAt = OldPlayAt, announcedAt = FreshUnlockAt),
+            ),
+        )
+        val cache = InMemoryAppCache().apply { set(AppData(achievementsSeenAt = SeenUnlockAt)) }
+
+        val vm = viewModel(cache = cache, achievements = badges)
+
+        assertEquals(1, vm.state.newBadgeCount)
     }
 
     @Test
@@ -4442,7 +4460,7 @@ class GameViewModelTest : CoroutineTest() {
 
     @Test
     fun openingTheGridClearsTheTrophysBadge() = runUnitTest {
-        val badges = RecordingAchievements(unlocked = mapOf(AchievementId.FirstSteps to FreshUnlockAt))
+        val badges = RecordingAchievements(unlocked = mapOf(AchievementId.FirstSteps to Unlock(FreshUnlockAt)))
         val cache = InMemoryAppCache()
         val vm = viewModel(cache = cache, achievements = badges)
         assertEquals(1, vm.state.newBadgeCount, "unseen until it has been seen")
@@ -4459,7 +4477,7 @@ class GameViewModelTest : CoroutineTest() {
     fun theBadgeSurvivesMovingToTheNextLevel() = runUnitTest {
         // `startAttempt` builds a fresh GameState by hand, so anything it forgets
         // to carry is silently dropped between two boards.
-        val badges = RecordingAchievements(unlocked = mapOf(AchievementId.FirstSteps to FreshUnlockAt))
+        val badges = RecordingAchievements(unlocked = mapOf(AchievementId.FirstSteps to Unlock(FreshUnlockAt)))
         val vm = viewModel(achievements = badges)
         assertEquals(1, vm.state.newBadgeCount)
 
@@ -5076,6 +5094,9 @@ class GameViewModelTest : CoroutineTest() {
         const val SeenUnlockAt = 1_000L
         const val FreshUnlockAt = 2_000L
 
+        /** Older than the watermark: the play a late catalog addition back-fills onto. */
+        const val OldPlayAt = 500L
+
         /** A streak record worth posting, and not one any other fake reports. */
         const val LongestRun = 9
 
@@ -5304,7 +5325,7 @@ class GameViewModelTest : CoroutineTest() {
          * Badges already earned, against the epoch-ms of the attempt that earned
          * them — the shape the trophy's count reads.
          */
-        unlocked: Map<AchievementId, Long> = emptyMap(),
+        unlocked: Map<AchievementId, Unlock> = emptyMap(),
     ) : AchievementsRepository {
         val recorded = mutableListOf<LevelResult>()
 
@@ -5324,7 +5345,7 @@ class GameViewModelTest : CoroutineTest() {
             // A fake that returned unlocks without logging them would let the
             // badge count pass on a repository that never remembers anything.
             history.value = history.value.copy(
-                unlocked = history.value.unlocked + unlocks.associate { it.id to result.finishedAt },
+                unlocked = history.value.unlocked + unlocks.associate { it.id to Unlock(result.finishedAt) },
             )
             return unlocks
         }

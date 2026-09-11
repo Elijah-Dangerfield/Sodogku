@@ -112,6 +112,40 @@ class AppDatabaseMigrationTest {
         assertEquals(VERSION_SIX, version)
     }
 
+    /**
+     * A badge earned before the app recorded *when it announced things* keeps
+     * reading exactly as it did the day before the upgrade.
+     *
+     * Version 11 splits one timestamp into two: when the badge was earned, and
+     * when the player was told. Every page that asks "anything new?" moved to
+     * the second one, so a row that arrives with it unset would be an answer to
+     * a question nobody asked it. Left at the column default of zero, a badge
+     * earned yesterday and not yet looked at goes quiet. Set to the migration's
+     * own clock, seventy-odd badges collected over months all announce
+     * themselves at once. Copying the earned date across is the only value that
+     * makes the new comparison return what the old one returned.
+     */
+    @Test
+    fun aBadgeEarnedBeforeVersionElevenKeepsTheAnswerItAlreadyHad() {
+        writeVersionSixDatabase()
+        migrateTo(VERSION_TEN)
+        execute(
+            "INSERT INTO achievement_unlock (achievementId, unlockedAt) " +
+                "VALUES ('FirstSteps', $EarnedLongAgo), ('GoodDog', $EarnedYesterday)",
+        )
+
+        migrateOnFrom(VERSION_TEN)
+
+        val announced = query("SELECT achievementId, announcedAt FROM achievement_unlock ORDER BY achievementId") { stmt ->
+            buildMap { while (stmt.step()) put(stmt.getText(0), stmt.getLong(1)) }
+        }
+        assertEquals(
+            mapOf("FirstSteps" to EarnedLongAgo, "GoodDog" to EarnedYesterday),
+            announced,
+            "the upgrade re-announced a collection, or silenced a badge nobody has seen",
+        )
+    }
+
     @Test
     fun theBuilderDoesNotFallBackDestructivelyFromAShippedVersion() {
         // Read as source rather than exercised, because the alternative needs an
@@ -133,7 +167,7 @@ class AppDatabaseMigrationTest {
         )
         // The versions it is allowed to drop are template history no install has
         // ever run. Anything from FIRST_PLAYER_DATA_VERSION up holds a save.
-        listOf("6", "7", "8", "9", "10").forEach {
+        listOf("6", "7", "8", "9", "10", "11").forEach {
             assertTrue(
                 !Regex("""PRE_GAME_SCHEMA_VERSIONS\s*=\s*intArrayOf\([^)]*\b$it\b""").containsMatchIn(provider),
                 "version $it holds player data and must never be droppable",
@@ -166,30 +200,34 @@ class AppDatabaseMigrationTest {
     /**
      * Runs every migration `AppDatabase` declares, in order.
      *
-     * Listed rather than discovered, so adding version 11 without a migration
+     * Listed rather than discovered, so adding version 12 without a migration
      * fails this file rather than passing quietly — which is the whole failure
      * mode being guarded against.
      */
     private fun migrateToCurrent() {
-        val migrations: List<Migration> = listOf(
-            AppDatabase_AutoMigration_6_7_Impl(),
-            AppDatabase_AutoMigration_7_8_Impl(),
-            AppDatabase_AutoMigration_8_9_Impl(),
-            AppDatabase_AutoMigration_9_10_Impl(),
-        )
         // Checked against the *exported schemas*, which Room writes on every
         // build, rather than against a constant in this file. The first version
         // of this compared two numbers that both lived here, so bumping
         // `@Database(version = …)` without adding a migration left it green —
         // which is precisely the mistake it exists to catch.
         assertEquals(
-            AppDatabase.FIRST_PLAYER_DATA_VERSION + migrations.size,
+            AppDatabase.FIRST_PLAYER_DATA_VERSION + MIGRATIONS.size,
             currentSchemaVersion(),
             "AppDatabase's version moved without a migration being added to this test",
         )
+        runMigrations(MIGRATIONS)
+    }
+
+    /** The migrations up to and including [version], for a test that has to stop part-way. */
+    private fun migrateTo(version: Int) = runMigrations(MIGRATIONS.filter { it.endVersion <= version })
+
+    /** The rest of them, from [version] on. */
+    private fun migrateOnFrom(version: Int) = runMigrations(MIGRATIONS.filter { it.startVersion >= version })
+
+    private fun runMigrations(migrations: List<Migration>) {
         BundledSQLiteDriver().open(dbPath).use { connection ->
             migrations.forEach { it.migrate(connection) }
-            connection.execSQL("PRAGMA user_version = ${currentSchemaVersion()}")
+            connection.execSQL("PRAGMA user_version = ${migrations.last().endVersion}")
         }
     }
 
@@ -206,6 +244,10 @@ class AppDatabaseMigrationTest {
     private fun <T> query(sql: String, block: (SQLiteStatement) -> T): T =
         BundledSQLiteDriver().open(dbPath).use { connection -> connection.prepare(sql).use(block) }
 
+    private fun execute(sql: String) {
+        BundledSQLiteDriver().open(dbPath).use { connection -> connection.execSQL(sql) }
+    }
+
     private inline fun <T> SQLiteConnection.use(block: (SQLiteConnection) -> T): T =
         try {
             block(this)
@@ -215,5 +257,18 @@ class AppDatabaseMigrationTest {
 
     private companion object {
         const val VERSION_SIX = 6
+        const val VERSION_TEN = 10
+
+        /** Two unlock times on a database written before `announcedAt` existed. */
+        const val EarnedLongAgo = 1_700_000_000_000L
+        const val EarnedYesterday = 1_757_000_000_000L
+
+        val MIGRATIONS: List<Migration> = listOf(
+            AppDatabase_AutoMigration_6_7_Impl(),
+            AppDatabase_AutoMigration_7_8_Impl(),
+            AppDatabase_AutoMigration_8_9_Impl(),
+            AppDatabase_AutoMigration_9_10_Impl(),
+            AppDatabase_AutoMigration_10_11_Impl(),
+        )
     }
 }

@@ -5,6 +5,7 @@ import com.sodogku.libraries.achievements.Achievements
 import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.achievements.Stat
+import com.sodogku.libraries.achievements.Unlock
 import com.sodogku.libraries.achievements.db.AchievementDao
 import com.sodogku.libraries.achievements.db.AchievementFactEntity
 import com.sodogku.libraries.achievements.db.AchievementUnlockEntity
@@ -38,7 +39,7 @@ class AchievementsRepositoryImplTest : CoroutineTest() {
         val earned = repository.record(result(levelId = 1, finishedAt = 10))
 
         assertEquals(listOf(AchievementId.FirstSteps), earned.map { it.id })
-        assertEquals(10L, repository.state().unlocked[AchievementId.FirstSteps])
+        assertEquals(Unlock(unlockedAt = 10, announcedAt = 10), repository.state().unlocked[AchievementId.FirstSteps])
     }
 
     @Test
@@ -101,6 +102,44 @@ class AchievementsRepositoryImplTest : CoroutineTest() {
     }
 
     /**
+     * The two dates a back-filled badge has, and why keeping only the first one
+     * left it off the shelf the toast pointed at.
+     *
+     * Ten clears are already on disk when a release adds a badge for ten clears.
+     * The fold puts the crossing at the tenth attempt, weeks back, and that is
+     * the true answer to "when did I earn this". It is also, by then, older than
+     * the watermark the achievements page and the board trophy compare against —
+     * so the announcement has to carry the attempt that actually delivered it.
+     */
+    @Test
+    fun aBackFilledBadge_keepsItsRealDate_andIsAnnouncedNow() = runUnitTest {
+        val dao = FakeAchievementDao()
+        (1..10).forEach { dao.insertFact(entity(result(levelId = it, finishedAt = it.toLong()))) }
+        dao.insertUnlocks(
+            listOf(AchievementUnlockEntity(AchievementId.FirstSteps.name, unlockedAt = 1, announcedAt = 1)),
+        )
+
+        val earned = AchievementsRepositoryImpl(dao).record(result(levelId = 11, finishedAt = Today))
+
+        assertEquals(listOf(AchievementId.GoodDog), earned.map { it.id })
+        val goodDog = dao.unlocks().first { it.achievementId == "GoodDog" }
+        assertEquals(10L, goodDog.unlockedAt, "the tenth clear is when they crossed the line")
+        assertEquals(Today, goodDog.announcedAt, "and today is when anybody told them")
+    }
+
+    /** The ordinary case, where the two dates are the same because they are. */
+    @Test
+    fun aBadgeEarnedByTheAttemptBeingRecorded_isAnnouncedAtThatAttempt() = runUnitTest {
+        val dao = FakeAchievementDao()
+
+        AchievementsRepositoryImpl(dao).record(result(levelId = 1, finishedAt = Today))
+
+        val firstSteps = dao.unlocks().first { it.achievementId == "FirstSteps" }
+        assertEquals(Today, firstSteps.unlockedAt)
+        assertEquals(Today, firstSteps.announcedAt)
+    }
+
+    /**
      * The other direction of the same rule, and the one the catalog leans on
      * whenever a target moves up.
      *
@@ -115,7 +154,9 @@ class AchievementsRepositoryImplTest : CoroutineTest() {
     fun aBadgeAlreadyEarned_survivesItsTargetMovingOutOfReach() = runUnitTest {
         val dao = FakeAchievementDao()
         (1..OldTopDogTarget).forEach { dao.insertFact(entity(result(levelId = it, finishedAt = it.toLong()))) }
-        dao.insertUnlocks(listOf(AchievementUnlockEntity(AchievementId.TopDog.name, unlockedAt = 500)))
+        dao.insertUnlocks(
+            listOf(AchievementUnlockEntity(AchievementId.TopDog.name, unlockedAt = 500, announcedAt = 500)),
+        )
 
         val repository = AchievementsRepositoryImpl(dao)
         val earned = repository.record(result(levelId = OldTopDogTarget + 1, finishedAt = 501))
@@ -150,7 +191,9 @@ class AchievementsRepositoryImplTest : CoroutineTest() {
     @Test
     fun anUnknownUnlockRow_isIgnoredRatherThanFatal() = runUnitTest {
         val dao = FakeAchievementDao()
-        dao.insertUnlocks(listOf(AchievementUnlockEntity("BadgeFromANewerBuild", unlockedAt = 5)))
+        dao.insertUnlocks(
+            listOf(AchievementUnlockEntity("BadgeFromANewerBuild", unlockedAt = 5, announcedAt = 5)),
+        )
         val repository = AchievementsRepositoryImpl(dao)
 
         val earned = repository.record(result(levelId = 1, finishedAt = 1))
@@ -213,6 +256,9 @@ class AchievementsRepositoryImplTest : CoroutineTest() {
 
     /** What `TopDog` asked for before the campaign grew to a thousand levels. */
     private val OldTopDogTarget = 500
+
+    /** Long after every attempt in these fixtures, so a back-fill is visibly late. */
+    private val Today = 1_000L
 
     private fun entity(result: LevelResult) = AchievementFactEntity(
         key = result.key,

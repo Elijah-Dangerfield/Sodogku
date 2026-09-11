@@ -109,17 +109,21 @@ class AchievementsViewModel(
      * Puts the watermark the board's trophy counts against at the newest badge
      * on screen, so the badge clears when the grid is opened and not before.
      *
-     * The newest unlock rather than "now", because this module has no clock and
-     * does not need one: the question the trophy asks is whether anything was
-     * unlocked *after* the last look, and the unlock times are the only side of
-     * that comparison. A "now" read from a device clock running ahead of the one
-     * that stamped the unlocks would swallow a badge earned later.
+     * The newest *announcement* rather than "now", because this module has no
+     * clock and does not need one: the question the trophy asks is whether
+     * anything was announced after the last look, and the announcement times are
+     * the only side of that comparison. A "now" read from a device clock running
+     * ahead of the one that stamped them would swallow a badge earned later.
+     *
+     * Announcement rather than the historical unlock date, or a badge back-filled
+     * onto an old play would leave the watermark behind where it already was and
+     * the trophy lit over a grid the player is looking at.
      *
      * Never lowers the watermark, so the order two screens happen to write in
      * cannot uncount a badge.
      */
     private suspend fun markSeen(history: AchievementState) {
-        val newest = history.unlocked.values.maxOrNull() ?: return
+        val newest = history.unlocked.values.maxOfOrNull { it.announcedAt } ?: return
         Catching {
             appCache.update { data ->
                 data.copy(achievementsSeenAt = maxOf(data.achievementsSeenAt, newest))
@@ -155,14 +159,14 @@ class AchievementsViewModel(
  * a mystery badge tells the reader exactly what to go and try.
  */
 private fun AchievementState.toBadges(seenAt: Long?): List<Badge> = Achievements.catalog.map { achievement ->
-    val unlockedAt = unlocked[achievement.id]
-    val mystery = achievement.hidden && unlockedAt == null
+    val unlock = unlocked[achievement.id]
+    val mystery = achievement.hidden && unlock == null
     Badge(
         id = achievement.id,
         group = Achievements.groupOf(achievement.id),
-        unlocked = unlockedAt != null,
+        unlocked = unlock != null,
         mystery = mystery,
-        isNew = unlockedAt != null && seenAt != null && unlockedAt > seenAt,
+        isNew = unlock != null && seenAt != null && unlock.announcedAt > seenAt,
         progress = if (mystery) 0f else achievement.progress(counters),
         current = if (mystery) 0L else achievement.currentFor(counters),
         target = achievement.target,
@@ -188,8 +192,12 @@ data class Badge(
     val mystery: Boolean,
 
     /**
-     * Earned since the last time this page was looked at, which is what the page
-     * celebrates. Always false while a badge is locked.
+     * Announced since the last time this page was looked at, which is what the
+     * page celebrates. Always false while a badge is locked.
+     *
+     * Announced, not earned: a badge the catalog gained today off a play from
+     * last month is news, and dating it by the play would file it behind the
+     * watermark and leave the shelf empty under a toast that pointed here.
      */
     val isNew: Boolean = false,
 

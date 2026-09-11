@@ -10,6 +10,7 @@ import com.sodogku.libraries.achievements.AchievementsRepository
 import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
 import com.sodogku.libraries.achievements.Stat
+import com.sodogku.libraries.achievements.Unlock
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
@@ -65,7 +66,7 @@ class AchievementsViewModelTest : CoroutineTest() {
             FakeAchievements(
                 AchievementState(
                     counters = counters(Stat.LevelsCleared to 4L),
-                    unlocked = mapOf(AchievementId.FirstSteps to 1_700_000_000_000L),
+                    unlocked = mapOf(AchievementId.FirstSteps to Unlock(1_700_000_000_000L)),
                 ),
             ),
         )
@@ -102,7 +103,7 @@ class AchievementsViewModelTest : CoroutineTest() {
             FakeAchievements(
                 AchievementState(
                     counters = counters(Stat.LevelsCleared to 342L),
-                    unlocked = mapOf(AchievementId.GoodDog to 1L),
+                    unlocked = mapOf(AchievementId.GoodDog to Unlock(1L)),
                 ),
             ),
         )
@@ -132,7 +133,7 @@ class AchievementsViewModelTest : CoroutineTest() {
             FakeAchievements(
                 AchievementState(
                     counters = counters(Stat.NightClears to 1L),
-                    unlocked = mapOf(AchievementId.NightOwl to 1L),
+                    unlocked = mapOf(AchievementId.NightOwl to Unlock(1L)),
                 ),
             ),
         )
@@ -144,7 +145,7 @@ class AchievementsViewModelTest : CoroutineTest() {
     @Test
     fun theSettingsToggleHidesTheGridAndNothingElse() = runUnitTest {
         val repository = FakeAchievements(
-            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to 1L)),
+            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to Unlock(1L))),
         )
         val vm = viewModel(repository, InMemoryAppCache(AppData(achievementsVisible = false)))
 
@@ -164,7 +165,7 @@ class AchievementsViewModelTest : CoroutineTest() {
         // player turns badges off, plays for a month, turns them back on: the
         // grid has to show that month, not a blank slate.
         val repository = FakeAchievements(
-            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to 1L)),
+            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to Unlock(1L))),
         )
         val cache = InMemoryAppCache(AppData(achievementsVisible = false))
         val vm = viewModel(repository, cache)
@@ -174,9 +175,9 @@ class AchievementsViewModelTest : CoroutineTest() {
         repository.history.value = AchievementState(
             counters = counters(Stat.LevelsCleared to 12L),
             unlocked = mapOf(
-                AchievementId.FirstSteps to 1L,
-                AchievementId.GoodDog to 2L,
-                AchievementId.SpeedDemon to 3L,
+                AchievementId.FirstSteps to Unlock(1L),
+                AchievementId.GoodDog to Unlock(2L),
+                AchievementId.SpeedDemon to Unlock(3L),
             ),
         )
         cache.set(AppData(achievementsVisible = true))
@@ -195,7 +196,7 @@ class AchievementsViewModelTest : CoroutineTest() {
 
         repository.history.value = AchievementState(
             counters = counters(Stat.LevelsCleared to 1L),
-            unlocked = mapOf(AchievementId.FirstSteps to 1L),
+            unlocked = mapOf(AchievementId.FirstSteps to Unlock(1L)),
         )
 
         assertEquals(1, vm.state.earnedCount)
@@ -224,7 +225,7 @@ class AchievementsViewModelTest : CoroutineTest() {
         assertFalse(vm.state.selected!!.unlocked)
 
         repository.history.value = AchievementState(
-            unlocked = mapOf(AchievementId.FirstSteps to 1L),
+            unlocked = mapOf(AchievementId.FirstSteps to Unlock(1L)),
         )
 
         assertTrue(vm.state.selected!!.unlocked)
@@ -248,7 +249,7 @@ class AchievementsViewModelTest : CoroutineTest() {
     fun lookingAtTheGridMarksWhatIsOnItAsSeen() = runUnitTest {
         val cache = InMemoryAppCache()
         val repository = FakeAchievements(
-            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to NewestUnlock)),
+            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to Unlock(NewestUnlock))),
         )
 
         viewModel(repository = repository, cache = cache)
@@ -265,7 +266,7 @@ class AchievementsViewModelTest : CoroutineTest() {
     fun aGridNobodyCanSeeMarksNothing() = runUnitTest {
         val cache = InMemoryAppCache(AppData(achievementsVisible = false))
         val repository = FakeAchievements(
-            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to NewestUnlock)),
+            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to Unlock(NewestUnlock))),
         )
 
         viewModel(repository = repository, cache = cache)
@@ -278,7 +279,7 @@ class AchievementsViewModelTest : CoroutineTest() {
     fun theWatermarkOnlyEverMovesForward() = runUnitTest {
         val cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock))
         val repository = FakeAchievements(
-            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to OlderUnlock)),
+            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to Unlock(OlderUnlock))),
         )
 
         viewModel(repository = repository, cache = cache)
@@ -297,8 +298,8 @@ class AchievementsViewModelTest : CoroutineTest() {
             repository = FakeAchievements(
                 AchievementState(
                     unlocked = mapOf(
-                        AchievementId.FirstSteps to OlderUnlock,
-                        AchievementId.GoodDog to NewestUnlock,
+                        AchievementId.FirstSteps to Unlock(OlderUnlock),
+                        AchievementId.GoodDog to Unlock(NewestUnlock),
                     ),
                 ),
             ),
@@ -311,6 +312,87 @@ class AchievementsViewModelTest : CoroutineTest() {
         assertEquals(listOf(AchievementId.GoodDog), vm.state.spotlight?.badges?.map { it.id })
     }
 
+    /**
+     * A badge added to the catalog today, off a play from weeks ago.
+     *
+     * Its earned date is older than the last time this page was opened, which is
+     * exactly what makes it the case worth a test: the toast that just fired
+     * sends the player here, and a page that dated the badge by the play would
+     * greet them with the shelf they were already looking at last week.
+     */
+    @Test
+    fun aBadgeBackFilledOntoAnOldPlayIsStillNews() = runUnitTest {
+        val vm = viewModel(
+            repository = FakeAchievements(
+                AchievementState(
+                    unlocked = mapOf(
+                        AchievementId.FirstSteps to Unlock(OlderUnlock),
+                        AchievementId.GoodDog to Unlock(
+                            unlockedAt = OlderUnlock,
+                            announcedAt = BackfilledToday,
+                        ),
+                    ),
+                ),
+            ),
+            cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
+        )
+
+        assertTrue(vm.badge(AchievementId.GoodDog).isNew, "granted after the last look, however old the play")
+        assertFalse(vm.badge(AchievementId.FirstSteps).isNew)
+        assertEquals(SpotlightKind.JustEarned, vm.state.spotlight?.kind)
+        assertEquals(listOf(AchievementId.GoodDog), vm.state.spotlight?.badges?.map { it.id })
+    }
+
+    /**
+     * And the badge that really is old stays old.
+     *
+     * The other half of the same rule: `announcedAt` exists so a back-fill can
+     * be news, not so everything can. A player who earned something weeks ago
+     * and has looked at the page since is not told about it again.
+     */
+    @Test
+    fun aBadgeTheyHaveAlreadySeenIsNotAnnouncedTwice() = runUnitTest {
+        val vm = viewModel(
+            repository = FakeAchievements(
+                AchievementState(
+                    unlocked = mapOf(
+                        AchievementId.FirstSteps to Unlock(
+                            unlockedAt = OlderUnlock,
+                            announcedAt = OlderUnlock,
+                        ),
+                    ),
+                ),
+            ),
+            cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
+        )
+
+        assertFalse(vm.badge(AchievementId.FirstSteps).isNew)
+        assertEquals(SpotlightKind.NextUp, vm.state.spotlight?.kind)
+    }
+
+    /**
+     * The watermark has to move past the *announcement*, or the trophy on the
+     * board stays lit over a grid the player has just been reading.
+     */
+    @Test
+    fun lookingAtABackFilledBadgeMarksItSeen() = runUnitTest {
+        val cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock))
+        val repository = FakeAchievements(
+            AchievementState(
+                unlocked = mapOf(
+                    AchievementId.GoodDog to Unlock(
+                        unlockedAt = OlderUnlock,
+                        announcedAt = BackfilledToday,
+                    ),
+                ),
+            ),
+        )
+
+        viewModel(repository = repository, cache = cache)
+
+        assertEquals(BackfilledToday, cache.get().achievementsSeenAt)
+    }
+
     /** The hero climbs to include the news, and starts from what came before it. */
     @Test
     fun theHeroClimbsFromWhatTheyHadBeforeTheUnlocks() = runUnitTest {
@@ -318,10 +400,10 @@ class AchievementsViewModelTest : CoroutineTest() {
             repository = FakeAchievements(
                 AchievementState(
                     unlocked = mapOf(
-                        AchievementId.FirstSteps to OlderUnlock,
-                        AchievementId.GoodDog to NewestUnlock,
-                        AchievementId.PerfectForm to NewestUnlock,
-                        AchievementId.SpeedDemon to NewestUnlock,
+                        AchievementId.FirstSteps to Unlock(OlderUnlock),
+                        AchievementId.GoodDog to Unlock(NewestUnlock),
+                        AchievementId.PerfectForm to Unlock(NewestUnlock),
+                        AchievementId.SpeedDemon to Unlock(NewestUnlock),
                     ),
                 ),
             ),
@@ -342,7 +424,7 @@ class AchievementsViewModelTest : CoroutineTest() {
     fun aPageWithNothingNewDoesNotPerform() = runUnitTest {
         val vm = viewModel(
             repository = FakeAchievements(
-                AchievementState(unlocked = mapOf(AchievementId.FirstSteps to OlderUnlock)),
+                AchievementState(unlocked = mapOf(AchievementId.FirstSteps to Unlock(OlderUnlock))),
             ),
             cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
         )
@@ -360,7 +442,7 @@ class AchievementsViewModelTest : CoroutineTest() {
     @Test
     fun aBadgeEarnedWhileTheScreenIsOpenIsCelebratedAndThenMarkedSeen() = runUnitTest {
         val repository = FakeAchievements(
-            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to OlderUnlock)),
+            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to Unlock(OlderUnlock))),
         )
         val cache = InMemoryAppCache(AppData(achievementsSeenAt = OlderUnlock))
         val vm = viewModel(repository, cache)
@@ -368,8 +450,8 @@ class AchievementsViewModelTest : CoroutineTest() {
 
         repository.history.value = AchievementState(
             unlocked = mapOf(
-                AchievementId.FirstSteps to OlderUnlock,
-                AchievementId.GoodDog to NewestUnlock,
+                AchievementId.FirstSteps to Unlock(OlderUnlock),
+                AchievementId.GoodDog to Unlock(NewestUnlock),
             ),
         )
 
@@ -406,7 +488,7 @@ class AchievementsViewModelTest : CoroutineTest() {
             repository = FakeAchievements(
                 AchievementState(
                     counters = counters(Stat.LevelsCleared to 8L, Stat.BestCombo to 3L),
-                    unlocked = mapOf(AchievementId.FirstSteps to OlderUnlock),
+                    unlocked = mapOf(AchievementId.FirstSteps to Unlock(OlderUnlock)),
                 ),
             ),
             cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
@@ -431,7 +513,7 @@ class AchievementsViewModelTest : CoroutineTest() {
     fun theSpotlightOffersTheNearerRungWhenOneLadderStepIsTwiceTheLast() = runUnitTest {
         val earnedSoFar = Achievements.catalog
             .filter { it.stat == Stat.LevelsCleared && it.target <= 400 }
-            .associate { it.id to OlderUnlock }
+            .associate { it.id to Unlock(OlderUnlock) }
         val vm = viewModel(
             repository = FakeAchievements(
                 AchievementState(
@@ -463,7 +545,7 @@ class AchievementsViewModelTest : CoroutineTest() {
                 AchievementState(
                     unlocked = Achievements.catalog
                         .filterNot { it.hidden }
-                        .associate { it.id to OlderUnlock },
+                        .associate { it.id to Unlock(OlderUnlock) },
                 ),
             ),
             cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
@@ -480,7 +562,7 @@ class AchievementsViewModelTest : CoroutineTest() {
     fun aFinishedCollectionHasNothingPinnedToTheTop() = runUnitTest {
         val vm = viewModel(
             FakeAchievements(
-                AchievementState(unlocked = Achievements.catalog.associate { it.id to OlderUnlock }),
+                AchievementState(unlocked = Achievements.catalog.associate { it.id to Unlock(OlderUnlock) }),
             ),
             InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
         )
@@ -496,8 +578,8 @@ class AchievementsViewModelTest : CoroutineTest() {
         val vm = viewModel(
             FakeAchievements(
                 AchievementState(
-                    unlocked = campaign.achievements.associate { it.id to OlderUnlock } +
-                        mapOf(AchievementId.PerfectForm to OlderUnlock),
+                    unlocked = campaign.achievements.associate { it.id to Unlock(OlderUnlock) } +
+                        mapOf(AchievementId.PerfectForm to Unlock(OlderUnlock)),
                 ),
             ),
         )
@@ -566,5 +648,8 @@ class AchievementsViewModelTest : CoroutineTest() {
         /** Two unlock times. The watermark is a comparison, so only order matters. */
         const val OlderUnlock = 1_000L
         const val NewestUnlock = 2_000L
+
+        /** After both, which is where a badge added to the catalog today lands. */
+        const val BackfilledToday = 3_000L
     }
 }

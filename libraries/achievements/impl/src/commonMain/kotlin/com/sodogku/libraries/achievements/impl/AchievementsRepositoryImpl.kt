@@ -8,6 +8,7 @@ import com.sodogku.libraries.achievements.Achievements
 import com.sodogku.libraries.achievements.AchievementsRepository
 import com.sodogku.libraries.achievements.LevelResult
 import com.sodogku.libraries.achievements.PlayMode
+import com.sodogku.libraries.achievements.Unlock
 import com.sodogku.libraries.achievements.db.AchievementDao
 import com.sodogku.libraries.achievements.db.AchievementFactEntity
 import com.sodogku.libraries.achievements.db.AchievementUnlockEntity
@@ -62,7 +63,16 @@ class AchievementsRepositoryImpl(
      * What gets announced is measured against the stored unlocks, not against
      * the state before this attempt. So an achievement that a *previous* release
      * did not have, but that this player's history already earns, is granted and
-     * celebrated here — with the date of the attempt that really earned it.
+     * celebrated here — with the date of the attempt that really earned it, and
+     * separately with *this* attempt as the moment it was handed over.
+     *
+     * Those two differ for exactly the back-filled case, and both are needed.
+     * The historical date is what the badge is; this attempt's time is what
+     * makes it news, because every page that asks "since you last looked"
+     * compares against a watermark that is already past the old date. Recording
+     * the announcement as the attempt's own `finishedAt` rather than a clock
+     * read keeps both sides of that comparison on the same clock — the same
+     * reason `AchievementEngine` has no clock of its own.
      */
     override suspend fun record(result: LevelResult): List<Achievement> = writes.withLock {
         val announced = dao.unlocks().mapTo(mutableSetOf()) { it.achievementId }
@@ -71,7 +81,15 @@ class AchievementsRepositoryImpl(
         val earned = AchievementEngine.replay(dao.facts().map { it.toResult() }).unlocked
         val newly = earned.filterKeys { it.name !in announced }
         if (newly.isNotEmpty()) {
-            dao.insertUnlocks(newly.map { (id, at) -> AchievementUnlockEntity(id.name, at) })
+            dao.insertUnlocks(
+                newly.map { (id, unlock) ->
+                    AchievementUnlockEntity(
+                        achievementId = id.name,
+                        unlockedAt = unlock.unlockedAt,
+                        announcedAt = result.finishedAt,
+                    )
+                },
+            )
         }
         Achievements.catalog.filter { it.id in newly }
     }
@@ -89,7 +107,9 @@ class AchievementsRepositoryImpl(
     ): AchievementState = AchievementState(
         counters = AchievementEngine.replay(facts.map { it.toResult() }).counters,
         unlocked = unlocks.mapNotNull { row ->
-            row.achievementId.toAchievementId()?.let { it to row.unlockedAt }
+            row.achievementId.toAchievementId()?.let {
+                it to Unlock(unlockedAt = row.unlockedAt, announcedAt = row.announcedAt)
+            }
         }.toMap(),
     )
 }

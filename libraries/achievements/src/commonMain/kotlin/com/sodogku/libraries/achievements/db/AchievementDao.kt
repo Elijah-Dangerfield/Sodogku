@@ -1,5 +1,6 @@
 package com.sodogku.libraries.achievements.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Index
@@ -7,6 +8,9 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.migration.AutoMigrationSpec
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -59,15 +63,45 @@ data class AchievementFactEntity(
  *
  * Derivable from the facts, and stored anyway: this is the record of what has
  * already been *announced*, so a catalog change cannot re-toast a badge someone
- * earned two months ago. The timestamp is the historical one, taken from the
- * attempt that crossed the threshold.
+ * earned two months ago.
+ *
+ * Two timestamps, because a back-filled badge has two honest answers.
+ * [unlockedAt] is the historical one, taken from the attempt that crossed the
+ * threshold. [announcedAt] is the attempt during which the badge was actually
+ * handed over. They differ only for a badge the catalog gained after the play
+ * that earned it, and keeping them apart is what lets such a badge read as news
+ * on a page that decides news by comparing against a seen-watermark.
  */
 @Entity(tableName = "achievement_unlock")
 data class AchievementUnlockEntity(
     /** [com.sodogku.libraries.achievements.AchievementId] name. */
     @PrimaryKey val achievementId: String,
     val unlockedAt: Long,
+    /**
+     * Zero only in the window between the column arriving and
+     * [AnnouncedAtBackfill] filling it, which is inside the migration's own
+     * transaction.
+     */
+    @ColumnInfo(defaultValue = "0") val announcedAt: Long,
 )
+
+/**
+ * Rows written before `announcedAt` existed claim they were announced when they
+ * were earned.
+ *
+ * That is the only reading that changes nothing. Before the column, "is this
+ * news" was `unlockedAt > seenAt`; copying `unlockedAt` across makes the new
+ * comparison give the identical answer for every badge already on disk, so
+ * nobody upgrading is told their two-month-old collection is new, and nobody
+ * loses a badge they earned yesterday and have not looked at yet. Defaulting to
+ * zero would do the second of those, and defaulting to the migration's own
+ * clock would do the first to everybody at once.
+ */
+class AnnouncedAtBackfill : AutoMigrationSpec {
+    override fun onPostMigrate(connection: SQLiteConnection) {
+        connection.execSQL("UPDATE achievement_unlock SET announcedAt = unlockedAt")
+    }
+}
 
 @Dao
 interface AchievementDao {
