@@ -1040,6 +1040,135 @@ class GameViewModelTest : CoroutineTest() {
         assertFalse(vm.state.nudgeBoosters, "the tutorial argued with itself")
     }
 
+    // ---- SD-51: the board with no dog on it, explained once. ----------------
+
+    @Test
+    fun anEmptyBoardSaysSoOnceThePlayerHasHadTimeToLookAtIt() = runUnitTest {
+        // The report this closes: a board that opens with nothing placed reads
+        // as a board that failed to load, and nothing on it said otherwise.
+        val cache = taughtCache()
+        val vm = viewModel(cache = cache)
+        assertNull(vm.state.starterDogCell, "the fixture is meant to open empty")
+
+        vm.tick()
+        assertNull(vm.state.warning, "the card landed on a board still drawing itself")
+
+        clock += Reading
+        vm.tick()
+
+        assertEquals(GameWarning.EmptyBoard, vm.state.warning)
+        assertTrue(cache.get().hasSeenEmptyBoardNote, "the showing was not written down")
+
+        vm.takeAction(GameAction.DismissWarning)
+        settle()
+        assertNull(vm.state.warning, "the card could not be dismissed")
+    }
+
+    @Test
+    fun theEmptyBoardIsExplainedOnceAndNeverAgain() = runUnitTest {
+        val cache = taughtCache()
+        val first = viewModel(cache = cache)
+        clock += Reading
+        first.tick()
+        assertEquals(GameWarning.EmptyBoard, first.state.warning)
+
+        // A second board on the same install, which is the shape the flag has to
+        // survive: a field alone would come back false on the next launch and a
+        // disk read alone would race the write that just happened.
+        val second = viewModel(levelId = PlainLevel + 1, cache = cache)
+        clock += Reading
+        second.tick()
+
+        assertNull(second.state.warning, "the same install was told twice")
+    }
+
+    @Test
+    fun aBoardThatCameWithADogIsNotToldItIsEmpty() = runUnitTest {
+        // On a board that has a starter dog the sentence is a lie, and spending
+        // the one showing on it costs the player the board it was written for.
+        val cache = taughtCache()
+        val vm = viewModel(levelId = StarterDogLevel, cache = cache)
+        assertNotNull(vm.state.starterDogCell, "the fixture never got its dog")
+
+        clock += Reading
+        vm.tick()
+
+        assertNull(vm.state.warning)
+        assertFalse(cache.get().hasSeenEmptyBoardNote, "the one showing was spent on a full board")
+    }
+
+    @Test
+    fun theRehearsalBoardIsNeverToldItIsEmpty() = runUnitTest {
+        // The rehearsal always opens with a dog, so the board check excludes it
+        // as well. It is asserted here because the rehearsal is not a campaign
+        // board at all: nothing that happens once per install should be spent on
+        // a demo the player did not choose to play.
+        val cache = untaughtCache()
+        val vm = viewModel(levelId = FirstGuidedLevel, cache = cache)
+        assertTrue(vm.state.isRehearsal, "the fixture never entered the rehearsal")
+
+        clock += Reading
+        vm.tick()
+
+        assertNull(vm.state.warning)
+        assertFalse(cache.get().hasSeenEmptyBoardNote, "the one showing was spent on the tutorial")
+    }
+
+    @Test
+    fun theDailyIsNeverToldItIsEmpty() = runUnitTest {
+        // Every daily board is empty — the packs share a number line and the
+        // starter dog is a position on the campaign curve — so a daily would
+        // always win the race to be the first empty board, and would explain a
+        // rule the player has not met yet.
+        val cache = taughtCache()
+        val vm = viewModel(
+            levelId = DailyLevel,
+            isDaily = true,
+            daily = FakeDaily(levelId = DailyLevel),
+            cache = cache,
+        )
+        assertNull(vm.state.starterDogCell, "the daily is meant to open empty")
+
+        clock += Reading
+        vm.tick()
+
+        assertNull(vm.state.warning)
+        assertFalse(cache.get().hasSeenEmptyBoardNote)
+    }
+
+    @Test
+    fun aPlayerWhoHasAlreadyStartedIsNotInterrupted() = runUnitTest {
+        // Somebody who has crossed a square off has worked out that the board is
+        // real. Saying so over the top of that is worse than saying nothing —
+        // and it does not count as shown, so the next empty board still can.
+        val cache = taughtCache()
+        val vm = viewModel(cache = cache)
+        vm.note(emptyCells(vm, count = 1).first())
+
+        clock += Reading
+        vm.tick()
+
+        assertNull(vm.state.warning)
+        assertFalse(
+            cache.get().hasSeenEmptyBoardNote,
+            "the showing was banked against a card nobody was shown",
+        )
+    }
+
+    @Test
+    fun theFlagIsNotWrittenUntilTheCardIsOnScreen() = runUnitTest {
+        // Written on open, the one showing would be spent by every empty board
+        // the player passed through before the card ever appeared — including
+        // the ones they solved in under four seconds.
+        val cache = taughtCache()
+        val vm = viewModel(cache = cache)
+
+        vm.tick()
+
+        assertNull(vm.state.warning)
+        assertFalse(cache.get().hasSeenEmptyBoardNote, "opening the board spent the showing")
+    }
+
     // ---- S19: the clock under the board. ------------------------------------
 
     @Test
@@ -5061,6 +5190,9 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Past `StruggleDetector`'s idle window, with room to spare. */
         val Staring = 12.seconds
+
+        /** Past `EmptyBoardNoteAfterMs`: long enough to have read the board. */
+        val Reading = 5.seconds
 
         /** Past the end of one attention burst. */
         val ABurst = 8.seconds

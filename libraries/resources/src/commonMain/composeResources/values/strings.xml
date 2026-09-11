@@ -70,6 +70,12 @@
     <string name="home_temporary_launcher">Temporary launcher. The level map replaces this in C5.</string>
     <string name="game_last_bone_title">One chance left</string>
     <string name="game_last_bone_body">Tap anywhere to keep going.</string>
+    <!-- Shown once, on the first board that opens with no dog already placed.
+         It says the board is deliberate and names the rules, and it must never
+         say where a dog goes. -->
+    <string name="game_empty_board_title">Empty on purpose</string>
+    <string name="game_empty_board_body">Some boards open with a dog already placed. This one does not, and nothing is missing. One dog per color, per row and per column is enough to work the first one out.</string>
+    <string name="game_empty_board_confirm">Got it</string>
     <string name="game_refill_bones">Watch an ad for %1$d bones</string>
     <string name="game_settings">Settings</string>
     <string name="game_levels_menu">Levels</string>

@@ -356,6 +356,18 @@ class GameViewModel(
     private var autoMark = false
 
     /**
+     * `AppData.hasSeenEmptyBoardNote`, read once and then owned here.
+     *
+     * A field rather than a read per tick, for the obvious reason: [tick] runs
+     * every second and this is a disk-backed flag. It is also this ViewModel's
+     * only writer, so once the note has fired the field is the truth and the
+     * write behind it is bookkeeping — which matters because `nextLevel` swaps
+     * boards without going back through [load], and a re-read there would race
+     * the write that had just happened.
+     */
+    private var emptyBoardNoteSeen = false
+
+    /**
      * The level's history as it stood *before* this attempt touched it.
      *
      * Read at the start, because `onCompleted` overwrites it and the achievement
@@ -526,6 +538,9 @@ class GameViewModel(
         // with everybody else. The alternative gives a player a board that
         // marks itself only when something has gone wrong.
         autoMark = settings?.autoMarkEnabled == true
+        // Same reasoning, and the same failure if it is read later: `tick` is
+        // the only reader and it must not go to disk once a second.
+        emptyBoardNoteSeen = settings?.hasSeenEmptyBoardNote == true
         updateState {
             it.copy(
                 colorblind = settings?.colorblindMode == true,
@@ -2571,10 +2586,10 @@ class GameViewModel(
     }
 
     /**
-     * A second of a live attempt: move the clock on, and ask whether the player
-     * looks stuck.
+     * A second of a live attempt: move the clock on, ask whether the player
+     * looks stuck, and say once that an empty board is deliberate.
      *
-     * Both halves are no-ops on a board that is not being played, which is what
+     * All three are no-ops on a board that is not being played, which is what
      * lets the ticker run unconditionally. The clock reads
      * [GameState.elapsedMs]'s own source, so a backgrounded app publishes the
      * same value it published a second ago and the [StateFlow] conflates it away
@@ -2589,8 +2604,50 @@ class GameViewModel(
         val now = elapsedMs()
         publishElapsed(now)
         if (rehearsing) return
+        noteEmptyBoard(now)
         val nudge = struggle.nudging(now)
         updateState { it.copy(nudgeBoosters = nudge) }
+    }
+
+    /**
+     * The first board a player opens with no dog on it, explained once.
+     *
+     * The early levels of each grid-size band open with one already placed, so
+     * the first that does not reads as a board that failed to load.
+     * [shouldNoteEmptyBoard] owns every clause of when to say so and why; this
+     * puts it on screen and writes the flag down.
+     *
+     * The write happens **here, on the tick that shows it**, not when the board
+     * opened and not when the player dismisses it. Writing on open would spend
+     * the one showing on a board the player never saw a card on; writing on
+     * dismiss would show it again on the next board to somebody who closed the
+     * app instead of tapping the button.
+     */
+    private suspend fun GameAction.noteEmptyBoard(now: Long) {
+        val show = shouldNoteEmptyBoard(
+            elapsedMs = now,
+            rehearsing = rehearsing,
+            isDaily = isDaily,
+            starterDogCell = state.starterDogCell,
+            dogsPlaced = state.dogsPlaced,
+            marks = state.manualMarks.size + state.clearedMarks.size + state.wrongGuesses.size,
+            alreadySeen = emptyBoardNoteSeen,
+            otherOverlayUp = state.warning != null ||
+                state.boosterPrompt != null ||
+                state.hintCells.isNotEmpty() ||
+                state.tutorial != null,
+        )
+        if (!show) return
+
+        // Into the field before the write and before the state update, for the
+        // reason `autoMark` is a field: `state` lags `updateState` by a
+        // dispatch, so the next tick can read a board whose warning has not
+        // landed yet and ask the same question again. The field is the answer
+        // that does not lag.
+        emptyBoardNoteSeen = true
+        updateState { it.copy(warning = GameWarning.EmptyBoard) }
+        Catching { appCache.update { it.copy(hasSeenEmptyBoardNote = true) } }
+            .logOnFailure { "Failed to record the empty-board note as seen" }
     }
 
     /**

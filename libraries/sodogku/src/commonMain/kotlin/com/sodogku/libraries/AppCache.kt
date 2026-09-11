@@ -55,6 +55,20 @@ data class AppData(
     val hasSeenDailyIntro: Boolean = false,
 
     /**
+     * True once the player has been told that a board with no dog on it is
+     * deliberate.
+     *
+     * The early levels of each grid-size band open with one dog already placed,
+     * and the rest do not. The first board that opens with none looks like a
+     * board that failed to load, and nothing on it says otherwise.
+     *
+     * Written when the note is **shown**, not when a qualifying board opens. A
+     * player who starts working before it appears has answered the question
+     * themselves and is not shown it, so the next empty board still can.
+     */
+    val hasSeenEmptyBoardNote: Boolean = false,
+
+    /**
      * Whether a placed dog crosses off the squares it rules out.
      *
      * **Display only.** The game keeps deducting either way — the sniff, the

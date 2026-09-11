@@ -31,6 +31,9 @@ import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.board_action_mark
 import sodogku.libraries.resources.generated.resources.board_action_place
+import sodogku.libraries.resources.generated.resources.game_empty_board_body
+import sodogku.libraries.resources.generated.resources.game_empty_board_confirm
+import sodogku.libraries.resources.generated.resources.game_empty_board_title
 import sodogku.libraries.resources.generated.resources.game_last_bone_body
 import sodogku.libraries.resources.generated.resources.game_last_bone_title
 import sodogku.libraries.resources.generated.resources.hint_reason_adjacency
@@ -83,6 +86,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 /** The thing the last-bone warning points at. */
 val LivesFocusKey = FocusTargetKey("game.lives")
 
+/**
+ * The grid as one rectangle, for a warning about the board rather than about a
+ * square on it.
+ *
+ * One `onGloballyPositioned` for the whole board, which is why this is
+ * registered unconditionally where a cell's key is not: a hundred of those is
+ * the cost the cells are guarded against, and one is not.
+ */
+val BoardFocusKey = FocusTargetKey("game.board")
+
 /** One focus key per board square, so a spotlight can light several at once. */
 fun cellFocusKey(cell: Int) = FocusTargetKey("game.cell.$cell")
 
@@ -90,35 +103,62 @@ val SniffFocusKey = FocusTargetKey("game.booster.sniff")
 val TreatFocusKey = FocusTargetKey("game.booster.treat")
 
 /**
- * Dims the board and lights up the bones when the player is down to their last
- * one.
+ * The two things the board stops to point at, drawn from [GameState.warning].
  *
- * Fires once per attempt, on the *edge* into one life rather than whenever one
- * life happens to be showing — a warning that reappears every time the board
- * redraws is noise, and noise is how a warning stops being read.
+ * - **[GameWarning.LastBone]** dims the board and lights the bones. Once per
+ *   attempt, on the *edge* into one life rather than whenever one life happens
+ *   to be showing, because a warning that reappears on every redraw is noise
+ *   and noise is how a warning stops being read.
+ * - **[GameWarning.EmptyBoard]** dims everything *except* the board and says
+ *   the missing starter dog is deliberate. Once per install. The grid is what
+ *   is lit because the grid is the thing being explained: dimming it to talk
+ *   about it would hide the evidence.
+ *
+ * Whether either fires is [GameViewModel]'s decision. This maps the answer to a
+ * spotlight and a piece of copy, and both are dismissed by the same action.
  */
 @Composable
-fun BoxScope.LastBoneWarning(state: GameState, onAction: (GameAction) -> Unit) {
+fun BoxScope.GameWarningOverlay(state: GameState, onAction: (GameAction) -> Unit) {
     FocusScrim(
-        spotlight = state.warning?.let {
-            Spotlight(targets = setOf(LivesFocusKey), dismissOnOutsideTap = true)
+        spotlight = state.warning?.let { warning ->
+            Spotlight(targets = setOf(focusOf(warning)), dismissOnOutsideTap = true)
         },
         onDismiss = { onAction(GameAction.DismissWarning) },
     ) { anchor ->
-        SpeechBubble(anchor = anchor) {
-            Text(
-                text = stringResource(Res.string.game_last_bone_title),
-                typography = AppTheme.typography.Heading.H600,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = stringResource(Res.string.game_last_bone_body),
-                typography = AppTheme.typography.Body.B400,
-                color = AppTheme.colors.textSecondary,
-                textAlign = TextAlign.Center,
+        // The last non-null, not `state.warning`, for the reason the tutorial
+        // holds its step: the scrim outlives the state that raised it by the
+        // length of a fade, and a `when` reading the live value would draw
+        // nothing at all for those frames.
+        when (rememberLastNonNull(state.warning)) {
+            null -> Unit
+            GameWarning.LastBone -> SpeechBubble(anchor = anchor) {
+                Text(
+                    text = stringResource(Res.string.game_last_bone_title),
+                    typography = AppTheme.typography.Heading.H600,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = stringResource(Res.string.game_last_bone_body),
+                    typography = AppTheme.typography.Body.B400,
+                    color = AppTheme.colors.textSecondary,
+                    textAlign = TextAlign.Center,
+                )
+            }
+
+            GameWarning.EmptyBoard -> CoachMark(
+                anchor = anchor,
+                title = stringResource(Res.string.game_empty_board_title),
+                body = stringResource(Res.string.game_empty_board_body),
+                confirmLabel = stringResource(Res.string.game_empty_board_confirm),
+                onConfirm = { onAction(GameAction.DismissWarning) },
             )
         }
     }
+}
+
+private fun focusOf(warning: GameWarning): FocusTargetKey = when (warning) {
+    GameWarning.LastBone -> LivesFocusKey
+    GameWarning.EmptyBoard -> BoardFocusKey
 }
 
 /**
@@ -300,7 +340,7 @@ fun BoxScope.TutorialCoachMark(state: GameState, onAction: (GameAction) -> Unit)
  * stale slot. It exists only so the exit animation has something to draw.
  */
 @Composable
-private fun rememberLastNonNull(value: TutorialStep?): TutorialStep? {
+private fun <T : Any> rememberLastNonNull(value: T?): T? {
     val holder = remember { mutableStateOf(value) }
     if (value != null) holder.value = value
     return holder.value

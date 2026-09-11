@@ -804,8 +804,80 @@ data class DisplaySettings(
     val achievements: Boolean,
 )
 
-/** Something the game wants to stop and point at. */
-enum class GameWarning { LastBone }
+/**
+ * Something the game wants to stop and point at.
+ *
+ * [LastBone] is per attempt and fires on the edge into one life. [EmptyBoard] is
+ * once per install and fires on the first board that opens with no dog on it.
+ * Both are dismissed the same way, by [GameAction.DismissWarning].
+ */
+enum class GameWarning { LastBone, EmptyBoard }
+
+/**
+ * Whether now is the moment to tell the player that an empty board is
+ * deliberate.
+ *
+ * Pure, and separated out for the same reason [StruggleDetector] is a class of
+ * its own: this is a decision about timing and the composable that draws the
+ * card has no business making it.
+ *
+ * ## Why not on open
+ *
+ * The board's entrance wave is still running when it opens, and a card over a
+ * board the player has not looked at yet explains something they have not
+ * noticed. So there is a wait, [EmptyBoardNoteAfterMs] of the attempt clock —
+ * which stops when the app is backgrounded, so a phone put down mid-board does
+ * not come back to a card.
+ *
+ * ## Why not later
+ *
+ * Later means the confusion has already had time to become "this is broken".
+ * The idle arm of [StruggleDetector] is ten seconds and is deliberately
+ * disarmed until the player has touched the board, which is exactly backwards
+ * here: the player this is for has not touched it because they do not believe
+ * there is anything to touch.
+ *
+ * ## Why any input at all cancels it
+ *
+ * [dogsPlaced] and [marks] are both zero or the note does not fire. A player who
+ * has already crossed a square off or placed a dog has worked out that the board
+ * is real, and interrupting that to say so is worse than saying nothing. It does
+ * not count as shown either, so the next empty board tries again.
+ *
+ * [alreadySeen] is `AppData.hasSeenEmptyBoardNote`, [otherOverlayUp] is any of
+ * the booster prompt, the hint, a live tutorial step or a warning already on
+ * screen, and [rehearsing] is belt and braces: the rehearsal board always opens
+ * with a dog, so [starterDogCell] excludes it too.
+ */
+internal fun shouldNoteEmptyBoard(
+    elapsedMs: Long,
+    rehearsing: Boolean,
+    isDaily: Boolean,
+    starterDogCell: Int?,
+    dogsPlaced: Int,
+    marks: Int,
+    alreadySeen: Boolean,
+    otherOverlayUp: Boolean,
+): Boolean = !alreadySeen &&
+    !rehearsing &&
+    // Campaign only. The daily never gets a starter dog, so every daily board is
+    // empty and it is not the position on the curve this note is explaining.
+    !isDaily &&
+    starterDogCell == null &&
+    dogsPlaced == 0 &&
+    marks == 0 &&
+    !otherOverlayUp &&
+    elapsedMs >= EmptyBoardNoteAfterMs
+
+/**
+ * Long enough for the board to have finished drawing itself and for the player
+ * to have read it. Short enough that they are still asking the question.
+ *
+ * Four seconds. The board's entrance wave is the floor: a 10x10 staggers its
+ * last cell by 18 steps of `Motion.BoardWaveStepMillis`, and the note must not
+ * land on a board still assembling itself.
+ */
+internal const val EmptyBoardNoteAfterMs: Long = 4_000L
 
 /** What the coach mark is showing, and where it is pointing. */
 data class TutorialFrame(val step: TutorialStep?, val cells: Set<Int>) {

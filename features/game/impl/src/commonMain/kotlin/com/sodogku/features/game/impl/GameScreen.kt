@@ -244,7 +244,7 @@ fun GameScreen(
                 )
             }
 
-            LastBoneWarning(state = state, onAction = onAction)
+            GameWarningOverlay(state = state, onAction = onAction)
 
             SniffHint(state = state, onAction = onAction)
 
@@ -700,10 +700,13 @@ private fun BoardGrid(state: GameState, onAction: (GameAction) -> Unit) {
         // Read inside the layer, never in composition: the board is the most
         // expensive subtree in the app and subscribing it to every frame of a
         // shake would recompose a hundred cells sixty times a second.
-        modifier = Modifier.graphicsLayer {
-            val progress = boardShake.value
-            translationX = sin(progress * BoardShakeCycles) * BoardShakeTravel.toPx() * (1f - progress)
-        },
+        modifier = Modifier
+            .focusTarget(BoardFocusKey)
+            .graphicsLayer {
+                val progress = boardShake.value
+                translationX =
+                    sin(progress * BoardShakeCycles) * BoardShakeTravel.toPx() * (1f - progress)
+            },
     ) {
         // Keyed on the level, because `nextLevel` swaps the board *in place*
         // rather than navigating. Without a key the cells are memoised by
