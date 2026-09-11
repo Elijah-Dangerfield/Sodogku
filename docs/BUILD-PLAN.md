@@ -349,8 +349,10 @@ Both are exactly what those rules exist for, and neither would have failed a tes
 
 ### Scaffolding to remove in C5
 
-`HomeScreen` is a temporary three-button launcher (4x4, 7x7, 10x10) so the board is reachable and
-testable at the sizes that differ. The level map replaces it wholesale.
+`HomeScreen` was a temporary three-button launcher (4x4, 7x7, 10x10) so the board was reachable and
+testable at the sizes that differ. It is gone. What replaced it is not the level map that was
+planned: the board became the start destination, the level list became a drawer on it, and
+`sodogku://game?levelId=N` reaches any level without going through a menu at all.
 
 ### Not yet wired
 

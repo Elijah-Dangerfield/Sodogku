@@ -7,15 +7,14 @@ layer — the cheapest layer that can fail when it breaks.
 ## The layers
 
 - **Library / feature unit tests** (`commonTest` in each module) — pure logic,
-  repositories over fakes, and SEAViewModel behaviour. `HomeViewModelTest` is
+  repositories over fakes, and SEAViewModel behaviour. `SettingsViewModelTest` is
   the reference recipe for VM tests: extend `CoroutineTest` (from
   `:libraries:flowroutines:testing`), hand-roll a fake per repository
   dependency, drive actions, assert on `vm.state`.
-- **Scenario harness** (`features/home/impl` `commonTest/harness/`) — when a
-  feature's tests keep re-wiring the same fakes, grow a tiny builder + verbs +
-  `assertState {}` DSL next to them so tests read as user scenarios.
-  `HomeScenario` / `HomeScenarioTest` demonstrate the shape. It's a pattern,
-  not a framework — copy and adapt, don't generalize.
+- **Scenario harness** (a feature's own `commonTest/`) — when a feature's tests
+  keep re-wiring the same fakes, grow a tiny builder + verbs + `assertState {}`
+  DSL next to them so tests read as user scenarios. It's a pattern, not a
+  framework — copy and adapt, don't generalize.
 - **Server unit + route tests** (`:apps:server` `src/test`) — plugins and
   routes through Ktor's `testApplication`, repositories over Testcontainers
   Postgres (`DatabaseTest` base class).
@@ -88,21 +87,19 @@ What runs where in a harness test:
 
 - **In-process, real:** a Netty engine on an ephemeral port booted through the
   production `installApp(component, verification, …)` seam
-  (`InProcessServer`), a real `ServerComponent` over a Testcontainers
-  Postgres with the real Flyway migrations, and the real JWT auth plugin
-  verifying HS256 tokens the test mints (`IntegrationAuth`, against the
-  `JwtVerification.Static` seam).
+  (`InProcessServer`), and a real `ServerComponent` over a Testcontainers
+  Postgres with the real Flyway migrations.
 - **In the client, real:** `NetworkClientImpl` with the real headers provider,
-  reachability tracker and buses, the real `HttpProfileApi` +
-  `ProfileRepositoryImpl`, and a real `HomeViewModel` (`TestClient`). Requests
-  travel real TCP — real serialization, real headers, real status codes.
-- **Fake, on purpose:** exactly the seams a device would own — auth-state
-  resolution (a canned `Authenticated`; the *token* side is real) and on-disk
-  persistence (an in-memory `CacheFactory` running the real store logic).
+  reachability tracker and access-denied bus, and the real
+  `RemoteConfigRemoteDataSource` over it (`TestClient`). Requests travel real
+  TCP — real serialization, real headers, real status codes.
+- **Fake, on purpose:** exactly the seams a device would own — the install and
+  session ids, and on-disk persistence (an in-memory `CacheFactory` running the
+  real store logic).
 
-`HarnessSmokeTest` pins the worked example: mint a JWT, boot the server, drive
-the home VM, and assert the display name on screen came from the server's
-`/v1/me` get-or-create — real client → real TCP → real server → real DB.
+`HarnessSmokeTest` pins the worked example: boot the server, seed a config value
+in Postgres, and assert a real client reads it back over HTTP — real client →
+real TCP → real server → real DB.
 New end-to-end flows should follow its shape: add a client surface to
 `TestClient`, a probe or seed helper to `InProcessServer` if the server side
 needs one, and await state with `awaitState` / `awaitUntil` — never fixed

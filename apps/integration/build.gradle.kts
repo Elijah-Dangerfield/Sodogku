@@ -8,8 +8,8 @@ android {
 
 // End-to-end integration harness. The tests run as Android unit tests on the
 // host JVM (`testDebugUnitTest`) — the same path the feature view models already
-// compile through — so they can drive the REAL client stack (and the real
-// HomeViewModel) against a REAL in-process Ktor server over a REAL Postgres
+// compile through — so they can drive the REAL client stack against a REAL
+// in-process Ktor server over a REAL Postgres
 // (Testcontainers). Everything lives in the `androidUnitTest` source set;
 // commonMain stays empty (nothing ships here, and the iOS target must not try
 // to link the JVM-only server).

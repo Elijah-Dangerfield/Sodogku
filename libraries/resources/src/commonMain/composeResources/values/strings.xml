@@ -67,7 +67,6 @@
     <string name="game_retry">Start over</string>
     <string name="game_back_to_levels">Levels</string>
     <string name="game_next_level">Next level</string>
-    <string name="home_temporary_launcher">Temporary launcher. The level map replaces this in C5.</string>
     <string name="game_last_bone_title">One chance left</string>
     <string name="game_last_bone_body">Tap anywhere to keep going.</string>
     <!-- Shown once, on the first board that opens with no dog already placed.
