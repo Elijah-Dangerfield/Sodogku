@@ -897,12 +897,16 @@ private fun BoardClock(elapsed: StateFlow<Long>, targetMs: Long, modifier: Modif
     ) {
         Text(
             text = elapsedLabel(millis).orEmpty(),
-            // Caption scale still, but no longer at caption weight. Sitting
-            // right under the grid the clock has the board's whole width of
-            // cream behind it, and Normal at that size read as a stray number
-            // rather than as a reading; Medium is the least the type scale can
-            // do and still look deliberate.
-            typography = AppTheme.typography.Body.B500.Medium,
+            // One step up the body scale, and the last one available: this is
+            // now the largest type under the board, which is right, because it
+            // is the only thing there that changes while the player watches.
+            //
+            // The step is deliberately small. The caption beside it is the
+            // load-bearing half of this row — a target is what makes the clock
+            // mean anything — and the two have to stay readable as one line, so
+            // the clock gets enough size to be read at a glance without
+            // becoming a heading the caption hangs off.
+            typography = AppTheme.typography.Body.B600.Medium,
             color = AppTheme.colors.textSecondary,
         )
         // Nothing at all on a level with no best time. An empty state here

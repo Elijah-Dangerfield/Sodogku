@@ -145,7 +145,8 @@ fun BoardControl(
                         // Damped by the remaining progress, so the picture
                         // shakes hardest as the beat lands and has settled by
                         // the time the button is at rest again.
-                        rotationZ = sin(pulse.value * ShakeCycles) * ShakeDegrees * (1f - pulse.value)
+                        val turns = pulse.value * Tau * ShakeCycles
+                        rotationZ = sin(turns) * ShakeDegrees * (1f - pulse.value)
                     },
                 ) {
                     art()
@@ -296,21 +297,43 @@ private const val AttentionRestMillis = 2_400L
 private const val Tau = 6.2831855f
 
 /**
- * How far the button swells at the top of a beat — six percent.
+ * How far the button swells at the top of a beat — eight percent.
  *
- * Small on purpose. This row sits under the board exactly where the hand
- * already is, and a control that grows under a thumb already on its way to it
- * is a control that gets mis-tapped. Six percent of a 70dp circle is about two
- * dp of travel on each edge: legible as movement in peripheral vision, and
- * nowhere near enough to walk out from under a finger.
+ * Still small on purpose, and this is the constant with a hard ceiling on it.
+ * The row sits under the board exactly where the hand already is, and a control
+ * that grows under a thumb already on its way to it is a control that gets
+ * mis-tapped. Eight percent of a 70dp circle is under three dp of travel on each
+ * edge: legible as movement in peripheral vision, and nowhere near enough to
+ * walk out from under a finger.
+ *
+ * When this is not loud enough, raise [ShakeDegrees] instead. The art moves
+ * inside the circle, so it can swing as far as it likes without the target
+ * moving at all.
  */
-private const val AttentionScale = 0.06f
+private const val AttentionScale = 0.08f
 
 /** Two beats per burst, so it reads as a pulse rather than as a single twitch. */
 private const val AttentionBeats = 2f
 
-private const val ShakeCycles = 9f
-private const val ShakeDegrees = 7f
+/**
+ * How many times the picture swings back and forth while the button beats.
+ *
+ * It used to be fed to `sin` as raw radians, which is the whole reason the shake
+ * was hard to see: nine radians is one and a half swings, so the art leaned over
+ * and came back once in a bit over a second. That is a slow tilt, not a shake,
+ * and at seven degrees of it there was nothing to catch an eye. Multiplied by
+ * [Tau] the name is true and the number means what it says.
+ */
+private const val ShakeCycles = 2.5f
+
+/**
+ * How far it swings at the start, before the damping takes it down.
+ *
+ * The art is inside the circle rather than being the control, so unlike
+ * [AttentionScale] this one is not limited by the touch target — nothing the
+ * player is reaching for moves. It is limited by taste instead.
+ */
+private const val ShakeDegrees = 10f
 
 @Preview
 @Composable
