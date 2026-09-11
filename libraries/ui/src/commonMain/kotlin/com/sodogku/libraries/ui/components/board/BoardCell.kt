@@ -15,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -194,8 +193,7 @@ fun BoardCell(
     }
 
     val shake = remember { Animatable(0f) }
-    val nonce by rememberUpdatedState(strikeNonce)
-    LaunchedEffect(nonce) {
+    LaunchedEffect(strikeNonce) {
         // Reset first, and unconditionally. `GameScreen` drives every cell that
         // is not the current strike cell to nonce 0, so when a second wrong tap
         // lands elsewhere within the shake this effect is cancelled mid-flight
@@ -204,7 +202,7 @@ fun BoardCell(
         // `sin(shake * 18) * 7 * (1 - shake)`, so up to about six pixels — and
         // the cell simply stayed there, off its own grid line.
         shake.snapTo(0f)
-        if (nonce == 0) return@LaunchedEffect
+        if (strikeNonce == 0) return@LaunchedEffect
         shake.animateTo(1f, tween(Motion.ShakeMillis))
     }
 
@@ -260,17 +258,7 @@ fun BoardCell(
                 // is not enough on its own. The shadow is what puts an edge back
                 // under it, so it is drawn for every placed dog rather than only
                 // while the placement animation runs.
-                // `derivedStateOf`, not `pop.value > 0f` directly. Reading an
-        // `Animatable` in composition subscribes this scope to every frame of
-        // the pop, recomposing the whole content subtree instead of just
-        // re-drawing the layer that reads it — the landmine AGENTS.md documents.
-        //
-        // Gating on `state == Occupied` would also fix the recomposition and
-        // would be wrong: `pop` animates *down* when a dog is removed, and the
-        // presence check is what keeps it on screen long enough to shrink away.
-        // The derived boolean flips twice per placement rather than once per
-        // frame, and the fade-out survives.
-        if (dogVisible) {
+                if (dogVisible) {
                     val radius = this.size.minDimension * DogShadowFraction
                     drawCircle(
                         brush = Brush.radialGradient(

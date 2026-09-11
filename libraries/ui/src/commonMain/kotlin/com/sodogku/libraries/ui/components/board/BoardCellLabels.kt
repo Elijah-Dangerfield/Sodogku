@@ -265,7 +265,10 @@ fun rememberBoardCellLabels(): BoardCellLabels {
     val markAction = stringResource(Res.string.board_action_mark)
     val clearAction = stringResource(Res.string.board_action_clear)
     val placeAction = stringResource(Res.string.board_action_place)
-    return remember(regions, glyphs, empty, marked, proposed, wrong, dog, cellFormat, markAction) {
+    return remember(
+        regions, glyphs, empty, marked, proposed, wrong, dog,
+        cellFormat, markAction, clearAction, placeAction,
+    ) {
         BoardCellLabels(
             regions = regions,
             glyphs = glyphs,

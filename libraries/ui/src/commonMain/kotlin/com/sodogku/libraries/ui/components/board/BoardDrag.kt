@@ -105,34 +105,45 @@ fun Modifier.dragAcrossCells(
         var last = grid.cellAt(down.position.x, down.position.y)
         var travelled = 0f
         var dragging = false
-        while (true) {
-            val event = awaitPointerEvent()
-            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-            if (change.changedToUpIgnoreConsumed()) break
-            // Somebody else took the gesture before it became a drag. Nothing
-            // here has been reported yet, so there is nothing to undo.
-            if (!dragging && change.isConsumed) break
+        // `finally`, because every exit from the loop below has to end the
+        // stroke and one of them is not a `break`. `awaitPointerEvent` is a
+        // suspension point, so a `pointerInput` key that changes mid-stroke —
+        // a rotation, or a second finger flipping `enabled` — cancels this
+        // coroutine from inside the loop and would step straight over a
+        // trailing call. A started stroke that never ends leaks its `game.drag`
+        // event and leaves the view model holding a `MarkStroke` until the next
+        // `startStroke` resets it.
+        try {
+            while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                if (change.changedToUpIgnoreConsumed()) break
+                // Somebody else took the gesture before it became a drag. Nothing
+                // here has been reported yet, so there is nothing to undo.
+                if (!dragging && change.isConsumed) break
 
-            travelled += change.positionChange().getDistance()
-            val cell = grid.cellAt(change.position.x, change.position.y)
-            // Touch slop as well as a change of square, for a thumb that goes
-            // down a pixel from a boundary: without it the smallest wobble on
-            // such a square would be a drag rather than the tap it was.
-            if (cell != null && cell != last && travelled >= slop) {
-                if (dragging) {
-                    onDragEnter(cell)
-                } else {
-                    dragging = true
-                    // Null when the thumb went down in the gutter, where there
-                    // is no square to have started on. The first square the
-                    // stroke reaches is the start instead.
-                    onDragStart(last ?: cell)
-                    if (last != null) onDragEnter(cell)
+                travelled += change.positionChange().getDistance()
+                val cell = grid.cellAt(change.position.x, change.position.y)
+                // Touch slop as well as a change of square, for a thumb that goes
+                // down a pixel from a boundary: without it the smallest wobble on
+                // such a square would be a drag rather than the tap it was.
+                if (cell != null && cell != last && travelled >= slop) {
+                    if (dragging) {
+                        onDragEnter(cell)
+                    } else {
+                        dragging = true
+                        // Null when the thumb went down in the gutter, where there
+                        // is no square to have started on. The first square the
+                        // stroke reaches is the start instead.
+                        onDragStart(last ?: cell)
+                        if (last != null) onDragEnter(cell)
+                    }
+                    last = cell
                 }
-                last = cell
+                if (dragging) change.consume()
             }
-            if (dragging) change.consume()
+        } finally {
+            if (dragging) onDragEnd()
         }
-        if (dragging) onDragEnd()
     }
 }

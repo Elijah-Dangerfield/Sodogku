@@ -66,7 +66,6 @@ data class FocusTargetKey(val value: String)
 @Immutable
 data class Spotlight(
     val targets: Set<FocusTargetKey>,
-    val message: String? = null,
     val dismissOnOutsideTap: Boolean = true,
 
     /**
