@@ -656,3 +656,69 @@ Stated so nobody adds them by reflex.
 - **Remote config keys for the ad units or the product id.** Deliberately kept out of config
   (`AdUnits.kt:16-18`, `features.md#remote-config`): changing one is a store operation, and a
   config outage that blanked them would take ads and purchases down together.
+
+---
+
+## 17. Watch a rewarded ad on the board, then try the controls
+
+This is the app's only P0 and it is one reproduction away from closed. It was
+SD-26 and SD-48 in `todos.md`, moved here because nothing else can move it.
+
+**What you reported:** taps did nothing. Not just navigation. Marks would not
+draw either, and it only recovered when the shake dialog reappeared. A later
+report of the same thing carried `GADFullScreenAdViewController` as its
+transaction, which means a rewarded ad had been on screen.
+
+**Why the ad is the way in.** The mechanism is settled from the androidx and
+Compose Multiplatform sources. The symptom is only producible by the Compose
+host believing its view is off screen, and the only two things in this app that
+can do that are the two `present(` calls in `apps/ios/iosApp/Platform/AdNetwork.swift`,
+the rewarded ad and the consent form. The keyboard cannot do it and neither can
+any floating window, both ruled out by reading the sources rather than guessing.
+
+**What to do**, on a device, with Sentry attached and log capture on:
+
+1. Get to a board and trigger a rewarded ad, through Hint or the
+   continue-after-fail path. Watch it to completion and dismiss it.
+2. Tap Levels and Start over a few times.
+3. Repeat five to ten times. It is intermittent, and one clean run refutes
+   nothing.
+
+**What the log settles.** A `HostLifecycle` error saying presses reached the app
+while the host was below STARTED is conclusive: the hosting view controller
+thinks its view is off screen and the ad's `viewWillAppear` never came back. The
+fix is then on the iOS presentation side. Controls dead with **no** such error
+means the mechanism above is wrong and the answer is somewhere three separate
+investigations ruled out, and that log is worth more than anything else in this
+file.
+
+**Also worth a look while you are in there**, unrelated to the stall:
+`AdNetwork.rootViewController()` filters on `.foregroundActive`, and right after
+the ATT prompt the scene can still be `.foregroundInactive`, so the first ad on a
+fresh install can silently not show.
+
+## 18. Long-press the app icon on an Android build
+
+Was SD-56. The home-screen quick actions ship on both platforms, Daily challenge
+and Report a bug, sitting above Delete App. The plist and the manifest are both
+verified as well formed, the deep links parse, and the cold-start path is tested.
+Nobody has tapped one, because the simulator will not take input on this host
+(item 11) and the emulator was in use.
+
+**What to check**, on each platform:
+
+1. Long-press the icon. Both entries appear above the system ones, in that
+   order, with the right words.
+2. Daily challenge with the app fully killed. Lands on today's daily, not the
+   campaign.
+3. Daily challenge with the app backgrounded mid-board. Same.
+4. Report a bug, both cold and warm. Lands on the feedback panel.
+5. Back out of each. You should land on the campaign board, not be thrown out of
+   the app.
+
+**If the Android entries do not appear or do not launch**, the cause is already
+known and written down. The shortcut intents name no target package, because a
+resource file gets no `${applicationId}` substitution and the literal would read
+`com.sodogku` while every debug install is `com.sodogku.debug`. An implicit VIEW
+intent against our own `sodogku://` filter was used instead. The fix if it fails
+is a Gradle-generated string holding the real application id.

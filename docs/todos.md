@@ -123,119 +123,6 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
-## SD-26 [P0] — The screen stops updating while it keeps taking taps
-
-**Ask:** Owner, 2026-09-09, on iOS: *"idk whats happening but im clicking all
-over and nothing is happening Im marking things, trying to open the side pine,
-trying to go to achivements. Its not working."* Confirmed 2026-09-10 that the
-board would not take marks either, and that it only recovered when the shake
-dialog reappeared.
-
-**The mechanism is settled. The interleaving that causes it is not.**
-
-Three readings from the androidx and Compose Multiplatform sources, each of which
-alone narrows it, and together leave one answer:
-
-1. `NavBackStackEntryImpl.updateState()` sets an entry's lifecycle to
-   `min(hostLifecycleState, maxLifecycle)`.
-2. `NavControllerImpl.updateBackStackLifecycle()` never assigns a `maxLifecycle`
-   below STARTED to the topmost entry, nor to the first non-`FloatingWindow`
-   entry beneath one. The `nextStarted` walk exists to guarantee exactly that.
-   **So no state of `FloatingWindowNavigator` or `FloatingWindowHost` can freeze
-   the board.**
-3. `DelegatingRouter.Bind` reads `LocalLifecycleOwner.current` from inside
-   `AppNavigation`, a sibling of `NavHost` rather than a destination, so its
-   drain gate is the **host** and no entry state reaches it.
-
-The log signature this was reported with, `Enqueuing navigation` followed by
-nothing executing, is therefore only producible by **the host being below
-STARTED**.
-
-**On iOS that has exactly one cause.** `UIKitLifecycleOwner` computes CREATED as
-`!isViewAppeared || !isAppForeground`. `!isAppActive` alone yields STARTED, which
-still drains everything, and `isAppForeground` only goes false on
-`UIApplicationDidEnterBackground`. With the player looking at the screen, host
-CREATED means `isViewAppeared == false`, and that flag moves only on
-`viewDidDisappear` / `viewWillAppear` of the Compose hosting view controller. The
-only thing in this app that fires those is a full-screen modal presented over the
-host, and `present(` appears at exactly two call sites, both in
-`AdNetwork.swift`: the rewarded ad and the UMP consent form.
-
-**What is left is finding the interleaving** that makes a `viewWillAppear` go
-missing after an ad dismisses. That needs a device. The candidate fixes all
-change behavior in ways that are unsafe to ship unverified: presenting from a
-dedicated `UIWindow` so the host never disappears changes whether the game keeps
-running under the ad, and re-asserting with `beginAppearanceTransition` double
--fires the keyboard manager and is documented as something not to do to a
-UIKit-managed child.
-
-**Two earlier diagnoses in this item were wrong, and both are worth keeping as
-corrections rather than deleting.**
-
-The first pass blamed the `STARTED` gate in `FloatingWindowHost`. Ruled out by (2).
-
-The second pass argued the host must have been healthy because the shake detector
-still worked. That does not hold: `LifecycleStartEffect` at CREATED calls
-`shakeHandler.stop()`, which stops CoreMotion. "It did not work again until the
-shake dialog popped back up" reads at least as well the other way round, as the
-host coming back, the detector restarting, the shake registering, and everything
-draining at once.
-
-The keyboard is also not a way in. `UIRemoteKeyboardWindow` changes neither view
-appearance nor an app-level notification, so it cannot move the lifecycle owner
-at all. Its only relevance is that it changes which window is key, which is what
-`AdNetwork.rootViewController()` reads.
-
-**Done when:** watching a rewarded ad to completion and returning to the board
-leaves every control working.
-
-**The instrumentation is in and it is what closes this.** `HostLifecycleWatchdog`
-logs an error when a press reaches the root while the host has been below STARTED
-for two seconds, which is a contradiction because a covered view takes no
-touches. A host held down with nobody tapping stays silent, so an ad and a
-backgrounding make no noise. This covers a blind spot in
-`NavigationQueueWatchdog`, which arms on an enqueued command and would have
-watched an empty queue throughout the original incident, since delivering the tap
-to the view model was one of the things that stopped.
-
-**Reproduce it like this**, on a device, with Sentry attached:
-
-1. Reach `GameRoute` and trigger a rewarded ad, through Hint or the
-   continue-after-fail path. Watch it to completion and dismiss it.
-2. Tap Levels and Start over a few times.
-3. Repeat five to ten times. It is intermittent and one clean run refutes nothing.
-
-What the log settles:
-
-- A `HostLifecycle` error naming presses against a host below STARTED is
-  **conclusive**: the hosting view controller believes its view is off screen and
-  the ad's `viewWillAppear` never came back. The fix is on the iOS presentation
-  side.
-- `Collection stopped for navigation queue` with no matching `Collection started`
-  after the ad says the same thing from the other end.
-- Controls dead with **no** `HostLifecycle` error, and the router's stall line
-  reporting STARTED or RESUMED, means the mechanism above is wrong and the answer
-  is somewhere it was ruled out. That log is worth more than any of this.
-## SD-56 [P2] — An Android shortcut may be pointing at a package that is not installed
-
-**Found by:** the SD-25 agent, 2026-09-10, which flagged it rather than shipping
-around it.
-
-`res/xml/shortcuts.xml` declares its intents with no `targetPackage` or
-`targetClass`. The documented form hardcodes the package, and a resource file gets
-no `${applicationId}` substitution, so the literal would read `com.sodogku` while
-every debug install is `com.sodogku.debug`. Broken on exactly the build somebody
-would test it on.
-
-The agent used an implicit VIEW intent against our own `sodogku://` filter instead,
-which should work and has not been tapped on a device.
-
-**Done when:** somebody has long-pressed the icon on an Android debug build and
-both entries appeared and launched.
-
-**If they did not**, this is the cause, and the fix is a Gradle-generated
-`@string/` holding the real application id rather than a literal in the resource.
-Nothing else in the change would explain the entries being absent or dead.
 ## SD-86 [P2] — `:apps:integration` has failed twice for reasons nobody can reproduce
 
 **Found by:** two separate investigations, 2026-09-10.
@@ -295,7 +182,6 @@ not "the daily has been started before".
 
 A `SEAViewModel` test can drive two actions through the channel without a UI
 harness, which is how SD-85's and SD-87's tests reached their second tap.
-
 ## SD-98 [P2] — Two template test files assert that 1 + 2 is 3
 
 **Found by:** the SD-94 agent, 2026-09-11, while writing 48 test file headers.
