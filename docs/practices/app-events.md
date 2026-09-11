@@ -141,7 +141,11 @@ Drop-off is `step_viewed` counts down the sequence; the ones to watch are the fo
 cannot leave by tapping anywhere.
 
 Replaying from Settings clears the flag and arms the run again, so a small number of repeat
-`tutorial.completed` events per install is expected rather than a bug.
+`tutorial.completed` events per install is expected rather than a bug. **Within one run it fires
+at most once**, and that is enforced rather than assumed. The coach mark keeps drawing through the
+scrim's fade, so Skip takes a tap after the run is already over (a second Skip, or one landing on a
+script that has just finished), and both of those used to report an ending of their own.
+`GameViewModel`'s `tutorialEnded` drops them.
 
 **There is no `tutorial.skipped`**, though the spec named one. A skip is `tutorial.completed` with
 `skipped=true` and a `last_step`: both endings write `AppData.hasCompletedTutorial` and both are

@@ -4015,6 +4015,52 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun aSecondSkipDoesNotReportASecondCompletion() = recordingEvents { events ->
+        runUnitTest {
+            // The card outlives the exit. `TutorialCoachMark` keeps drawing
+            // through the scrim's fade, so Skip takes a second tap after the
+            // first one has already left the rehearsal, and that one used to
+            // log its own `tutorial.completed` with `last_step = "none"`.
+            // Nobody saw it: the only number it moved was the one that says
+            // what fraction of players finish onboarding.
+            val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+            val showing = assertNotNull(vm.state.tutorial, "nothing was showing to skip out of")
+
+            vm.takeAction(GameAction.SkipTutorial)
+            vm.takeAction(GameAction.SkipTutorial)
+            settle()
+
+            val completions = events.attributesOf("tutorial.completed")
+            assertEquals(1, completions.size, "the second Skip reported its own ending")
+            // And it is the first tap's account of the ending that survived,
+            // not the second one's, which knows nothing about where they were.
+            assertEquals(showing.name, completions.single()["last_step"])
+            assertEquals(true, completions.single()["skipped"])
+        }
+    }
+
+    @Test
+    fun aSkipAfterTheScriptRunsOutDoesNotReportASecondCompletion() = recordingEvents { events ->
+        runUnitTest {
+            // The other door into the same room. Both endings go through
+            // `completeTutorial`, so a Skip arriving a few frames after the
+            // last "Got it" is a duplicate too, and this one would add a
+            // `skipped=true` the player never did next to the `skipped=false`
+            // they earned, which reads as a drop-off in the funnel.
+            val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+            vm.runScript()
+            assertEquals(null, vm.state.tutorial, "the script never finished")
+
+            vm.takeAction(GameAction.SkipTutorial)
+            settle()
+
+            val completions = events.attributesOf("tutorial.completed")
+            assertEquals(1, completions.size, "the late Skip reported its own ending")
+            assertEquals(false, completions.single()["skipped"], "a finished run was recorded as a skip")
+        }
+    }
+
+    @Test
     fun theFlagSurvivesTheScreenItWasWrittenOn() = runUnitTest {
         val cache = untaughtCache()
         viewModel(levelId = FirstGuidedLevel, cache = cache)

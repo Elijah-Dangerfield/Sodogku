@@ -379,6 +379,25 @@ class GameViewModel(
     private var emptyBoardNoteSeen = false
 
     /**
+     * Whether this run has already reported its ending.
+     *
+     * The two ways out of the rehearsal, the script running itself out and
+     * Skip, both funnel through [completeTutorial], and each can be arrived at
+     * twice. `TutorialCoachMark` holds its card through the scrim's fade, so
+     * its Skip stays live for a few frames after the first tap has already left
+     * the rehearsal, and a Skip landing on a script that has just finished is
+     * the same arrival through the other door. Neither is reachable once the
+     * lesson is genuinely over, because [load] arms the run once per ViewModel
+     * and a replay from Settings opens a new one.
+     *
+     * It matters because `tutorial.completed` is the only measure of what
+     * fraction of players finish onboarding, and a double-tapped Skip that
+     * reported twice inflated it. `completeTutorial`'s other two effects are
+     * idempotent already; the event is not, so the guard goes around all three.
+     */
+    private var tutorialEnded = false
+
+    /**
      * The level's history as it stood *before* this attempt touched it.
      *
      * Read at the start, because `onCompleted` overwrites it and the achievement
@@ -1098,17 +1117,22 @@ class GameViewModel(
             leaveRehearsal()
             return
         }
-        // Reached by a *second* Skip, and only by that. `TutorialCoachMark` holds
-        // the card through the scrim's fade-out, so its button stays live for a
-        // few frames after the first tap has already left the rehearsal, and by
-        // then `rehearsing` is false and there is no step left to clear. It stays
-        // because the branch needs an ending: a `skipTutorial` that returns
-        // without clearing the card would be a worse thing to be wrong about than
-        // an update that writes what is already true.
+        // Reached by a Skip that lands after the rehearsal is already over:
+        // either a second one, or one on the heels of the script finishing.
+        // `TutorialCoachMark` holds the card through the scrim's fade-out, so
+        // its button stays live for a few frames after the exit has happened,
+        // and by then `rehearsing` is false and there is no step left to clear.
+        // It stays because the branch needs an ending: a `skipTutorial` that
+        // returned without clearing the card would be a worse thing to be wrong
+        // about than an update that writes what is already true. The completion
+        // it arrives with is dropped by `tutorialEnded`, which is the part that
+        // was wrong: the event went out twice and the funnel counted both.
         updateState { it.copy(tutorial = null, tutorialCells = emptySet()) }
     }
 
     private suspend fun completeTutorial(skipped: Boolean, at: TutorialStep?) {
+        if (tutorialEnded) return
+        tutorialEnded = true
         tutorial.stop()
         logger.logEvent(
             "tutorial.completed",
