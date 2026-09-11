@@ -86,11 +86,20 @@ class InMemoryLogTreeTest {
 
     @Test
     fun secretsAreScrubbedBeforeTheyEverEnterTheBuffer() {
+        // Through `KLog`, not straight into the tree. The scrub moved to the
+        // engine so that the two sinks that leave the device get it too, and
+        // what this test is for is the buffer a reporter can attach — so it has
+        // to be asserted over the path a real line takes to reach it.
         val tree = tree(maxLineChars = 500)
+        KLog.plant(tree)
 
-        tree.log(entry("GET /config failed, authorization: Bearer sk-live-9f3ab2"))
-        tree.log(entry("init dsn=https://deadbeef@o1.ingest.sentry.io/1"))
-        tree.log(entry("mailto elijah@example.com bounced"))
+        try {
+            KLog.i("GET /config failed, authorization: Bearer sk-live-9f3ab2")
+            KLog.i("init dsn=https://deadbeef@o1.ingest.sentry.io/1")
+            KLog.i("mailto elijah@example.com bounced")
+        } finally {
+            KLog.clearTrees()
+        }
 
         val dump = tree.snapshot()
         assertFalse(dump.contains("sk-live-9f3ab2"), "bearer token leaked: $dump")

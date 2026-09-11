@@ -65,11 +65,24 @@ class SentryLogTree(
         return !throwable.isExpectedControlFlow && !throwable.isOfflineError()
     }
 
+    /**
+     * The line as this tree renders it, from the entry and never off the
+     * throwable.
+     *
+     * `LoggingEngine` scrubs the message and the extras once, before fan-out;
+     * a throwable is the one thing it cannot rewrite, so its message comes
+     * through [LogEntry.throwableMessage], which scrubs at the read. The
+     * throwable object itself still goes to [Sentry.captureException] whole —
+     * that is what carries the stack trace.
+     */
+    internal fun renderedMessage(entry: LogEntry): String =
+        entry.message ?: entry.throwableMessage ?: DEFAULT_MESSAGE
+
     private fun addBreadcrumb(entry: LogEntry) {
         val breadcrumb = Breadcrumb().apply {
             level = entry.level.toSentryLevel()
             category = entry.tag ?: BREADCRUMB_CATEGORY
-            message = entry.message ?: entry.throwable?.message ?: DEFAULT_MESSAGE
+            message = renderedMessage(entry)
         }
 
         entry.context.tags.forEach { (key, value) ->
@@ -85,7 +98,7 @@ class SentryLogTree(
     }
 
     private fun captureEvent(entry: LogEntry): LogId? {
-        val message = entry.message ?: entry.throwable?.message ?: DEFAULT_MESSAGE
+        val message = renderedMessage(entry)
         val sentryLevel = entry.level.toSentryLevel()
 
         val sentryId = entry.throwable?.let {

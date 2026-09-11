@@ -6,6 +6,7 @@ import io.opentelemetry.kotlin.logging.SeverityNumber
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class GrafanaLogTreeTest {
@@ -201,6 +202,27 @@ class GrafanaLogTreeTest {
             processor.records.map { it.attributes["session_id"] },
             "the rate is not deciding anything: both sessions were treated the same",
         )
+    }
+
+    /**
+     * Loki is a shared Grafana Cloud stack, and a Warn line goes there by
+     * default. A token that rode one used to be scrubbed out of the feedback
+     * attachment and shipped here in the clear, under our own service name.
+     */
+    @Test
+    fun klogForwardingOn_secretsAreScrubbedOutOfTheBodyAndTheException() {
+        klogForwardingEnabled = true
+        plantTree()
+
+        KLog.w("POST /v1/logs rejected, authorization: Bearer sk-live-9f3ab2")
+        KLog.e("exporter gave up", IllegalStateException("dsn=https://deadbeef@o1.ingest.sentry.io/1"))
+
+        val forwarded = processor.records.map { it.body }.joinToString("\n") +
+            processor.records.mapNotNull { it.attributes["exception_message"] }.joinToString("\n")
+        assertEquals(2, processor.records.size)
+        assertFalse(forwarded.contains("sk-live-9f3ab2"), "a bearer token reached Loki: $forwarded")
+        assertFalse(forwarded.contains("deadbeef"), "a dsn reached Loki: $forwarded")
+        assertTrue(forwarded.contains("POST /v1/logs rejected"), "the readable part of the line did not survive")
     }
 
     @Test

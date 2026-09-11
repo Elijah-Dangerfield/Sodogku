@@ -13,7 +13,22 @@ data class LogEntry(
     val message: String?,
     val throwable: Throwable?,
     val context: LogContext
-)
+) {
+    /**
+     * [throwable]'s own message, and its `toString()`, scrubbed of secrets.
+     *
+     * The engine scrubs [message] and [context] once before any tree sees them,
+     * but a throwable travels by reference and cannot be rewritten: wrapping it
+     * to scrub the message would cost the stack trace, which is the reason it is
+     * being sent at all. So every sink that renders *text* off a throwable reads
+     * it through these rather than off the object. The object itself still
+     * reaches the crash reporter unaltered, which is the one place it has to.
+     */
+    val throwableMessage: String? get() = throwable?.message?.let(::redactSecrets)
+
+    /** See [throwableMessage]. The type-and-message form, for a log body. */
+    val throwableText: String? get() = throwable?.toString()?.let(::redactSecrets)
+}
 
 /**
  * Represents an optional identifier produced by one of the planted log trees (for example a Sentry

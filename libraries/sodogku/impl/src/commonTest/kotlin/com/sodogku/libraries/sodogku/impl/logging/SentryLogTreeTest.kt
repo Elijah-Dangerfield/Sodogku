@@ -47,6 +47,28 @@ class SentryLogTreeTest {
         )
     }
 
+    /**
+     * The breadcrumb trail and the captured event both render through this, and
+     * both leave the device. Redaction is the engine's job now, but a throwable
+     * is the one thing it cannot rewrite — so the scrub happens at the read, and
+     * a tree that goes back to `entry.throwable?.message` fails here.
+     */
+    @Test
+    fun `a secret in a throwable's message does not reach the rendered line`() {
+        val rendered = tree.renderedMessage(
+            LogEntry(
+                level = LogLevel.Error,
+                tag = "Net",
+                message = null,
+                throwable = IllegalStateException("refresh failed, authorization: Bearer sk-live-9f3ab2"),
+                context = LogContext.Empty,
+            ),
+        )
+
+        assertFalse(rendered.contains("sk-live-9f3ab2"), "bearer token reached Sentry: $rendered")
+        assertTrue(rendered.startsWith("refresh failed"), "the readable part did not survive: $rendered")
+    }
+
     private fun errorEntry(throwable: Throwable?): LogEntry = LogEntry(
         level = LogLevel.Error,
         tag = "test",

@@ -3,11 +3,12 @@ package com.sodogku.libraries.core.logging
 /**
  * Scrubs the handful of things that must never ride a log line off the device.
  *
- * The in-memory tail is attached to feedback reports, which land in a bug
- * tracker a human browses. Sodogku has no accounts and no user data, so the
- * realistic leak is not "the player's identity" but "a credential that happened
- * to be interpolated into a message": a DSN, a bearer header echoed while
- * debugging a request, a signed URL. Those are what this removes.
+ * A log line has three exits: the in-memory tail a reporter can attach to
+ * feedback, the Sentry breadcrumb trail, and the Warn-and-above bodies
+ * forwarded to Loki. Sodogku has no accounts and no user data, so the realistic
+ * leak is not "the player's identity" but "a credential that happened to be
+ * interpolated into a message": a DSN, a bearer header echoed while debugging a
+ * request, a signed URL. Those are what this removes, on all three.
  *
  * Deliberately narrow. Redacting aggressively (every query string, every long
  * hex run) would eat the session ids, level ids and request paths that make a
@@ -25,6 +26,38 @@ internal fun redactSecrets(line: String): String =
         .replace(JWT, REDACTED)
         .replace(KEYED_SECRET, "$1$REDACTED")
         .replace(EMAIL, REDACTED)
+
+/**
+ * [redactSecrets] over everything on an entry a tree might render: the message
+ * and every string in the context.
+ *
+ * Applied once by the engine before fan-out, and deliberately not by each tree.
+ * It ran in [InMemoryLogTree] alone for a while, which is the one sink that
+ * never leaves the device unless a reporter attaches it — the Sentry breadcrumb
+ * trail and the Warn-and-above bodies forwarded to Loki both leave, and both saw
+ * the same line in the clear. The guard was sitting on the safest of the three
+ * exits.
+ *
+ * The throwable is left alone here; [LogEntry.throwableMessage] says why.
+ * A non-string extra is left alone too: it is a number, a boolean or a domain
+ * object, and the ones that stringify do so at the sink.
+ */
+internal fun LogEntry.scrubbed(): LogEntry = copy(
+    message = message?.let(::redactSecrets),
+    context = context.scrubbed(),
+)
+
+private fun LogContext.scrubbed(): LogContext {
+    if (isEmpty()) return this
+    return LogContext(
+        tags = tags.mapValues { (_, value) -> redactSecrets(value) },
+        // The event name is a constant this repo wrote, never a credential, and
+        // it is the one extra on the hot path — every `logEvent` carries it.
+        extras = extras.mapValues { (key, value) ->
+            if (key == EXTRA_APP_EVENT || value !is String) value else redactSecrets(value)
+        },
+    )
+}
 
 private const val REDACTED = "<redacted>"
 

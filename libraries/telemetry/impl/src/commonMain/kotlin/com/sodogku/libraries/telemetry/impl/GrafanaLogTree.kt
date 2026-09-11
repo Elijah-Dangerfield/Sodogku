@@ -108,7 +108,10 @@ class GrafanaLogTree(
         if (!isSessionSampledIn(sessionId)) return
 
         eventLogger.emit(
-            body = entry.message ?: entry.throwable?.toString(),
+            // Both read through [LogEntry], never off the throwable: the engine
+            // scrubs the message and the extras before fan-out, and a throwable
+            // is the one thing it cannot rewrite.
+            body = entry.message ?: entry.throwableText,
             eventName = eventName,
             severityNumber = entry.level.toSeverityNumber(),
             attributes = {
@@ -119,7 +122,7 @@ class GrafanaLogTree(
                     entry.tag?.let { setStringAttribute(TAG_KEY, it) }
                     entry.throwable?.let {
                         setStringAttribute(EXCEPTION_TYPE_KEY, it::class.simpleName ?: "Throwable")
-                        it.message?.let { m -> setStringAttribute(EXCEPTION_MESSAGE_KEY, m) }
+                        entry.throwableMessage?.let { m -> setStringAttribute(EXCEPTION_MESSAGE_KEY, m) }
                     }
                 }
                 entry.context.tags.forEach { (key, value) -> setStringAttribute(key, value) }

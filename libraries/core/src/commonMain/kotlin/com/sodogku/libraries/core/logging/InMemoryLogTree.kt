@@ -22,6 +22,10 @@ import kotlin.time.Clock
  * always empty.
  *
  * Writes arrive from any thread, so both ends are synchronized.
+ *
+ * Nothing is scrubbed here. It used to be, and that was the whole of the app's
+ * redaction — `LoggingEngine` now does it once for every tree, so this one is no
+ * longer the only sink that gets a clean line.
  */
 @OptIn(InternalCoroutinesApi::class)
 class InMemoryLogTree(
@@ -40,10 +44,9 @@ class InMemoryLogTree(
     override fun log(entry: LogEntry): LogId? {
         if (entry.level.priority < minLevel.priority) return null
 
-        val message = entry.message ?: entry.throwable?.message ?: NO_MESSAGE
+        val message = entry.message ?: entry.throwableMessage ?: NO_MESSAGE
         val rendered = "${now()} ${entry.level.name.uppercase()} ${entry.tag ?: "-"}: $message"
-        val safe = redactSecrets(rendered)
-        val capped = if (safe.length > maxLineChars) safe.take(maxLineChars) + "…" else safe
+        val capped = if (rendered.length > maxLineChars) rendered.take(maxLineChars) + "…" else rendered
 
         synchronized(lock) {
             while (lines.size >= capacity) lines.removeFirst()

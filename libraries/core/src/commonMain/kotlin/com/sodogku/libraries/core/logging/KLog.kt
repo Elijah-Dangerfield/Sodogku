@@ -193,19 +193,25 @@ private object LoggingEngine {
         val combinedContext = globalScope.merge(context)
         val finalTag = explicitTag ?: tagResolver.resolve()
 
-        var capturedId: LogId? = null
         val snapshot = treeSnapshot
+        if (snapshot.isEmpty()) return null
+
+        // Scrubbed once, here, rather than by each tree: this is the only point
+        // every entry passes through, and a guard that each sink has to remember
+        // to call is a guard two of the three sinks did not have. See
+        // `LogEntry.scrubbed`.
+        val entry = LogEntry(
+            level = level,
+            tag = finalTag,
+            message = message,
+            throwable = throwable,
+            context = combinedContext
+        ).scrubbed()
+
+        var capturedId: LogId? = null
         for (tree in snapshot) {
             if (!tree.isLoggable(level, finalTag)) continue
-            val id = tree.log(
-                LogEntry(
-                    level = level,
-                    tag = finalTag,
-                    message = message,
-                    throwable = throwable,
-                    context = combinedContext
-                )
-            )
+            val id = tree.log(entry)
             if (capturedId == null && id != null) {
                 capturedId = id
             }
