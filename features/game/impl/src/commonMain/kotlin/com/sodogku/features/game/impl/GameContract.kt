@@ -936,6 +936,12 @@ sealed interface GameAction {
     /** The persisted bone count moved, here or on another open board. */
     data class BonesChanged(val bones: Int) : GameAction
 
+    /**
+     * The Pro entitlement moved, which on this screen means a purchase or a
+     * restore made from Settings and then backed out of.
+     */
+    data class ProChanged(val isPro: Boolean) : GameAction
+
     /** Trade an ad for the level, after enough attempts have failed. */
     data object SkipLevel : GameAction
     data object NextLevel : GameAction

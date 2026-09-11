@@ -4358,6 +4358,25 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun aPurchaseMadeWhileTheBoardIsOpenReachesTheBoard() = runUnitTest {
+        // Settings is one tap from the board and offers the paywall, so the
+        // player buys and comes straight back. `isPro` was snapshotted at load,
+        // so the drawer stayed locked and the booster row kept its Ad badges
+        // while `refill`, `refillBones` and `goToLevel` were already granting
+        // without one: the screen was promising an ad the code would not show.
+        val entitlements = BuyableEntitlements()
+        val vm = viewModel(entitlements = entitlements, cache = emptyHandedCache())
+        assertFalse(vm.state.isPro, "the fixture opened already Pro")
+        assertTrue(vm.state.tapPlaysAd(Consumable.Sniff), "the fixture has no Ad badge to lose")
+
+        entitlements.purchasePro()
+        settle()
+
+        assertTrue(vm.state.isPro, "the purchase did not reach the board")
+        assertFalse(vm.state.tapPlaysAd(Consumable.Sniff), "the Ad badge outlived the purchase")
+    }
+
+    @Test
     fun theProFloorIsTheConfiguredOne() = runUnitTest {
         val cache = InMemoryAppCache()
         cache.set(AppData(sniffs = 0, treats = 0))
@@ -5786,6 +5805,20 @@ class GameViewModelTest : CoroutineTest() {
     private class ProEntitlements : Entitlements {
         override val isPro: StateFlow<Boolean> = MutableStateFlow(true)
         override suspend fun purchasePro(trigger: String?) = PurchaseOutcome.AlreadyOwned
+        override suspend fun restore() = RestoreOutcome.Restored
+    }
+
+    /**
+     * Pro bought somewhere else while this board is open, which is what the gear
+     * makes possible: Settings offers the paywall and the player comes straight
+     * back to the board they left.
+     */
+    private class BuyableEntitlements : Entitlements {
+        override val isPro = MutableStateFlow(false)
+        override suspend fun purchasePro(trigger: String?): PurchaseOutcome {
+            isPro.value = true
+            return PurchaseOutcome.Success
+        }
         override suspend fun restore() = RestoreOutcome.Restored
     }
 }

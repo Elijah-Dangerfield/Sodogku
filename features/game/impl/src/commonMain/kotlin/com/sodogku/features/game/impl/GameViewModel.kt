@@ -435,6 +435,13 @@ class GameViewModel(
             .distinctUntilChanged()
             .onEach { bones -> takeAction(GameAction.BonesChanged(bones)) }
             .launchIn(viewModelScope)
+        // Observed for the same reason the display settings above are, and by
+        // the same route: Settings offers the paywall, and Settings is one tap
+        // from the board. Read once at load, a purchase left the drawer locked
+        // and the Ad badges up while the ViewModel was already granting without
+        // an ad — `refill`, `refillBones` and `goToLevel` all read the flow
+        // live, so the screen was promising an ad the code would not show.
+        entitlements.isPro.collectIn(viewModelScope) { takeAction(GameAction.ProChanged(it)) }
         // The trophy's badge is a comparison between two things that both move
         // while this screen is up: the log, which a clear writes to, and the
         // watermark, which the grid moves when the player goes and looks. Both
@@ -490,6 +497,7 @@ class GameViewModel(
             is GameAction.BonesChanged -> action.updateState {
                 it.copy(livesRemaining = action.bones)
             }
+            is GameAction.ProChanged -> action.updateState { it.copy(isPro = action.isPro) }
             GameAction.SkipLevel -> action.skipLevel()
             GameAction.NextLevel -> action.nextLevel()
             GameAction.LevelsOpened -> action.loadRecords()
