@@ -757,5 +757,13 @@ it claims.
 the same mistake in three components. A sweep learns the rule once; four separate
 fixes learn it four times and miss the fifth.
 
+**One loose end the pass should tie off.** `BoosterButton` in `libraries/ui` is
+dead code, and it cannot be deleted yet: it is the only thing that references
+`booster_a11y`, and a guard now fails the build when a string has no reader. That
+string is exactly what the booster fix above should start using, so the order is
+fix the semantics, point them at the string, then delete the composable. Deleting
+it today would mean either a red build or throwing away a translated key the fix
+needs.
+
 **When you want it**, say so and it gets a session of its own. It needs a device,
 because a semantics tree read off a test is not the same as hearing it.

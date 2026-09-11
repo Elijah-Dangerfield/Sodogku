@@ -134,7 +134,6 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
-
 ## SD-86 [P2] — `:apps:integration` has failed twice for reasons nobody can reproduce
 
 **Found by:** two separate investigations, 2026-09-10.
@@ -165,7 +164,6 @@ tree is half-removed is a different situation from a walk that skips it.
 
 Reproducing it may mean running the tier in a loop while adding and removing a
 worktree. That is worth an hour: everything else in this repo trusts these guards.
-
 ## SD-102 [P2] — FocusScrim reads its Animatable in composition, and the detekt rule cannot see it
 
 **Ask:** `libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/system/Focus.kt:196`
@@ -210,7 +208,6 @@ counter on `content` proves the first part.
 `LevelDrawer` one shows the rule's fix text creates the blind spot. Found by the
 SD-6 review of the `libraries/ui` board and dog slice, 2026-09-11, against
 `17a2a6c`.
-
 ## SD-103 [P2] — One Dog component, so no call site has to remember the preview fix
 
 **Ask:** Owner, 2026-09-11: *"we should have a custom DS component called Dog and
@@ -243,7 +240,6 @@ component answer both and say which wins.
 A guard is worth more than the refactor. Once one component owns it, a test that
 fails when a composable outside the design system references a dog drawable keeps
 it owned.
-
 ## SD-104 [P2] — RuleChip flashes once per rule, not once per strike
 
 **Ask:** `RuleChip`'s flash
@@ -268,7 +264,6 @@ and the rest of the slice has already made it.
 `ruleChipFlashKey(broken, strikeNonce)` beside `brokenRule` makes the decision
 testable without a composition. Found by the SD-6 review of the `libraries/ui`
 board and dog slice, 2026-09-11, against `17a2a6c`.
-
 ## SD-105 [P2] — rememberHaptics allocates a new Haptics on every composition
 
 **Ask:** `rememberHaptics`
@@ -293,101 +288,3 @@ child not recomposing when an unrelated state changes.
 one-line change plus an import and was not taken here because its effect is in
 another feature. Found by the SD-6 review of the `libraries/ui` board and dog
 slice, 2026-09-11, against `17a2a6c`.
-
-## SD-106 [P2] — DogLoopSchedule.clipAt recurses once per turn, without bound
-
-**Ask:** `clipAt(turn)`
-(`libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/components/dog/DogLoopSchedule.kt:41`)
-calls `clipAt(turn - 1)` to learn the previous clip, so its stack depth is
-`turn`. `LoopingDogImpl` calls it on every recomposition with a `turn` that
-only ever grows. Measured on the JVM: it returns at turn 50,000 and overflows
-the stack at 100,000. A turn is about 2.5 to 3.2 seconds, so that is over forty
-hours of one dog looping on one screen before the JVM limit; the iOS main thread
-has a 1MB stack and larger native frames, so its limit is lower and was not
-measured. Latent rather than live, and the per-recomposition cost grows
-linearly with time on screen for as long as the dog is composed.
-
-Same file, `holdTurnsAt` (line 58): `roll` is in `0 until 2 * max` and
-`roll >= max` maps to zero, so the hold is never `max` (the top value is
-`max - 1`) and zero comes up four times in six, not "about half" as the docblock
-says. Mutating `>=` to `>` survived because
-`theDogSometimesPausesAndSometimesDoesNot` allows `0..MaxHold`. Confidence high
-on both; the first was measured, the second is arithmetic.
-
-**Done when:** `clipAt(1_000_000)` returns in `DogLoopScheduleTest`, and the
-hold's name, docblock and range agree.
-
-**Hints:** Iterate from turn zero carrying the previous clip, or have
-`LoopingDogImpl` hold the previous clip in state and pass it in; the schedule's
-determinism is preserved either way. Found by the SD-6 review of the
-`libraries/ui` board and dog slice, 2026-09-11, against `17a2a6c`.
-
-## SD-107 [P2] — Two board tests cannot fail for the reason they claim
-
-**Ask:** Both found by mutation.
-
-`PlacementPulseTest.severalSquaresAppearingAtOnceIsNotAPlacement` restores
-`{1, 7, 13}` and asserts that cell 7 has no role. With `singleOrNull()` changed
-to `firstOrNull()` the pulse picks cell 1 (row 0, column 1), and cell 7 (row 1,
-column 2) is on neither of its lines, so the test stays green against the exact
-wrong implementation it was written to refuse.
-
-`BoardCellLabelsTest.everyCellStateSaysSomethingDifferent` asserts that the five
-state phrases are distinct and nothing else, as its docblock admits. Swapping
-the `Marked` and `Wrong` phrases in `stateOf` stayed green. No test anywhere
-pins which phrase belongs to which state, and this is the string a screen
-reader user hears when they cross a square off: after that swap they would hear
-"wrong guess, cost a bone".
-
-**Done when:** the restore test asserts `restored == PlacementPulse.None` (or
-probes the cell that would be the false origin), and a mapping test asserts
-each `BoardCellState` against its own phrase. Both mutations above then die.
-
-**Hints:** Both are additions to existing test files. Found by the SD-6 review
-of the `libraries/ui` board and dog slice, 2026-09-11, against `17a2a6c`.
-
-## SD-109 [P2] — Untidy: dead code, stale comments and one narrow gesture gap in the board and HUD
-
-**Ask:** Six small things, none of which a player meets on its own, gathered so
-one pass can clear them.
-
-- `BoosterButton` (`GameHud.kt:310` to `374`) has no callers outside its own
-  preview. Its `booster_a11y` string is kept alive only by it, which is why the
-  unused-strings guard from `c4a8b0f` does not see it. SD-99 wants the string;
-  delete the composable after.
-- `Spotlight.message` (`Focus.kt:69`) is never set and never read.
-- `BoardCell.kt:259` to `272` is a second, mis-indented copy of the
-  `derivedStateOf` paragraph, inside `drawBehind` where the concern does not
-  apply. Delete it.
-- `BoardCell.kt:197`: `rememberUpdatedState(strikeNonce)` feeding
-  `LaunchedEffect(nonce)` is `LaunchedEffect(strikeNonce)` plus one snapshot
-  write per cell per composition. The comment above it explains the reset,
-  which is right; the holder is not doing anything.
-- `BoardCellLabels.kt:268`: the `remember` keys omit `clearAction` and
-  `placeAction`. Harmless today, since a locale change moves every other key,
-  and wrong in principle.
-- `dragAcrossCells` (`BoardDrag.kt:96`): if the `pointerInput` key changes
-  mid-stroke (a rotation, or a second finger toggling `enabled`), the coroutine
-  is cancelled before the trailing `onDragEnd()`. The cost today is one lost
-  `game.drag` event and a `MarkStroke` held in the view model until the next
-  stroke or attempt; `startStroke` resets it, so nothing on the board is wrong.
-  A `try/finally` around the loop closes it.
-
-**Done when:** the six are gone and `git grep` finds no `BoosterButton`,
-`Spotlight.message` or duplicated paragraph.
-
-**Hints:** All in files this review read end to end; none needs a test beyond
-the build. Found by the SD-6 review of the `libraries/ui` board and dog slice,
-2026-09-11, against `17a2a6c`.
-
-## Suggested entry for the SD-6 slice list
-
-- **The `libraries/ui` board and dog components**, 2026-09-11, against
-  `17a2a6c`. Eleven findings, now SD-99 through SD-109. 16 mutations, 13
-  killed, every survivor explained. Verdict: the board cell and the drag are
-  right about the two things the brief worried about, animated reads and gesture
-  ownership, and the defects are semantics in the components around it: three
-  controls with the name on one node and the action or the children on another,
-  all provable with the composition tier. Nine lines in ten of the slice have no
-  test, which is the expected shape for composables; two existing tests were
-  found unable to fail for the reason they claim.
