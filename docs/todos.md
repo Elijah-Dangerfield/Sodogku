@@ -112,42 +112,6 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
-## SD-13 [P1] — 500 levels is not a campaign
-
-**Ask:** Meowdoku reviewers report being at level 1912 and past 1000. Ours ends
-at 500, and clearing it walks the player out of the app (`proposals.md` item 4).
-Two problems, and the second one is worse than the first.
-
-**Done when:** Finishing the last level lands on something that says so, and the
-shipped campaign is at least 1000 levels.
-
-**SD-20 is answered and it settles the shape.** See
-`docs/reference/large-boards-spike.md`. No new grid size: 4x4 through 10x10 only,
-no zoom, no pan. The measurements are decisive rather than close. The touch-target
-rule that was supposed to force zoom already broke at 8x8 three hundred levels
-ago, a 12x12 costs 22 times more generator time per shipped board, and the game's
-own rater says a 12x12 needs 25% more deductions for 44% more squares, which is a
-longer board rather than a harder one.
-
-So the surplus goes into **non-repetition**, not size. `Generator.canonicalKey`
-already dedups up to the eight symmetries and region renaming, so "our boards do
-not repeat" is a claim we can make and Meowdoku's own reviewers say it cannot.
-More 9x9 and 10x10 bands cost a couple of minutes of generation, which keeps the
-whole pack regenerable in one sitting and `LevelPackVerificationTest` cheap.
-
-**Also worth fixing while you are in here.** The spike found that
-`RegionPalette.get`, `BoardCellLabels.describe` and the `board_region_*` /
-`board_glyph_*` string sets all wrap silently with `mod` past ten. Harmless while
-`MAX_SIZE` is 10, but an eleventh region would draw in region 0's pink and be
-announced by region 0's name instead of failing loudly.
-
-**Hints:** The generator makes 1,230 boards in about 42 seconds, so content is
-cheap; verification is what costs. `LevelPacks.PACK_VERSION` exists because
-progress is keyed on level id, which makes appending safe and reordering a
-silent reassignment of everyone's history. Do not spend the daily pool on this,
-for the reason in `proposals.md`. Meowdoku's own reviewers say its boards start
-repeating around every 100, so this is a place where we can be better rather
-than merely bigger.
 ## SD-22 [P2] — Write down what the game offers, and delete SPEC
 
 **Ask:** Owner, 2026-09-09: "It seems like it would be nice to have a wiki
@@ -892,3 +856,43 @@ pulse is `Modifier.pulsate`; read `Animatable.value` inside `graphicsLayer` and
 not in composition or `AnimatedStateReadInComposition` fails the build.
 
 Provenance: Sentry SODOGKU-6, session `95dd30d1`, 2026-09-10.
+
+## SD-54 [P2] — Two exits from a board still throw the player out of the app
+
+**Found by:** the SD-13 agent, 2026-09-10, after fixing the third one.
+
+`GameAction.Leave` sends `NavigateBack`, and the board **is** the start
+destination, so popping it leaves the app. That was the whole bug behind "finishing
+the campaign closes the app", now fixed for the campaign ending.
+
+The same mechanism is still wired to the "Levels" button on the **lose** sheet, and
+to the same button on the fail dialog. It may be deliberate that losing walks you
+out; nobody has said so either way, and the owner has separately called that dialog
+"kind of stupid" (SD-49).
+
+**Done when:** every control that says "Levels" opens the level pane, or somebody
+writes down why one of them should close the app.
+
+**Hints:** Do this with SD-49 rather than before it, since that item is rebuilding
+the lose path anyway and this is one of the buttons on it.
+
+## SD-55 [P2] — `TopDog` still unlocks at the halfway point
+
+**Found by:** the SD-13 agent, 2026-09-10.
+
+The achievement fired at 500 cleared levels, which used to mean "you finished the
+campaign". The campaign is now a thousand, so it means "you are halfway".
+
+**Not simply raised to 1000, and the reason is the interesting part.** The
+achievement log recomputes from counters, so moving the threshold would
+*un-unlock* it for anybody already holding it. An achievement that disappears is
+worse than one that arrives early.
+
+**Done when:** finishing the campaign unlocks something that says so, and nobody
+loses an achievement they already have.
+
+**Hints:** A second achievement at 1000 leaves the existing one alone and is the
+cheap answer, but then `TopDog` is an award for being halfway and its name says
+otherwise. Renaming what a player already earned is its own small betrayal.
+Decide which of those two you would rather explain. `AchievementCounters` and
+`Stat` are where it lives.
