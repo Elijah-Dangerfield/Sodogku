@@ -78,10 +78,12 @@ fun Scoring.standingFor(
      * [ScoringConfig.MAX_LIVES] and get the same three verdicts as before.
      */
     livesRemaining: Int = ScoringConfig.MAX_LIVES,
+    /** Dogs the player placed. Pass `ScoreCard.placements`; see [Scoring.parScore]. */
+    placements: Int = size,
     config: ScoringConfig = ScoringConfig.Default,
 ): Standing? {
     if (!completed) return null
-    val par = parScore(size, difficulty, config)
+    val par = parScore(size, difficulty, placements, config)
     val sharp = score >= par * config.fivePawFraction
     return when {
         sharp && livesRemaining >= ScoringConfig.MAX_LIVES -> Standing.Flawless

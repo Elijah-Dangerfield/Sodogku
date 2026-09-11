@@ -94,6 +94,17 @@ object Scoring {
         total = card.total + completionBonus(size, difficulty, livesRemaining, config),
     )
 
+    /**
+     * What finishing pays, priced per cell of the board.
+     *
+     * Per cell rather than per row, which is the same rate the placement total
+     * grows at: a placement pays `basePerPlacement * size` and a board holds
+     * `size` of them. Keeping the two halves on the same curve is what makes a
+     * fraction of [parScore] describe the same quality of run on a 4x4 as on a
+     * 10x10; per row, completion was 55% of a 4x4's par and 29% of a 10x10's,
+     * and since a clean run banks all of it whatever its pace, that difference
+     * was the whole of why the reachable band was narrower on small boards.
+     */
     fun completionBonus(
         size: Int,
         difficulty: Int,
@@ -102,7 +113,8 @@ object Scoring {
     ): Int {
         val difficultyFactor = 1.0 + (difficulty - 1).coerceAtLeast(0) * config.difficultyBonusRate
         val livesFactor = 1.0 + livesRemaining.coerceAtLeast(0) * config.livesBonusRate
-        return (config.completionBase * size * difficultyFactor * livesFactor).toInt()
+        val cells = config.completionPerCell * size * size
+        return (cells * difficultyFactor * livesFactor).toInt()
     }
 
     /**
@@ -141,17 +153,27 @@ object Scoring {
      * Derived rather than shipped in the pack so the paw thresholds move when
      * the coefficients do. Baking it into the level data would freeze what a
      * three-paw clear means at generation time.
+     *
+     * [placements] is how many dogs the *player* gets to place, which is the
+     * board's size on most levels and one less on the first few of every band,
+     * where `LevelCurve.opensWithStarterDog` puts one down for them. Par used to
+     * count the whole board either way, so a starter-dog level charged the run
+     * for a placement it was never offered, and the one it dropped was the
+     * highest-combo one: a flawless five-second 4x4 came out at 84.9% of par and
+     * missed the top rung by a thousandth. Every level of that shape had the
+     * same tax, and they are exactly the levels that open a grid size.
      */
     fun parScore(
         size: Int,
         difficulty: Int,
+        placements: Int = size,
         config: ScoringConfig = ScoringConfig.Default,
     ): Int {
-        val placements = (0 until size).sumOf { index ->
+        val placementTotal = (0 until placements.coerceAtLeast(0)).sumOf { index ->
             val multiplier = comboMultiplier(index, config) * config.speedMaxMultiplier
             (config.basePerPlacement * size * multiplier).toInt()
         }
-        return placements + completionBonus(size, difficulty, ScoringConfig.MAX_LIVES, config)
+        return placementTotal + completionBonus(size, difficulty, ScoringConfig.MAX_LIVES, config)
     }
 
     /**
@@ -163,10 +185,12 @@ object Scoring {
         size: Int,
         difficulty: Int,
         completed: Boolean,
+        /** Dogs the player placed. Pass `ScoreCard.placements`; see [parScore]. */
+        placements: Int = size,
         config: ScoringConfig = ScoringConfig.Default,
     ): Int {
         if (!completed) return 0
-        val par = parScore(size, difficulty, config)
+        val par = parScore(size, difficulty, placements, config)
         // Walked from the top so the first rung cleared wins. A `when` written
         // the other way round would award the lowest paw the score qualifies
         // for, which is every paw except the right one.

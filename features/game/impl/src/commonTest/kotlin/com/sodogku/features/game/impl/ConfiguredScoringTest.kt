@@ -5,7 +5,7 @@ import com.sodogku.libraries.config.values.ScoringBasePerPlacement
 import com.sodogku.libraries.config.values.ScoringBoosterPenaltyRate
 import com.sodogku.libraries.config.values.ScoringComboMax
 import com.sodogku.libraries.config.values.ScoringComboStep
-import com.sodogku.libraries.config.values.ScoringCompletionBase
+import com.sodogku.libraries.config.values.ScoringCompletionPerCell
 import com.sodogku.libraries.config.values.ScoringDifficultyBonusRate
 import com.sodogku.libraries.config.values.ScoringExcellentPraiseAt
 import com.sodogku.libraries.config.values.ScoringGreatPraiseAt
@@ -50,7 +50,7 @@ class ConfiguredScoringTest {
         val tuned = scoringFrom(
             configOf(
                 "scoring.basePerPlacement" to 111,
-                "scoring.completionBase" to 222,
+                "scoring.completionPerCell" to 222,
                 "scoring.comboStep" to 0.11,
                 "scoring.comboMax" to 3.0,
                 "scoring.speedWindowMs" to 4_000,
@@ -74,7 +74,7 @@ class ConfiguredScoringTest {
         ).invoke()
 
         assertEquals(111, tuned.basePerPlacement)
-        assertEquals(222, tuned.completionBase)
+        assertEquals(222, tuned.completionPerCell)
         assertEquals(0.11, tuned.comboStep)
         assertEquals(3.0, tuned.comboMax)
         assertEquals(4_000L, tuned.speedWindowMs)
@@ -127,7 +127,7 @@ class ConfiguredScoringTest {
         val mixed = scoringFrom(
             configOf(
                 "scoring.basePerPlacement" to 500,
-                "scoring.completionBase" to 0,
+                "scoring.completionPerCell" to 0,
             ),
         ).invoke()
 
@@ -143,7 +143,7 @@ class ConfiguredScoringTest {
 
     private fun scoringFrom(config: AppConfigMap) = ConfiguredScoring(
         ScoringBasePerPlacement(config),
-        ScoringCompletionBase(config),
+        ScoringCompletionPerCell(config),
         ScoringComboStep(config),
         ScoringComboMax(config),
         ScoringSpeedWindowMs(config),

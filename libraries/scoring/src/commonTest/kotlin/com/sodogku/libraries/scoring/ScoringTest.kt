@@ -74,7 +74,7 @@ class ScoringTest {
 
         assertEquals(config.speedWindowMs, window, "the reference board gets the configured window")
         assertEquals(config.speedMaxMultiplier, Scoring.speedMultiplier(size, 0))
-        assertEquals(1.30, Scoring.speedMultiplier(size, window / 2), ABSOLUTE_TOLERANCE)
+        assertEquals(1.50, Scoring.speedMultiplier(size, window / 2), ABSOLUTE_TOLERANCE)
         assertEquals(1.0, Scoring.speedMultiplier(size, window))
         assertEquals(1.0, Scoring.speedMultiplier(size, window * 10))
     }
@@ -90,13 +90,13 @@ class ScoringTest {
         assertEquals(config.speedWindowMs, small)
         assertEquals(small * 10 / 4, large)
         assertTrue(
-            Scoring.speedMultiplier(10, TWELVE_SECONDS) > 1.0,
-            "twelve seconds on a 10x10 has to still be worth a bonus",
+            Scoring.speedMultiplier(10, TWENTY_FOUR_SECONDS) > 1.0,
+            "twenty-four seconds on a 10x10 has to still be worth a bonus",
         )
         assertEquals(
             1.0,
-            Scoring.speedMultiplier(4, TWELVE_SECONDS),
-            "the same twelve seconds on a 4x4 is not fast at all",
+            Scoring.speedMultiplier(4, TWENTY_FOUR_SECONDS),
+            "the same twenty-four seconds on a 4x4 is not fast at all",
         )
     }
 
@@ -126,8 +126,8 @@ class ScoringTest {
 
     @Test
     fun completionBonusWorkedExample() {
-        // 25 base x 6 size x (1 + 2 tiers above one x 0.2) x (1 + 3 lives x 0.5)
-        assertEquals(525, Scoring.completionBonus(size = 6, difficulty = 3, livesRemaining = 3))
+        // 4 per cell x 36 cells x (1 + 2 tiers above one x 0.2) x (1 + 3 lives x 0.8)
+        assertEquals(685, Scoring.completionBonus(size = 6, difficulty = 3, livesRemaining = 3))
     }
 
     @Test
@@ -209,14 +209,18 @@ class ScoringTest {
     @Test
     fun theWorstCompletableRunStillOnlyEarnsOnePaw() {
         // The genuinely worst run a player can finish: two strikes spent (you
-        // are out at three), every placement slow. If this scores two paws the
-        // rating carries no information, which is exactly what the first pass
-        // at these coefficients did.
+        // are out at three), every placement past the board's speed window. If
+        // this scores two paws the rating carries no information, which is
+        // exactly what the first pass at these coefficients did.
+        //
+        // The pace is quoted per row so it stays past the window when the window
+        // is retuned. It was a flat 30,000ms, which stopped being slow the moment
+        // `speedWindowMs` doubled and an 8x8's window reached 32 seconds.
         val size = 8
         var card = ScoreCard.Empty
         repeat(size) { index ->
             if (index < ScoringConfig.MAX_LIVES - 1) card = Scoring.strike(card)
-            card = Scoring.placement(card, size, millisSinceLastPlacement = 30_000).card
+            card = Scoring.placement(card, size, millisSinceLastPlacement = SLOW_MS_PER_ROW * size).card
         }
         card = Scoring.complete(card, size, difficulty = 3, livesRemaining = 1)
 
@@ -230,9 +234,9 @@ class ScoringTest {
     @Test
     fun aCleanButUnhurriedRunLandsInTheMiddle() {
         // The middle of the ladder has to be reachable too, or paws are just a
-        // pass/perfect flag. Twenty seconds a move on an 8x8 is well past that
-        // board's speed window, so the bonus is gone and only the clean sheet
-        // is left.
+        // pass/perfect flag. Twenty seconds a move on an 8x8 spends most of that
+        // board's speed window, so most of the bonus is gone and what is left is
+        // mainly the clean sheet.
         //
         // Asserted as a band rather than a rung. With five paws the exact rung a
         // clean unhurried run lands on depends on the shape, and pinning it
@@ -259,64 +263,199 @@ class ScoringTest {
         // unreachable above 6x6 for months while every worked example above
         // stayed green, because they all pick their own board.
         //
-        // Two questions, and they are different. First: does every rung on the
+        // Three questions, and they are different. First: does every rung on the
         // ladder have a run somewhere that earns it? Second: on each individual
-        // board, does going faster rate at least as well as going slower?
+        // board, does going faster rate at least as well as going slower, and
+        // does a clean run rate at least as well as a struck one? Third: are the
+        // two ends nailed down, so a quick clean run always tops out and the
+        // worst completable run always bottoms out?
         //
-        // Deliberately *not* "this pace earns exactly this rating". The unhurried
-        // pace lands between 79% and 84% of par depending on the shape, which
-        // straddles a rung, so pinning it to one number would be pinning the test
-        // to a tuning rather than to real play. Retuning the ladder is allowed;
-        // making a rating unreachable is not.
+        // Deliberately *not* "this pace earns exactly this rating" in the middle
+        // of the ladder. Retuning the rungs is allowed; making one unreachable,
+        // or making the order come apart, is not.
         val earned = mutableSetOf<Int>()
         val failures = mutableListOf<String>()
 
-        (SMALLEST_BOARD..BIGGEST_BOARD).forEach { size ->
-            (1..SHIPPED_MAX_DIFFICULTY).forEach { difficulty ->
-                val fast = ratingAt(size, difficulty, FAST_MS_PER_ROW, strikes = 0)
-                val unhurried = ratingAt(size, difficulty, UNHURRIED_MS_PER_ROW, strikes = 0)
-                val slow = ratingAt(size, difficulty, SLOW_MS_PER_ROW, ScoringConfig.MAX_LIVES - 1)
-                earned += listOf(fast, unhurried, slow)
+        everyShape { size, difficulty, placements, shape ->
+            val fast = ratingAt(size, difficulty, placements, FAST_MS_PER_ROW, strikes = 0)
+            val unhurried = ratingAt(size, difficulty, placements, UNHURRIED_MS_PER_ROW, strikes = 0)
+            val slow = ratingAt(size, difficulty, placements, SLOW_MS_PER_ROW, strikes = 0)
+            val struck = ratingAt(size, difficulty, placements, UNHURRIED_MS_PER_ROW, strikes = 1)
+            val struckAndSlow = ratingAt(size, difficulty, placements, SLOW_MS_PER_ROW, strikes = 1)
+            val worst = ratingAt(size, difficulty, placements, SLOW_MS_PER_ROW, ScoringConfig.MAX_LIVES - 1)
+            earned += listOf(fast, unhurried, slow, struck, struckAndSlow, worst)
 
-                if (fast != Scoring.MAX_PAWS) {
-                    failures += "${size}x$size tier $difficulty: a quick clean run earned $fast, " +
-                        "so the top rating is unreachable there"
-                }
-                if (slow != Scoring.ONE_PAW) {
-                    failures += "${size}x$size tier $difficulty: the worst completable run earned $slow"
-                }
-                if (fast < unhurried || unhurried < slow) {
-                    failures += "${size}x$size tier $difficulty: ratings do not fall with pace " +
-                        "($fast, $unhurried, $slow)"
-                }
+            if (fast != Scoring.MAX_PAWS) {
+                failures += "$shape: a quick clean run earned $fast, " +
+                    "so the top rating is unreachable there"
+            }
+            if (worst != Scoring.ONE_PAW) {
+                failures += "$shape: the worst completable run earned $worst"
+            }
+            if (slow < Scoring.THREE_PAWS) {
+                failures += "$shape: a flawless run earned $slow for being slow, " +
+                    "and a clean sheet is worth more than that"
+            }
+            if (fast < unhurried || unhurried < slow) {
+                failures += "$shape: ratings do not fall with pace ($fast, $unhurried, $slow)"
+            }
+            if (unhurried < struck || slow < struckAndSlow) {
+                failures += "$shape: a strike rated better than the clean run beside it " +
+                    "($unhurried against $struck, $slow against $struckAndSlow)"
             }
         }
 
         assertTrue(failures.isEmpty(), failures.joinToString("\n"))
-        assertTrue(
-            earned.containsAll(listOf(Scoring.ONE_PAW, Scoring.MAX_PAWS)),
-            "the ends of the ladder were never earned across the whole sweep: $earned",
+        assertEquals(
+            (Scoring.ONE_PAW..Scoring.MAX_PAWS).toSet(),
+            earned,
+            "a rung of the ladder was never earned anywhere in the sweep",
         )
     }
 
-    private fun ratingAt(size: Int, difficulty: Int, msPerRow: Long, strikes: Int): Int =
-        Scoring.paws(runAt(size, difficulty, msPerRow, strikes), size, difficulty, completed = true)
+    @Test
+    fun theLadderIsSpacedAgainstMeasuredPlay() {
+        // The sweep the thresholds were chosen from, kept as a test so the next
+        // person retuning them does not have to run it again. For every shipped
+        // grid size, every shipped tier and both board shapes, it plays a whole
+        // attempt at three paces and three strike counts and records what
+        // fraction of par the run reached.
+        //
+        // Then it asserts the thing the fractions are *for*: that each rung sits
+        // in a gap between two bands rather than inside one. The bug this catches
+        // is the one that has now happened three times. The ladder went to five
+        // rungs inside the same 25 points of par, and the band a clean run could
+        // actually reach was narrower than that at every size and narrowest of
+        // all on a 4x4, so two of the rungs were below anything a clean run could
+        // score and a flawless 8x8 at a considered pace rated three paws.
+        //
+        // Two different assertions, because the two directions are not equally
+        // strict. **A rung has to be reachable on every shape**, starter-dog
+        // boards included, or somebody cannot earn it: that is checked against
+        // the whole sweep. Whether a rung is also *distinguishing*, meaning no
+        // run in the band below can reach it, is checked on full boards only. A
+        // board that hands out a dog has one fewer placement against the same
+        // completion bonus, so its bands sit a little higher and overlap the
+        // full-board ones by a point or two of par. That overlap is a property
+        // of the shape and not a tuning error.
+        //
+        // The whole table goes in the failure message, because a broken tuning is
+        // only diagnosable next to the numbers it was measured against.
+        val rows = mutableListOf<String>()
+        val everyShapeBands = mutableMapOf<String, MutableList<Double>>()
+        val fullBoardBands = mutableMapOf<String, MutableList<Double>>()
+
+        listOf(0, 1, ScoringConfig.MAX_LIVES - 1).forEach { strikes ->
+            listOf(FAST_MS_PER_ROW, UNHURRIED_MS_PER_ROW, SLOW_MS_PER_ROW).forEach { pace ->
+                val key = bandKey(strikes, pace)
+                everyShape { size, difficulty, placements, shape ->
+                    val score = runAt(size, difficulty, placements, pace, strikes)
+                    val par = Scoring.parScore(size, difficulty, placements)
+                    val fraction = score.toDouble() / par
+                    everyShapeBands.getOrPut(key) { mutableListOf() } += fraction
+                    if (placements == size) fullBoardBands.getOrPut(key) { mutableListOf() } += fraction
+                    rows += "$shape, $key: ${percent(fraction)}% of par, " +
+                        "${Scoring.paws(score, size, difficulty, completed = true, placements)} paws"
+                }
+            }
+        }
+
+        val failures = mutableListOf<String>()
+        fun cut(name: String, threshold: Double, below: String, above: String) {
+            val ceilingBelow = fullBoardBands.getValue(below).max()
+            val floorAbove = everyShapeBands.getValue(above).min()
+            if (ceilingBelow >= threshold) {
+                failures += "$name at $threshold does not separate anything: a full-board run " +
+                    "in the '$below' band already reaches ${percent(ceilingBelow)}% of par"
+            }
+            if (floorAbove < threshold) {
+                failures += "$name at $threshold is out of reach: the weakest run in the " +
+                    "'$above' band only reaches ${percent(floorAbove)}% of par"
+            }
+        }
+
+        cut(
+            "twoPawFraction", config.twoPawFraction,
+            below = bandKey(2, SLOW_MS_PER_ROW), above = bandKey(1, SLOW_MS_PER_ROW),
+        )
+        cut(
+            "threePawFraction", config.threePawFraction,
+            below = bandKey(1, SLOW_MS_PER_ROW), above = bandKey(0, SLOW_MS_PER_ROW),
+        )
+        cut(
+            "fourPawFraction", config.fourPawFraction,
+            below = bandKey(0, SLOW_MS_PER_ROW), above = bandKey(0, UNHURRIED_MS_PER_ROW),
+        )
+        cut(
+            "fivePawFraction", config.fivePawFraction,
+            below = bandKey(0, UNHURRIED_MS_PER_ROW), above = bandKey(0, FAST_MS_PER_ROW),
+        )
+
+        val table = everyShapeBands.entries.joinToString("\n") { (key, values) ->
+            val full = fullBoardBands.getValue(key)
+            "  $key: ${percent(full.min())}% .. ${percent(full.max())}% of par on a full board, " +
+                "${percent(values.min())}% .. ${percent(values.max())}% counting starter-dog boards"
+        }
+        assertTrue(
+            failures.isEmpty(),
+            failures.joinToString("\n") + "\n\nmeasured bands:\n" + table +
+                "\n\nevery run:\n" + rows.joinToString("\n"),
+        )
+    }
+
+    private fun bandKey(strikes: Int, msPerRow: Long): String =
+        "$strikes strike(s) at ${msPerRow}ms a row"
 
     @Test
-    fun theThirdPawIsWhatSpeedBuys() {
-        // The half the sweep above cannot say on its own: that the gap between
-        // two paws and three is the *pace*, on every board and not just the
-        // small ones. Pinned as a score comparison as well as a rating, so a
-        // window that stopped scaling would fail here with a readable number
-        // rather than only as a missing rating.
+    fun aStarterDogIsNotChargedToTheRunThatDidNotPlaceIt() {
+        // `LevelCurve.opensWithStarterDog` puts a dog down on the first few
+        // levels of every band, so the player places `size - 1` of them. Par
+        // counted the whole board either way, and the placement it charged for
+        // was the last one, which carries the highest combo: a flawless run on
+        // one of those boards came out around a tenth of par short and lost a
+        // paw for it. Every level that opens a grid size had the same tax.
         (SMALLEST_BOARD..BIGGEST_BOARD).forEach { size ->
-            val fast = runAt(size, difficulty = 4, msPerRow = FAST_MS_PER_ROW, strikes = 0)
-            val unhurried = runAt(size, difficulty = 4, msPerRow = UNHURRIED_MS_PER_ROW, strikes = 0)
+            val placements = size - 1
+            val whole = Scoring.parScore(size, difficulty = 3)
+            val short = Scoring.parScore(size, difficulty = 3, placements = placements)
 
-            assertTrue(
-                fast > unhurried,
-                "on ${size}x$size the fast run scored $fast and the unhurried one $unhurried",
+            assertTrue(short < whole, "par has to drop when the board hands a dog out")
+            assertEquals(
+                Scoring.MAX_PAWS,
+                Scoring.paws(
+                    runAt(size, difficulty = 3, placements = placements, FAST_MS_PER_ROW, strikes = 0),
+                    size,
+                    difficulty = 3,
+                    completed = true,
+                    placements = placements,
+                ),
+                "a flawless quick run on a ${size}x$size that opened with a starter dog",
             )
+        }
+    }
+
+    private fun ratingAt(size: Int, difficulty: Int, placements: Int, msPerRow: Long, strikes: Int): Int =
+        Scoring.paws(
+            runAt(size, difficulty, placements, msPerRow, strikes),
+            size,
+            difficulty,
+            completed = true,
+            placements = placements,
+        )
+
+    /**
+     * Every shape a player can actually be handed: each shipped grid size, each
+     * shipped tier, and both `size` placements and `size - 1` for the boards
+     * that open with a starter dog.
+     */
+    private fun everyShape(body: (size: Int, difficulty: Int, placements: Int, shape: String) -> Unit) {
+        (SMALLEST_BOARD..BIGGEST_BOARD).forEach { size ->
+            (1..SHIPPED_MAX_DIFFICULTY).forEach { difficulty ->
+                listOf(size, size - 1).forEach { placements ->
+                    val dog = if (placements < size) ", starter dog" else ""
+                    body(size, difficulty, placements, "${size}x$size tier $difficulty$dog")
+                }
+            }
         }
     }
 
@@ -327,11 +466,13 @@ class ScoringTest {
      *
      * Per row rather than flat, because a move on a 10x10 is not the same
      * amount of work as a move on a 4x4 and a test that pretended otherwise
-     * would be asking every board for the same wall clock.
+     * would be asking every board for the same wall clock. It is also the unit
+     * the speed window is quoted in, so the same number is the same fraction of
+     * the window on every board.
      */
-    private fun runAt(size: Int, difficulty: Int, msPerRow: Long, strikes: Int): Int {
+    private fun runAt(size: Int, difficulty: Int, placements: Int, msPerRow: Long, strikes: Int): Int {
         var card = ScoreCard.Empty
-        repeat(size) { index ->
+        repeat(placements) { index ->
             if (index in 1..strikes) card = Scoring.strike(card)
             card = Scoring.placement(card, size, millisSinceLastPlacement = msPerRow * size).card
         }
@@ -342,6 +483,8 @@ class ScoringTest {
             livesRemaining = ScoringConfig.MAX_LIVES - strikes,
         ).total
     }
+
+    private fun percent(fraction: Double): Int = (fraction * PERCENT).toInt()
 
     @Test
     fun placementsAndCompletionAreRoughlyBalanced() {
@@ -469,9 +612,9 @@ class ScoringTest {
         listOf(
             "negative base" to { ScoringConfig(basePerPlacement = -100) },
             "zero base" to { ScoringConfig(basePerPlacement = 0) },
-            "negative completion" to { ScoringConfig(completionBase = -250) },
+            "negative completion" to { ScoringConfig(completionPerCell = -250) },
             "overflowing base" to { ScoringConfig(basePerPlacement = 300_000_000) },
-            "overflowing completion" to { ScoringConfig(completionBase = 300_000_000) },
+            "overflowing completion" to { ScoringConfig(completionPerCell = 300_000_000) },
         ).forEach { (name, build) ->
             assertTrue(runCatching(build).isFailure, "$name must not be constructible")
         }
@@ -513,7 +656,7 @@ class ScoringTest {
         var card = ScoreCard.Empty
         repeat(size) { index ->
             if (index < strikes) card = Scoring.strike(card)
-            card = Scoring.placement(card, size, millisSinceLastPlacement = 30_000).card
+            card = Scoring.placement(card, size, millisSinceLastPlacement = SLOW_MS_PER_ROW * size).card
         }
         val lives = ScoringConfig.MAX_LIVES - strikes
         card = Scoring.complete(card, size, difficulty = 3, livesRemaining = lives)
@@ -526,10 +669,10 @@ class ScoringTest {
         // check the corner rather than trusting the arithmetic.
         val extreme = ScoringConfig(
             basePerPlacement = ScoringConfig.MAX_POINT_VALUE,
-            completionBase = ScoringConfig.MAX_POINT_VALUE,
+            completionPerCell = ScoringConfig.MAX_POINT_VALUE,
         )
 
-        assertTrue(Scoring.parScore(BIGGEST_BOARD, MAX_DIFFICULTY, extreme) > 0)
+        assertTrue(Scoring.parScore(BIGGEST_BOARD, MAX_DIFFICULTY, config = extreme) > 0)
         assertTrue(Scoring.placement(ScoreCard.Empty, BIGGEST_BOARD, null, extreme).points > 0)
     }
 
@@ -543,7 +686,7 @@ class ScoringTest {
 
         assertEquals(100, scored.points)
         assertTrue(
-            Scoring.parScore(5, 2, richer) > Scoring.parScore(5, 2),
+            Scoring.parScore(5, 2, config = richer) > Scoring.parScore(5, 2),
             "par has to move with the coefficients, or the paw thresholds drift",
         )
     }
@@ -568,14 +711,22 @@ class ScoringTest {
         /**
          * Three paces, in milliseconds per row of board per placement, chosen
          * as descriptions of play rather than as fractions of a coefficient:
-         * on a 10x10 they are 9, 25 and 40 seconds a move, or a minute and a
-         * half, four minutes and six and a half for the whole board.
+         * on a 10x10 they are 9, 25 and 60 seconds a move, or a minute and a
+         * half, four minutes and ten for the whole board.
+         *
+         * Per row, because the speed window is per row too
+         * ([Scoring.speedWindowMsFor] is `speedWindowMs * size / 4`, so 4000ms
+         * a row at the shipped default). A pace quoted this way therefore means
+         * the same fraction of the window on every board, which is the only way
+         * the sweep can compare a 4x4 with a 10x10. [SLOW_MS_PER_ROW] is past
+         * the window on every size, so it is the floor of what a run can score
+         * rather than merely a slow number.
          */
         const val FAST_MS_PER_ROW = 900L
         const val UNHURRIED_MS_PER_ROW = 2_500L
-        const val SLOW_MS_PER_ROW = 4_000L
+        const val SLOW_MS_PER_ROW = 6_000L
 
-        const val TWELVE_SECONDS = 12_000L
+        const val TWENTY_FOUR_SECONDS = 24_000L
         const val PERCENT = 100
     }
 }

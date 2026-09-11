@@ -24,7 +24,7 @@ import com.sodogku.libraries.config.values.ScoringBasePerPlacement
 import com.sodogku.libraries.config.values.ScoringBoosterPenaltyRate
 import com.sodogku.libraries.config.values.ScoringComboMax
 import com.sodogku.libraries.config.values.ScoringComboStep
-import com.sodogku.libraries.config.values.ScoringCompletionBase
+import com.sodogku.libraries.config.values.ScoringCompletionPerCell
 import com.sodogku.libraries.config.values.ScoringDifficultyBonusRate
 import com.sodogku.libraries.config.values.ScoringExcellentPraiseAt
 import com.sodogku.libraries.config.values.ScoringGreatPraiseAt
@@ -66,6 +66,7 @@ import com.sodogku.libraries.leaderboards.Leaderboard
 import com.sodogku.libraries.leaderboards.Leaderboards
 import com.sodogku.libraries.leaderboards.NoLeaderboards
 import com.sodogku.libraries.leaderboards.WindowedScore
+import com.sodogku.libraries.puzzle.Board
 import com.sodogku.libraries.puzzle.HintFinder
 import com.sodogku.libraries.puzzle.autoMarkedCells
 import com.sodogku.libraries.scoring.Scoring
@@ -4635,7 +4636,7 @@ class GameViewModelTest : CoroutineTest() {
 
     private fun scoringFrom(config: AppConfigMap) = ConfiguredScoring(
         ScoringBasePerPlacement(config),
-        ScoringCompletionBase(config),
+        ScoringCompletionPerCell(config),
         ScoringComboStep(config),
         ScoringComboMax(config),
         ScoringSpeedWindowMs(config),
@@ -4898,11 +4899,17 @@ class GameViewModelTest : CoroutineTest() {
         val LateGap = 400.milliseconds
 
         /**
-         * Longer than `scoring.speedWindowMs`, so the speed multiplier is
-         * exactly 1.0 and a placement's score is arithmetic a test can state
-         * rather than a second copy of the formula.
+         * Longer than the speed window of the biggest board these tests play,
+         * so the speed multiplier is exactly 1.0 and a placement's score is
+         * arithmetic a test can state rather than a second copy of the formula.
+         *
+         * Derived rather than written down. It was a flat twenty seconds, which
+         * stopped being past the window the moment `scoring.speedWindowMs`
+         * doubled, and the three tests that lean on it failed with an
+         * off-by-a-multiplier that said nothing about the window.
          */
-        val PastSpeedWindow = 20.seconds
+        val PastSpeedWindow =
+            (Scoring.speedWindowMsFor(Board.MAX_SIZE) + 1).milliseconds
 
         /** Any badge will do; these tests care about whether one is shown. */
         val AnyAchievement = Achievement(AchievementId.FirstSteps, Stat.LevelsCleared, target = 1)

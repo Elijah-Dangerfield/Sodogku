@@ -1541,11 +1541,20 @@ class GameViewModel(
         // multiplier, so rating the pre-penalty total is identical to scaling
         // par by the same factor — and it keeps three paws reachable for the
         // player the tutorial has just told to spend a sniff and a treat.
+        // `finished.placements` and not `level.size`. Par prices the placements
+        // the player was actually offered, and the first few levels of every
+        // band open with a starter dog, so on those boards the run is one
+        // placement short of the grid. Charging it for the dog it was given, and
+        // for the highest-combo placement at that, cost about a tenth of par and
+        // was the whole of "I did this in five seconds with no mistakes and did
+        // not get five paws".
+        val placements = finished.placements
         val paws = Scoring.paws(
             finished.total,
             level.size,
             level.difficulty,
             completed = true,
+            placements = placements,
             config = scoring,
         )
         // Rated on the same number as the paws, and it has to be. The two sit
@@ -1561,6 +1570,7 @@ class GameViewModel(
             level.difficulty,
             completed = true,
             livesRemaining = bonesUnspent,
+            placements = placements,
             config = scoring,
         )
         // Against the *scored* total, not the banked one. The booster penalty
@@ -1571,6 +1581,7 @@ class GameViewModel(
             level.size,
             level.difficulty,
             completed = true,
+            placements = placements,
             config = scoring,
         )
         val boostersUsed = sniffsUsed + treatsUsed

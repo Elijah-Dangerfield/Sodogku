@@ -8,7 +8,7 @@ package com.sodogku.libraries.scoring
  * is worth and what counts as a three-paw clear are exactly the kind of dials
  * that want retuning against real play data without an app release.
  *
- * The defaults are the shipped fallbacks, balanced on three things.
+ * The defaults are the shipped fallbacks, balanced on four things.
  *
  * First, placements are roughly 60% of a good run's score and the completion
  * bonus the other 40%. Tilt too far toward completion and a fast clean solve
@@ -17,8 +17,8 @@ package com.sodogku.libraries.scoring
  *
  * Second, and less obvious: the multipliers have to spread *wide* enough for the
  * paw thresholds to mean anything. The first pass used gentler numbers, and the
- * worst possible completed run still landed at 63% of par — above the two-paw
- * line — so a single paw was unreachable and the rating carried no information.
+ * worst possible completed run still landed at 63% of par, above the two-paw
+ * line, so a single paw was unreachable and the rating carried no information.
  * Compressing the range is the failure mode to watch when retuning these.
  *
  * That failure came back at the other end, and what it looked like is worth
@@ -30,19 +30,44 @@ package com.sodogku.libraries.scoring
  * the whole back half of the campaign. The range has to stay wide *on the board
  * being played*, not just on paper.
  *
- * Third, and unlike the other two this one is only about how the number *reads*:
- * [basePerPlacement] and [completionBase] started at 100 and 250, which paid a
- * good 10x10 a little under 32,000 points and had a player on level 29 carrying
- * a six-figure career total. By level 500 it would have been seven figures. Both
- * are a tenth of that now.
+ * **Then it came back a third time, and this is the one worth reading.** Going
+ * from three paws to five put four cuts inside a 25-point band, and a sweep of
+ * every shipped shape at every pace showed the band a clean run can actually
+ * reach was narrower than that: 0.73 to 1.00 of par on a 10x10 and only 0.83 to
+ * 1.00 on a 4x4. Two paws and three paws were below the *floor* of a clean run
+ * on every board, so no amount of playing badly-but-cleanly could earn them and
+ * no amount of playing well could avoid four. A flawless 8x8 at a considered
+ * pace rated three paws. Moving the four cuts down into that band would have
+ * put the rungs four points of par apart on a 4x4, which is relabelling the
+ * compression rather than fixing it, so the multipliers moved instead:
+ * [speedMaxMultiplier] went 1.6 to 2.0, [speedWindowMs] doubled, and
+ * [livesBonusRate] went 0.5 to 0.8. A clean run now spans 0.67 to 1.00 and a
+ * finished one 0.48 to 1.00.
+ *
+ * Fourth, and the reason the same tuning now means the same thing on every
+ * board: **both halves of the score are priced per cell.** A placement pays
+ * [basePerPlacement] per row and a board has one placement per row, so the
+ * placement total grows with the cell count; [completionPerCell] makes finishing
+ * do the same. It used to be per row, which made completion 55% of a 4x4's par
+ * and 29% of a 10x10's, and since a clean run always collects the completion
+ * bonus in full it is exactly the part of the score that pace cannot move. That
+ * is why the reachable band was 10 points of par narrower on a 4x4 than on a
+ * 10x10, and why one set of fractions could not describe both. Per cell, at a
+ * fixed tier, the clean floor moves by two points of par across all seven grid
+ * sizes where it used to move by ten.
+ *
+ * The last one is only about how the number *reads*: [basePerPlacement] and the
+ * completion term started at 100 and 250, which paid a good 10x10 a little under
+ * 32,000 points and had a player on level 29 carrying a six-figure career total.
+ * By level 500 it would have been seven figures. Both are a tenth of that now.
  *
  * Dividing the two of them by the same factor is the only safe way to do that,
  * and it is safe *because* everything else here is a ratio. Every multiplier,
- * both paw fractions, the praise cutoffs and the booster cost are unitless, so
- * the whole scale moves together: a score, the par it is rated against and the
- * thresholds that are fractions of par all shrink by ten and no rating changes
- * on any board. Retuning only one of the two would not be a rescale, it would
- * be the 60/40 balance above.
+ * all four paw fractions, the praise cutoffs and the booster cost are unitless,
+ * so the whole scale moves together: a score, the par it is rated against and
+ * the thresholds that are fractions of par all shrink by ten and no rating
+ * changes on any board. Retuning only one of the two would not be a rescale, it
+ * would be the 60/40 balance above.
  *
  * What a rescale does move is anything outside this file holding an absolute
  * number of points. The three `Stat.BestScore` achievements are the only ones
@@ -53,8 +78,17 @@ data class ScoringConfig(
     /** Points for one correct placement, before size and multipliers. */
     val basePerPlacement: Int = 10,
 
-    /** Points for finishing, before size, difficulty and lives. */
-    val completionBase: Int = 25,
+    /**
+     * Points for finishing, per cell of the board, before difficulty and lives.
+     *
+     * Per cell and not per row, which is the same shape the placement total
+     * already has: `basePerPlacement * size` points a placement, `size`
+     * placements. Both halves of a run therefore grow with the board at the same
+     * rate, so their ratio, and with it the width of the band a run can land in,
+     * is the same on a 4x4 as on a 10x10. Per row it was not, and one set of paw
+     * fractions could not describe both ends of the campaign.
+     */
+    val completionPerCell: Int = 4,
 
     /** Added to the combo multiplier per consecutive correct placement. */
     val comboStep: Double = 0.08,
@@ -74,14 +108,37 @@ data class ScoringConfig(
      * clean run on a big board scored the same 73% of par however fast it was
      * played, and the third paw at 0.85 was unreachable. Scaling the window with
      * the grid is what makes "fast" mean fast *for this board*.
+     *
+     * Scaling it was necessary and was not sufficient. At 8000 the window closed
+     * after 14 seconds a move on a 7x7, and SPEC Q3 puts an ordinary daily on a
+     * 6x6 to 8x8 at three to five minutes, which is 26 to 43 seconds a move.
+     * Every ordinary run was still outside the window, so the speed term was
+     * dead for the median player on the median board and only a sprint moved the
+     * score at all. Sixteen thousand puts a three-minute 7x7 inside the window
+     * and a two-minute one comfortably inside it.
      */
-    val speedWindowMs: Long = 8_000,
+    val speedWindowMs: Long = 16_000,
 
-    /** The speed multiplier for an instant placement; it decays linearly to 1.0. */
-    val speedMaxMultiplier: Double = 1.6,
+    /**
+     * The speed multiplier for an instant placement; it decays linearly to 1.0.
+     *
+     * This number *is* the width of the band a clean run can land in: the
+     * placement half of a slow clean run is worth `1 / speedMaxMultiplier` of
+     * the same half of par, and the completion half is worth all of it whatever
+     * the pace. At 1.6 that left a clean 4x4 unable to score below 83% of par,
+     * so three of the four rungs were below anything a clean run could reach.
+     */
+    val speedMaxMultiplier: Double = 2.0,
 
-    /** How much each surviving life adds to the completion bonus. */
-    val livesBonusRate: Double = 0.5,
+    /**
+     * How much each surviving life adds to the completion bonus.
+     *
+     * The gap between the clean band and the struck ones, and therefore where
+     * the bottom two rungs live. At 0.5 a two-strike run reached the top of the
+     * one-strike band with three points of par to spare, which is not enough
+     * room to put a threshold in and know it will stay put.
+     */
+    val livesBonusRate: Double = 0.8,
 
     /** How much each difficulty tier above 1 adds to the completion bonus. */
     val difficultyBonusRate: Double = 0.2,
@@ -112,36 +169,53 @@ data class ScoringConfig(
      * the new ladder. A player who had three paws does not wake up with "3 out
      * of 5".
      *
-     * The rungs are spaced against *measured play*, not by dividing the range
-     * up neatly. `ScoringTest`'s sweep runs every shipped board shape at three
-     * paces and reports what fraction of par each reaches: a quick clean run
-     * lands around 90%, an unhurried one around 79%, and a slow run with two
-     * strikes around 58%. A first pass at 0.45/0.65/0.82/0.95 put the top rung
-     * above anything the fast pace could reach, which is the failure that sweep
-     * exists to catch -- a rating nobody can earn, invisible to every worked
-     * example because they each pick their own board.
+     * The rungs are spaced against *measured play*, and each one sits in a gap
+     * between two things a player can do rather than at a round number.
+     * `ScoringTest.theLadderIsSpacedAgainstMeasuredPlay` prints the whole sweep
+     * and is where these came from; the bands it measures, across every shipped
+     * grid size and every shipped tier, are:
      *
-     * So **both original rungs stay exactly where they were**: 0.60 above the
-     * worst completable run, and 0.85 at what a quick clean run scores on the
-     * *hardest* shape to score well on. Those two were already validated by the
-     * sweep. The two new rungs are inserted between them, which adds granularity
-     * without moving either end of a ladder that was known to work.
+     * ```
+     * two strikes, past the speed window       0.48 .. 0.49   one paw
+     * one strike, past the window              0.57 .. 0.62   two paws
+     * clean, past the window                   0.67 .. 0.75   three paws
+     * clean, 2500ms a row (a considered pace)  0.79 .. 0.84   four paws
+     * clean, 900ms a row (fast for the board)  0.92 .. 0.94   five paws
+     * ```
      *
-     * A pass at 0.88 for the top looked reasonable and failed on 8x8 and larger,
-     * where a quick run reaches about 85% rather than the 90% a 4x4 reaches. The
-     * curve does not scale uniformly with board size, which is the sort of thing
-     * only the sweep knows.
+     * So the ladder reads: you finished; you finished after mistakes; you
+     * finished clean; you finished clean and briskly; you finished clean and
+     * fast. **Five paws is deliberately not common.** A clean run is necessary
+     * and is not sufficient, which is what the owner asked for when a flawless
+     * run was landing on four.
+     *
+     * The previous ladder was 0.60/0.70/0.78/0.85 and three of those four cuts
+     * were below the floor of the clean band on every board, so they could only
+     * ever be earned by losing bones. The fix was the multipliers rather than
+     * these numbers; see the class KDoc for why moving them alone would have
+     * been relabelling.
+     *
+     * Nothing had to be migrated for this, or for the move from three paws to
+     * five before it. `LevelRecord.bestPaws` is stored rather than re-derived
+     * and only ever goes up, so no record is demoted by a retune, and a score
+     * banked under the old coefficients simply gets beaten by the next run.
      */
-    val twoPawFraction: Double = 0.60,
-    val threePawFraction: Double = 0.70,
-    val fourPawFraction: Double = 0.78,
+    val twoPawFraction: Double = 0.53,
+    val threePawFraction: Double = 0.64,
+    val fourPawFraction: Double = 0.77,
     val fivePawFraction: Double = 0.85,
 
-    /** Combined-multiplier cutoffs for the floating praise text. */
-    val nicePraiseAt: Double = 1.2,
-    val greatPraiseAt: Double = 1.5,
-    val excellentPraiseAt: Double = 1.9,
-    val perfectPraiseAt: Double = 2.3,
+    /**
+     * Combined-multiplier cutoffs for the floating praise text.
+     *
+     * Fractions of the ceiling in disguise: the combined multiplier tops out at
+     * `comboMax * speedMaxMultiplier`, so these move whenever either does or the
+     * top word starts firing on an ordinary placement.
+     */
+    val nicePraiseAt: Double = 1.5,
+    val greatPraiseAt: Double = 1.9,
+    val excellentPraiseAt: Double = 2.4,
+    val perfectPraiseAt: Double = 2.9,
 ) {
     init {
         // Every field that scales a score is guarded, because the whole set
@@ -157,11 +231,11 @@ data class ScoringConfig(
         // is the same shape as the incident these guards were added for, where a
         // dropped minus sign gave every player three paws for scoring zero.
         require(basePerPlacement > 0) { "basePerPlacement must be positive" }
-        require(completionBase > 0) { "completionBase must be positive" }
+        require(completionPerCell > 0) { "completionPerCell must be positive" }
         require(comboStep >= 0.0) { "comboStep must not be negative" }
         require(livesBonusRate >= 0.0) { "livesBonusRate must not be negative" }
         require(difficultyBonusRate >= 0.0) { "difficultyBonusRate must not be negative" }
-        require(basePerPlacement <= MAX_POINT_VALUE && completionBase <= MAX_POINT_VALUE) {
+        require(basePerPlacement <= MAX_POINT_VALUE && completionPerCell <= MAX_POINT_VALUE) {
             "point values must be at most $MAX_POINT_VALUE, so scoring cannot overflow"
         }
         require(comboMax >= 1.0) { "comboMax must be at least 1.0" }
@@ -205,6 +279,10 @@ data class ScoringConfig(
          * the board size as Ints before widening to Double, so a value in the
          * hundreds of millions wraps negative. A million is four orders of
          * magnitude above anything a tuning pass would plausibly want.
+         *
+         * [completionPerCell] multiplies by the size *twice*, so the widest
+         * intermediate is a million cells' worth of a 10x10, a hundred million,
+         * and the largest legal par is a little under a billion.
          */
         const val MAX_POINT_VALUE: Int = 1_000_000
 

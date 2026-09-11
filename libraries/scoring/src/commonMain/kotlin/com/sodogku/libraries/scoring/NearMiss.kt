@@ -35,10 +35,12 @@ fun Scoring.nearMiss(
     size: Int,
     difficulty: Int,
     completed: Boolean,
+    /** Dogs the player placed. Pass `ScoreCard.placements`; see [Scoring.parScore]. */
+    placements: Int = size,
     config: ScoringConfig = ScoringConfig.Default,
 ): NearMiss? {
-    val earned = paws(score, size, difficulty, completed, config)
-    val par = parScore(size, difficulty, config)
+    val earned = paws(score, size, difficulty, completed, placements, config)
+    val par = parScore(size, difficulty, placements, config)
 
     // The rung above whatever was earned. Indexed off the earned count rather
     // than searched for, so a ladder with a repeated fraction cannot loop.

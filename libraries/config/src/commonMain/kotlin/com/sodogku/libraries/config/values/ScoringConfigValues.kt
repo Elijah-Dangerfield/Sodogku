@@ -46,24 +46,32 @@ class ScoringBasePerPlacement(appConfigMap: AppConfigMap) : IntConfigValue(appCo
 }
 
 /**
- * Points for finishing, before size, difficulty and lives. Balanced against
- * [ScoringBasePerPlacement] so placements are roughly 60% of a good run and the
- * completion bonus the other 40%: tilt too far toward completion and a fast clean
- * solve scores what a slow scrappy one does, too far toward placements and
- * finishing stops mattering.
+ * Points for finishing, **per cell of the board**, before difficulty and lives.
+ * Balanced against [ScoringBasePerPlacement] so placements are roughly 60% of a
+ * good run and the completion bonus the other 40%: tilt too far toward
+ * completion and a fast clean solve scores what a slow scrappy one does, too far
+ * toward placements and finishing stops mattering.
  *
  * The two of them together set the *scale* of every score in the game, and they
  * were ten times larger until a six-figure career total at level 29 made the
  * point that nothing is served by big numbers. Move them together or the 60/40
  * split above is what moves instead.
+ *
+ * The key is `completionPerCell` and not the `scoring.completionBase` it
+ * replaced, because the number means something different now: it used to be per
+ * *row*, which made the completion bonus a much larger share of a small board's
+ * score than of a large one's, and since a clean run banks the bonus in full at
+ * any pace, that is the share of the score no pace can move. A live override of
+ * the old key applied to the new formula would be 25 points a cell rather than
+ * 25 a row, so it gets a new path and simply stops being read.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class ScoringCompletionBase(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
-    override val name = "Completion base points"
-    override val path = "scoring.completionBase"
-    override val default = 25
+class ScoringCompletionPerCell(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Completion points per cell"
+    override val path = "scoring.completionPerCell"
+    override val default = 4
 }
 
 /**
@@ -94,15 +102,18 @@ class ScoringComboMax(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigM
 /**
  * How long the speed bonus takes to decay from [ScoringSpeedMaxMultiplier] to
  * 1.0, measured from the previous placement, **on a 4x4**. The window scales
- * with the grid from there (`Scoring.speedWindowMsFor`), so 8000 here is 20
+ * with the grid from there (`Scoring.speedWindowMsFor`), so 16000 here is 40
  * seconds on a 10x10. The decay is linear rather than exponential so the
  * pressure the player feels is proportional to the clock they can see.
  *
- * Raising this makes the third paw easier at every size at once, which is the
- * lever to pull if telemetry says three-paw clears are too rare. It was a flat
- * window until it turned out nobody places inside eight seconds on a 9x9, which
- * pinned the multiplier at 1.0 and put three paws out of reach for the whole
- * back half of the campaign.
+ * This is the lever to pull if telemetry says the top paws are too rare, and it
+ * moves every size at once. It was a flat window until it turned out nobody
+ * places inside eight seconds on a 9x9, which pinned the multiplier at 1.0 and
+ * put the top paw out of reach for the whole back half of the campaign. Scaling
+ * it with the grid fixed that and left it half the size it needed to be: at 8000
+ * the window closed after fourteen seconds a move on a 7x7, and SPEC Q3 budgets
+ * three to five minutes for a 6x6-to-8x8 daily, which is twenty-six seconds a
+ * move at the fast end. The median run was still outside the window.
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -110,23 +121,32 @@ class ScoringComboMax(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigM
 class ScoringSpeedWindowMs(appConfigMap: AppConfigMap) : LongConfigValue(appConfigMap) {
     override val name = "Speed window (ms, at 4x4)"
     override val path = "scoring.speedWindowMs"
-    override val default = 8_000L
+    override val default = 16_000L
 }
 
-/** The speed multiplier for an instant placement, decaying to 1.0 over the window. */
+/**
+ * The speed multiplier for an instant placement, decaying to 1.0 over the window.
+ *
+ * Also the width of the band a clean run can land in, which is what the paw
+ * thresholds are cut out of: the placement half of a run played slowly is worth
+ * `1 / this` of par's, and the completion half is worth all of it however the
+ * board was played. At 1.6 a clean 4x4 could not score below 83% of par and
+ * three of the four rungs sat below that.
+ */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
 class ScoringSpeedMaxMultiplier(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Speed max multiplier"
     override val path = "scoring.speedMaxMultiplier"
-    override val default = 1.6
+    override val default = 2.0
 }
 
 /**
- * What each surviving life adds to the completion bonus. At 0.5 a no-strike clear
- * multiplies the bonus by 2.5 where a one-life-left clear gets 1.5, and that gap
- * is a large part of what separates a three-paw finish from a one-paw one.
+ * What each surviving life adds to the completion bonus. At 0.8 a no-strike clear
+ * multiplies the bonus by 3.4 where a one-life-left clear gets 1.8, and that gap
+ * is the whole of what separates the bottom two rungs of the ladder from the
+ * top three: strikes, not pace, are what drop a run below three paws.
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -134,7 +154,7 @@ class ScoringSpeedMaxMultiplier(appConfigMap: AppConfigMap) : DoubleConfigValue(
 class ScoringLivesBonusRate(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Lives bonus rate"
     override val path = "scoring.livesBonusRate"
-    override val default = 0.5
+    override val default = 0.8
 }
 
 /**
@@ -184,7 +204,7 @@ class ScoringBoosterPenaltyRate(appConfigMap: AppConfigMap) : DoubleConfigValue(
 class ScoringTwoPawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Two paw fraction of par"
     override val path = "scoring.twoPawFraction"
-    override val default = 0.6
+    override val default = 0.53
 }
 
 /** Fraction of par at which the third paw is awarded. See [ScoringTwoPawFraction]. */
@@ -194,7 +214,7 @@ class ScoringTwoPawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(appC
 class ScoringThreePawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Three paw fraction of par"
     override val path = "scoring.threePawFraction"
-    override val default = 0.7
+    override val default = 0.64
 }
 
 /** Fraction of par at which the fourth paw is awarded. See [ScoringTwoPawFraction]. */
@@ -204,7 +224,7 @@ class ScoringThreePawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(ap
 class ScoringFourPawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Four paw fraction of par"
     override val path = "scoring.fourPawFraction"
-    override val default = 0.78
+    override val default = 0.77
 }
 
 /** Fraction of par at which the fifth and last paw is awarded. See [ScoringTwoPawFraction]. */
@@ -219,9 +239,11 @@ class ScoringFivePawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(app
 
 /**
  * Combined-multiplier cutoff for the "Nice" floating praise. The four cutoffs are
- * read against `comboMultiplier × speedMultiplier`, so 1.2 fires on a placement
- * that was either quick or part of a streak, and [ScoringPerfectPraiseAt] at 2.3
- * needs both at once.
+ * read against `comboMultiplier × speedMultiplier`, so 1.5 fires on a placement
+ * that was either quick or part of a streak, and [ScoringPerfectPraiseAt] at 2.9
+ * needs both at once. They are fractions of `comboMax × speedMaxMultiplier` in
+ * disguise, so retuning either of those without these makes the top word fire on
+ * an ordinary placement.
  *
  * Praise is cosmetic. It is in config anyway because how often the board shouts
  * at the player is a feel question that wants tuning against real sessions.
@@ -232,7 +254,7 @@ class ScoringFivePawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(app
 class ScoringNicePraiseAt(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Praise: Nice at"
     override val path = "scoring.nicePraiseAt"
-    override val default = 1.2
+    override val default = 1.5
 }
 
 /** Combined-multiplier cutoff for "Great". See [ScoringNicePraiseAt]. */
@@ -242,7 +264,7 @@ class ScoringNicePraiseAt(appConfigMap: AppConfigMap) : DoubleConfigValue(appCon
 class ScoringGreatPraiseAt(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Praise: Great at"
     override val path = "scoring.greatPraiseAt"
-    override val default = 1.5
+    override val default = 1.9
 }
 
 /** Combined-multiplier cutoff for "Excellent". See [ScoringNicePraiseAt]. */
@@ -252,7 +274,7 @@ class ScoringGreatPraiseAt(appConfigMap: AppConfigMap) : DoubleConfigValue(appCo
 class ScoringExcellentPraiseAt(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Praise: Excellent at"
     override val path = "scoring.excellentPraiseAt"
-    override val default = 1.9
+    override val default = 2.4
 }
 
 /** Combined-multiplier cutoff for "Perfect". See [ScoringNicePraiseAt]. */
@@ -262,13 +284,13 @@ class ScoringExcellentPraiseAt(appConfigMap: AppConfigMap) : DoubleConfigValue(a
 class ScoringPerfectPraiseAt(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Praise: Perfect at"
     override val path = "scoring.perfectPraiseAt"
-    override val default = 2.3
+    override val default = 2.9
 }
 
 /** Every `scoring.*` value. Registered in [SodogkuConfigValues]. */
 fun scoringConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>> = listOf(
     ScoringBasePerPlacement(appConfigMap),
-    ScoringCompletionBase(appConfigMap),
+    ScoringCompletionPerCell(appConfigMap),
     ScoringComboStep(appConfigMap),
     ScoringComboMax(appConfigMap),
     ScoringSpeedWindowMs(appConfigMap),

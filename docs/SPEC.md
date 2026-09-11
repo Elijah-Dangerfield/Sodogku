@@ -113,8 +113,8 @@ points = basePerPlacement × size × comboMultiplier × speedMultiplier
 - `size` is the grid dimension, so a 9x9 placement is worth more than a 4x4 one.
 - `comboMultiplier` ramps with consecutive correct placements: 1.0, 1.08, 1.16 and so on, capped
   at 2.0. Resets to 1.0 on a strike.
-- `speedMultiplier` decays linearly from 1.6 to 1.0 over `scoring.speedWindowMs` (default 8000)
-  since the previous placement. Linear rather than exponential so the pressure a player feels is
+- `speedMultiplier` decays linearly from 2.0 to 1.0 over `scoring.speedWindowMs` (default 16000,
+  scaled by the grid) since the previous placement. Linear rather than exponential so the pressure a player feels is
   proportional to the clock they can see.
 
 The multipliers have to spread **wide**, not just exist. A first pass used gentler numbers
@@ -126,8 +126,8 @@ whenever these get retuned.
 Level completion bonus:
 
 ```
-bonus = completionBase × size × (1 + (difficulty - 1) × difficultyBonusRate)
-                              × (1 + livesRemaining × livesBonusRate)
+bonus = completionPerCell × size × size × (1 + (difficulty - 1) × difficultyBonusRate)
+                                        × (1 + livesRemaining × livesBonusRate)
 ```
 
 Boosters cost points:
@@ -150,10 +150,12 @@ on level 2. Paws say how the board was solved; the score says what the help was 
 Praise text floats over the board on high-multiplier placements: "Nice", "Great", "Excellent",
 "Perfect". Purely cosmetic, thresholds in config.
 
-**Paw rating** (0 to 3) is score-based, not strike-based, which rewards the speed and combo the
-score system exists to measure. Par is *derived at runtime* from size and difficulty (see section
-3.2), never stored in the pack, so retuning what a three-paw clear means is a config change.
-Finishing at all earns one paw; the second and third are fractions of par (0.60 and 0.85).
+**Paw rating** (0 to 5) is score-based, not strike-based, which rewards the speed and combo the
+score system exists to measure. Par is *derived at runtime* from size, difficulty and how many
+dogs the player is left to place (see section 3.2), never stored in the pack, so retuning what a
+five-paw clear means is a config change. Finishing at all earns one paw; the other four are
+fractions of par (0.53, 0.64, 0.77, 0.85), placed in the gaps between measured runs: finished,
+finished after mistakes, finished clean, finished clean and briskly, finished clean and fast.
 
 Records kept per level: `best_score`, `best_time_ms`, `best_paws`.
 
@@ -428,7 +430,7 @@ on device.
    refinement converts 23 of 40. The seed placement survives by construction, because a region
    move never touches a dog cell.
 4. Score difficulty with the technique-tier solver.
-5. Compute a par score and derive the three paw thresholds.
+5. Compute a par score and derive the four paw thresholds.
 6. Deduplicate using a canonical form under the 8 grid symmetries plus region relabeling.
 7. Bucket into the curve, emit `campaign.pack` and `daily.pack`.
 
@@ -544,11 +546,12 @@ which is why `apps/admin/config-manifest-registry.json` must list **every** decl
 
 **Scoring**
 
-`scoring.basePerPlacement` (100), `scoring.completionBase` (250), `scoring.comboStep` (0.08),
-`scoring.comboMax` (2.0), `scoring.speedWindowMs` (8000), `scoring.speedMaxMultiplier` (1.6),
-`scoring.livesBonusRate` (0.5), `scoring.difficultyBonusRate` (0.2),
-`scoring.boosterPenaltyRate` (0.15), `scoring.twoPawFraction`
-(0.60), `scoring.threePawFraction` (0.85), and the four praise cutoffs.
+`scoring.basePerPlacement` (10), `scoring.completionPerCell` (4), `scoring.comboStep` (0.08),
+`scoring.comboMax` (2.0), `scoring.speedWindowMs` (16000), `scoring.speedMaxMultiplier` (2.0),
+`scoring.livesBonusRate` (0.8), `scoring.difficultyBonusRate` (0.2),
+`scoring.boosterPenaltyRate` (0.15), `scoring.twoPawFraction` (0.53),
+`scoring.threePawFraction` (0.64), `scoring.fourPawFraction` (0.77),
+`scoring.fivePawFraction` (0.85), and the four praise cutoffs.
 
 **Daily**
 

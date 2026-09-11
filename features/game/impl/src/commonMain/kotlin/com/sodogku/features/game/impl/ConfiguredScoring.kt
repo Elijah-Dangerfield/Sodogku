@@ -4,7 +4,7 @@ import com.sodogku.libraries.config.values.ScoringBasePerPlacement
 import com.sodogku.libraries.config.values.ScoringBoosterPenaltyRate
 import com.sodogku.libraries.config.values.ScoringComboMax
 import com.sodogku.libraries.config.values.ScoringComboStep
-import com.sodogku.libraries.config.values.ScoringCompletionBase
+import com.sodogku.libraries.config.values.ScoringCompletionPerCell
 import com.sodogku.libraries.config.values.ScoringDifficultyBonusRate
 import com.sodogku.libraries.config.values.ScoringExcellentPraiseAt
 import com.sodogku.libraries.config.values.ScoringGreatPraiseAt
@@ -47,7 +47,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @SingleIn(AppScope::class)
 class ConfiguredScoring(
     private val basePerPlacement: ScoringBasePerPlacement,
-    private val completionBase: ScoringCompletionBase,
+    private val completionPerCell: ScoringCompletionPerCell,
     private val comboStep: ScoringComboStep,
     private val comboMax: ScoringComboMax,
     private val speedWindowMs: ScoringSpeedWindowMs,
@@ -76,7 +76,7 @@ class ConfiguredScoring(
     operator fun invoke(): ScoringConfig = Catching {
         ScoringConfig(
             basePerPlacement = basePerPlacement(),
-            completionBase = completionBase(),
+            completionPerCell = completionPerCell(),
             comboStep = comboStep(),
             comboMax = comboMax(),
             speedWindowMs = speedWindowMs(),
