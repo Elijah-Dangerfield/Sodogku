@@ -3746,3 +3746,36 @@ One thing noticed while in that file and deliberately not changed:
 work C0 deleted, and nothing in the app enables it any more. Removing an
 entitlement is safe where adding one is not, but it is not this change's to
 make.
+
+## The source-scanning tests stay fragile to a file deleted mid-run
+
+**2026-09-11.** SD-86, two unexplained failures in `:apps:integration`, is
+explained and deliberately not fixed.
+
+**The cause.** `DocReferencesResolveTest` and `ConfigValuesAreReadTest` both walk
+the tree into a list and then read each file. Anything deleted between the walk
+and the read throws `FileNotFoundException` and fails whichever test triggered
+it. Reproduced 10 times out of 10 by churning files under
+`tools/level-generator/` while the tier ran, and independently again here: one
+run failed as `everyCitedSectionExists` alone, which is exactly the shape that
+was reported, and two failed earlier at Gradle's own input snapshot.
+
+**What was ruled out**, so nobody re-runs it. Agent worktrees under `.claude/`
+are not the trigger: 100 adversarial runs with worktrees being created and
+half-deleted throughout, zero failures. The input declarations are correct and
+`docReferenceScan` matches the test's scan set exactly. A vanished Gradle input
+cannot surface as a test-method failure; it fails the build with its own message
+naming the property and the path.
+
+**Why not harden it.** The obvious fix is to let the read skip a file that has
+gone. That weakens the guard, because the file that vanished could have been the
+one with the broken reference, and a scanning test whose answer depends on
+timing is worse than one that fails loudly. It also would not make the tier green
+under this condition: in most reproductions Gradle fails first, before the test
+body runs, with a message that already explains itself.
+
+**What to do instead.** Do not run a `merge`, `rebase`, `checkout` or `stash` in
+a checkout while its own test tier is running. That is what the original
+`DocReferencesResolveTest` failure followed. If this becomes common enough to be
+annoying rather than rare, the answer is `Task.doNotTrackState()` or a retry at
+the harness level, not a scanning test that shrugs at a missing file.

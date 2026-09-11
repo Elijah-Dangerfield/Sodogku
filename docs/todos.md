@@ -134,36 +134,6 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
-## SD-86 [P2] — `:apps:integration` has failed twice for reasons nobody can reproduce
-
-**Found by:** two separate investigations, 2026-09-10.
-
-`ConfigValuesAreReadTest` failed once and passed on re-run with no change. The
-SD-37 agent went looking, disproved the obvious explanation (`FileTreeWalk` does
-not throw when a file vanishes underneath it), fixed the wasteful walk anyway,
-and reported that **the original failure still has no explanation.**
-
-Then `DocReferencesResolveTest.everyCitedSectionExists` failed once immediately
-after a merge and passed on eight consecutive re-runs afterwards. Its `.claude`
-exclusion is correct and matches the relative path. No explanation either.
-
-Two unexplained single failures in one tier is a pattern rather than two
-coincidences, and this is the tier that holds every source-scanning guard in the
-repo. A guard that fails at random gets re-run instead of read, which is how a
-guard stops being one.
-
-**Done when:** either the cause is found, or the tier runs enough times under
-adversarial conditions to say honestly that it does not flake.
-
-**Hints:** The common shape is a test that reads the working tree at runtime while
-something else writes to it. Both failures happened while agent worktrees under
-`.claude/worktrees/` were being created or removed. The tests exclude that
-directory; the Gradle `inputs.files` declarations in
-`apps/integration/build.gradle.kts` may not, and an input snapshot taken while a
-tree is half-removed is a different situation from a walk that skips it.
-
-Reproducing it may mean running the tier in a loop while adding and removing a
-worktree. That is worth an hour: everything else in this repo trusts these guards.
 ## SD-103 [P2] — One Dog component, so no call site has to remember the preview fix
 
 **Ask:** Owner, 2026-09-11: *"we should have a custom DS component called Dog and
@@ -196,7 +166,6 @@ component answer both and say which wins.
 A guard is worth more than the refactor. Once one component owns it, a test that
 fails when a composable outside the design system references a dog drawable keeps
 it owned.
-
 ## SD-110 [P2] — The level drawer still flickers as it dismisses
 
 **Found by:** the SD-102 agent, 2026-09-11, which fixed the other half and said
