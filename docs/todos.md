@@ -497,30 +497,31 @@ which has happened four times in this repo.
 Write the headers where they are missing rather than deleting the rule. Starting
 with `GameViewModelTest` would be worth it on its own.
 
-## SD-95 [P2] — One feature module keeps its own strings, which will make translation harder
+## SD-96 [P2] — Seven streak strings are not referenced by any code
 
-**Ask:** Owner, 2026-09-11: *"ideally we dont have any per feature strings xml.
-Id prefer all strings be in the resources module. Thatll make it easier to
-translate in the future."*
+**Found by:** the SD-95 agent, 2026-09-11, while moving the streak's copy into the
+shared file.
 
-`features/streak/impl` has its own `composeResources/values/strings.xml` with 32
-strings in it. Every other player-facing string in the app, 497 of them, lives in
-`libraries/resources`. So this is one module out of step rather than a pattern,
-and it is cheap to fix now and annoying to fix after a translator has been sent
-the first batch.
+`streak_indicator_label`, `streak_indicator_days`, `streak_indicator_none`,
+`streak_celebrate_done` and `streak_day_failed` are referenced from no Kotlin at
+all. `streak_current_days` and `streak_current_none` are imported by
+`StreakScreen.kt` and never read.
 
-**Done when:** `libraries/resources` holds every player-facing string, no other
-module declares a `composeResources` strings file, and something fails the build
-if one appears again.
+They were moved rather than pruned, because deciding what is dead copy was not
+that change. They matter now for a reason they did not before: a translator is
+paid per string, and these are seven rows of a batch nobody will ever see.
 
-**Hints:** The guard matters more than the move. `UserFacingCopyStyleTest` in
-`:apps:integration` already walks every `composeResources/**/*.xml`, so it knows
-how to find them; add an assertion that the only one is the resources module's.
-Declare the Gradle inputs with `inputs.files(...)` or it will silently read
-nothing, which has happened four times in this repo.
+**Done when:** every string in the shared file is either referenced or
+deliberately kept, and something fails the build when an unreferenced one is
+added.
 
-Moving the strings means the streak feature takes a dependency on
-`:libraries:resources` if it does not already, and the generated `Res` accessor
-changes package, so the call sites move with it. Check whether the split was
-deliberate before assuming it was not: a feature owning its own strings is a
-reasonable pattern, just not the one this app chose.
+**Hints:** Be careful about what "referenced" means before writing a guard.
+Compose Multiplatform generates a `Res.string.*` accessor per key, so a plain
+grep for the key name works, but a string looked up dynamically would not be
+found and would be deleted wrongly. Check for that pattern first.
+
+A guard here is more valuable than the cleanup, and `:apps:integration` is where
+the other source-scanning tests live. `UserFacingCopyStyleTest` already walks
+both the strings and the Kotlin tree, so it has both halves in hand. Declare the
+Gradle inputs with `inputs.files(...)`, which that test already does for the
+string files but may not for the Kotlin side.
