@@ -112,43 +112,6 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
-## SD-22 [P2] — Write down what the game offers, and delete SPEC
-
-**Ask:** Owner, 2026-09-09: "It seems like it would be nice to have a wiki
-markdown about the features we do offer." Confirmed 2026-09-10: *"at this stage
-we can delete the spec doc and rebuild a features md."*
-
-`docs/SPEC.md` is a design document that argues with itself across 1,500 lines
-and records decisions that were later reversed. It is the only place that reads
-like a description of the game, which makes it worse than nothing: a reader
-trusts it and is wrong. The game shipped, so the code is the specification now.
-
-**Done when:**
-
-1. `docs/reference/features.md` describes every player-facing feature as it
-   actually behaves, with its rules, which of its numbers are remote config, and
-   where it lives in code.
-2. `docs/SPEC.md` is deleted.
-3. Every `SPEC <n>` citation in the codebase points at a section of the new doc
-   or is removed. There are around 145 of them, mostly in KDoc, and leaving them
-   dangling would trade one wrong map for a hundred broken links.
-4. The doc map in `README.md` and any pointer in `AGENTS.md` names the new doc.
-
-**Derive every line from the code, not from SPEC.** Where the two disagree the
-code is right, and the disagreement is worth a sentence in the commit message
-because it is usually a feature somebody remembers differently than it works.
-
-**Hints:** Candidate sections: the board and auto-mark cascade, bones, sniffs
-and treats, score and paws, skip, the campaign ladder and its bands, the daily,
-the streak, achievements, leaderboards, Pro, ads, settings, accessibility.
-
-Two things the old SPEC gets wrong that you will trip over. The streak is no
-longer folded from the daily, it folds over `play_day`, and any day with a
-finished board counts. Sharing was removed entirely and SPEC still describes it.
-
-Where a decision was genuinely reversed rather than merely restated, the
-reversal belongs in `decisions.md` before SPEC goes, or the reasoning dies with
-the file.
 ## SD-26 [P0] — The screen stops updating while it keeps taking taps
 
 **Ask:** Owner, 2026-09-09, on iOS: *"idk whats happening but im clicking all
@@ -324,18 +287,71 @@ bookkeeping is what put SD-26 on the wrong trail for a day.
 `navigation-compose` version actually on the classpath rather than against
 memory. Decide the `pushWithTransition` question separately; it may be
 deliberate, and the git history will say.
-## SD-64 [P2] — `proposals.md` item 4 argues entirely from a 500-level campaign
 
-**Found by:** the SD-55 agent, 2026-09-10.
+## SD-65 [P1] — The store listing says 500 levels and the pack holds 1000
 
-Proposal 4 is the reasoning behind the campaign ending, and every number in it is
-a number about a 500-level pack. The campaign is a thousand now and the ending
-shipped, so the proposal is both stale and superseded by the thing it argued for.
+**Found by:** the SD-22 agent, 2026-09-10.
 
-**Done when:** it is deleted, or it says what it decided and points at the commit
-that did it.
+`docs/store/listing.md` claims 500 levels, and a bullet says the number matches
+the pack. It did until today. This is copy that goes in front of a reviewer and
+a customer, and it is the only stale claim of the fifteen SD-22 found that a
+player could ever read.
 
-**Hints:** Deleting is probably right. `decisions.md` is where a decision lives
-once it is made, and the ending's commit message already carries the reasoning
-and what it rejected. A proposal kept past the proposal is a second, worse copy
-of a decision. Check nothing else cross-references item 4 first.
+**Done when:** the listing says a thousand, and nothing else in it is a number
+somebody has to remember to update.
+
+**Hints:** Sweep the rest of the file while you are in it, against
+`docs/reference/features.md`, which is now derived from code. Sharing is gone,
+there are leaderboards on both platforms, and the daily has no give-up. Any of
+those could be in there too.
+
+Worth asking whether the listing should name a level count at all. A number in
+store copy is a promise that ages every time the pack grows, and "hundreds of
+handmade boards" ages never.
+
+## SD-66 [P2] — `README.md` still describes a template file this repo does not have
+
+**Found by:** the SD-22 agent, 2026-09-10, while fixing the doc map.
+
+`README.md`'s doc map links `docs/PORT-CANDIDATES.md` and a whole section
+explains what it is for. The file does not exist here. It lives in
+`Workspace/KMPTemplate`, which is the repo Sodogku was generated from, and the
+cross-repo pointer is described in `AGENTS.md`.
+
+The new `DocReferencesResolveTest` has it as a documented exemption, a set of
+one, which is the right holding position and not the right answer.
+
+**Done when:** the README either stops describing a file this repo does not
+have, or says plainly that it lives in the template repo and why a reader here
+would care.
+
+**Hints:** Check the rest of `README.md` for the same thing. It is largely still
+the template's, which SD-32 noted and only corrected where it had been made
+definitively false. A full pass is this item.
+
+## SD-67 [P2] — Three things nothing calls, and one config key no test can see
+
+**Found by:** the SD-22 agent, 2026-09-10, while deriving the features doc from
+code.
+
+Four small ones, grouped because each is a line or two and they are all the same
+kind of rot:
+
+- **`config.refreshThrottleMs` is declared outside `SodogkuConfigValues` and has
+  no `FallbackConfigMap` entry**, so neither completeness test sees it. Benign
+  today and a real hole in the guard that is supposed to make config keys
+  impossible to forget. Fix this one first; the others are tidying and this is a
+  blind spot.
+- **`features/home` is dead at runtime.** `HomeScreen` is a hardcoded dev
+  launcher with three level buttons and a no-op ViewModel. Only the bug-report
+  screen in that module is live.
+- **`GameViewModel.clearSavedBoard` has no callers.**
+- **`AppData.resetAccountScoped()` has no callers**, which is an account-era
+  leftover SD-32 missed.
+
+**Done when:** the config key is visible to both completeness tests, and each of
+the other three is either deleted or has a caller.
+
+**Hints:** Check `features/home` carefully before deleting it. A dev launcher
+that nobody ships is still the thing somebody reaches for when they need to jump
+to a level, and the QA panel may or may not have replaced it.
