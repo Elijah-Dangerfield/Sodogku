@@ -164,6 +164,24 @@ tasks.withType<Test>().configureEach {
         },
     ).withPropertyName("docReferenceScan")
 
+    // `TestFilesCarryAHeaderTest` walks every test source set in the repo, and
+    // `configReaderScan` above covers only libraries/, features/ and apps/, so
+    // :detekt-rules, :build-logic and anything a future module invents were
+    // invisible, and a headerless test file added there would leave this task
+    // UP-TO-DATE.
+    //
+    // Deliberately the whole Kotlin tree rather than a `src/…Test…` pattern.
+    // The change the guard exists to catch is a test file appearing somewhere
+    // nobody anticipated, and a pattern narrow enough to be tidy is a pattern
+    // that stops running on exactly that change. Overlapping the scan above is
+    // free; a gap is not.
+    inputs.files(
+        rootProject.fileTree(repo) {
+            include("**/*.kt")
+            exclude("**/build/**", ".claude/**", ".gradle/**")
+        },
+    ).withPropertyName("testFileHeaderScan")
+
     // Same again for the agent skills. `FeedbackTriageQueryContractTest` holds
     // the triage skill's Sentry queries against the enum that produces the tag
     // values — and the enum half is covered by the `*.kt` tree above while the
