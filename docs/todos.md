@@ -164,50 +164,6 @@ tree is half-removed is a different situation from a walk that skips it.
 
 Reproducing it may mean running the tier in a loop while adding and removing a
 worktree. That is worth an hour: everything else in this repo trusts these guards.
-## SD-102 [P2] — FocusScrim reads its Animatable in composition, and the detekt rule cannot see it
-
-**Ask:** `libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/system/Focus.kt:196`
-is `if (progress.value <= 0f) return`, a read of a `remember { Animatable() }`
-in the composable body. `AnimatedStateReadInComposition` matches only
-`by animate*AsState(...)`, so this shape is invisible to it in every file. Two
-more of the same shape outside this slice: `ScoreCounter.kt:223`
-(`if (progress.value >= 1f) return`) and `LevelDrawer.kt:126`
-(`if (slide.value <= 0f) return`, where `slide` is an `animateFloatAsState` kept
-as `State`, which is the rule's own recommended fix and then read anyway).
-
-Three consequences in `FocusScrim`:
-
-- The whole body, the `lit` lookup, the `Box`, the `AccessibleHole` nodes and
-  the `content` lambda's scope, recomposes on every frame of the `Motion.Pop`
-  spring in and out. Bounded, small subtree, and still the pattern the repo
-  bans.
-- `Motion.Pop` is a 0.5-damping spring with no bounds set on the `Animatable`.
-  On dismissal it undershoots zero (about 16% for that damping, then about 3%
-  back over), so the `<= 0f` gate removes the scrim from composition and then
-  composes it again as the spring recrosses zero: a fresh `pointerInput`, fresh
-  `AccessibleHole` semantics nodes, the coach mark re-entering, for a few frames
-  at an alpha nobody can see. This half is reasoning from the spring, not
-  observed. Confidence medium-high.
-- The scrim ignores `LocalReduceAnimations`. `features.md` says dialogs fade
-  under it; the scrim springs regardless.
-
-Scenario: a TalkBack user dismissing the last-bone warning may hear the lit
-control's node flicker back into the tree during the fade-out. A sighted player
-sees nothing.
-
-**Done when:** composition depends on a `derivedStateOf { progress.value > 0f }`
-as `BoardCell` already does; the progress cannot leave `[0, 1]` (either
-`updateBounds(0f, 1f)` or `Motion.fade()` under reduce-animations and a bounded
-spring otherwise); and the detekt rule flags a `.value` read of an
-`Animatable` or a kept `State` in a composable body outside a
-`graphicsLayer`/`drawBehind`/`offset`/`layout` lambda, or a targeted rule
-covers the `if (x.value` gate shape. A composition test with a recomposition
-counter on `content` proves the first part.
-
-**Hints:** The two sibling sites are worth fixing in the same sweep; the
-`LevelDrawer` one shows the rule's fix text creates the blind spot. Found by the
-SD-6 review of the `libraries/ui` board and dog slice, 2026-09-11, against
-`17a2a6c`.
 ## SD-103 [P2] — One Dog component, so no call site has to remember the preview fix
 
 **Ask:** Owner, 2026-09-11: *"we should have a custom DS component called Dog and
@@ -240,51 +196,25 @@ component answer both and say which wins.
 A guard is worth more than the refactor. Once one component owns it, a test that
 fails when a composable outside the design system references a dog drawable keeps
 it owned.
-## SD-104 [P2] — RuleChip flashes once per rule, not once per strike
 
-**Ask:** `RuleChip`'s flash
-(`libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/components/game/GameHud.kt:230`)
-is `LaunchedEffect(highlighted, still)` on a `Boolean`. A second wrong guess
-against the same rule leaves `highlighted` true, so the effect does not restart
-and the chip does not move, while the cell shakes and the board flinches, both
-of which are keyed on a nonce for exactly this case. `BoardCell`'s own docblock
-states the rule: "A nonce rather than a boolean, so the same cell can be got
-wrong twice running."
+## SD-110 [P2] — The level drawer still flickers as it dismisses
 
-Scenario: a player breaks "no touching" twice in a row. The first strike flashes
-the chip and it settles to the tint; the second changes nothing on the chip, so
-the one piece of feedback that names the rule is the one that goes quiet.
-Confidence high on the behaviour; whether a re-flash is wanted is a design call,
-and the rest of the slice has already made it.
+**Found by:** the SD-102 agent, 2026-09-11, which fixed the other half and said
+so rather than claiming the file.
 
-**Done when:** a second strike against the same rule re-flashes its chip.
+`LevelDrawer` gates on an animated value crossing zero, and its
+`animateFloatAsState` has no bounds. `Motion.Pop` is a spring that undershoots:
+measured at **-0.163** springing from one to zero. So the gate crosses zero twice
+on the way out and the drawer leaves and re-enters composition mid-dismissal.
 
-**Hints:** Key the effect on `state.strikeNonce`, passed from `RuleChips` in
-`GameScreen.kt:572`, and keep the boolean for which chip. A pure
-`ruleChipFlashKey(broken, strikeNonce)` beside `brokenRule` makes the decision
-testable without a composition. Found by the SD-6 review of the `libraries/ui`
-board and dog slice, 2026-09-11, against `17a2a6c`.
-## SD-105 [P2] — rememberHaptics allocates a new Haptics on every composition
+The per-frame recomposition half is already fixed. This is the remaining flicker.
 
-**Ask:** `rememberHaptics`
-(`libraries/ui/src/commonMain/kotlin/com/sodogku/libraries/ui/system/Haptics.kt:70`)
-remembers nothing: it returns `Haptics(feedback, enabled)` each call. `Haptics`
-is `@Immutable` with identity equality, so every composition yields a "changed"
-value. In `features/game` it is used locally and this costs one allocation per
-recomposition. In `features/streak` it is the value of a
-`staticCompositionLocalOf` provided at an entry point that recomposes on every
-state change (`StreakFeatureEntryPoint.kt:54` and `:72`), and a static local
-whose value changes does not track reads: it recomposes everything under the
-provider and disables skipping while it does. Confidence high on the
-allocation, medium-high on the static-local consequence, which is Compose's
-documented behaviour and was not measured here.
+**Done when:** the drawer's dismissal crosses zero once.
 
-**Done when:** `rememberHaptics` returns the same instance for the same
-`(feedback, enabled)`, and a composition test with a recomposition counter under
-`CompositionLocalProvider(LocalHaptics provides rememberHaptics(...))` shows the
-child not recomposing when an unrelated state changes.
+**Hints:** `FocusScrim` solved the same problem in the same pass by switching to
+an `Animatable` with `updateBounds(0f, 1f)`, and that is the shape to copy.
+`animateFloatAsState` cannot be bounded, so this is a conversion rather than a
+parameter, which is why it was left: the file is outside the slice that found it.
 
-**Hints:** `remember(feedback, enabled) { Haptics(feedback, enabled) }`. It is a
-one-line change plus an import and was not taken here because its effect is in
-another feature. Found by the SD-6 review of the `libraries/ui` board and dog
-slice, 2026-09-11, against `17a2a6c`.
+`MotionTest` now measures the undershoot, so the number above is checked rather
+than asserted, and it will move if anybody retunes `Motion.Pop`.
