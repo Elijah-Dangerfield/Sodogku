@@ -277,30 +277,6 @@ Weigh this against what it costs. A UI test tier that nobody trusts is worse
 than none, so the bar is that it runs in CI, does not flake, and fails for a real
 reason. If the first two tests cannot meet that, say so and close this rather
 than leaving a tier half built.
-## SD-51 [P2] — Nothing tells a player the missing starting dog is deliberate
-
-**Ask:** Owner, 2026-09-10: *"we pretty quickly start giving us those puzzles that
-don't have a starting dog... maybe the first time that they see one we should let
-them know that there's no starting dog on purpose and that they should be able to
-deduce it. Like maybe a little tool tip or something."*
-
-**Half of this shipped.** SD-12 moved the free dog from one absolute level id to a
-position inside each grid-size band, so it now comes back at every new board size
-instead of ending inside the 5x5 band. The frequency complaint is answered.
-
-**What is left is the sentence.** The first board a player opens with no dog on it
-looks like a board that failed to load, and nothing says otherwise.
-
-**Done when:** the first campaign board a player opens without a starting dog says
-so once, and never again.
-
-**Hints:** `CoachMark` and `AnchoredCard` are the existing tooltip surface and the
-tutorial already drives them. "Once, ever" is a flag in `AppCache`, next to the
-other one-time prompts. Say it without saying where a dog goes, the way the sniff
-reason copy does. It has to be dismissible and must not fire on the rehearsal
-board, which always has a dog.
-
-Provenance: Sentry SODOGKU-7, session `95dd30d1`, 2026-09-10.
 ## SD-56 [P2] — An Android shortcut may be pointing at a package that is not installed
 
 **Found by:** the SD-25 agent, 2026-09-10, which flagged it rather than shipping
@@ -321,25 +297,6 @@ both entries appeared and launched.
 **If they did not**, this is the cause, and the fix is a Gradle-generated
 `@string/` holding the real application id rather than a literal in the resource.
 Nothing else in the change would explain the entries being absent or dead.
-## SD-60 [P2] — The treat no-op emits nothing, so the panel splitting by booster is half a chart
-
-**Found by:** the SD-44 agent, 2026-09-10, which fixed the words rather than the
-gap and said so.
-
-`game.booster_no_op` fires when a sniff has nothing left to show. The treat's
-equivalent path emits nothing at all, so a dashboard splitting `by (booster)`
-has one bar where it should have two and no way to tell an unused feature from
-an unreported one.
-
-The doc and the panel now say that out loud, which was the honest fix for an item
-about misleading words. The gap is still a gap.
-
-**Done when:** a treat that would do nothing reports it the same way a sniff does,
-or somebody writes down why a treat cannot no-op.
-
-**Hints:** `GameViewModel.kt:2490`. Small. Check first whether a treat genuinely
-can no-op: if the answer is that it always has something to give, the fix is a
-sentence rather than an emit, and the panel should say one booster on purpose.
 ## SD-62 [P2] — `FloatingWindowHost` never took androidx's fix for an entry popped before it composed
 
 **Found by:** the SD-48 agent, 2026-09-10, while ruling the floating windows out
