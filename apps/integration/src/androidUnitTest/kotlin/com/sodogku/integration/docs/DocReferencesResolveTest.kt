@@ -183,9 +183,14 @@ class DocReferencesResolveTest {
 
     private fun File.isScannable(): Boolean {
         if (!isFile || extension !in SCANNED_EXTENSIONS) return false
-        if (toRelativeString(File(repoRoot())) in NOT_SCANNED) return false
-        // `.claude` holds agent worktrees, which are full checkouts of this repo.
-        return path.split(File.separatorChar).none { it == "build" || it == ".claude" }
+        // Relative to the repo root, not the absolute path. An agent worktree is
+        // itself a full checkout living under `.claude/worktrees/`, so matching
+        // on the absolute path excluded the entire tree and left the scan reading
+        // five files. It still passed the "did it find anything" floor, which is
+        // why that floor now counts anchored references separately.
+        val relative = toRelativeString(File(repoRoot()))
+        if (relative in NOT_SCANNED) return false
+        return relative.split(File.separatorChar).none { it == "build" || it == ".claude" }
     }
 
     private fun repoRoot(): String =
