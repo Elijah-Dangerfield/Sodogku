@@ -3057,6 +3057,38 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun aDailyRouteOpenedWhileTheSwitchIsOffStartsNoAttempt() = runUnitTest {
+        // The card honoured the switch and the route did not, and the card is
+        // not the only way in: `sodogku://game?daily=true` is a home-screen
+        // shortcut that lands on this route directly, as does a back stack
+        // restored after somebody threw the switch. A killed daily was still
+        // playable, still wrote a result and still fed the streak.
+        val daily = FakeDaily(levelId = DailyLevel, enabled = false)
+        val vm = viewModel(isDaily = true, daily = daily)
+        val events = eventsOf(vm)
+        settle()
+
+        assertNull(vm.state.level, "a daily switched off still put a board on screen")
+        assertTrue(vm.state.phase != GamePhase.Playing, "a daily switched off still started an attempt")
+        assertTrue(events.any { it == GameEvent.NavigateBack }, "the route sat on an empty board")
+    }
+
+    @Test
+    fun aSpentDayStillOpensOnItsResultAfterTheSwitchIsThrown() = runUnitTest {
+        // The deliberate limit on the line above. The lever stops the day being
+        // played; a score already written is the player's, and refusing to show
+        // it back to them is not what the lever is for.
+        val done = completedToday()
+        val vm = viewModel(
+            isDaily = true,
+            daily = FakeDaily(levelId = DailyLevel, enabled = false, result = done),
+        )
+
+        assertEquals(GamePhase.Recap, vm.state.phase, "a spent day was hidden by the kill switch")
+        assertEquals(done, vm.state.dailyRecap)
+    }
+
+    @Test
     fun aDailyThatIsSwitchedOffOpensNothing() = runUnitTest {
         val vm = viewModel(daily = FakeDaily(levelId = DailyLevel, enabled = false))
         val events = eventsOf(vm)

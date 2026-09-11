@@ -124,6 +124,8 @@ private data class DailyBoard(
     /** Non-null once the day is played, cleared or given up on. */
     val result: DailyResult?,
     val streak: Int,
+    /** The kill switch, off the same status snapshot as everything else here. */
+    val enabled: Boolean,
 )
 
 /**
@@ -639,6 +641,17 @@ class GameViewModel(
      * the repository refuses a second write regardless — but "you cannot play
      * this again" and "you cannot look at it again" are different sentences and
      * only the first one was meant.
+     *
+     * **The kill switch is checked here and not only on the card.** `playDaily`
+     * honours it, but the card is not the only way in: the home-screen shortcut
+     * is `sodogku://game?daily=true` and lands on this route directly, as does a
+     * back stack restored after the switch was thrown. Without the check a daily
+     * killed from the console stayed playable for anyone arriving either way,
+     * and still wrote a `daily_result` and still fed the streak.
+     *
+     * A day that has already been played still opens on its recap, switch or no
+     * switch: the result is written, and refusing to show somebody a score they
+     * already earned is not what the lever is for.
      */
     private suspend fun GameAction.loadDaily() {
         val today = dailyBoard()
@@ -651,6 +664,11 @@ class GameViewModel(
         val spent = today.result
         if (spent != null) {
             showDailyRecap(today.level, spent, today.streak)
+            return
+        }
+        if (!today.enabled) {
+            logger.d { "The daily is switched off; nothing to open" }
+            sendEvent(GameEvent.NavigateBack)
             return
         }
         startAttempt(today.level, resume = savedBoardFor(today.level))
@@ -671,7 +689,7 @@ class GameViewModel(
             .getOrNull()
             ?: return null
         val level = LevelPacks.daily.byId(status.levelId) ?: return null
-        return DailyBoard(level, status.date, status.result, status.streak)
+        return DailyBoard(level, status.date, status.result, status.streak, status.enabled)
     }
 
     /**
