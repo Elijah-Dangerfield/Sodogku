@@ -49,6 +49,11 @@ kotlin {
             implementation(libs.robolectric)
             implementation(libs.kotlin.testJunit)
             implementation(libs.kotlinx.coroutines.test)
+            // Not for the host itself. A floating window's lifecycle only
+            // matters through what the app hangs off it, and every one of those
+            // goes through `ObserveWithLifecycle`, so the test asserts against
+            // the real observer rather than a stand-in with the same gate.
+            implementation(projects.libraries.flowroutines)
         }
     }
 }
