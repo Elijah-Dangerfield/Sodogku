@@ -174,6 +174,35 @@ class GrafanaLogTreeTest {
         assertTrue(counts == 0 || counts == 2, "a session's events are all-or-nothing, got $counts of 2")
     }
 
+    /**
+     * The half [samplingIsStablePerSession] cannot see. All-or-nothing is
+     * satisfied by a tree that keeps everything and by one that keeps nothing,
+     * so on its own it stays green while the rate does nothing at all — and the
+     * rate is the volume dial the whole Grafana bill hangs off.
+     *
+     * The two ids were picked once by search and pinned: through
+     * `isSessionSampledIn`'s hash they bucket to 0.428 and 0.659, so a rate of
+     * 0.5 falls between them and exactly one of the two sessions exports.
+     * Anything that flattens the hash, moves the comparison, or drops the rate
+     * on the floor puts them back on the same side of it and fails here.
+     */
+    @Test
+    fun theRateDecidesWhichSessionsExport() {
+        sampleRate = 0.5
+        sessionId = SessionUnderTheRate
+        plantTree()
+
+        KLog.logEvent("example.completed", "step_number" to 1)
+        sessionId = SessionOverTheRate
+        KLog.logEvent("example.completed", "step_number" to 2)
+
+        assertEquals(
+            listOf(SessionUnderTheRate),
+            processor.records.map { it.attributes["session_id"] },
+            "the rate is not deciding anything: both sessions were treated the same",
+        )
+    }
+
     @Test
     fun isOffline_isStampedAtEmitTime_onEventsAndPlainLogs() {
         klogForwardingEnabled = true
@@ -233,4 +262,12 @@ class GrafanaLogTreeTest {
     }
 
     private data class CustomError(val reason: String)
+
+    private companion object {
+        /** Buckets to 0.428, so a rate of 0.5 keeps it. */
+        const val SessionUnderTheRate = "session-under"
+
+        /** Buckets to 0.659, so the same rate drops it. */
+        const val SessionOverTheRate = "session-over"
+    }
 }
