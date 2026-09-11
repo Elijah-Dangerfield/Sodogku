@@ -523,19 +523,6 @@ data class GameState(
         get() = phase == GamePhase.Won && paceAgainst(elapsedMs, targetTimeMs) == Pace.Inside
 
     /**
-     * Bones this attempt did not spend: how cleanly the run went, as opposed to
-     * how many bones the player is holding.
-     *
-     * Derived from [strikesThisAttempt] rather than read off [livesRemaining],
-     * because the holding is global and an ad refill moves it. A player who
-     * refilled mid-board would otherwise read as a clean sheet after a run that
-     * cost them three. `GameViewModel.win` prices the completion bonus and the
-     * standing on the same expression, for that reason.
-     */
-    val bonesUnspent: Int
-        get() = (ScoringConfig.MAX_LIVES - strikesThisAttempt).coerceAtLeast(0)
-
-    /**
      * The auto-marks a player can actually see crossed off — **what the board
      * is showing**, as against the deduction in [autoMarks].
      *

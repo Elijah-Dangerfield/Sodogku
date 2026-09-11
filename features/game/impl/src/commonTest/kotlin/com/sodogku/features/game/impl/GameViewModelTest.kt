@@ -1646,19 +1646,42 @@ class GameViewModelTest : CoroutineTest() {
         // cleanly did this go". A player who refills mid-board would finish
         // reading as a clean sheet, worth a bigger completion bonus and a badge
         // they did not earn.
+        //
+        // Two runs that strike once and then solve the same board, differing
+        // only by the refill between, so the completion bonus is the whole of
+        // any gap between the totals. On the score rather than on a count,
+        // because a `win` that priced the bonus off the held count would leave
+        // every count on the state right and still overpay.
+        //
+        // No speed bonus, because the refill resets `lastPlacementAt` — an ad
+        // is not meant to cost the player their pace — and that alone puts the
+        // two runs two points apart on placements.
+        val unhurried = configOf("scoring.speedMaxMultiplier" to 1.0)
+        val onTheStash = Scoring.completionBonus(level.size, level.difficulty, ConsumableRefillTo)
+        val onTheAttempt =
+            Scoring.completionBonus(level.size, level.difficulty, ConsumableRefillTo - 1)
+        assertNotEquals(onTheStash, onTheAttempt, "the fixture cannot tell the two prices apart")
+
         val badges = RecordingAchievements()
-        val vm = viewModel(achievements = badges)
-        val level = assertNotNull(vm.state.level)
-        vm.commit(tappableWrongCell(vm))
-        vm.takeAction(GameAction.RefillBones)
-        assertEquals(ConsumableRefillTo, vm.state.livesRemaining, "the refill has to land")
+        val refilled = viewModel(achievements = badges, config = unhurried)
+        refilled.commit(tappableWrongCell(refilled))
+        refilled.takeAction(GameAction.RefillBones)
+        assertEquals(ConsumableRefillTo, refilled.state.livesRemaining, "the refill has to land")
+        solve(refilled)
 
-        (0 until level.size).forEach { row -> vm.commit(cellFor(row)) }
+        val kept = viewModel(config = unhurried)
+        kept.commit(tappableWrongCell(kept))
+        solve(kept)
 
-        assertEquals(GamePhase.Won, vm.state.phase)
+        assertEquals(GamePhase.Won, refilled.state.phase)
+        assertEquals(GamePhase.Won, kept.state.phase)
         assertEquals(1, badges.recorded.single().strikes, "the wrong guess still happened")
-        assertEquals(1, vm.state.strikesThisAttempt)
-        assertEquals(ConsumableRefillTo - 1, vm.state.bonesUnspent, "the refill buys no clean sheet")
+        assertEquals(1, refilled.state.strikesThisAttempt)
+        assertEquals(
+            kept.state.score.total,
+            refilled.state.score.total,
+            "the refill bought a bigger completion bonus",
+        )
     }
 
     @Test
@@ -1674,7 +1697,6 @@ class GameViewModelTest : CoroutineTest() {
         val resumed = viewModel(cache = cache)
 
         assertEquals(1, resumed.state.strikesThisAttempt)
-        assertEquals(ConsumableRefillTo - 1, resumed.state.bonesUnspent)
     }
 
     @Test
