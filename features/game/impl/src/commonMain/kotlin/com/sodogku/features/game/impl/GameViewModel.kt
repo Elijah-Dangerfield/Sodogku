@@ -743,7 +743,7 @@ class GameViewModel(
         // Both keyed on the attempt, and both would otherwise carry the last
         // board across: the detector's pace history is about *this* puzzle, and
         // a resumed board's clock starts from what it had already spent.
-        struggle.reset()
+        struggle.reset(at = resume?.elapsedMs ?: 0L)
         publishElapsed(resume?.elapsedMs ?: 0L)
         lastTappedCell = null
         lastTapAt = null

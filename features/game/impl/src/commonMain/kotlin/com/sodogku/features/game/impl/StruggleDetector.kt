@@ -106,11 +106,24 @@ internal class StruggleDetector(
     private var burstStartedAt: Long? = null
     private var quietUntil = 0L
 
-    /** A fresh attempt. Everything above is about one board. */
-    fun reset() {
+    /**
+     * A fresh attempt. Everything above is about one board.
+     *
+     * [at] is where the attempt clock starts, which is zero for a new board and
+     * the saved elapsed time for a resumed one. Both clocks below are set to it
+     * rather than to zero: they are compared against the same attempt-elapsed
+     * millis every entry point takes, so a board that comes back with five
+     * minutes on it would otherwise open five minutes into a placement drought
+     * and record its first pace gap as the whole span before the resume.
+     *
+     * [touched] stays false either way. A resumed board is one nobody has tried
+     * *this* time round, and the idle and drought rules both wait for a first
+     * input for the same reason they do on a new one.
+     */
+    fun reset(at: Long) {
         touched = false
-        lastInputAt = 0L
-        lastPlacementAt = 0L
+        lastInputAt = at
+        lastPlacementAt = at
         marksSinceCommit = 0
         struck = false
         gaps.clear()

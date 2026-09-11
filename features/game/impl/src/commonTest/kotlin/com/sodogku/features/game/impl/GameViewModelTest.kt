@@ -94,6 +94,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 import kotlinx.coroutines.flow.Flow
@@ -1017,6 +1018,33 @@ class GameViewModelTest : CoroutineTest() {
         vm.tick()
 
         assertFalse(vm.state.nudgeBoosters, "the new board inherited the old board's struggle")
+    }
+
+    @Test
+    fun aBoardResumedWithTimeOnItDoesNotNagOnTheFirstCross() = runUnitTest {
+        // A relaunch onto a board with five minutes on it. The detector reads
+        // the attempt clock, which resumes at the saved elapsed, so a detector
+        // reset to zero sees the whole pre-resume span as a run with no dog in
+        // it and beats the Locate button on the tick after the first cross.
+        val cache = InMemoryAppCache()
+        val first = viewModel(cache = cache)
+        first.commit(cellFor(row = 0))
+        clock += FiveMinutesIn
+        first.note(emptyCells(first, count = 1).first())
+        val saved = assertNotNull(cache.get().boardInProgress)
+        assertTrue(
+            saved.elapsedMs >= FiveMinutesIn.inWholeMilliseconds,
+            "the fixture never put five minutes on the saved board",
+        )
+
+        val resumed = viewModel(cache = cache)
+        resumed.note(emptyCells(resumed, count = 1).first())
+        resumed.tick()
+
+        assertFalse(
+            resumed.state.nudgeBoosters,
+            "a board resumed five minutes in nagged on its first cross",
+        )
     }
 
     @Test
@@ -5260,6 +5288,9 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Past the end of one attention burst. */
         val ABurst = 8.seconds
+
+        /** A board somebody was well into before they put the phone down. */
+        val FiveMinutesIn = 5.minutes
 
         /** A phone call, a school run, a night. None of it is play. */
         val AnHourAway = 1.hours

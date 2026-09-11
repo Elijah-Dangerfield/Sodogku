@@ -293,10 +293,72 @@ class StruggleDetectorTest {
         detector.onStruck(0)
         assertTrue(detector.nudging(0))
 
-        detector.reset()
+        detector.reset(at = 0)
 
         assertFalse(detector.nudging(0), "the new board opened with the old board's wrong guess")
         assertFalse(detector.nudging(TwoMinutes), "the new board inherited the old board's idle clock")
+    }
+
+    /**
+     * The resumed board, which is the case the class KDoc promises and the one
+     * a reset to zero got wrong.
+     *
+     * The caller passes attempt-elapsed millis, and on a resume that clock opens
+     * at whatever the saved board had already spent. Starting the drought from
+     * zero reads the entire pre-resume span as a run with no dog in it, so the
+     * tick after the first cross fires.
+     */
+    @Test
+    fun aBoardResumedWithTimeOnItIsNotDroughtedByTheTimeItCameBackWith() {
+        val detector = StruggleDetector()
+        detector.reset(at = FiveMinutes)
+
+        detector.onMarked(FiveMinutes)
+
+        assertFalse(
+            detector.nudging(FiveMinutes + Second),
+            "a board resumed at five minutes was nagged one second after its first cross",
+        )
+    }
+
+    @Test
+    fun aResumedBoardWithTheCrossesInIsStillJudgedFromTheResume() {
+        // Six crosses is the allowance the drought applies as it stands, so this
+        // is the shortest the rule can ever be: twenty seconds, against a board
+        // that came back with twenty-five on it.
+        val detector = StruggleDetector()
+        detector.reset(at = TwentyFiveSeconds)
+
+        repeat(MarksBeforeStall) { detector.onMarked(TwentyFiveSeconds) }
+
+        assertFalse(
+            detector.nudging(TwentyFiveSeconds + PastTheCrosses),
+            "a board resumed at twenty-five seconds was nagged three seconds in",
+        )
+    }
+
+    /**
+     * The other half of the same bug, and the one that fails quietly rather than
+     * loudly: [StruggleDetector.onPlaced] records its gap from the last
+     * placement, so a first dog measured from zero writes the whole pre-resume
+     * span into the pace and pushes the threshold out of reach for the rest of
+     * the board.
+     */
+    @Test
+    fun aResumedBoardsFirstPaceGapIsMeasuredFromTheResume() {
+        val detector = StruggleDetector()
+        detector.reset(at = FiveMinutes)
+        detector.onPlaced(FiveMinutes + FortySeconds)
+        val lastDog = FiveMinutes + FortySeconds * 2
+        detector.onPlaced(lastDog)
+        val pacedThreshold = (FortySeconds * StallPaceMultiple).toLong()
+
+        markThrough(detector, from = lastDog, to = lastDog + pacedThreshold)
+
+        assertTrue(
+            detector.nudging(lastDog + pacedThreshold),
+            "the pre-resume span was recorded as a gap and set the pace for the whole board",
+        )
     }
 
     /**
@@ -337,8 +399,16 @@ class StruggleDetectorTest {
         const val Second = 1_000L
         const val TwoSeconds = 2_000L
         const val FiveSeconds = 5_000L
+        const val TwentyFiveSeconds = 25_000L
         const val FortySeconds = 40_000L
         const val TwoMinutes = 120_000L
+        const val FiveMinutes = 300_000L
+
+        /**
+         * Long enough after six crosses to be past the pre-resume span a board
+         * resumed at [TwentyFiveSeconds] carries, and nowhere near [StallFloor].
+         */
+        const val PastTheCrosses = 3_000L
 
         /**
          * How often a busy player touches the board in these tests. Comfortably
