@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * It holds what the player *did*, not what the game derived. Auto-marks are
  * recomputed from [placements] on restore, because they are a function of it and
  * a stored copy is a second source of truth that can disagree. Everything else
- * here is either a choice ([manualMarks]) or a cost already paid
+ * here is either a choice ([manualMarks], [clearedMarks]) or a cost already paid
  * ([wrongGuesses], [strikesTaken], [score]) and cannot be recovered any other
  * way.
  *
@@ -31,6 +31,24 @@ data class BoardSnapshot(
 
     /** The player's own crosses. Auto-marks are derived and not stored. */
     val manualMarks: Set<Int>,
+
+    /**
+     * Auto-marks the player has tapped off.
+     *
+     * The exception that proves the rule above it. Auto-marks themselves are
+     * recomputed from [placements] and must not be stored, but *removing* one is
+     * a decision the player made and nothing else here implies it. Held as an
+     * exclusion for the same reason the game holds it as one: a cross taken out
+     * of the derived set comes straight back on the next move.
+     *
+     * Defaulted, so a snapshot written before this existed decodes as a board
+     * with nothing tapped off, which is what those boards came back as anyway.
+     *
+     * Absent from [isEmpty] on purpose: clearing an auto-mark needs an auto-mark,
+     * which needs a dog on the board, so a snapshot carrying one is already worth
+     * keeping on [placements] alone.
+     */
+    val clearedMarks: Set<Int> = emptySet(),
 
     /** Squares that cost a bone. These stay red, so they have to survive too. */
     val wrongGuesses: Set<Int>,

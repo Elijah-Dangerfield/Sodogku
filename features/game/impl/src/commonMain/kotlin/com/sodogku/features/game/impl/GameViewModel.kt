@@ -830,9 +830,12 @@ class GameViewModel(
 
         if (rehearsal) tutorial.begin(autoMark)
         // The frame is handed what the player can see, not the cascade: a
-        // lesson points at squares on screen. `clearedMarks` is empty on a
-        // board that is only now opening, so this is the whole of
-        // `visibleAutoMarks` for it.
+        // lesson points at squares on screen. `clearedMarks` needs no subtracting
+        // here, and the reason is the rehearsal rather than the board being
+        // fresh: `openingFrame` returns `TutorialFrame.None` unless a script is
+        // loaded, and the only board that has one is the rehearsal, which never
+        // resumes. So this is the whole of `visibleAutoMarks` everywhere it is
+        // read.
         val lesson = tutorial.openingFrame(
             level,
             opening,
@@ -853,6 +856,12 @@ class GameViewModel(
                 },
                 phase = GamePhase.Playing,
                 manualMarks = resume?.manualMarks.orEmpty(),
+                // The crosses above are the player's own; these are the ones the
+                // board drew that they took back off. Both are their bookkeeping
+                // and both have to come back, but only this one is an exclusion:
+                // `autoMarks` is recomputed from `opening` a few lines up, so
+                // without it every cross the player cleared is redrawn.
+                clearedMarks = resume?.clearedMarks.orEmpty(),
                 wrongGuesses = resume?.wrongGuesses.orEmpty(),
                 // Carried, not granted. This is the line the whole of R15 turns
                 // on: it used to read `ScoringConfig.MAX_LIVES`, so every start
@@ -2781,6 +2790,7 @@ class GameViewModel(
                 isDaily = isDaily,
                 placements = state.placed.columnByRow.toList(),
                 manualMarks = state.manualMarks,
+                clearedMarks = state.clearedMarks,
                 wrongGuesses = state.wrongGuesses,
                 strikesTaken = state.strikesThisAttempt,
                 score = state.score.total,

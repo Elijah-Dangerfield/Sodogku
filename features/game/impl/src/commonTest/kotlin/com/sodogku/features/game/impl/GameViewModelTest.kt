@@ -2515,6 +2515,36 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(GamePhase.Playing, resumed.state.phase)
     }
 
+    /**
+     * The piece of the player's own bookkeeping the snapshot used to drop.
+     *
+     * Auto-marks are recomputed from the placements on restore, which is right,
+     * and a cross the player tapped off is an exclusion from that rather than an
+     * absence in it. Carrying the placements and not the exclusions handed back a
+     * board with every cleared cross drawn on again, so the one gesture that
+     * undoes the game's help was also the only one a relaunch reversed.
+     */
+    @Test
+    fun aClearedAutoMarkSurvivesTheProcessBeingKilled() = runUnitTest {
+        val cache = assistedCache()
+        val first = viewModel(cache = cache)
+        first.commit(cellFor(row = 0))
+        val cleared = first.state.visibleAutoMarks.first { it !in first.state.placedCells }
+
+        first.note(cleared)
+        assertTrue(cleared in first.state.clearedMarks, "the fixture cleared nothing")
+        assertTrue(cleared !in first.state.visibleAutoMarks, "the cross is still drawn")
+
+        val resumed = viewModel(cache = cache)
+
+        assertTrue(cleared in resumed.state.autoMarks, "the deduction has to come back")
+        assertTrue(
+            cleared in resumed.state.clearedMarks,
+            "the resumed board forgot that the player tapped this cross off",
+        )
+        assertTrue(cleared !in resumed.state.visibleAutoMarks, "and so it redrew it")
+    }
+
     @Test
     fun aResumedBoardKeepsTheBonesItAlreadySpent() = runUnitTest {
         val cache = InMemoryAppCache()
