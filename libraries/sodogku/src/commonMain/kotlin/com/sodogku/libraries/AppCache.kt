@@ -253,18 +253,3 @@ class AppCacheImpl(
         defaultValue = { AppData() },
     )
 )
-/**
- * Reset the fields that used to be scoped to a signed-in user, leaving every
- * device-scoped setting (install id, screen visits, feedback counters…) alone.
- *
- * **Nothing calls this.** It is the last survivor of the account layer removed
- * in C0, along with the `UserScopedClearer` / `UserScopedDaoCleaner` dump the
- * auth layer used to run on a user change. There is no sign-out, no account
- * switch and no delete, so there is no event left that would fire it. Kept only
- * because [AppData] is the store a future "start over" would clear; if you are
- * reading this to answer a data question, the answer is that nothing on this
- * device is ever cleared except by uninstall.
- */
-fun AppData.resetAccountScoped(): AppData = copy(
-    hasUserOnboarded = false,
-)
