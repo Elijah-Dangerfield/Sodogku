@@ -701,34 +701,6 @@ reason copy does. It has to be dismissible and must not fire on the rehearsal
 board, which always has a dog.
 
 Provenance: Sentry SODOGKU-7, session `95dd30d1`, 2026-09-10.
-## SD-52 [P2] — The timer is small and the boosters barely ask
-
-**Ask:** Owner, 2026-09-10: *"let's make the timer text just slightly bigger and
-let's make the pulsing of those buttons on the bottom a little bit more
-noticeable. Like I wanna see them with the icon shaking in the middle a little
-bit more. And I honestly haven't been seeing them that much. We probably need a
-better algorithm for deciding when they should pulse."*
-
-Three things, and the third is the real one. The first two are a size and an
-amplitude. The third says the prompt is not firing when a player is actually
-stuck, which is the only thing it exists for.
-
-**Done when:** the clock is legible at a glance, a pulsing booster reads as asking
-to be pressed, and the rule that decides when to pulse has been checked against
-what being stuck actually looks like rather than tuned by feel.
-
-**Hints:** `StruggleDetector` owns the decision and is the part worth measuring.
-Write down what it currently keys on before changing it, then say what it should
-key on. Time on the board without a placement is the obvious signal and it is not
-the only one: a run of wrong guesses, or a long pause after a strike, are both
-stuck in a way a stopwatch alone misses.
-
-The clock is `elapsedLabel` drawn in `BoardClock`, which now also carries the
-time-to-beat caption from SD-17, so a size change has to leave room for both. The
-pulse is `Modifier.pulsate`; read `Animatable.value` inside `graphicsLayer` and
-not in composition or `AnimatedStateReadInComposition` fails the build.
-
-Provenance: Sentry SODOGKU-6, session `95dd30d1`, 2026-09-10.
 ## SD-54 [P2] — Two exits from a board still throw the player out of the app
 
 **Found by:** the SD-13 agent, 2026-09-10, after fixing the third one.
@@ -810,3 +782,22 @@ stale filter, and deleting the alternation would quietly close the question.
 sides and does not check that filtered *values* are producible, which is the hole
 this fell through. SD-39 added a value check for the `iap.*` events; widening it
 to every event with a closed value set is the guard.
+
+## SD-59 [P2] — `Modifier.pulsate` is dead and does not respect reduce-animations
+
+**Found by:** the SD-52 agent, 2026-09-10, while looking for the booster pulse.
+
+`libraries/ui/.../system/Pulsate.kt` has zero call sites. The booster nudge is
+`BoardControl(attention = ...)`, which drives its own `Animatable`. So the brief
+for SD-52 pointed at the wrong thing, and so would the next person's.
+
+It also ignores `LocalReduceAnimations`, which `BoardControl` respects. That is
+harmless while nothing calls it and is a trap the moment somebody does, because
+it looks like the obvious tool for the job.
+
+**Done when:** it is deleted, or it respects reduce-animations and something uses
+it.
+
+**Hints:** Deleting is the answer unless somebody wants it. It is named in
+`docs/SPEC.md`, which SD-22 is deleting anyway, so do this after that or take
+the reference out in the same pass.
