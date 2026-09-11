@@ -266,24 +266,6 @@ tree is half-removed is a different situation from a walk that skips it.
 
 Reproducing it may mean running the tier in a loop while adding and removing a
 worktree. That is worth an hour: everything else in this repo trusts these guards.
-## SD-93 [P2] — `GameState.bonesUnspent` has no reader outside its own tests
-
-**Found by:** the SD-71 agent, 2026-09-10, while clearing comment rot.
-
-The share card was its only production reader and went with the sharing feature.
-`GameViewModel.win` computes the same expression locally, so the property is
-kept alive by two assertions in `GameViewModelTest` and nothing else.
-
-Its KDoc now describes what it is rather than a deleted caller, which stops it
-misleading anybody, and leaves it as a field the state carries for no one.
-
-**Done when:** it is gone, and the two assertions read whatever they were really
-about.
-
-**Hints:** The second half is the work. Those assertions were written to check
-what the share card would draw, so deleting the field without deciding what they
-should assert instead would quietly drop coverage of the bones-at-the-end rule.
-Check whether `win`'s local computation deserves the test rather than the field.
 ## SD-94 [P2] — A quarter of the test files skip the header the practices doc requires
 
 **Found by:** the SD-72 agent, 2026-09-10, while rewriting that doc.
@@ -307,35 +289,6 @@ which has happened four times in this repo.
 
 Write the headers where they are missing rather than deleting the rule. Starting
 with `GameViewModelTest` would be worth it on its own.
-## SD-96 [P2] — Seven streak strings are not referenced by any code
-
-**Found by:** the SD-95 agent, 2026-09-11, while moving the streak's copy into the
-shared file.
-
-`streak_indicator_label`, `streak_indicator_days`, `streak_indicator_none`,
-`streak_celebrate_done` and `streak_day_failed` are referenced from no Kotlin at
-all. `streak_current_days` and `streak_current_none` are imported by
-`StreakScreen.kt` and never read.
-
-They were moved rather than pruned, because deciding what is dead copy was not
-that change. They matter now for a reason they did not before: a translator is
-paid per string, and these are seven rows of a batch nobody will ever see.
-
-**Done when:** every string in the shared file is either referenced or
-deliberately kept, and something fails the build when an unreferenced one is
-added.
-
-**Hints:** Be careful about what "referenced" means before writing a guard.
-Compose Multiplatform generates a `Res.string.*` accessor per key, so a plain
-grep for the key name works, but a string looked up dynamically would not be
-found and would be deleted wrongly. Check for that pattern first.
-
-A guard here is more valuable than the cleanup, and `:apps:integration` is where
-the other source-scanning tests live. `UserFacingCopyStyleTest` already walks
-both the strings and the Kotlin tree, so it has both halves in hand. Declare the
-Gradle inputs with `inputs.files(...)`, which that test already does for the
-string files but may not for the Kotlin side.
-
 ## SD-97 [P2] — Two taps on the daily card start two dailies
 
 **Found by:** the SD-87 agent, 2026-09-11, while sweeping for events that can
