@@ -192,3 +192,36 @@ ladder again, the law is the next thing to look at rather than the magnitude,
 and that is the thing worth knowing in advance.
 
 **Look at this if:** paw distributions by grid size diverge in the field.
+
+## SD-69 [P1] — The store screenshots show a feature that no longer exists
+
+**Found by:** the SD-65 agent, 2026-09-10, while sweeping the listing.
+
+All eight frames in `docs/store/screenshots/android-phone/` predate the current
+build, and two are wrong in ways a reviewer would see:
+
+- **`02-good-dog.png` has a SHARE button on the win sheet.** Sharing was removed
+  entirely. A submitted screenshot advertising a control that is not in the app
+  is the kind of thing a review rejects over. It also shows three paw slots and
+  paws now run to five.
+- **`07-achievements.png`** reads "2 of 21 earned" over a flat grid. The page is
+  now 73 badges on nine labelled shelves.
+
+`04-levels-and-daily.png` shows a Treat chip on level 395, which the current
+schedule no longer pays. The listing file now carries a callout saying the set is
+stale, which is the holding position, not the fix.
+
+**Done when:** all eight frames match the shipped app, and nothing in them
+advertises something that was removed.
+
+**Hints:** This needs an emulator, so it is owner work or work for a session with
+a device. It is the same job as the iOS 6.9" frames in `OWNER-TODO.md`, which are
+blocked on item 11, so doing both at once is the cheap order. The streak pages,
+the win sheet, the board clock and the lose sheet have all changed too, so check
+every frame rather than the two named here.
+
+**Parked 2026-09-11.** Owner: they will retake the whole set themselves before
+submitting, so there is no point fixing two frames now. Nothing reads these
+files, so a stale screenshot in the repo costs nothing until somebody uploads
+one. The listing copy that made the same claim in words is already fixed.
+

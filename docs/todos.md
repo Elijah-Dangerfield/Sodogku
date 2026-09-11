@@ -236,32 +236,6 @@ both entries appeared and launched.
 **If they did not**, this is the cause, and the fix is a Gradle-generated
 `@string/` holding the real application id rather than a literal in the resource.
 Nothing else in the change would explain the entries being absent or dead.
-## SD-69 [P1] — The store screenshots show a feature that no longer exists
-
-**Found by:** the SD-65 agent, 2026-09-10, while sweeping the listing.
-
-All eight frames in `docs/store/screenshots/android-phone/` predate the current
-build, and two are wrong in ways a reviewer would see:
-
-- **`02-good-dog.png` has a SHARE button on the win sheet.** Sharing was removed
-  entirely. A submitted screenshot advertising a control that is not in the app
-  is the kind of thing a review rejects over. It also shows three paw slots and
-  paws now run to five.
-- **`07-achievements.png`** reads "2 of 21 earned" over a flat grid. The page is
-  now 73 badges on nine labelled shelves.
-
-`04-levels-and-daily.png` shows a Treat chip on level 395, which the current
-schedule no longer pays. The listing file now carries a callout saying the set is
-stale, which is the holding position, not the fix.
-
-**Done when:** all eight frames match the shipped app, and nothing in them
-advertises something that was removed.
-
-**Hints:** This needs an emulator, so it is owner work or work for a session with
-a device. It is the same job as the iOS 6.9" frames in `OWNER-TODO.md`, which are
-blocked on item 11, so doing both at once is the cheap order. The streak pages,
-the win sheet, the board clock and the lose sheet have all changed too, so check
-every frame rather than the two named here.
 ## SD-86 [P2] — `:apps:integration` has failed twice for reasons nobody can reproduce
 
 **Found by:** two separate investigations, 2026-09-10.
@@ -481,7 +455,6 @@ learn the real two-strike floor from the table without running the sweep.
 **Hints:** All prose. The one that takes a decision is the band table: either
 add a "two strikes, spread" row or relabel the existing one as the ceiling of
 the two-strike band.
-
 ## SD-93 [P2] — `GameState.bonesUnspent` has no reader outside its own tests
 
 **Found by:** the SD-71 agent, 2026-09-10, while clearing comment rot.
@@ -500,7 +473,6 @@ about.
 what the share card would draw, so deleting the field without deciding what they
 should assert instead would quietly drop coverage of the bones-at-the-end rule.
 Check whether `win`'s local computation deserves the test rather than the field.
-
 ## SD-94 [P2] — A quarter of the test files skip the header the practices doc requires
 
 **Found by:** the SD-72 agent, 2026-09-10, while rewriting that doc.
@@ -524,3 +496,31 @@ which has happened four times in this repo.
 
 Write the headers where they are missing rather than deleting the rule. Starting
 with `GameViewModelTest` would be worth it on its own.
+
+## SD-95 [P2] — One feature module keeps its own strings, which will make translation harder
+
+**Ask:** Owner, 2026-09-11: *"ideally we dont have any per feature strings xml.
+Id prefer all strings be in the resources module. Thatll make it easier to
+translate in the future."*
+
+`features/streak/impl` has its own `composeResources/values/strings.xml` with 32
+strings in it. Every other player-facing string in the app, 497 of them, lives in
+`libraries/resources`. So this is one module out of step rather than a pattern,
+and it is cheap to fix now and annoying to fix after a translator has been sent
+the first batch.
+
+**Done when:** `libraries/resources` holds every player-facing string, no other
+module declares a `composeResources` strings file, and something fails the build
+if one appears again.
+
+**Hints:** The guard matters more than the move. `UserFacingCopyStyleTest` in
+`:apps:integration` already walks every `composeResources/**/*.xml`, so it knows
+how to find them; add an assertion that the only one is the resources module's.
+Declare the Gradle inputs with `inputs.files(...)` or it will silently read
+nothing, which has happened four times in this repo.
+
+Moving the strings means the streak feature takes a dependency on
+`:libraries:resources` if it does not already, and the generated `Res` accessor
+changes package, so the call sites move with it. Check whether the split was
+deliberate before assuming it was not: a feature owning its own strings is a
+reasonable pattern, just not the one this app chose.
