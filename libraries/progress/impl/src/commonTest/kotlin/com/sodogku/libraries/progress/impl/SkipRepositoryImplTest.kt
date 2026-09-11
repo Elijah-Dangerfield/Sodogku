@@ -28,6 +28,38 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 @OptIn(ExperimentalTime::class)
+/**
+ * A daily allowance of skips, and a device clock the player controls.
+ *
+ * The allowance is per local day, which means the only clock available is one
+ * the player can set to anything. So the refill is asserted against a moving
+ * clock rather than a passing one: forward refills, backward does not restore a
+ * spent skip, and forward-then-back leaves the allowance spent for every real
+ * day in between. That last one is what makes the cheat cost more than it buys,
+ * and it is the reason the recorded day only ever moves forward.
+ *
+ * Flying west repeats a date, and repeating a date grants nothing new. That is
+ * the same rule seen from a player who is not cheating at all, which is why it
+ * is worth stating separately.
+ *
+ * The ad rules follow the house position that an outage may never be the reason
+ * somebody is stuck: a failed ad still grants the skip, and only a deliberate
+ * dismissal withholds it, spending nothing. Pro skips without an ad and is
+ * still capped, since the cap is about pacing rather than about revenue.
+ *
+ * Two configuration edges. A non-default cap has to be the one enforced, which
+ * is the half that stops a hardcoded three passing. A negative cap grants
+ * nothing rather than everything, which is what a comparison written the
+ * natural way would do.
+ *
+ * The counter survives a cold start, checked by building a second repository
+ * over the same persisted state.
+ *
+ * ### Not here
+ *
+ * When the offer is shown and what happens to the board is the skip section of
+ * `GameViewModelTest`.
+ */
 class SkipRepositoryImplTest : CoroutineTest() {
 
     private val clock = MovableClock(Noon)

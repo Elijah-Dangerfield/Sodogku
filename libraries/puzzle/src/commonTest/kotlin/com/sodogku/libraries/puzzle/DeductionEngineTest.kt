@@ -7,6 +7,29 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Reasoning the way a player would, in the order a player would reach for it.
+ *
+ * The engine is what difficulty is measured with, so the load-bearing claim is
+ * not that it solves boards but that it never takes a deep technique while a
+ * shallow one applies. Difficulty is defined as the deepest technique a board
+ * needs; an engine that skips ahead rates an easy board hard and the curve
+ * bends for no reason a player could feel. That property is checked across two
+ * hundred generated boards by asking, at every step, whether anything shallower
+ * was available.
+ *
+ * Around it: the tier cap actually stops the engine early, a board with no
+ * answer ends stuck or contradicted rather than looping, and a board handed in
+ * already solved reports zero steps and tier zero rather than one free
+ * deduction.
+ *
+ * ### Not here
+ *
+ * Whether the conclusions are *correct* is `PuzzleSolverTest`, through a brute
+ * force oracle that shares no code with the search. How often the engine
+ * finishes, which is the other half of soundness, is pinned in `DifficultyTest`
+ * instead, because that is the file the answer would mislead.
+ */
 class DeductionEngineTest {
 
     @Test

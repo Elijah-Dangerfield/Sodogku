@@ -9,6 +9,31 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * The builder a caller actually writes, and the two places it can read one way
+ * and behave another.
+ *
+ * Retries and attempts are different numbers, and the whole file leans on that:
+ * three retries is four attempts, and zero retries is one attempt rather than
+ * none. A policy that made zero mean zero would turn a caller opting out of
+ * retrying into a caller making no request at all, which is why that case has
+ * its own test instead of riding on the arithmetic.
+ *
+ * The chain is immutable, so every step returns a new policy and the one it was
+ * built from is unchanged. That is asserted by reading the base back after two
+ * further steps, since a builder that mutates in place passes every test that
+ * only reads the end of the chain.
+ *
+ * `retryIf` replaces the predicate rather than composing with it, which is a
+ * decision a reader could assume either way. It is pinned with a failure the
+ * default would retry and the replacement will not.
+ *
+ * ### Not here
+ *
+ * The delay arithmetic is `BackoffTest` and the randomisation is `JitterTest`.
+ * Which real network failures count as transient is `OfflineErrorsTest`, once
+ * per platform, because the answer is different on each.
+ */
 class RetryPolicyTest {
 
     @Test

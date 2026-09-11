@@ -6,6 +6,32 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * The checks that run in the browser before anything is sent, mirroring the
+ * server's.
+ *
+ * Duplicated rules are usually a smell, and here they are the design: the
+ * server is the authority and refuses bad writes, while this half exists so the
+ * operator finds out in the form rather than through a failed request with a
+ * path in it. The cost is drift, so the mirrored rules are asserted together in
+ * one test that names each of them, which is the place a reader can compare the
+ * list against the server's.
+ *
+ * Typed parsing leans on the near misses, because those are what somebody
+ * actually types: `6` for a boolean, `1.5` for an integer, an unquoted word
+ * where a JSON string belongs, and an empty field, which is the most common
+ * input of all and the one that most easily parses as something.
+ *
+ * Version comparison is by precedence rather than by text, so ten sorts above
+ * nine and a two-part version equals its three-part spelling. Compared as
+ * strings, a rollout gated on version ten would silently never match.
+ *
+ * ### Not here
+ *
+ * The authoritative checks are `ConfigValidationTest` in `:apps:server`. The
+ * console's own detekt exemptions mean its copy is English-only and not
+ * player-facing, so `VerifyStrings` does not apply to it.
+ */
 class ValidationTest {
 
     @Test

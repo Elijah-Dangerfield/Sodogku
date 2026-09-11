@@ -4,6 +4,44 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * What a run is worth, from one placement up to the paw rating on the win
+ * sheet.
+ *
+ * Two layers, and the second is the reason the file is long. The bottom half is
+ * arithmetic with worked examples written out in the comments, so a reader can
+ * check a number by hand instead of trusting the expression that produced it.
+ * The top half drives the real API through whole runs, because the coefficients
+ * can each be right while the ladder they add up to is unreachable at one end.
+ *
+ * Three runs pin that ladder. A perfect run has to clear par, or the top rating
+ * exists and nobody can reach it. The worst run somebody can still finish has
+ * to earn exactly one paw, which the first pass at these coefficients got wrong
+ * by handing out two. And a clean but unhurried run has to land in the middle,
+ * or paws are a pass-or-perfect flag with three unused values.
+ *
+ * That middle case is asserted as a band rather than a rung, on purpose. With
+ * five paws the exact rung depends on the board's shape, and pinning it would
+ * pin the test to a tuning; what has to stay true is that it is neither the
+ * floor nor the ceiling.
+ *
+ * The speed window scales with the grid, which is the fix for solving fast on a
+ * large board and still scoring two paws: a flat window is an age on a four by
+ * four and a blink on a ten by ten, so above about six every placement fell
+ * outside it. The slow fixtures quote their pace per row for the same reason,
+ * since a flat thirty seconds stopped being slow the moment the window doubled.
+ *
+ * Two refusals guard the clock. Unknown timing scores at base rate rather than
+ * guessing, and a negative elapsed time cannot inflate the bonus. A monotonic
+ * clock should never produce the second one, and a backgrounded app with a
+ * resumed timer is exactly where it would come from.
+ *
+ * ### Not here
+ *
+ * Where points go once earned is `LifetimeScoreTest`, and which configured
+ * rates the game actually spends is `ConfiguredScoringTest` and the remote
+ * config section of `GameViewModelTest`.
+ */
 class ScoringTest {
 
     private val config = ScoringConfig.Default

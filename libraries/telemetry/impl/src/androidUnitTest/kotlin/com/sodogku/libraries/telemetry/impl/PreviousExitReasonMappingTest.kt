@@ -4,6 +4,27 @@ import android.app.ApplicationExitInfo
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Android's exit reason codes, folded down to the four words a dashboard reads.
+ *
+ * `ApplicationExitInfo` has more than a dozen reasons and the app reports four
+ * buckets, so most of the work is deciding what does *not* count. A dependency
+ * dying, an initialisation failure and excessive resource use all fall to
+ * `Unknown` on purpose: each has a plausible argument for being a crash, and
+ * counting them as one would inflate the crash rate with exits no fix would
+ * ever move.
+ *
+ * The signalled case goes the other way. It arrives when the system or a
+ * developer stops the process, which looks violent and is clean, and reading it
+ * as a crash would make every debugger detach a reported one.
+ *
+ * This lives in `androidUnitTest` because the constants are platform ones.
+ *
+ * ### Not here
+ *
+ * The iOS answer to the same question is `MetricKitExitReportTest`, which folds
+ * a day of counts rather than mapping a code.
+ */
 class PreviousExitReasonMappingTest {
 
     @Test

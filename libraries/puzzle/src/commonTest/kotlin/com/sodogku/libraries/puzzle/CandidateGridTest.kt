@@ -6,6 +6,32 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * The mutable working state every search and every hint runs on.
+ *
+ * A placement eliminates its row, its column, its region and all eight
+ * neighbours, and those four sweeps are asserted separately because a grid
+ * missing one of them still solves most boards and quietly accepts an illegal
+ * answer on the rest. Around that: placing twice is idempotent, eliminating
+ * twice reports no change, a copy shares nothing with the original, and a group
+ * left with neither a dog nor a candidate is a contradiction rather than a
+ * silently unsolvable grid.
+ *
+ * Placing on an already eliminated cell throws, because no caller inside the
+ * library can reach that state legitimately. What a *player* does on a crossed
+ * off square is a different question entirely and lives in the game feature.
+ *
+ * `autoMarkedCells` is here too, since it is the same elimination read from the
+ * outside. It is what the board draws when assistance is on, so the test covers
+ * the cell the player placed staying unmarked and an unrelated cell staying
+ * open, which are the two ends a sweep that is too eager gets wrong.
+ *
+ * ### Not here
+ *
+ * The search that drives this grid, and how many answers it finds, is
+ * `PuzzleSolverTest`. Which deductions a human would reach for is
+ * `DeductionEngineTest`.
+ */
 class CandidateGridTest {
 
     private val board = Fixtures.rowsAsRegions(6)

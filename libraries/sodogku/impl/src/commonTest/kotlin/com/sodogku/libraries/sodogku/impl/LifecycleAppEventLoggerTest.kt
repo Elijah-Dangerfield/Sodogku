@@ -14,6 +14,28 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
+/**
+ * How long the player had the app open, measured across foreground edges.
+ *
+ * Session length is a number product decisions get made on, and every way of
+ * getting it wrong here produces a plausible number rather than an obvious one.
+ * So the clock is a `TestTimeSource` and the arithmetic is asserted directly: a
+ * fraction of a second truncates rather than rounding up, and a second
+ * foreground restarts the count instead of accumulating, which is the bug that
+ * would make every session look longer the more days somebody played.
+ *
+ * A background with no foreground before it omits the attribute entirely. That
+ * happens on a process the system started without showing anything, and
+ * reporting zero there would drag the average down with sessions that never
+ * existed. An absent attribute is a gap in a dashboard; a zero is a lie in one.
+ *
+ * ### Not here
+ *
+ * Where lifecycle edges come from is platform code. What is done with the
+ * emitted event, including whether it is exported at all, is
+ * `GrafanaLogTreeTest`, and that the attribute name matches the dashboards is
+ * `DashboardQueryContractTest`.
+ */
 class LifecycleAppEventLoggerTest {
 
     private val tree = RecordingTree()

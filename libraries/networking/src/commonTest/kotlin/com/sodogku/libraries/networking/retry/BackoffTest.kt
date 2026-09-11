@@ -7,6 +7,30 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * How long to wait before trying again, for each of the four strategies.
+ *
+ * Mostly arithmetic, and pinned at several attempt numbers rather than one
+ * because an off-by-one in the exponent is invisible at attempt one and doubles
+ * every wait after it. The two tests that are not arithmetic are the ones worth
+ * having.
+ *
+ * The cap has to hold for pathological attempt counts. Computed in nanoseconds
+ * the exponential overflows a `Long` somewhere around attempt forty, which
+ * turns a sixty second ceiling into a negative delay and then into no wait at
+ * all, so a phone with a dead connection hammers the gateway. Attempt one
+ * hundred is asked for explicitly.
+ *
+ * The two constructor refusals, a growth factor at or below one and an initial
+ * delay above the ceiling, both describe a policy that silently does nothing
+ * like backoff. Refusing at construction puts the failure where somebody wrote
+ * it rather than in production traffic.
+ *
+ * ### Not here
+ *
+ * Randomisation on top of these numbers is `JitterTest`, and how many attempts
+ * are made and which failures qualify is `RetryPolicyTest`.
+ */
 class BackoffTest {
 
     @Test

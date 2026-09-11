@@ -7,6 +7,33 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Three sources of truth, one table, and the precedence between them.
+ *
+ * A key can exist in the database, in a build's baked defaults, in a preview of
+ * what a given device would resolve, or in any two of those and not the third.
+ * The table is their union, so a key present in only one source still has a
+ * row. Dropping those rows is the failure that hides the interesting keys: an
+ * override for something the current build no longer declares is exactly what
+ * somebody is looking for when they open this page.
+ *
+ * Precedence runs preview over database over baked default, and each step is
+ * pinned with the step under it set to something different, so a column that
+ * stopped consulting one of them fails rather than agreeing by accident. The
+ * row also has to say *which* source answered, since "false" from a deliberate
+ * override and "false" from a default nobody has touched are the same character
+ * on screen and completely different facts.
+ *
+ * The version label is here because it is the only thing telling the operator
+ * which build's defaults they are looking at, and it has to degrade to a build
+ * number when the name is missing rather than rendering an empty parenthesis.
+ *
+ * ### Not here
+ *
+ * Comparing two environments is `DiffRowsTest`. What a value is allowed to be
+ * is `ValidationTest`, and the authoritative version of that is in
+ * `:apps:server`.
+ */
 class FlagRowsTest {
 
     private val manifestEntry = ManifestEntryDto(

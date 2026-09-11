@@ -111,6 +111,43 @@ import com.sodogku.libraries.progress.streak.StreakPrompt
 import com.sodogku.libraries.progress.streak.StreakRepository
 import com.sodogku.libraries.progress.streak.StreakSummary
 
+/**
+ * The playing loop, driven through the view model the screen actually binds to.
+ *
+ * Everything a player can do to a board arrives here as a `GameAction`, so this
+ * is the one place the rules meet each other: a tap that costs a bone, a bone
+ * that reaches disk, a disk write that survives a kill, a clear that pays a
+ * streak, an ad that refills what the clear did not. Most of the file is those
+ * intersections rather than any single rule, which is why it is the size it is.
+ * The section banners inside carry the requirement each run of tests came from.
+ *
+ * The fixture is a real `LevelPacks.campaign` level past [StarterDogLevel], a
+ * real `Board`, a real `Scoring`, and a hand-rolled fake per repository. The
+ * only things held still are the two clocks, because time of day is an input to
+ * the badges and a test that read the wall clock would pass or fail by when it
+ * ran.
+ *
+ * ### Not here
+ *
+ * Any decision that could be pulled out of the loop has been, and it is tested
+ * where it was pulled out to, not again from this end. `lossFacts` and
+ * `lossStats` are in `LossFactsTest`, the stuck detector in
+ * `StruggleDetectorTest`, the rule chip in `BrokenRuleTest`, the hint sentence
+ * in `HintSentenceTest`, the clock label in `ElapsedLabelTest`, the pace target
+ * in `PaceAgainstTest`, the ad badge in `AdBadgeTest`, the empty-board note in
+ * `EmptyBoardNoteTest` and the tutorial script in `TutorialBoardTest`. Which
+ * dialog a state asks for is `GameDialogsTest`. A test here that only wants to
+ * know what one of those returns is in the wrong file, and slower for it.
+ *
+ * Scoring arithmetic belongs to `:libraries:scoring` and the solver to
+ * `:libraries:puzzle`. What this file asserts about either is the wiring: that
+ * the configured rate is the one the board spends, and that the engine the hint
+ * consults is the engine the board was built from.
+ *
+ * Events are asserted through `recordingEvents`, which plants a `LogTree` and
+ * reads back what the board emitted. Name-level agreement between an event and
+ * a dashboard is somebody else's guard, in `:libraries:telemetry:impl`.
+ */
 class GameViewModelTest : CoroutineTest() {
 
     /**

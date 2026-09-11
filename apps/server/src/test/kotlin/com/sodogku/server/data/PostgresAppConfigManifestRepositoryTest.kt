@@ -12,6 +12,32 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
+/**
+ * Storing what a build declares it can be configured with, against real
+ * Postgres.
+ *
+ * A manifest is uploaded per app version, and CI uploads the same version more
+ * than once, so the upload has to replace that version's rows rather than
+ * append to them. An appending write looks correct until the second deploy of a
+ * release, at which point the console shows every key twice and the second copy
+ * may be stale. That is the claim the single test is built around: upload,
+ * upload again with a different key set, and read back the second one.
+ *
+ * Two smaller promises ride along because they share the fixture. Versions list
+ * newest first, which is the order the console renders without sorting. And
+ * asking for no particular version answers with the newest captured one, which
+ * is what the admin tool does on first load.
+ *
+ * This runs on a Testcontainers Postgres through the real migrations, and it
+ * cleans up its own rows in a `finally` because the container is shared for the
+ * whole JVM.
+ *
+ * ### Not here
+ *
+ * What a value is allowed to be is `ConfigValidationTest`, with no database.
+ * Whether the uploaded key set agrees with the client's is
+ * `ConfigManifestRegistryDriftTest` in `:apps:integration`.
+ */
 @OptIn(ExperimentalTime::class)
 class PostgresAppConfigManifestRepositoryTest : DatabaseTest() {
 

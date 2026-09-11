@@ -5,6 +5,26 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * The number that orders the packs, and the three ways it can lie.
+ *
+ * A board with no answer and a board with several both score
+ * `BEYOND_DEDUCTION`, which is the value that keeps them out of a pack. That is
+ * a refusal rather than a rating, and reading it as "very hard" is the mistake
+ * the first two tests exist to make loud.
+ *
+ * The other two failures are statistical, so they are pinned statistically over
+ * sixty generated boards. A scorer whose engine gives up on most boards is
+ * measuring its own blind spots, and a scorer that returns one tier for
+ * everything cannot drive a curve at all. Neither shows up as a wrong answer on
+ * any single board, which is why neither would be caught anywhere else.
+ *
+ * ### Not here
+ *
+ * That the engine's reasoning is sound, and that it prefers shallow techniques,
+ * is `DeductionEngineTest`. Which levels end up in which pack is
+ * `:libraries:levels`.
+ */
 class DifficultyTest {
 
     @Test

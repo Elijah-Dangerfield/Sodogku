@@ -6,6 +6,35 @@ import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * One number for everything the player has ever banked, and the window a weekly
+ * board reads out of it.
+ *
+ * `withAttempt` is pinned in both directions, and the testing doc cites it as
+ * the reason mutation checking is a house rule here: each direction alone
+ * passes a different wrong implementation. That a replay does not double count
+ * passes against "ignore the attempt entirely". That the number climbs on a
+ * fresh level passes against "always add". Only the pair says what the function
+ * does, so neither test is removable and neither is redundant.
+ *
+ * Campaign levels and dailies pay into the same total, and a daily is held out
+ * of it the same way a level is. The daily case is not hypothetical arithmetic
+ * even though a day cannot normally be replayed: a revived attempt after a loss
+ * reaches the same code.
+ *
+ * The windowed half is the weekly leaderboard. Its boundary is inclusive, and
+ * the reason is external rather than aesthetic: Game Center hands back the
+ * instant a window *opened*, so a score stamped with exactly that instant
+ * belongs to the window that opened and an exclusive comparison drops it from
+ * both. The idle week returning zero matters for the same reason, since zero is
+ * the value the submitter refuses to send, and a fold that fell back to the
+ * lifetime total would stamp a stale number onto the board.
+ *
+ * ### Not here
+ *
+ * What an attempt is worth is `:libraries:scoring`. When a submission actually
+ * goes out is the leaderboard section of `GameViewModelTest`.
+ */
 class LifetimeScoreTest {
 
     @Test

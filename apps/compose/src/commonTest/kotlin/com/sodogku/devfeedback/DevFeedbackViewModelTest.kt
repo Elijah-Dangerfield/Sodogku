@@ -11,6 +11,34 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * The in-app panel the owner files work from, and what rides along with a note.
+ *
+ * The attachments are the point. A directive with no log tail and no screenshot
+ * is a sentence somebody has to reproduce from, so the log box defaults on, the
+ * screenshot the panel was opened over is sent by default, and both are
+ * asserted at the repository rather than on state. Removing the screenshot
+ * removes it from the submission too, which is the half that would otherwise
+ * only clear the preview.
+ *
+ * Two refusals shape the form. Whitespace is not a directive and is not filed.
+ * Typing past the character limit truncates rather than growing an attachment
+ * nothing will read.
+ *
+ * A failed send still confirms, and that is a deliberate choice rather than
+ * swallowed error handling: Sentry is usually disabled on a local build, and
+ * retyping the same directive into the same disabled Sentry is not a recovery.
+ * Asking for one would train the owner to ignore the panel.
+ *
+ * Filing clears the form, including the log preference, so the next directive
+ * starts from the defaults rather than inheriting the last one's.
+ *
+ * ### Not here
+ *
+ * How a report is uploaded, and what the triage skill does with it afterwards,
+ * are outside this view model. That the skill's queries match the tags is
+ * `FeedbackTriageQueryContractTest`.
+ */
 class DevFeedbackViewModelTest : CoroutineTest() {
 
     @Test

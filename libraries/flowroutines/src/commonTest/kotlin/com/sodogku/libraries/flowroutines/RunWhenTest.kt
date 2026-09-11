@@ -12,6 +12,41 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Work that should run while a key is present, and must stop the moment it is
+ * not.
+ *
+ * The primitive looks small and has a lot of edges, which is why the file is
+ * long. Each test names one transition: a key already present when somebody
+ * subscribes, a key arriving later, a key changing to a different one, and a
+ * key going away. The last is the one with consequences, and it is asserted
+ * twice, once against work that is mid-flight and once against a retry sitting
+ * in its backoff. A cancellation that reaches the running body and not the
+ * pending delay leaves work that wakes up after the key it belonged to is gone.
+ *
+ * Repeat requests while a slow run is in progress coalesce into one trailing
+ * run rather than queueing, because the caller is asking for fresh results and
+ * not for a backlog.
+ *
+ * Retries stop on success, stop on exhaustion, and re-arm a fresh counter on
+ * the next request, so an early streak of failures does not poison the rest of
+ * the session. A body that throws is a failed attempt rather than the death of
+ * the surrounding scope, which is the difference between one retry and a silent
+ * end to everything the scope was running.
+ *
+ * The external cancellation test is about a promise, not a mechanism. Whatever
+ * cancels the job seen from inside the body has to be cancelling the *whole*
+ * cycle, pending backoff and repeat edges included, and the loop still has to
+ * be alive for the next key.
+ *
+ * Timing is virtual throughout, so nothing here sleeps.
+ *
+ * ### Not here
+ *
+ * The delay arithmetic under a retrying network call is
+ * `:libraries:networking`. Anything about view-model scopes is `SEAViewModel`
+ * and its own tests.
+ */
 class RunWhenTest {
 
     @Test

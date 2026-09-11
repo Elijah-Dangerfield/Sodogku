@@ -9,6 +9,41 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Everything that decides whether a log line leaves the device, and what it
+ * carries when it does.
+ *
+ * Four gates stack here and each can silently swallow the others: the kill
+ * switch, the sample rate, the forwarding toggle that lets plain `KLog` lines
+ * through alongside events, and the severity floor under that toggle. They are
+ * tested in combination rather than one at a time, because the failures worth
+ * catching are the ones where an outer gate hides an inner one and the tree
+ * still looks like it works.
+ *
+ * The sampling pair is the shape to copy. All-or-nothing per session is
+ * satisfied by a tree that keeps everything and by one that keeps nothing, so
+ * on its own it stays green while the rate does nothing, and the rate is the
+ * dial the whole Grafana bill hangs off. Its companion pins two session ids
+ * that bucket either side of one half, so a rate that stopped being consulted
+ * fails rather than passing.
+ *
+ * The scrubbing test is a privacy claim, not a formatting one. Loki is a shared
+ * stack, a warning goes there by default, and a bearer token that rode one used
+ * to be stripped from the feedback attachment and shipped here in the clear.
+ *
+ * The rest is what a record is stamped with: correlation ids at emit time, a
+ * session id that follows a rollover, an absent install id omitted rather than
+ * crashing, and attributes that are neither strings nor numbers stringified
+ * rather than dropped.
+ *
+ * ### Not here
+ *
+ * Serialising a record onto the wire is `OtlpJsonLogRecordExporterTest`, and
+ * surviving a dead network is `FailSafeLogRecordExporterTest`. That the event
+ * names and attributes agree with what the dashboards ask for is
+ * `DashboardQueryContractTest`, which is a name check and proves nothing about
+ * whether the code path runs.
+ */
 class GrafanaLogTreeTest {
 
     private val processor = RecordingLogRecordProcessor()

@@ -6,6 +6,31 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Comparing two environments, and being careful about what counts as a
+ * difference.
+ *
+ * The console shows this before somebody promotes config from staging to
+ * production, so the number of highlighted rows is the number of things they
+ * are about to change. Three kinds of drift are tracked separately and only two
+ * of them mean the environments disagree.
+ *
+ * A value overridden on one side and unset on the other differs. Rules
+ * attached on one side and not the other differ, even when the resolved value
+ * is currently identical, because the rule will start applying to somebody.
+ * Defaults baked into different builds are reported and do not count, since
+ * that is two release trains rather than a configuration change, and counting
+ * it would make every row light up the week of a release.
+ *
+ * The row set is the union of both sides across both flags and both manifests,
+ * which is what stops a key that exists only in the environment being promoted
+ * *to* from vanishing out of the comparison.
+ *
+ * ### Not here
+ *
+ * Whether a value is well formed is `ValidationTest`, undoing a change is
+ * `RevertTest`, and how rows are grouped and filtered is `FlagRowsTest`.
+ */
 class DiffRowsTest {
 
     private fun flag(path: String, value: Boolean, rules: List<ConfigRuleDto> = emptyList()) =

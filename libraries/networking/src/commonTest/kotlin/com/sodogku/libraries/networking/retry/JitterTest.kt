@@ -7,6 +7,26 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * Spreading retries out so a fleet that failed together does not come back
+ * together.
+ *
+ * The point of jitter is a distribution, and a distribution is what a single
+ * assertion cannot see, so each strategy is walked two hundred times through a
+ * seeded random and held to its range. Seeded rather than free, because a range
+ * test on real randomness is a test that fails once a month on somebody else's
+ * change.
+ *
+ * The zero case is the one with teeth. No configured backoff means no delay,
+ * and jitter must not invent one out of nothing. It also guards a crash:
+ * picking a random value in an empty range throws, so an unguarded jitter turns
+ * a no-retry policy into an exception on the first failure.
+ *
+ * ### Not here
+ *
+ * The delays being jittered are `BackoffTest`. Whether a retry happens at all
+ * is `RetryPolicyTest`.
+ */
 class JitterTest {
 
     @Test

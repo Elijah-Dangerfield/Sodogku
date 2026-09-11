@@ -34,6 +34,38 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalTime::class)
+/**
+ * Config has to answer immediately, offline, and before the network ever does.
+ *
+ * The boot gate awaits the first emission, so anything that can make this
+ * repository quiet is a launch that hangs. Three tests exist because three
+ * different causes produced that same symptom, and none of them looked like a
+ * config bug from the outside: a fresh install with nothing cached, a cached
+ * snapshot that no longer parses, and a synchronous read landing on the main
+ * thread before the stream had emitted at all. The last one blocked, missed the
+ * scene-create watchdog and was killed by the platform, which reads as a launch
+ * crash.
+ *
+ * Their companion is the one that keeps them honest: a real snapshot still
+ * supersedes the fallback. Without it, "return the bundled defaults and stop"
+ * passes all three.
+ *
+ * The refresh half is throttling, and the throttle is itself a config value, so
+ * it is exercised at its default, at a custom interval and at zero. A failed
+ * fetch does not reset the clock, which is what stops a dead server turning
+ * every foreground into another request.
+ *
+ * Overrides are asserted on top of a cached snapshot rather than on their own,
+ * since a QA override that only works when the cache is empty works nowhere
+ * real.
+ *
+ * ### Not here
+ *
+ * Storing and merging the overrides themselves is
+ * `ConfigOverrideRepositoryImplTest`. That every declared key has a reader, and
+ * that the client and server key sets agree, are source-scanning guards in
+ * `:apps:integration`.
+ */
 class OfflineFirstAppConfigRepositoryTest : CoroutineTest() {
 
     private val throttleMs = 5 * 60 * 1000L

@@ -13,6 +13,25 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * The app going to the background is the last chance to upload what it logged.
+ *
+ * Two opposite mistakes, and both of them are quiet. Not flushing loses
+ * everything a session buffered, because the process may never be foregrounded
+ * again. Flushing unconditionally builds the whole OTLP stack on an edge that
+ * nothing ever logged through, which on a cold launch straight to background is
+ * work a player pays for and no dashboard ever sees.
+ *
+ * So the flusher is asserted from both ends: a background edge after a real log
+ * call flushes once, and a background edge with a planted tree that nothing has
+ * logged through flushes zero times.
+ *
+ * ### Not here
+ *
+ * What the tree does with a record, including sampling and offline handling, is
+ * `GrafanaLogTreeTest`. Failures inside the exporter are
+ * `FailSafeLogRecordExporterTest`.
+ */
 class TelemetryBackgroundFlusherTest : CoroutineTest() {
 
     private class FlushCountingProcessor : LogRecordProcessor {

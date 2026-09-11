@@ -11,6 +11,31 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
+/**
+ * The only id this app has, and the three states it can be read in.
+ *
+ * Sodogku has no accounts, so an install id is the whole of what correlates one
+ * device's telemetry. It is minted once on a cold install and then has to be
+ * returned verbatim forever. The reuse test asserts both halves of that: the
+ * value comes back unchanged, and reading it does not write a new one, since a
+ * provider that re-minted on every read would still pass a test that only
+ * compared the return value to itself.
+ *
+ * The third state is a cache that cannot be read. The provider answers null
+ * rather than throwing, the header is simply omitted, and the server tolerates
+ * its absence. A crash here would take down a launch over a value that is only
+ * ever used for correlation.
+ *
+ * The eager hydrate in `init` is why the fixture works without awaiting
+ * anything: `CoroutineTest`'s unconfined dispatcher runs it before `current()`
+ * is called, which mirrors what the real `Main.immediate` does.
+ *
+ * ### Not here
+ *
+ * That the id reaches outbound requests is the networking headers provider, and
+ * `:apps:integration` sees it over real HTTP. What the privacy page promises
+ * about identity is `NoIdentitySeamsTest`.
+ */
 class CachedInstallIdProviderTest : CoroutineTest() {
 
     @Test

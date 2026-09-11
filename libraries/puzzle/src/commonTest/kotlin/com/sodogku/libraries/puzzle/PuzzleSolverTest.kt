@@ -8,6 +8,32 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * The search, held against an oracle that shares none of its code.
+ *
+ * The solver prunes, and a wrong pruning rule is invisible from the inside: it
+ * returns an answer, the answer obeys the rules, and the count it reports is
+ * simply too low. So counts are checked against brute force enumeration of
+ * every column permutation, filtered by the public rule checker. That oracle is
+ * exponential and only ever runs on the small fixtures, which is the price of
+ * having a second opinion at all.
+ *
+ * Uniqueness is the part the rest of the game leans on, since a level with two
+ * answers marks a correct placement wrong. Its three outcomes are separated:
+ * exactly one answer, several, and none.
+ *
+ * Two fixtures are doing quiet work. Regions that *are* the columns constrain
+ * nothing, so they have to count the same as rows-as-regions, and anything that
+ * makes them look constrained is a bug in the search. Given placements that
+ * already break a rule have to yield nothing rather than being treated as a
+ * fresh start.
+ *
+ * ### Not here
+ *
+ * What the rules are is `SolutionTest`. How a board gets built, and whether
+ * refinement converges, is `BoardFactoryTest`. Human-shaped reasoning over the
+ * same boards is `DeductionEngineTest`.
+ */
 class PuzzleSolverTest {
 
     @Test

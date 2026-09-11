@@ -6,6 +6,35 @@ import kotlin.test.assertContains
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * The ring buffer a bug report carries, and the four ways it lets somebody
+ * down.
+ *
+ * Its whole reason to exist is the last few hundred lines before something went
+ * wrong, so the failures are all about what is missing when a reporter finally
+ * looks. It drops the oldest line rather than the newest. A runaway line is
+ * truncated in place rather than evicting its neighbours, which is the bug that
+ * loses exactly the context around a five hundred character dump. A snapshot
+ * does not consume the buffer, so a second report still gets something. And an
+ * entry below the minimum level is refused at the write as well as at
+ * `isLoggable`, because a caller that checks neither must not get verbose churn
+ * into a debug buffer.
+ *
+ * The scrub test goes through `KLog` rather than straight into the tree, and
+ * that is deliberate. Redaction moved into the engine so the two sinks that
+ * leave the device would get it too, which means the tree alone no longer
+ * scrubs anything. Asserting on the path a real line takes is the only way this
+ * still proves what it claims.
+ *
+ * The rendered format is pinned literally, since a reporter reads it and
+ * nothing else parses it.
+ *
+ * ### Not here
+ *
+ * The other two trees. What Sentry captures is `SentryLogTreeTest`, and what
+ * Grafana exports is `GrafanaLogTreeTest`, both of which scrub on their own
+ * paths.
+ */
 class InMemoryLogTreeTest {
 
     private fun tree(

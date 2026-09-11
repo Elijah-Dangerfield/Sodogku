@@ -23,6 +23,43 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 
+/**
+ * The badge grid, the news it announces, and the three things it suggests going
+ * after next.
+ *
+ * The grid draws shelves rather than a flat list, so the shelves are asserted
+ * to hold every badge in the catalogue exactly once and in the catalogue's own
+ * order. A badge that fell out of the grouping would be invisible on screen
+ * while every count on the page still added up.
+ *
+ * Progress is a counter over a target, read off the same counter for several
+ * badges at once, and it stops at the target once earned. That counter keeps
+ * climbing forever, and "342 / 10" under a badge won months ago reads as a bug
+ * rather than as a boast.
+ *
+ * A hidden badge gives nothing away, and the test says why the obvious
+ * implementation is wrong: reporting even zero out of one tells the reader
+ * exactly what to go and try, which is the half of the surprise worth keeping.
+ *
+ * The news half is a watermark that only ever moves forward, so a badge seen
+ * once is not announced again and a badge back-filled onto an older play still
+ * counts as news. Looking at a grid nobody can see marks nothing, which is what
+ * stops the announcement being spent by a screen that never rendered.
+ *
+ * The spotlight picks the nearest rung on each ladder, refuses to point at a
+ * mystery badge, and goes quiet on a finished collection rather than pinning
+ * something arbitrary to the top.
+ *
+ * The settings toggle hides the grid and nothing else, asserted by the
+ * repository being read-only from here. That is what makes a month of play
+ * appear when somebody turns badges back on.
+ *
+ * ### Not here
+ *
+ * Which histories earn which badges, and when, is `AchievementEngineTest` in
+ * `:libraries:achievements`. The trophy that carries a badge back to the board
+ * is the trophy section of `GameViewModelTest`.
+ */
 class AchievementsViewModelTest : CoroutineTest() {
 
     @Test

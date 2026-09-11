@@ -5,6 +5,38 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * A lint rule for a gesture conflict, and the line it draws between a report
+ * and silence.
+ *
+ * A vertical scroll inside a sheet fights the sheet's own drag-to-dismiss, and
+ * the result is a sheet that sometimes closes when somebody meant to scroll.
+ * Nobody notices in review, so the rule catches it instead. Most of this file
+ * is therefore the negative cases, since a rule that reports too much gets
+ * baselined away and then protects nothing.
+ *
+ * Reported: a scroll in the content lambda however deep, a scroll passed as the
+ * sheet's own modifier, the design system's scroll-with-bar wrapper, and a
+ * vertically oriented `Modifier.scrollable`. Allowed: a horizontally scrolling
+ * row, which cannot fight a vertical drag, a scroll on an ordinary screen, the
+ * sheet that opts in properly, and the sheet declaration itself, which has to
+ * contain the scroll it offers.
+ *
+ * One message test, because a lint report naming only the problem sends the
+ * reader to search for the fix. This one names the opt-in parameter.
+ *
+ * ### What the rule cannot see, asserted rather than assumed
+ *
+ * A scroll inside a composable the lambda calls. That needs type resolution
+ * across files, which this rule does not have, and the limit is pinned as a
+ * passing test so it reads as a known edge rather than as a gap somebody
+ * later mistakes for coverage.
+ *
+ * ### Not here
+ *
+ * Whether the rule is switched on, and where it is excluded, is
+ * `config/detekt/detekt.yml`.
+ */
 class ScrollInsideBottomSheetTest {
 
     private val rule get() = ScrollInsideBottomSheet(Config.empty)

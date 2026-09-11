@@ -16,6 +16,32 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
 
+/**
+ * The note a player sends, and the promise the screen makes about what rides
+ * with it.
+ *
+ * The log attachment is the claim worth guarding. The screen prints a line
+ * telling the player their note travels with a log of the session, and nothing
+ * on this path passes that flag explicitly, so the promise rests entirely on
+ * the interface default. If that assertion ever fails, the copy is the thing to
+ * fix rather than the assertion, and that is written down because the opposite
+ * reflex is the natural one.
+ *
+ * A send that fails still confirms, and the counter still moves. Sentry may be
+ * disabled or the phone offline, and telling somebody their thank-you note
+ * bounced only invites them to retype it into the same void.
+ *
+ * The two refusals are an empty note, which is not sent at all, and typing past
+ * the character limit, which truncates rather than growing a report nobody will
+ * read.
+ *
+ * ### Not here
+ *
+ * The owner's own in-app panel is `DevFeedbackViewModelTest` in `:apps:compose`,
+ * which files a different kind and carries a screenshot. What triage does with
+ * a report afterwards is the skill, held to the enum by
+ * `FeedbackTriageQueryContractTest`.
+ */
 class FeedbackViewModelTest : CoroutineTest() {
 
     @Test

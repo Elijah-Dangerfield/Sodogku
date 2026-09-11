@@ -6,6 +6,30 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * The rules themselves, stated once so everything else can be checked against
+ * them.
+ *
+ * `ruleViolations` is the definition of a legal placement in this game, and the
+ * solver, the generator and the board all defer to it. Each of the four ways to
+ * break it gets its own test, matched on the message rather than the count, so
+ * a checker that reports the wrong reason fails rather than passing on a
+ * coincidence.
+ *
+ * Two properties matter more than the four rules. A partial placement is judged
+ * only on what is placed, which is what lets a half-finished board be valid and
+ * unsolved at the same time. And rows two apart can never touch whatever
+ * columns they use, which is the fact that lets the solver reduce adjacency to
+ * one comparison per consecutive pair instead of a sweep.
+ *
+ * The rest is the value type: placements are copies, an index is row-major, and
+ * clearing a row leaves it unplaced rather than at column zero.
+ *
+ * ### Not here
+ *
+ * Region shape and contiguity belong to the board, in `BoardTest`. Counting how
+ * many placements satisfy these rules is `PuzzleSolverTest`.
+ */
 class SolutionTest {
 
     private val board = Fixtures.uniqueFourByFour()

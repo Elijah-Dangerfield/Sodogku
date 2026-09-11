@@ -3,6 +3,29 @@ package com.sodogku.server.http
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Picking a string for a request whose language the catalogue may not have.
+ *
+ * The whole file is about degrading, since the interesting inputs are the ones
+ * with no exact answer. A tag is matched case insensitively, and subtags are
+ * stripped one at a time until something matches, so a phone asking for
+ * `zh-Hant-TW` still gets the `zh` entry rather than nothing.
+ *
+ * Preference order is the part that is easy to get backwards. The list is
+ * walked in order and the first tag that matches *anything* wins, so a first
+ * preference the catalogue has never heard of falls through to the second
+ * rather than ending the search.
+ *
+ * Two last resorts, in order: English, then any value at all. The second is
+ * deliberately unordered, and the test asserts only that the result came from
+ * the catalogue. Pinning which one would be pinning map iteration order, which
+ * is not a promise and would fail on an unrelated change.
+ *
+ * ### Not here
+ *
+ * How the preference list is parsed out of an `Accept-Language` header, and
+ * which routes consult this, are the route tests.
+ */
 class LocaleMatchTest {
 
     private val sample = mapOf(

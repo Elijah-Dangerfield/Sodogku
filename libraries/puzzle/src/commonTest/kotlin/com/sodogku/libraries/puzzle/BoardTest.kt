@@ -6,6 +6,26 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * The grid itself: what a board is made of, before anybody plays on it.
+ *
+ * Three claims. Letters parse row-major into regions and survive a round trip
+ * through `toString`, which is how every committed level is stored. A cell's
+ * neighbours include the diagonals and clamp at the edges, which is the rule
+ * the whole game is built on and the easiest one to get subtly wrong in a
+ * corner. And `structuralProblems` names a malformed board: an empty region, a
+ * region in two pieces, and the case that reads as contiguous to the eye,
+ * region halves meeting only at a corner.
+ *
+ * Malformation is checked through the reports rather than through a refusal to
+ * construct, because the generator builds partial boards on purpose and would
+ * have nowhere to go if the constructor threw.
+ *
+ * ### Not here
+ *
+ * Whether a board has an answer, or one answer, is `PuzzleSolverTest`. How the
+ * board gets built is `BoardFactoryTest`.
+ */
 class BoardTest {
 
     @Test

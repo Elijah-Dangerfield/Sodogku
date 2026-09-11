@@ -11,6 +11,35 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Turning a line of audit history back into the change that would undo it.
+ *
+ * This is the button somebody reaches for when a flag has just broken
+ * production, so the failure that matters is a plan that looks like an undo and
+ * is not. Each action inverts to its opposite: a create becomes a removal, an
+ * update restores the value from before, a deleted rule is rebuilt from its
+ * snapshot with its priority and conditions intact.
+ *
+ * Deleting a flag cascades to its rules, and restoring the flag does not bring
+ * them back. Since nothing in the interface would show that, the plan carries a
+ * caveat and this pins that it is there. A silent partial undo is worse than a
+ * refusal, because the operator walks away believing they are back where they
+ * started.
+ *
+ * Refusals are grouped in one test on purpose: an action with no inverse, an
+ * update with no recorded before value, and a snapshot that no longer parses
+ * all produce no plan rather than an empty one. The alternative is a revert
+ * button that writes nothing and says it worked.
+ *
+ * The audit sentence and the relative timestamp are here too. They are read by
+ * the same person under the same pressure, so they are held to full sentences
+ * and to buckets that are checked at each unit rather than only at minutes.
+ *
+ * ### Not here
+ *
+ * Whether the server accepts the resulting write is `ConfigValidationTest` and
+ * the route tests in `:apps:server`. This file stops at the plan.
+ */
 class RevertTest {
 
     private fun entry(

@@ -8,6 +8,32 @@ import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
+/**
+ * What the admin console is allowed to save, checked without a database.
+ *
+ * Remote config is the live-ops lever, so a value that gets past validation
+ * reaches every installed client. The type checks are therefore about near
+ * misses rather than nonsense: a quoted `"true"` where a boolean belongs, a
+ * `"5"` where an integer belongs. Both look right in a text field and both
+ * deserialise to something the client will not read.
+ *
+ * An unknown path passes on purpose, and that is the one decision here somebody
+ * might call a bug. A key can only be added to the manifest by shipping a
+ * build, and refusing unknown paths would mean no flag could be set before the
+ * release it belongs to had gone out. The cost is that a typo in a path saves
+ * quietly, which the client-side manifest guards catch instead.
+ *
+ * Rule conditions are bounds and ordering: a rollout outside nought to one
+ * hundred, a minimum version above its maximum. Each of those describes a rule
+ * that will simply never match, which is indistinguishable from a rule that was
+ * never saved.
+ *
+ * ### Not here
+ *
+ * Which rule wins when several match is `AppConfigTargetingEngineTest`. Storing
+ * any of this is the Postgres repository tests. That the key set agrees with
+ * the client's is `ConfigManifestRegistryDriftTest` in `:apps:integration`.
+ */
 class ConfigValidationTest {
 
     private fun entry(path: String, type: String, allowed: List<String>? = null) = ManifestEntry(

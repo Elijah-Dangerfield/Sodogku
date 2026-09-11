@@ -22,6 +22,34 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * The wire format, asserted field by field against a mock engine.
+ *
+ * OTLP JSON is a contract with a collector that is not in this repo, so it
+ * cannot be checked by round-tripping. The failure mode is a payload the
+ * gateway accepts with a two hundred and then silently drops, which looks
+ * exactly like healthy telemetry from here. So the nesting is walked all the
+ * way down, and every attribute type is pinned to the typed slot it has to land
+ * in: a long in `intValue`, a boolean in `boolValue`, a double in
+ * `doubleValue`. Putting a number in the string slot is the mistake that costs
+ * a week of empty panels.
+ *
+ * Two constants are pinned rather than derived. Severity nine is what INFO has
+ * to serialise as, which guards an ordinal mapping that would otherwise shift
+ * silently, and the nanosecond timestamp is spelled out because a millisecond
+ * value here is three orders of magnitude wrong and still parses.
+ *
+ * The transport half covers the three ways a post ends: success, a server
+ * error, and an engine that throws instead of responding, which is airplane
+ * mode. An empty batch skips the network entirely, since a request with nothing
+ * in it is a wakeup a player pays for.
+ *
+ * ### Not here
+ *
+ * Which records reach an exporter at all, including sampling and scrubbing, is
+ * `GrafanaLogTreeTest`. That a throw cannot escape into the batch processor's
+ * coroutine is `FailSafeLogRecordExporterTest`.
+ */
 class OtlpJsonLogRecordExporterTest {
 
     private class FakeResource(override val attributes: Map<String, Any>) : Resource {

@@ -7,6 +7,29 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+/**
+ * Generation, from a random placement to a board with exactly one answer.
+ *
+ * Four stages, each with its own invariant: seed a legal placement, grow
+ * regions around it, mutate a region without breaking the partition, refine
+ * until the answer is unique. The one that matters most is that every later
+ * stage still leaves the seed solving the board. Lose that and the generator
+ * happily emits a level whose recorded answer is wrong, which nothing
+ * downstream would notice until a player placed the last dog and was told no.
+ *
+ * Two assertions here are about throughput rather than correctness, and are
+ * written as floors on how often refinement converges. They exist because
+ * random mutation converted zero of sixty at the largest size, and a generator
+ * that is merely slow looks exactly like one that is broken until somebody
+ * waits an hour for it.
+ *
+ * ### Not here
+ *
+ * Solving and uniqueness counting are `PuzzleSolverTest`, and how hard the
+ * result is to play is `DifficultyTest`. This file uses the solver only to ask
+ * whether refinement finished, never to check the solver itself. The packs the
+ * generator writes are validated in `:libraries:levels`.
+ */
 class BoardFactoryTest {
 
     @Test

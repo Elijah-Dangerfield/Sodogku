@@ -25,6 +25,44 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
+/**
+ * The reference recipe for a view-model test in this repo, and the screen where
+ * a toggle that lies is invisible.
+ *
+ * `docs/practices/testing.md#the-layers` points here for the shape: extend
+ * `CoroutineTest`, hand-roll a fake per dependency, drive actions, assert on
+ * `vm.state`. Anything new in that tier should read like this file.
+ *
+ * Every toggle is round-tripped rather than only flipped, because a handler
+ * that writes without persisting and a screen that persists without reading
+ * back both look correct from one direction. The ones seeded to their
+ * non-default matter most: against `false`, "opens showing what is saved"
+ * passes for a screen that never opened the cache at all.
+ *
+ * Flipping a toggle and flipping it back is the cheapest guard against a real
+ * bug in this pattern. `state` lags `updateState` by a dispatch, so a handler
+ * that reads it back after writing computes the second flip from a stale value
+ * and the switch sticks on.
+ *
+ * Two decisions here are about what a toggle must *not* do. Hiding achievements
+ * writes one display flag and leaves the log recording, which is what makes
+ * turning them back on show real history, and that is pinned by comparing the
+ * whole of the persisted data rather than the one field. Replaying the tutorial
+ * clears its flag before navigating, since the board reads that flag once as it
+ * loads, and it leaves the onboarding flag alone so somebody two hundred levels
+ * in is not shown the welcome screen again.
+ *
+ * The remote-config cases lean toward the player: with no config the
+ * achievements section is present, and a malformed value does not hide it.
+ * A string typed into a boolean key used to resolve to false, and every feature
+ * key is one console typo away from that.
+ *
+ * ### Not here
+ *
+ * What the settings actually change. Auto-mark's effect on a board is
+ * `GameViewModelTest`, reduced motion's effect on a dialog is
+ * `ModalDialogDefaultsTest`, and sending feedback is `FeedbackViewModelTest`.
+ */
 class SettingsViewModelTest : CoroutineTest() {
 
     @Test

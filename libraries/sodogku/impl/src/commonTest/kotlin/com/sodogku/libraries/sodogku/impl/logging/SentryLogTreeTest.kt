@@ -8,6 +8,31 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * What reaches Sentry, and what must not.
+ *
+ * Two questions, both answered without a Sentry client. Whether an entry
+ * becomes an event is decided by level and by whether the throwable is control
+ * flow the app expected: a deliberate short circuit thrown at error level is
+ * noise that would bury real crashes, while an error with no throwable at all
+ * is still a report somebody wants. Each of those four combinations gets its
+ * own assertion, because a threshold check that ignored the marker interface
+ * passes three of them.
+ *
+ * The other question is redaction, and it is a privacy claim rather than a
+ * formatting one. A throwable's message is the one field the logging engine
+ * cannot rewrite on its way past, so the scrub has to happen where the tree
+ * reads it. A tree that goes back to reading the message directly ships a
+ * bearer token off the device, and that is what the last test fails on.
+ *
+ * ### Not here
+ *
+ * Everything downstream of the decision: transport, batching and whether Sentry
+ * is initialised at all. That the privacy page's claims about Sentry stay true
+ * is `NoIdentitySeamsTest` in `:apps:integration`. Scrubbing on the Grafana
+ * path is asserted separately in `GrafanaLogTreeTest`, since the two exporters
+ * share no code.
+ */
 class SentryLogTreeTest {
 
     private val tree = SentryLogTree(

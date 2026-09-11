@@ -4,6 +4,32 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
+/**
+ * What a screen visit reports about its frames, and when it reports nothing.
+ *
+ * Every failure here is a dashboard that reads plausibly and is wrong, which is
+ * the worst kind: a panel with a number on it is trusted. One janky frame out
+ * of three is thirty-three percent and means only that the screen was barely on
+ * show, so short visits are dropped. A dropped visit still has to clear its
+ * counters, or the next screen inherits frames it never rendered.
+ *
+ * The worst-frame field is the one that earns its keep for stall work. A screen
+ * dropping one frame in two hundred rounds to one percent and looks healthy; if
+ * that frame took nine hundred milliseconds there is a freeze in it, and this
+ * is the only field that says so. Its companion is that a long frame which was
+ * still on time never sets it, since duration is recorded for every frame and
+ * a slow first composition inside a generous budget is not jank.
+ *
+ * A perfectly smooth screen reports too. Zero is a result, and a tally that
+ * spoke up only about trouble could not tell a fixed screen from an unvisited
+ * one.
+ *
+ * ### Not here
+ *
+ * Where the frame callbacks come from is platform code. That the emitted
+ * attribute names match what the dashboards query is
+ * `DashboardQueryContractTest`.
+ */
 class JankTallyTest {
 
     @Test

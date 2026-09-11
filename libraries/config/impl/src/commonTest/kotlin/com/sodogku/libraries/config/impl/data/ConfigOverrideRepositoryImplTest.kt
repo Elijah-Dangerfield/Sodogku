@@ -13,6 +13,34 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * The QA menu's local overrides, and the disk they share with real config.
+ *
+ * Overrides and the fetched config live in the same cached blob, so the
+ * assertion with the most teeth is that writing one leaves the other untouched.
+ * Serialising the whole object back from a partial model would wipe the fetched
+ * values on the next override, and the symptom is a tester reporting that
+ * remote config stopped arriving on a build where it is working fine.
+ *
+ * The writes are otherwise an upsert with the edges stated separately: setting
+ * the same path twice replaces rather than appends, and unrelated paths
+ * survive. Clearing resets the cache as well as the in-memory copy, since an
+ * override that comes back after a relaunch is worse than one that never left.
+ *
+ * Hydration covers three starting states: a populated cache, an empty one, and
+ * a value on disk that no longer parses. The last falls back to no overrides,
+ * because this is the path the app boots through and a refusal here bricks a
+ * build over a debug feature.
+ *
+ * The flow emits the current snapshot before any update, which is what lets a
+ * screen bind to it without a separate initial read.
+ *
+ * ### Not here
+ *
+ * How an override wins over a fetched value is
+ * `OfflineFirstAppConfigRepositoryTest`. What the keys mean, and whether every
+ * declared one is read, is `ConfigValuesAreReadTest` in `:apps:integration`.
+ */
 class ConfigOverrideRepositoryImplTest : CoroutineTest() {
 
     @Test
