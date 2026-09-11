@@ -251,31 +251,6 @@ the other three is either deleted or has a caller.
 **Hints:** Check `features/home` carefully before deleting it. A dev launcher
 that nobody ships is still the thing somebody reaches for when they need to jump
 to a level, and the QA panel may or may not have replaced it.
-## SD-68 [P2] — `pushWithTransition` pins a live floating window at STARTED
-
-**Found by:** the SD-34 agent, 2026-09-10, which deliberately left it alone.
-
-`FloatingWindowNavigator.navigate` uses `state.pushWithTransition(entry)` where
-androidx's `DialogNavigator` uses plain `push`. The effect is that a sheet or
-dialog that is on screen and interactive is held at STARTED rather than reaching
-RESUMED.
-
-Git history says nothing about why: the file arrived whole in `02ec89c`, the
-commit that generated Sodogku from the template, so it is inherited rather than
-chosen.
-
-**Not folded into the SD-62 fix on purpose.** Changing it is a real behavior
-change to every sheet and dialog in the app, and SD-62 was about an entry that
-leaks, not about the state of one that works.
-
-**Done when:** it matches upstream, or a comment says why it should not.
-
-**Hints:** Work out what actually differs at RESUMED before changing it. A
-`collectAsStateWithLifecycle` inside a sheet gates on STARTED and would not
-notice, so the answer may be nothing, in which case the fix is the comment. The
-composition test tier can now drive this: assert the sheet entry's state while it
-is on screen.
-
 ## SD-69 [P1] — The store screenshots show a feature that no longer exists
 
 **Found by:** the SD-65 agent, 2026-09-10, while sweeping the listing.
@@ -302,7 +277,6 @@ a device. It is the same job as the iOS 6.9" frames in `OWNER-TODO.md`, which ar
 blocked on item 11, so doing both at once is the cheap order. The streak pages,
 the win sheet, the board clock and the lose sheet have all changed too, so check
 every frame rather than the two named here.
-
 ## SD-70 [P2] — `docs/practices/outbox.md` documents code deleted in C0
 
 **Found by:** the SD-66 agent, 2026-09-10.
@@ -322,7 +296,6 @@ exists, or deleted.
 only sync surface left is `warmForeground` / `cameOnline` / `isOffline`, then
 there is no outbox to document and the honest move is deletion plus a line in
 `features.md` about what the app does instead.
-
 ## SD-71 [P2] — Comment rot left behind by the sharing removal
 
 **Found by:** the SD-66 agent, 2026-09-10.
