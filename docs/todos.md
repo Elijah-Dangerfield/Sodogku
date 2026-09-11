@@ -400,43 +400,6 @@ has nothing to do with what it asserts is a test people re-run instead of read.
 already there to copy: an `onEnter` filter excluding `build`, `.git` and
 `.claude`. Check every other source-walking test in `:apps:integration` in the
 same pass rather than fixing the one that happened to fail.
-## SD-39 [P1] — `iap.*` outcomes are class names, and R8 renames them in the Play build
-
-**Ask:** `iap.purchase_result` and `iap.restore_result` send `outcome` as
-`result::class.simpleName` (`RealEntitlements.kt:117` and `:146`). `PurchaseOutcome.Success`
-and its siblings are plain sealed `data object`s: not `@Serializable`, not `Throwable`.
-Release minification is on (`ApplicationConventionPlugin.kt:110`), and the only
-name-keeping rule in `apps/compose/proguard-rules.pro` is `-keepnames class * extends
-java.lang.Throwable`. `-keepclassmembers` keeps members, not class names. So on an
-Android release build `outcome` arrives as whatever R8 called the class, and
-`paywall-conversion.json` filters `outcome="Success"` and `outcome="Failed"`.
-
-In practice: the first Play release ships, people buy Pro, and "Purchases completed"
-and "Conversion" on the paywall board read zero on Android while Play Console shows
-sales. "Purchase failures by store code" is empty for the same reason. Nothing errors.
-This is exactly the failure `DashboardQueryContractTest` says it exists to prevent, and
-the test cannot see it because the spelling at the emit site is right; the runtime value
-is what changes. iOS is unaffected (no obfuscation). The other `simpleName` emit values
-in the surface are Throwable names (`RealAdGate.kt:104`, `NetworkCall.kt:175`,
-`GrafanaLogTree.kt:121`) and those are kept.
-
-Confidence: high on the mechanism, from reading the keep rules and the build config. Not
-executed: neither checkout has a release `mapping.txt` to grep, and building one was out
-of bounds for this review.
-
-**Done when:** `iap.purchase_result.outcome` and `iap.restore_result.outcome` are emitted
-from a value that survives minification (a `name` string on each outcome, or an enum
-`.name`), the vocabulary in `docs/practices/app-events.md` matches it, and a release
-build's `mapping.txt` shows no `logEvent` attribute fed from `::class.simpleName` of a
-non-Throwable. A `-keepnames` rule is the weaker fix, because dashboards are keyed on
-these strings and a keep rule is not something anyone will think to check when renaming
-a class.
-
-**Hints:** `libraries/billing/src/.../Entitlements.kt:12` for the sealed types.
-`DashboardQueryContractTest.STRINGY_VALUE` already treats `simpleName` as a string, so
-the contract test is not the place for this; a `CheckReleaseMapping`-style test that
-reads `mapping.txt` when it exists would be. Filed by the SD-6 telemetry review,
-2026-09-10.
 ## SD-40 [P2] — `placement` is two vocabularies, so the refill cannot be joined to its ad
 
 **Ask:** `game.bones_refilled` emits `"placement" to placement.name`
@@ -841,3 +804,27 @@ both entries appeared and launched.
 **If they did not**, this is the cause, and the fix is a Gradle-generated
 `@string/` holding the real application id rather than a literal in the resource.
 Nothing else in the change would explain the entries being absent or dead.
+
+## SD-58 [P2] — The ad funnel filters on an outcome nothing emits
+
+**Found by:** the SD-39 agent, 2026-09-10, while confirming that enum `.name`
+survives R8.
+
+`ad-funnel.json` filters `outcome=~"Rewarded|Completed"`, and `AdShowResult` has
+no `Completed` value. No interstitial path emits one either.
+
+Milder than SD-39, because the panel is not empty: `Rewarded` matches and the
+chart draws. But it counts less than its title claims, and nobody reading the
+number would know. `docs/practices/app-events.md` repeats the error, so the two
+places somebody would check agree with each other and disagree with the code.
+
+**Done when:** the filter names only values `AdShowResult` can produce, or
+`Completed` exists and something emits it.
+
+**Hints:** Decide which before editing either. If interstitials were meant to
+report a completion distinct from a reward, that is a missing emit rather than a
+stale filter, and deleting the alternation would quietly close the question.
+`DashboardQueryContractTest` checks that attribute *names* agree across the two
+sides and does not check that filtered *values* are producible, which is the hole
+this fell through. SD-39 added a value check for the `iap.*` events; widening it
+to every event with a closed value set is the guard.
