@@ -134,24 +134,3 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
-## SD-110 [P2] — The level drawer still flickers as it dismisses
-
-**Found by:** the SD-102 agent, 2026-09-11, which fixed the other half and said
-so rather than claiming the file.
-
-`LevelDrawer` gates on an animated value crossing zero, and its
-`animateFloatAsState` has no bounds. `Motion.Pop` is a spring that undershoots:
-measured at **-0.163** springing from one to zero. So the gate crosses zero twice
-on the way out and the drawer leaves and re-enters composition mid-dismissal.
-
-The per-frame recomposition half is already fixed. This is the remaining flicker.
-
-**Done when:** the drawer's dismissal crosses zero once.
-
-**Hints:** `FocusScrim` solved the same problem in the same pass by switching to
-an `Animatable` with `updateBounds(0f, 1f)`, and that is the shape to copy.
-`animateFloatAsState` cannot be bounded, so this is a conversion rather than a
-parameter, which is why it was left: the file is outside the slice that found it.
-
-`MotionTest` now measures the undershoot, so the number above is checked rather
-than asserted, and it will move if anybody retunes `Motion.Pop`.
