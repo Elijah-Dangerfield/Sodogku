@@ -266,32 +266,6 @@ tree is half-removed is a different situation from a walk that skips it.
 
 Reproducing it may mean running the tier in a loop while adding and removing a
 worktree. That is worth an hour: everything else in this repo trusts these guards.
-## SD-87 [P2] — `onboarding.completed` has the same non-idempotent shape SD-85 fixed
-
-**Found by:** the SD-85 agent, 2026-09-10, after fixing the tutorial's version and
-checking whether the shape existed elsewhere.
-
-`OnboardingViewModel.finish` logs `onboarding.completed` unconditionally, and
-`exitedToHome` is only read in `onCleared`. The buttons are gated on
-`state.isFinishing`, which makes this much harder to reach than the tutorial's
-was, but `updateState` lags the state flow by one dispatch, so two taps inside a
-single frame can both land in the channel before the disabled state renders.
-
-Same consequence as SD-85: `onboarding.completed` is how we would know what
-fraction of installs get through onboarding, and a double tap inflates it.
-
-**Done when:** onboarding reports its completion once however many times the
-button is tapped.
-
-**Hints:** The fix SD-85 took is the shape to copy, and the reason it went where
-it did is the lesson: a guard on the button would have left the other door open.
-Put it on the thing that logs.
-
-A `SEAViewModel` test can drive two actions through the channel without a UI
-harness, which is how SD-85's test reached its second tap. Check the other
-one-shot completion events in the same pass rather than fixing the third one
-later: `tutorial.completed` and `onboarding.completed` were both written the same
-way, so a third probably was too.
 ## SD-93 [P2] — `GameState.bonesUnspent` has no reader outside its own tests
 
 **Found by:** the SD-71 agent, 2026-09-10, while clearing comment rot.
@@ -361,3 +335,33 @@ the other source-scanning tests live. `UserFacingCopyStyleTest` already walks
 both the strings and the Kotlin tree, so it has both halves in hand. Declare the
 Gradle inputs with `inputs.files(...)`, which that test already does for the
 string files but may not for the Kotlin side.
+
+## SD-97 [P2] — Two taps on the daily card start two dailies
+
+**Found by:** the SD-87 agent, 2026-09-11, while sweeping for events that can
+fire twice.
+
+`GameViewModel.playDaily` has no guard. Two taps on the drawer's daily card emit
+two `daily.started` and send two `GameEvent.OpenDaily`.
+
+**The duplicate navigation is the more interesting half.** The event inflates the
+denominator of the daily funnel, which is a reporting problem. Two `OpenDaily`
+events push the daily route twice, and `SEAViewModel`'s own docblock records a
+production `NavController` crash caused by replayed navigation events. Events
+expire after five seconds now, so the old stampede cannot recur in that exact
+shape, but two events one frame apart both arrive well inside that window.
+
+This is a *start* event rather than a completion, so it is not the shape SD-85 and
+SD-87 fixed, and a flag that never resets would be wrong: a player can genuinely
+start the daily more than once in a session.
+
+**Done when:** two taps on the daily card start one daily and report one
+`daily.started`.
+
+**Hints:** Look at what the other navigating actions do before inventing
+something. Some already refuse when the target is already open, which is the
+shape that fits here: the guard is "the daily is already the current route",
+not "the daily has been started before".
+
+A `SEAViewModel` test can drive two actions through the channel without a UI
+harness, which is how SD-85's and SD-87's tests reached their second tap.
