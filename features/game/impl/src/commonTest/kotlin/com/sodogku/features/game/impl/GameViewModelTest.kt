@@ -2963,6 +2963,44 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun theRehearsalEmitsNothingUnderGame() = recordingEvents { events ->
+        runUnitTest {
+            // The registry promises the practice board emits no `game.*` at
+            // all, and until this test the promise was kept by three separate
+            // `rehearsing` guards that nothing checked: `game.level_started`,
+            // `game.commit` and `game.drag` could all be un-guarded without a
+            // single game test moving. What that costs is not an empty panel
+            // but a plausible one — every install's first `game.level_started`
+            // would be the demo board, at a level id nobody can play and
+            // difficulty 0, inside the campaign funnel.
+            val vm = viewModel(levelId = FirstGuidedLevel, cache = untaughtCache())
+            assertTrue(vm.state.isRehearsal, "the fixture never entered the rehearsal")
+
+            // On the last step, where the script is done asking for gestures:
+            // a drag is not part of the curriculum, so `endStroke` is the one
+            // guard the script cannot reach on its own.
+            vm.driveTo(TutorialStep.Graduation)
+            vm.takeAction(GameAction.DragStarted(freeCell(vm)))
+            vm.takeAction(GameAction.DragEnded)
+            settle()
+            vm.runScript()
+
+            // Everything up to the graduation, because `tutorial.completed` is
+            // immediately followed by level 1 opening — and level 1 emitting
+            // `game.level_started` is the handover working, not a leak.
+            val duringRehearsal = events.all.takeWhile { it.first != "tutorial.completed" }
+            assertTrue(
+                events.all.any { it.first == "tutorial.completed" },
+                "the script never finished, so the window below proves nothing: ${events.all.map { it.first }}",
+            )
+            assertTrue(
+                duringRehearsal.none { it.first.startsWith("game.") },
+                "the rehearsal reached the play funnels: ${duringRehearsal.map { it.first }}",
+            )
+        }
+    }
+
+    @Test
     fun aWrongGuessOnTheRehearsalBoardCostsNothing() = runUnitTest {
         // SPEC 10 asks the player to get one wrong on purpose. Charging for
         // following instructions is the failure; charging for the *second* one
