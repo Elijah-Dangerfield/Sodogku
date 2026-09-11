@@ -390,10 +390,24 @@
     <string name="month_short_12">Dec</string>
 
     <string name="achievements_title">Achievements</string>
-    <string name="achievements_summary">%1$s of %2$s earned</string>
+    <string name="achievements_hero_label">of %1$s earned</string>
     <string name="achievements_progress">%1$s / %2$s</string>
     <string name="achievements_earned">Earned</string>
     <string name="achievements_locked">Keep going</string>
+    <string name="achievements_empty_body">Nothing earned yet. Finishing a board is what lights the first one up.</string>
+    <string name="achievements_just_earned">Just earned</string>
+    <string name="achievements_next_up">Next up</string>
+    <string name="achievements_stat_earned">Earned</string>
+    <string name="achievements_stat_earned_spoken">%1$s badges earned</string>
+    <string name="achievements_stat_to_go">To go</string>
+    <string name="achievements_stat_to_go_spoken">%1$s badges still to earn</string>
+    <string name="achievements_stat_sets">Sets</string>
+    <string name="achievements_stat_sets_value">%1$s/%2$s</string>
+    <string name="achievements_stat_sets_spoken">%1$s of %2$s sets finished</string>
+    <string name="achievements_spoken_earned">%1$s. Earned.</string>
+    <string name="achievements_spoken_new">%1$s. Just earned.</string>
+    <string name="achievements_spoken_progress">%1$s. Locked, %2$s of %3$s.</string>
+    <string name="achievements_spoken_hidden">Hidden badge. Not found yet.</string>
     <string name="achievements_hidden_name">???</string>
     <string name="achievements_hidden_body">A surprise. You will know it when you find it.</string>
     <string name="achievements_unlocked_toast">Badge unlocked</string>

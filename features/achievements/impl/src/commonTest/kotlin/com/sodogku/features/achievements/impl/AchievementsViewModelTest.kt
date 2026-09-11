@@ -2,6 +2,7 @@ package com.sodogku.features.achievements.impl
 
 import com.sodogku.libraries.achievements.Achievement
 import com.sodogku.libraries.achievements.AchievementCounters
+import com.sodogku.libraries.achievements.AchievementGroup
 import com.sodogku.libraries.achievements.AchievementId
 import com.sodogku.libraries.achievements.AchievementState
 import com.sodogku.libraries.achievements.Achievements
@@ -283,6 +284,194 @@ class AchievementsViewModelTest : CoroutineTest() {
         viewModel(repository = repository, cache = cache)
 
         assertEquals(NewestUnlock, cache.get().achievementsSeenAt)
+    }
+
+    /**
+     * The watermark is the whole of "is this news", so the page's celebration
+     * lives or dies on it being read before [AchievementsViewModel.markSeen]
+     * moves it.
+     */
+    @Test
+    fun aBadgeEarnedSinceTheLastLookOpensAsNews() = runUnitTest {
+        val vm = viewModel(
+            repository = FakeAchievements(
+                AchievementState(
+                    unlocked = mapOf(
+                        AchievementId.FirstSteps to OlderUnlock,
+                        AchievementId.GoodDog to NewestUnlock,
+                    ),
+                ),
+            ),
+            cache = InMemoryAppCache(AppData(achievementsSeenAt = OlderUnlock)),
+        )
+
+        assertFalse(vm.badge(AchievementId.FirstSteps).isNew, "already seen before this visit")
+        assertTrue(vm.badge(AchievementId.GoodDog).isNew)
+        assertEquals(SpotlightKind.JustEarned, vm.state.spotlight?.kind)
+        assertEquals(listOf(AchievementId.GoodDog), vm.state.spotlight?.badges?.map { it.id })
+    }
+
+    /** The hero climbs to include the news, and starts from what came before it. */
+    @Test
+    fun theHeroClimbsFromWhatTheyHadBeforeTheUnlocks() = runUnitTest {
+        val vm = viewModel(
+            repository = FakeAchievements(
+                AchievementState(
+                    unlocked = mapOf(
+                        AchievementId.FirstSteps to OlderUnlock,
+                        AchievementId.GoodDog to NewestUnlock,
+                        AchievementId.PerfectForm to NewestUnlock,
+                        AchievementId.SpeedDemon to NewestUnlock,
+                    ),
+                ),
+            ),
+            cache = InMemoryAppCache(AppData(achievementsSeenAt = OlderUnlock)),
+        )
+
+        assertEquals(4, vm.state.earnedCount)
+        assertEquals(1, vm.state.countUpFrom, "three landed at once, so one climb of three")
+        assertEquals(
+            listOf(AchievementId.GoodDog, AchievementId.PerfectForm, AchievementId.SpeedDemon),
+            vm.state.spotlight?.badges?.map { it.id },
+            "all of it, in catalog order: capping the stage would make the heading a lie",
+        )
+    }
+
+    /** A page holding no news does not perform. The streak page's rule, for the same reason. */
+    @Test
+    fun aPageWithNothingNewDoesNotPerform() = runUnitTest {
+        val vm = viewModel(
+            repository = FakeAchievements(
+                AchievementState(unlocked = mapOf(AchievementId.FirstSteps to OlderUnlock)),
+            ),
+            cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
+        )
+
+        assertNull(vm.state.countUpFrom)
+        assertEquals(SpotlightKind.NextUp, vm.state.spotlight?.kind)
+    }
+
+    /**
+     * A badge landing while the grid is open is still news, because the line the
+     * page celebrates against was frozen when it opened. The watermark on disk
+     * moves anyway, or the board's trophy stays lit over a badge the player has
+     * been staring at.
+     */
+    @Test
+    fun aBadgeEarnedWhileTheScreenIsOpenIsCelebratedAndThenMarkedSeen() = runUnitTest {
+        val repository = FakeAchievements(
+            AchievementState(unlocked = mapOf(AchievementId.FirstSteps to OlderUnlock)),
+        )
+        val cache = InMemoryAppCache(AppData(achievementsSeenAt = OlderUnlock))
+        val vm = viewModel(repository, cache)
+        assertNull(vm.state.countUpFrom)
+
+        repository.history.value = AchievementState(
+            unlocked = mapOf(
+                AchievementId.FirstSteps to OlderUnlock,
+                AchievementId.GoodDog to NewestUnlock,
+            ),
+        )
+
+        assertTrue(vm.badge(AchievementId.GoodDog).isNew)
+        assertFalse(vm.badge(AchievementId.FirstSteps).isNew)
+        assertEquals(1, vm.state.countUpFrom)
+        assertEquals(OlderUnlock, vm.state.seenAt, "the line this visit celebrates against never moves")
+        assertEquals(NewestUnlock, cache.get().achievementsSeenAt, "but the trophy is cleared")
+    }
+
+    /**
+     * The state nobody designs. A brand-new player's page is seventy-odd things
+     * they have not done, so it has to open with three they can go and get.
+     */
+    @Test
+    fun anEmptyPageStillOffersThreeThingsToGoAndGet() = runUnitTest {
+        val vm = viewModel()
+
+        val spotlight = requireNotNull(vm.state.spotlight)
+        assertEquals(SpotlightKind.NextUp, spotlight.kind)
+        assertEquals(
+            listOf(AchievementId.FirstSteps, AchievementId.PerfectForm, AchievementId.Comeback),
+            spotlight.badges.map { it.id },
+            "with every counter at zero the nearest badges are the cheapest ones, one per shelf",
+        )
+    }
+
+    @Test
+    fun theSpotlightPointsAtTheNearestBadgeOnEachLadder() = runUnitTest {
+        // Eight clears is 8/10 of Good Dog; a three-chain is 3/5 of Chain of
+        // Five. Nothing else has moved, so the third slot falls to the cheapest
+        // untouched badge on a shelf neither of those came from.
+        val vm = viewModel(
+            repository = FakeAchievements(
+                AchievementState(
+                    counters = counters(Stat.LevelsCleared to 8L, Stat.BestCombo to 3L),
+                    unlocked = mapOf(AchievementId.FirstSteps to OlderUnlock),
+                ),
+            ),
+            cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
+        )
+
+        assertEquals(
+            listOf(AchievementId.GoodDog, AchievementId.ChainOfFive, AchievementId.PerfectForm),
+            vm.state.spotlight?.badges?.map { it.id },
+        )
+    }
+
+    /**
+     * A player who has everything except the secrets is offered nothing, which is
+     * the right answer: "Next up: ???" names a goal nobody can act on, and naming
+     * the real one gives away the half of the surprise worth keeping.
+     */
+    @Test
+    fun theSpotlightWillNotPointAtAMysteryBadge() = runUnitTest {
+        val vm = viewModel(
+            repository = FakeAchievements(
+                AchievementState(
+                    unlocked = Achievements.catalog
+                        .filterNot { it.hidden }
+                        .associate { it.id to OlderUnlock },
+                ),
+            ),
+            cache = InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
+        )
+
+        assertTrue(
+            vm.state.badges.any { it.mystery },
+            "the fixture has to still have mysteries left, or this proves nothing",
+        )
+        assertNull(vm.state.spotlight)
+    }
+
+    @Test
+    fun aFinishedCollectionHasNothingPinnedToTheTop() = runUnitTest {
+        val vm = viewModel(
+            FakeAchievements(
+                AchievementState(unlocked = Achievements.catalog.associate { it.id to OlderUnlock }),
+            ),
+            InMemoryAppCache(AppData(achievementsSeenAt = NewestUnlock)),
+        )
+
+        assertEquals(0, vm.state.lockedCount)
+        assertNull(vm.state.spotlight)
+    }
+
+    /** The one fact on the page about the collection rather than about one badge. */
+    @Test
+    fun aSetCountsOnlyWhenEveryBadgeOnItIsEarned() = runUnitTest {
+        val campaign = Achievements.sections.first { it.group == AchievementGroup.Campaign }
+        val vm = viewModel(
+            FakeAchievements(
+                AchievementState(
+                    unlocked = campaign.achievements.associate { it.id to OlderUnlock } +
+                        mapOf(AchievementId.PerfectForm to OlderUnlock),
+                ),
+            ),
+        )
+
+        assertEquals(1, vm.state.completedSetCount, "Clean play is started, not finished")
+        assertEquals(campaign.achievements.size + 1, vm.state.earnedCount)
+        assertEquals(Achievements.catalog.size - campaign.achievements.size - 1, vm.state.lockedCount)
     }
 
     private fun viewModel(

@@ -80,12 +80,22 @@ class AchievementsViewModel(
             .logOnFailure { "Failed to read achievement history" }
             .getOrNull()
             ?: AchievementState.Empty
+        // Read *before* `markSeen` moves it, and then frozen for as long as this
+        // screen is alive. It is the line between "you have seen this badge" and
+        // "this is news", and the page celebrates everything on the far side of
+        // it. Re-reading it after the write would be a page that congratulates
+        // nobody, which is exactly the bug the watermark exists to avoid.
+        val seenAt = Catching { appCache.get().achievementsSeenAt }
+            .logOnFailure { "Failed to read the achievements watermark" }
+            .getOrNull()
+            ?: 0L
 
         updateState {
             it.copy(
                 loading = false,
                 visible = visible,
-                badges = history.toBadges(),
+                seenAt = seenAt,
+                badges = history.toBadges(seenAt),
             )
         }
         // Only what was actually put in front of somebody. With badges switched
@@ -117,9 +127,22 @@ class AchievementsViewModel(
         }.logOnFailure { "Failed to mark badges as seen" }
     }
 
+    /**
+     * A badge landing while the grid is open.
+     *
+     * [AchievementsState.seenAt] deliberately does not move, so the badge that
+     * just arrived reads as new and the page celebrates it. The *watermark on
+     * disk* does move, because the player has now genuinely seen it and the
+     * board's trophy counts against that number rather than against this state.
+     * Leaving that write out is how a badge earned in front of the player leaves
+     * the trophy lit for the rest of the install.
+     */
     private suspend fun AchievementsAction.onHistory(history: AchievementState) {
-        val badges = history.toBadges()
-        updateState { it.copy(loading = false, badges = badges) }
+        updateState { it.copy(loading = false, badges = history.toBadges(it.seenAt)) }
+        // Only once the first load has settled: the observer's first emission can
+        // beat `Load` through the action queue, and marking seen off the back of
+        // it would count a grid nobody has been shown yet.
+        if (state.seenAt != null && state.visible) markSeen(history)
     }
 }
 
@@ -131,14 +154,15 @@ class AchievementsViewModel(
  * one place where showing a real number would be a leak: "4am clears: 0 / 1" on
  * a mystery badge tells the reader exactly what to go and try.
  */
-private fun AchievementState.toBadges(): List<Badge> = Achievements.catalog.map { achievement ->
-    val earned = isUnlocked(achievement.id)
-    val mystery = achievement.hidden && !earned
+private fun AchievementState.toBadges(seenAt: Long?): List<Badge> = Achievements.catalog.map { achievement ->
+    val unlockedAt = unlocked[achievement.id]
+    val mystery = achievement.hidden && unlockedAt == null
     Badge(
         id = achievement.id,
         group = Achievements.groupOf(achievement.id),
-        unlocked = earned,
+        unlocked = unlockedAt != null,
         mystery = mystery,
+        isNew = unlockedAt != null && seenAt != null && unlockedAt > seenAt,
         progress = if (mystery) 0f else achievement.progress(counters),
         current = if (mystery) 0L else achievement.currentFor(counters),
         target = achievement.target,
@@ -163,10 +187,31 @@ data class Badge(
     /** Hidden and not yet earned: rendered as a mystery, with no progress. */
     val mystery: Boolean,
 
+    /**
+     * Earned since the last time this page was looked at, which is what the page
+     * celebrates. Always false while a badge is locked.
+     */
+    val isNew: Boolean = false,
+
     /** 0.0 to 1.0. */
     val progress: Float,
     val current: Long,
     val target: Long,
+)
+
+/** What the pinned card at the top of the page is for right now. */
+enum class SpotlightKind {
+    /** Badges earned since the last look. An unlock is an event, so it gets a stage. */
+    JustEarned,
+
+    /** The nearest unearned badges. What a page with nothing on it yet is about. */
+    NextUp,
+}
+
+/** The pinned card at the top: a reason to have opened the page. */
+data class Spotlight(
+    val kind: SpotlightKind,
+    val badges: List<Badge>,
 )
 
 data class AchievementsState(
@@ -180,6 +225,12 @@ data class AchievementsState(
     val visible: Boolean = true,
     val badges: List<Badge> = emptyList(),
 
+    /**
+     * The unlock watermark as it stood when this screen opened, or null before
+     * the first load has finished. Frozen: see [AchievementsViewModel].
+     */
+    val seenAt: Long? = null,
+
     /** The badge whose detail sheet is open. */
     val selectedId: AchievementId? = null,
 ) {
@@ -187,7 +238,27 @@ data class AchievementsState(
 
     val totalCount: Int get() = badges.size
 
+    val lockedCount: Int get() = totalCount - earnedCount
+
     val selected: Badge? get() = badges.firstOrNull { it.id == selectedId }
+
+    /** Everything earned since the last look, in catalog order. */
+    val justEarned: List<Badge> get() = badges.filter { it.isNew }
+
+    /**
+     * What the hero number climbs from, or null when there is nothing to
+     * celebrate.
+     *
+     * The same rule the streak page settled on: a page you went looking for
+     * should not perform at you. Here the trigger is not *how* the page was
+     * opened but whether it is holding news, so three badges landing at once is
+     * one climb of three rather than three separate performances.
+     */
+    val countUpFrom: Int? get() = (earnedCount - justEarned.size).takeIf { justEarned.isNotEmpty() }
+
+    /** Whole shelves finished, which is the only fact on the page about the *set*. */
+    val completedSetCount: Int
+        get() = sections.count { section -> section.badges.all { it.unlocked } }
 
     /**
      * The grid, one shelf at a time. Grouped rather than declared twice, so a
@@ -197,7 +268,47 @@ data class AchievementsState(
      */
     val sections: List<BadgeSection>
         get() = badges.groupBy { it.group }.map { (group, list) -> BadgeSection(group, list) }
+
+    /**
+     * The pinned card at the top of the page.
+     *
+     * News first, and all of it: a backfill that lands eleven badges at once
+     * gets eleven cards, because capping the celebration at three would make the
+     * heading a lie while the hero counted up by eleven.
+     *
+     * Otherwise the nearest unearned badges, which is the answer to the state
+     * nobody designs. A brand-new player's page is seventy-three things they
+     * have not done; these three are the ones within reach, and with every
+     * counter at zero "nearest" settles on the cheapest targets, one from each
+     * shelf. One per group rather than three rungs of the same ladder, so the
+     * row reads as a set of ways to play instead of as one task repeated.
+     *
+     * Mystery badges are never here. Naming one would give away the half of the
+     * surprise worth keeping, and "Next up: ???" is not a goal anybody can act on.
+     */
+    val spotlight: Spotlight?
+        get() {
+            if (justEarned.isNotEmpty()) return Spotlight(SpotlightKind.JustEarned, justEarned)
+
+            val nearest = badges.asSequence()
+                .filter { !it.unlocked && !it.mystery }
+                // A stable sort, so catalog order breaks every tie. That is the
+                // whole of what a fresh install needs: every counter is zero, so
+                // every candidate ties, and `AchievementSection` declares each
+                // shelf easiest first. Sorting on the target as well looked like
+                // insurance and turned out to be unreachable — a shelf whose
+                // cheapest badge is unearned always has it first anyway.
+                .sortedByDescending { it.progress }
+                .distinctBy { it.group }
+                .take(NextUpSize)
+                .toList()
+
+            return if (nearest.isEmpty()) null else Spotlight(SpotlightKind.NextUp, nearest)
+        }
 }
+
+/** Three fits across a phone without the row becoming a second grid. */
+private const val NextUpSize = 3
 
 /** One heading and the badges under it. */
 data class BadgeSection(

@@ -1,8 +1,5 @@
 package com.sodogku.libraries.ui.components.streak
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,34 +10,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
-import com.sodogku.libraries.ui.components.text.OutlinedText
+import com.sodogku.libraries.ui.components.text.CountUpNumber
 import com.sodogku.libraries.ui.components.text.Text
-import com.sodogku.libraries.ui.system.Feel
-import com.sodogku.libraries.ui.system.LocalHaptics
-import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Radii
 import com.sodogku.system.clip
 import com.sodogku.system.VerticalSpacerD300
 import com.sodogku.system.VerticalSpacerD700
-import kotlinx.coroutines.delay
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -79,33 +65,6 @@ fun StreakHero(
     modifier: Modifier = Modifier,
     countUpFrom: Int? = null,
 ) {
-    val still = LocalReduceAnimations.current || LocalInspectionMode.current
-    val haptics = LocalHaptics.current
-
-    var shown by remember { mutableIntStateOf(countUpFrom ?: streak) }
-    val thump = remember { Animatable(if (countUpFrom == null || still) 1f else SlamFrom) }
-
-    LaunchedEffect(streak, countUpFrom, still) {
-        if (countUpFrom == null || still) {
-            shown = streak
-            thump.snapTo(1f)
-            return@LaunchedEffect
-        }
-        // Count first, land second. The number arriving at its new value and
-        // *then* being hit is the order that reads as an impact; scaling while
-        // the digits are still changing reads as a glitch.
-        for (value in (countUpFrom + 1)..streak) {
-            shown = value
-            delay(TickMillis)
-        }
-        thump.snapTo(SlamFrom)
-        haptics.play(Feel.Win)
-        thump.animateTo(
-            targetValue = 1f,
-            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-        )
-    }
-
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -114,20 +73,8 @@ fun StreakHero(
 
         VerticalSpacerD300()
 
-        // Outlined, because this is the largest thing on a screen the player is
-        // looking straight at, and the number is the screen.
-        OutlinedText(
-            text = shown.toString(),
-            typography = AppTheme.typography.Display.D1500,
-            color = AppTheme.colors.accentBrand,
-            textAlign = TextAlign.Center,
-            // Read in the layer, never in composition. A spring on a number this
-            // size would otherwise re-lay-out the whole column every frame.
-            modifier = Modifier.graphicsLayer {
-                scaleX = thump.value
-                scaleY = thump.value
-            },
-        )
+        CountUpNumber(value = streak, countUpFrom = countUpFrom)
+
         Text(
             text = dayLabel,
             typography = AppTheme.typography.Heading.H600,
@@ -193,18 +140,6 @@ private fun StreakWeekStrip(week: List<StreakWeekDay>, modifier: Modifier = Modi
 private val DogSize = Dimension.D1900
 
 private val DiscSize = Dimension.D1000
-
-/**
- * Where the number starts before it lands.
- *
- * Well over one, so it arrives *shrinking* onto the screen rather than growing
- * out of it. A number that grows into place reads as appearing; one that slams
- * down from too large reads as landing, which is the difference the thump is for.
- */
-private const val SlamFrom = 1.6f
-
-/** Per digit while counting. Fast, because nobody is reading the intermediate values. */
-private const val TickMillis = 90L
 
 @Preview
 @Composable
