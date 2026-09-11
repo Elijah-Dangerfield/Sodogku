@@ -225,45 +225,6 @@ both entries appeared and launched.
 **If they did not**, this is the cause, and the fix is a Gradle-generated
 `@string/` holding the real application id rather than a literal in the resource.
 Nothing else in the change would explain the entries being absent or dead.
-## SD-65 [P1] — The store listing says 500 levels and the pack holds 1000
-
-**Found by:** the SD-22 agent, 2026-09-10.
-
-`docs/store/listing.md` claims 500 levels, and a bullet says the number matches
-the pack. It did until today. This is copy that goes in front of a reviewer and
-a customer, and it is the only stale claim of the fifteen SD-22 found that a
-player could ever read.
-
-**Done when:** the listing says a thousand, and nothing else in it is a number
-somebody has to remember to update.
-
-**Hints:** Sweep the rest of the file while you are in it, against
-`docs/reference/features.md`, which is now derived from code. Sharing is gone,
-there are leaderboards on both platforms, and the daily has no give-up. Any of
-those could be in there too.
-
-Worth asking whether the listing should name a level count at all. A number in
-store copy is a promise that ages every time the pack grows, and "hundreds of
-handmade boards" ages never.
-## SD-66 [P2] — `README.md` still describes a template file this repo does not have
-
-**Found by:** the SD-22 agent, 2026-09-10, while fixing the doc map.
-
-`README.md`'s doc map links `docs/PORT-CANDIDATES.md` and a whole section
-explains what it is for. The file does not exist here. It lives in
-`Workspace/KMPTemplate`, which is the repo Sodogku was generated from, and the
-cross-repo pointer is described in `AGENTS.md`.
-
-The new `DocReferencesResolveTest` has it as a documented exemption, a set of
-one, which is the right holding position and not the right answer.
-
-**Done when:** the README either stops describing a file this repo does not
-have, or says plainly that it lives in the template repo and why a reader here
-would care.
-
-**Hints:** Check the rest of `README.md` for the same thing. It is largely still
-the template's, which SD-32 noted and only corrected where it had been made
-definitively false. A full pass is this item.
 ## SD-67 [P2] — Three things nothing calls, and one config key no test can see
 
 **Found by:** the SD-22 agent, 2026-09-10, while deriving the features doc from
@@ -290,7 +251,6 @@ the other three is either deleted or has a caller.
 **Hints:** Check `features/home` carefully before deleting it. A dev launcher
 that nobody ships is still the thing somebody reaches for when they need to jump
 to a level, and the QA panel may or may not have replaced it.
-
 ## SD-68 [P2] — `pushWithTransition` pins a live floating window at STARTED
 
 **Found by:** the SD-34 agent, 2026-09-10, which deliberately left it alone.
@@ -315,3 +275,66 @@ leaks, not about the state of one that works.
 notice, so the answer may be nothing, in which case the fix is the comment. The
 composition test tier can now drive this: assert the sheet entry's state while it
 is on screen.
+
+## SD-69 [P1] — The store screenshots show a feature that no longer exists
+
+**Found by:** the SD-65 agent, 2026-09-10, while sweeping the listing.
+
+All eight frames in `docs/store/screenshots/android-phone/` predate the current
+build, and two are wrong in ways a reviewer would see:
+
+- **`02-good-dog.png` has a SHARE button on the win sheet.** Sharing was removed
+  entirely. A submitted screenshot advertising a control that is not in the app
+  is the kind of thing a review rejects over. It also shows three paw slots and
+  paws now run to five.
+- **`07-achievements.png`** reads "2 of 21 earned" over a flat grid. The page is
+  now 73 badges on nine labelled shelves.
+
+`04-levels-and-daily.png` shows a Treat chip on level 395, which the current
+schedule no longer pays. The listing file now carries a callout saying the set is
+stale, which is the holding position, not the fix.
+
+**Done when:** all eight frames match the shipped app, and nothing in them
+advertises something that was removed.
+
+**Hints:** This needs an emulator, so it is owner work or work for a session with
+a device. It is the same job as the iOS 6.9" frames in `OWNER-TODO.md`, which are
+blocked on item 11, so doing both at once is the cheap order. The streak pages,
+the win sheet, the board clock and the lose sheet have all changed too, so check
+every frame rather than the two named here.
+
+## SD-70 [P2] — `docs/practices/outbox.md` documents code deleted in C0
+
+**Found by:** the SD-66 agent, 2026-09-10.
+
+Its worked example is `PendingProfileEditStore` and `ProfileEditFlusher` in
+`:libraries:identity:impl`, and step 3 tells a reader to implement
+`UserScopedSyncer` and hang off the `activeAccount` level. All of it went with
+accounts in C0.
+
+The doc map row is labelled honestly now, which stops a reader trusting it
+blind. The doc itself is still a set of instructions nobody can follow.
+
+**Done when:** it is rewritten against `SyncTriggers`, which is what actually
+exists, or deleted.
+
+**Hints:** Decide which by asking whether this app has an outbox at all. If the
+only sync surface left is `warmForeground` / `cameOnline` / `isOffline`, then
+there is no outbox to document and the honest move is deletion plus a line in
+`features.md` about what the app does instead.
+
+## SD-71 [P2] — Comment rot left behind by the sharing removal
+
+**Found by:** the SD-66 agent, 2026-09-10.
+
+`libraries/resources/.../strings.xml` still has comments referencing the share
+sheet and the share card, around lines 393 and 674. The strings they described
+are gone; the comments explaining them are not.
+
+**Done when:** no comment in the resources describes a feature the app does not
+have.
+
+**Hints:** Grep the whole tree for `share` rather than fixing the two lines
+named here, since the same pass that left these probably left others. `--` inside
+an XML comment fails the resource build with an error naming no file and no line,
+so be careful editing them.
