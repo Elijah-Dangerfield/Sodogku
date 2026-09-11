@@ -101,18 +101,26 @@ class InProcessServer : AutoCloseable {
         /**
          * Skip (JUnit `Assume`) rather than fail when Docker isn't reachable,
          * so contributors without Docker still get a green build — mirrors the
-         * server's `DatabaseTest`.
+         * server's `DatabaseTest`, including the CI carve-out: on CI an
+         * unreachable daemon is a hard failure, because the whole end-to-end
+         * tier lives behind this gate and a silent skip would report a green
+         * job that exercised nothing.
          */
         fun assumeDockerAvailable() {
-            Assume.assumeTrue(
-                "Docker is not available; skipping integration tests",
-                try {
-                    DockerClientFactory.instance().client().pingCmd().exec()
-                    true
-                } catch (_: Throwable) {
-                    false
-                },
-            )
+            val dockerAvailable = try {
+                DockerClientFactory.instance().client().pingCmd().exec()
+                true
+            } catch (_: Throwable) {
+                false
+            }
+            check(dockerAvailable || System.getenv("CI") == null) { DOCKER_REQUIRED_ON_CI }
+            Assume.assumeTrue("Docker is not available; skipping integration tests", dockerAvailable)
         }
+
+        private const val DOCKER_REQUIRED_ON_CI =
+            "Docker is unreachable and CI is set. Skipping here would turn " +
+                ":apps:integration:testDebugUnitTest green without running any " +
+                "end-to-end test. Restore Docker on the runner rather than " +
+                "letting the job pass empty."
     }
 }

@@ -100,8 +100,10 @@ fun Route.thingRoutes(repo: ThingRepository) {
 ### Add a migration — `resources/db/migration/V<n>__snake.sql`
 Flyway SQL is the **source of truth** for the schema; the Exposed objects in
 `db/Tables.kt` are read-side projections. Never edit an applied migration — add
-the next one. Mirror schema changes into `Tables.kt` and add a line to
-`DatabaseSchemaTest`. Repositories run every method in `database.transaction { }`,
+the next one. Mirror schema changes into `Tables.kt`; a new table also needs a
+line in `DatabaseSchemaTest`'s `PROJECTIONS`, which compares each projection
+against JDBC metadata and fails on drift in either direction.
+Repositories run every method in `database.transaction { }`,
 take an injected `Clock`, and treat a unique-violation (SQLSTATE `23505`) as the
 arbiter rather than pre-checking.
 
@@ -123,7 +125,8 @@ Three patterns, each with a copyable example:
   `testApplication` + the real plugins + a fake passed as a plain arg.
 - **Repository test** (`data/PostgresAppConfigSourceTest.kt`) — real Postgres
   via Testcontainers (`DatabaseTest`), `@After` table cleanup, injected clock.
-  Skips cleanly (JUnit `Assume`) when Docker is absent.
+  Skips cleanly (JUnit `Assume`) when Docker is absent, except when `CI` is set,
+  where an unreachable daemon fails the job rather than passing it empty.
 - **Full-stack test** (`:apps:integration`) — the real client stack over real TCP
   against the real `installApp` seam on a Testcontainers Postgres.
 

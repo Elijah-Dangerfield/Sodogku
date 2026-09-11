@@ -8,8 +8,10 @@ import org.jetbrains.exposed.sql.javatime.timestamp
  *
  * Flyway SQL (resources/db/migration) is the source of truth for the schema;
  * these objects are read-side projections used to type-check queries and map
- * rows. Keep them in sync — `DatabaseSchemaTest` fails if a column declared here
- * doesn't exist in the migrated schema.
+ * rows. Keep them in sync — `DatabaseSchemaTest` compares each projection's
+ * columns against JDBC metadata and fails either way round: a column declared
+ * here that the migration doesn't have, or a migrated column nothing here
+ * declares. Register new tables in that test's `PROJECTIONS` list.
  *
  * Convention: object named `XxxTable`, SQL table name in the `Table("…")`
  * constructor, camelCase Kotlin vals mapping to snake_case columns.

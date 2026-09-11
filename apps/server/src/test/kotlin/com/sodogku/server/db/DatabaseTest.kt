@@ -18,7 +18,10 @@ import org.testcontainers.containers.PostgreSQLContainer
  * share state — clean tables in `@After` or use unique data per test.
  *
  * If Docker isn't reachable the suite is skipped (JUnit `Assume`) rather than
- * failing red, so contributors without Docker still get a green build.
+ * failing red, so contributors without Docker still get a green build. On CI
+ * that skip is a hard failure instead: these tests are the only coverage of the
+ * Flyway schema and the Postgres repositories, and a runner that quietly lost
+ * its Docker daemon would otherwise report a green job that ran none of them.
  *
  * ```
  * class MyRepoTest : DatabaseTest() {
@@ -36,15 +39,23 @@ abstract class DatabaseTest {
     companion object {
         private const val POSTGRES_IMAGE = "postgres:16-alpine"
 
+        private const val DOCKER_REQUIRED_ON_CI =
+            "Docker is unreachable and CI is set. Skipping here would turn " +
+                ":apps:server:test green without running the schema or Postgres " +
+                "repository tests. Restore Docker on the runner rather than " +
+                "letting the job pass empty."
+
         private var container: PostgreSQLContainer<*>? = null
         private var sharedDatabase: Database? = null
 
         @JvmStatic
         @BeforeClass
         fun startPostgres() {
+            val dockerAvailable = isDockerAvailable()
+            check(dockerAvailable || System.getenv("CI") == null) { DOCKER_REQUIRED_ON_CI }
             Assume.assumeTrue(
                 "Docker is not available; skipping Postgres integration tests",
-                isDockerAvailable(),
+                dockerAvailable,
             )
             val c = PostgreSQLContainer(POSTGRES_IMAGE)
                 .withDatabaseName("template_test")

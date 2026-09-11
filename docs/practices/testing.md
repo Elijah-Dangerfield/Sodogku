@@ -56,7 +56,11 @@ the home VM, and assert the display name on screen came from the server's
 New end-to-end flows should follow its shape: add a client surface to
 `TestClient`, a probe or seed helper to `InProcessServer` if the server side
 needs one, and await state with `awaitState` / `awaitUntil` — never fixed
-sleeps. Docker down → the suite skips (JUnit `Assume`), not fails.
+sleeps. Docker down → the suite skips (JUnit `Assume`), not fails, so a
+contributor without Docker still gets a green build. That courtesy is only safe
+because it is off on CI: both this harness and the server's `DatabaseTest` turn
+the skip into a hard failure when `CI` is set, since a green job that ran none
+of its tests is worse than a red one.
 
 **Fault injection** is worth knowing about even though this template doesn't
 ship it: when a project grows a long-lived transport (a WebSocket, a sync

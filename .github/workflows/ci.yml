@@ -163,6 +163,12 @@ jobs:
     # Runs in parallel with build-and-test on a cheap Ubuntu runner so the
     # testcontainers Postgres can spin up — macOS runners don't ship with
     # the Docker daemon.
+    #
+    # Keep this on a Docker-capable runner. `DatabaseTest` skips itself when
+    # Docker is unreachable so contributors without it still get a green build,
+    # and that skip is exactly how a schema test can rot unnoticed. The skip is
+    # a hard failure when CI is set, so moving this job to a runner without a
+    # daemon fails loudly instead of reporting a green job that ran nothing.
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -213,7 +219,9 @@ jobs:
     # testcontainers Postgres. Runs as Android unit tests on the host JVM, so
     # it needs the Android SDK (preinstalled on the runner) and Docker (also
     # preinstalled) but no Xcode/iOS — hence a cheap Ubuntu runner, separate
-    # from the macOS client build.
+    # from the macOS client build. Same rule as `server-test`: the Docker skip
+    # in `InProcessServer` is a hard failure when CI is set, so this job cannot
+    # go green by running nothing.
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
