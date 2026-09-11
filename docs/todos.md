@@ -205,41 +205,6 @@ What the log settles:
 - Controls dead with **no** `HostLifecycle` error, and the router's stall line
   reporting STARTED or RESUMED, means the mechanism above is wrong and the answer
   is somewhere it was ruled out. That log is worth more than any of this.
-## SD-34 [P1] — There is no way to test a composable
-
-**Found by:** the SD-26 investigation, 2026-09-10.
-
-A grep for `runComposeUiTest`, `ComposeUiTest` and `createComposeRule` returns
-nothing, and the version catalog has no Compose test artifact. Every test in this
-repo is a ViewModel test, a pure-function test or an integration test that reads
-source files as text. Nothing has ever asserted against a composition.
-
-**This is what SD-26 is stuck behind.** The suspected fault is an entry left in
-`NavController.transitionsInProgress` because a `DisposableEffect` in
-`FloatingWindowHost` never disposed, which is a statement about recomposition and
-cannot be proved or ruled out from a ViewModel test. The reported sequence is
-four navigations long (sheet open, sheet popped, dialog pushed, dialog popped)
-and would be about twenty lines to drive with a composition under test.
-
-**Done when:** a test can compose something, act on it, and assert, on at least
-the JVM target, and one real test exists that would have caught a bug we shipped.
-
-**Hints:** `org.jetbrains.compose.ui:ui-test-junit4` for the JVM/desktop target
-is the cheap way in and covers everything in `libraries/ui` and every entry
-point. Do not start by trying to cover the board: the board's gestures are the
-hardest thing here and a first attempt at them will produce a flaky test that
-teaches everybody to distrust the tier.
-
-Two candidates worth writing first, because both are known-hard and currently
-unguarded. The `FloatingWindowHost` transition-completion sequence above. And
-`AnimatedStateReadInComposition`, the custom detekt rule, which catches the
-static shape of a per-frame read but cannot catch one that is laundered through
-a helper.
-
-Weigh this against what it costs. A UI test tier that nobody trusts is worse
-than none, so the bar is that it runs in CI, does not flake, and fails for a real
-reason. If the first two tests cannot meet that, say so and close this rather
-than leaving a tier half built.
 ## SD-56 [P2] — An Android shortcut may be pointing at a package that is not installed
 
 **Found by:** the SD-25 agent, 2026-09-10, which flagged it rather than shipping
@@ -260,34 +225,6 @@ both entries appeared and launched.
 **If they did not**, this is the cause, and the fix is a Gradle-generated
 `@string/` holding the real application id rather than a literal in the resource.
 Nothing else in the change would explain the entries being absent or dead.
-## SD-62 [P2] — `FloatingWindowHost` never took androidx's fix for an entry popped before it composed
-
-**Found by:** the SD-48 agent, 2026-09-10, while ruling the floating windows out
-of SD-26.
-
-`FloatingWindowHost` is a copy of androidx's `DialogHost` that predates a fix
-upstream: androidx runs a `LaunchedEffect` that completes an entry popped before
-it ever composed, and ours has no equivalent. Our `navigate` also uses
-`pushWithTransition` where upstream uses `push`, which widens the window in which
-that can happen.
-
-**This is a leak, not the stall.** `NavControllerImpl` never holds the topmost
-entry or the first non-`FloatingWindow` beneath one below STARTED, so an entry
-stuck in `transitionsInProgress` cannot freeze the board. It holds a
-`NavBackStackEntry` and its `ViewModelStore` alive for the life of the process.
-
-**Done when:** an entry popped before it composed is completed, and a test shows
-it.
-
-**Blocked on SD-34.** Proving this needs a composition under test, which this repo
-cannot do yet. Do not fix it blind: the last hand-edit to this file's transition
-bookkeeping is what put SD-26 on the wrong trail for a day.
-
-**Hints:** Diff `FloatingWindowHost` against the `DialogHost` on the
-`navigation-compose` version actually on the classpath rather than against
-memory. Decide the `pushWithTransition` question separately; it may be
-deliberate, and the git history will say.
-
 ## SD-65 [P1] — The store listing says 500 levels and the pack holds 1000
 
 **Found by:** the SD-22 agent, 2026-09-10.
@@ -308,7 +245,6 @@ those could be in there too.
 Worth asking whether the listing should name a level count at all. A number in
 store copy is a promise that ages every time the pack grows, and "hundreds of
 handmade boards" ages never.
-
 ## SD-66 [P2] — `README.md` still describes a template file this repo does not have
 
 **Found by:** the SD-22 agent, 2026-09-10, while fixing the doc map.
@@ -328,7 +264,6 @@ would care.
 **Hints:** Check the rest of `README.md` for the same thing. It is largely still
 the template's, which SD-32 noted and only corrected where it had been made
 definitively false. A full pass is this item.
-
 ## SD-67 [P2] — Three things nothing calls, and one config key no test can see
 
 **Found by:** the SD-22 agent, 2026-09-10, while deriving the features doc from
@@ -355,3 +290,28 @@ the other three is either deleted or has a caller.
 **Hints:** Check `features/home` carefully before deleting it. A dev launcher
 that nobody ships is still the thing somebody reaches for when they need to jump
 to a level, and the QA panel may or may not have replaced it.
+
+## SD-68 [P2] — `pushWithTransition` pins a live floating window at STARTED
+
+**Found by:** the SD-34 agent, 2026-09-10, which deliberately left it alone.
+
+`FloatingWindowNavigator.navigate` uses `state.pushWithTransition(entry)` where
+androidx's `DialogNavigator` uses plain `push`. The effect is that a sheet or
+dialog that is on screen and interactive is held at STARTED rather than reaching
+RESUMED.
+
+Git history says nothing about why: the file arrived whole in `02ec89c`, the
+commit that generated Sodogku from the template, so it is inherited rather than
+chosen.
+
+**Not folded into the SD-62 fix on purpose.** Changing it is a real behavior
+change to every sheet and dialog in the app, and SD-62 was about an entry that
+leaks, not about the state of one that works.
+
+**Done when:** it matches upstream, or a comment says why it should not.
+
+**Hints:** Work out what actually differs at RESUMED before changing it. A
+`collectAsStateWithLifecycle` inside a sheet gates on STARTED and would not
+notice, so the answer may be nothing, in which case the fix is the comment. The
+composition test tier can now drive this: assert the sheet entry's state while it
+is on screen.
