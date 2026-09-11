@@ -149,43 +149,6 @@ finished board counts. Sharing was removed entirely and SPEC still describes it.
 Where a decision was genuinely reversed rather than merely restated, the
 reversal belongs in `decisions.md` before SPEC goes, or the reasoning dies with
 the file.
-## SD-25 [P2] — Custom quick actions on the iOS home-screen long press
-
-**Ask:** Owner, 2026-09-09: *"on iOS how can I edit the options shown on the hold
-to delete? Maybe like a 'bugs? Contact us' or a 'Stay, we value you!'"*
-
-The long-press menu on the app icon. iOS builds it from two halves and we only
-control one: **Delete App, Share App, Edit Home Screen and Require Face ID are
-system entries and cannot be removed, reordered or renamed.** Everything above
-them is ours, via `UIApplicationShortcutItems` in `Info.plist` (static) or
-`UIApplication.shared.shortcutItems` (dynamic, so the list can react to state).
-
-So a literal "Stay, we value you!" cannot be attached to the Delete row, and
-nothing can intercept a delete. What is available is putting a route or two above
-it, which is where a "Report a bug" belongs anyway.
-
-Worth deciding what earns a slot before building it. Three or four is the visible
-maximum and the menu is a place people go to delete the app, not to browse, so a
-list that reads as marketing is worse than no list. The two that survive that test
-are probably *Report a bug* (straight into the feedback panel, which is the one
-thing a frustrated player wants and currently has to hunt for in Settings) and
-*Daily puzzle* (straight into today's board).
-
-**Done when:** Long-pressing the icon on a device shows our entries above the
-system ones, and each opens the app on the right screen from cold start as well as
-from background.
-
-**Hints:** `apps/ios/iosApp/Info.plist` for the static list; each item needs
-`UIApplicationShortcutItemType`, `...Title` and `...IconType`/`...IconFile`.
-Handling is `application(_:performActionFor:completionHandler:)` on cold start and
-`windowScene(_:performActionFor:)` when already running — both have to work, and
-the cold-start path is the one that gets missed, because the shortcut arrives
-before Compose has a router. Route through the same deep-link entry the app
-already has rather than inventing a second way in. Android's equivalent is
-`android.app.shortcuts` in the manifest, so this is worth doing on both or
-neither.
-
-**Not blocked on anything.** No store review implication, no new permission.
 ## SD-26 [P0] — The screen stops updating while it keeps taking taps
 
 **Ask:** Owner, 2026-09-09, on iOS: *"idk whats happening but im clicking all
@@ -856,7 +819,6 @@ pulse is `Modifier.pulsate`; read `Animatable.value` inside `graphicsLayer` and
 not in composition or `AnimatedStateReadInComposition` fails the build.
 
 Provenance: Sentry SODOGKU-6, session `95dd30d1`, 2026-09-10.
-
 ## SD-54 [P2] — Two exits from a board still throw the player out of the app
 
 **Found by:** the SD-13 agent, 2026-09-10, after fixing the third one.
@@ -875,7 +837,6 @@ writes down why one of them should close the app.
 
 **Hints:** Do this with SD-49 rather than before it, since that item is rebuilding
 the lose path anyway and this is one of the buttons on it.
-
 ## SD-55 [P2] — `TopDog` still unlocks at the halfway point
 
 **Found by:** the SD-13 agent, 2026-09-10.
@@ -896,3 +857,24 @@ cheap answer, but then `TopDog` is an award for being halfway and its name says
 otherwise. Renaming what a player already earned is its own small betrayal.
 Decide which of those two you would rather explain. `AchievementCounters` and
 `Stat` are where it lives.
+
+## SD-56 [P2] — An Android shortcut may be pointing at a package that is not installed
+
+**Found by:** the SD-25 agent, 2026-09-10, which flagged it rather than shipping
+around it.
+
+`res/xml/shortcuts.xml` declares its intents with no `targetPackage` or
+`targetClass`. The documented form hardcodes the package, and a resource file gets
+no `${applicationId}` substitution, so the literal would read `com.sodogku` while
+every debug install is `com.sodogku.debug`. Broken on exactly the build somebody
+would test it on.
+
+The agent used an implicit VIEW intent against our own `sodogku://` filter instead,
+which should work and has not been tapped on a device.
+
+**Done when:** somebody has long-pressed the icon on an Android debug build and
+both entries appeared and launched.
+
+**If they did not**, this is the cause, and the fix is a Gradle-generated
+`@string/` holding the real application id rather than a literal in the resource.
+Nothing else in the change would explain the entries being absent or dead.
