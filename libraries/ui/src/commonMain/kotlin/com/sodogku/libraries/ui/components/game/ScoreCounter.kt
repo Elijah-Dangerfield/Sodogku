@@ -171,10 +171,10 @@ fun ScorePawBurst(modifier: Modifier = Modifier) {
             Box(
                 modifier = Modifier
                     .size(PawSize)
-                    // Read here and never in composition. The sheet holds a
-                    // share card and a paw rating, and subscribing that subtree
-                    // to sixty frames a second is the one way this flourish
-                    // could cost the player something.
+                    // Read here and never in composition. The sheet holds a stat
+                    // row and a paw rating, and subscribing that subtree to
+                    // sixty frames a second is the one way this flourish could
+                    // cost the player something.
                     .graphicsLayer {
                         val travelled = progress.value
                         val remaining = 1f - travelled

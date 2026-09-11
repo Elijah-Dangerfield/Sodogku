@@ -262,70 +262,6 @@ a device. It is the same job as the iOS 6.9" frames in `OWNER-TODO.md`, which ar
 blocked on item 11, so doing both at once is the cheap order. The streak pages,
 the win sheet, the board clock and the lose sheet have all changed too, so check
 every frame rather than the two named here.
-## SD-70 [P2] — `docs/practices/outbox.md` documents code deleted in C0
-
-**Found by:** the SD-66 agent, 2026-09-10.
-
-Its worked example is `PendingProfileEditStore` and `ProfileEditFlusher` in
-`:libraries:identity:impl`, and step 3 tells a reader to implement
-`UserScopedSyncer` and hang off the `activeAccount` level. All of it went with
-accounts in C0.
-
-The doc map row is labelled honestly now, which stops a reader trusting it
-blind. The doc itself is still a set of instructions nobody can follow.
-
-**Done when:** it is rewritten against `SyncTriggers`, which is what actually
-exists, or deleted.
-
-**Hints:** Decide which by asking whether this app has an outbox at all. If the
-only sync surface left is `warmForeground` / `cameOnline` / `isOffline`, then
-there is no outbox to document and the honest move is deletion plus a line in
-`features.md` about what the app does instead.
-## SD-71 [P2] — Comment rot left behind by the sharing removal
-
-**Found by:** the SD-66 agent, 2026-09-10.
-
-`libraries/resources/.../strings.xml` still has comments referencing the share
-sheet and the share card, around lines 393 and 674. The strings they described
-are gone; the comments explaining them are not.
-
-**Done when:** no comment in the resources describes a feature the app does not
-have.
-
-**Hints:** Grep the whole tree for `share` rather than fixing the two lines
-named here, since the same pass that left these probably left others. `--` inside
-an XML comment fails the resource build with an error naming no file and no line,
-so be careful editing them.
-## SD-72 [P2] — `docs/practices/testing.md` describes a test suite that does not exist
-
-**Found by:** the SD-67 agent, 2026-09-10, while correcting the parts of it that
-named things it was deleting.
-
-It cites `HomeViewModelTest`, a `HomeScenario` harness under
-`features/home/impl/commonTest/harness/`, a JWT auth plugin, `IntegrationAuth`,
-`HttpProfileApi` and `ProfileRepositoryImpl`. None of them exist.
-`features/home/impl` has no `commonTest` directory at all. Most died with the
-accounts deletion in C0.
-
-This is the document a new contributor reads to learn how to test in this repo,
-which makes it the worst place in the tree to be wrong. Somebody following it
-would spend an afternoon looking for a harness that was deleted a year ago.
-
-The parts naming deleted code have been corrected, so it is no longer actively
-lying about the things SD-67 touched. The rest has not been read against reality.
-
-**Done when:** every file, class and directory it names exists, and the practices
-it describes are the ones the repo actually follows.
-
-**Hints:** There is a lot to add as well as remove. The composition test tier
-landed on 2026-09-10 and is documented, but mutation testing is the house rule
-this repo actually runs on and the doc barely mentions it. So does the rule about
-pushing decisions out of composables into pure functions, which is why several
-bugs were catchable at all. Write down what is true now rather than patching what
-was.
-
-`DocReferencesResolveTest` will catch a dead file path but not a class name, so
-grep for every symbol it names.
 ## SD-86 [P2] — `:apps:integration` has failed twice for reasons nobody can reproduce
 
 **Found by:** two separate investigations, 2026-09-10.
@@ -356,7 +292,6 @@ tree is half-removed is a different situation from a walk that skips it.
 
 Reproducing it may mean running the tier in a loop while adding and removing a
 worktree. That is worth an hour: everything else in this repo trusts these guards.
-
 ## SD-87 [P2] — `onboarding.completed` has the same non-idempotent shape SD-85 fixed
 
 **Found by:** the SD-85 agent, 2026-09-10, after fixing the tutorial's version and
@@ -383,7 +318,6 @@ harness, which is how SD-85's test reached its second tap. Check the other
 one-shot completion events in the same pass rather than fixing the third one
 later: `tutorial.completed` and `onboarding.completed` were both written the same
 way, so a third probably was too.
-
 ## SD-88 [P1] — `Standing.Sharp` is a verdict no human pace can earn, the fourth compression bug
 
 **Found by:** the SD-6 scoring review, 2026-09-11.
@@ -427,7 +361,6 @@ needs its band map redrawn, because `Sharp` would sit at four paws. Or delete
 let the sheet have three states. Do not lower `fivePawFraction` to make room;
 that is the relabelling the class KDoc warns about. The win sheet mapping is
 `verdictTitle` in `GameOutcomeSheets.kt`.
-
 ## SD-89 [P2] — `nearMiss` is one point short on 221 of the 224 rungs the campaign ships
 
 **Found by:** the SD-6 scoring review, 2026-09-11.
@@ -454,7 +387,6 @@ the bug and will need to move with the fix. Mutations S1 and S2 (each `>=` in
 `paws` to `>`) both survive, so no test pins a tie at any rung; the sweep in
 `theGapNeverExceedsTheWindowItIsGatedOn` does hit the tie at percent 64 by
 accident of integer division but only checks `pointsShort > 0` there.
-
 ## SD-90 [P2] — The `ScoringConfig` guards stop a dropped minus sign and nothing else
 
 **Found by:** the SD-6 scoring review, 2026-09-11.
@@ -494,7 +426,6 @@ Double covers the Infinity case; NaN is already rejected because every
 comparison with it is false. Check `DoubleConfigValue` for whether `"1e9"` and
 `"Infinity"` parse, since that decides whether this is reachable from the
 console or only from code.
-
 ## SD-91 [P2] — `PawLadderReachabilityTest` asserts the middle rungs across the campaign, not per shape, and skips the daily
 
 **Found by:** the SD-6 scoring review, 2026-09-11.
@@ -520,7 +451,6 @@ and the sweep covers `LevelCurve.dailyShape` as well as the campaign.
 file, driven off the curve. Then the scoring copy can keep its constants as a
 worked example and stop being the guard. `theSweepActuallyCoversTheCampaign`
 is a real vacuity check and can stay.
-
 ## SD-92 [P2] — Comment rot in the scoring slice
 
 **Found by:** the SD-6 scoring review, 2026-09-11.
@@ -551,3 +481,46 @@ learn the real two-strike floor from the table without running the sweep.
 **Hints:** All prose. The one that takes a decision is the band table: either
 add a "two strikes, spread" row or relabel the existing one as the ceiling of
 the two-strike band.
+
+## SD-93 [P2] — `GameState.bonesUnspent` has no reader outside its own tests
+
+**Found by:** the SD-71 agent, 2026-09-10, while clearing comment rot.
+
+The share card was its only production reader and went with the sharing feature.
+`GameViewModel.win` computes the same expression locally, so the property is
+kept alive by two assertions in `GameViewModelTest` and nothing else.
+
+Its KDoc now describes what it is rather than a deleted caller, which stops it
+misleading anybody, and leaves it as a field the state carries for no one.
+
+**Done when:** it is gone, and the two assertions read whatever they were really
+about.
+
+**Hints:** The second half is the work. Those assertions were written to check
+what the share card would draw, so deleting the field without deciding what they
+should assert instead would quietly drop coverage of the bones-at-the-end rule.
+Check whether `win`'s local computation deserves the test rather than the field.
+
+## SD-94 [P2] — A quarter of the test files skip the header the practices doc requires
+
+**Found by:** the SD-72 agent, 2026-09-10, while rewriting that doc.
+
+`docs/practices/testing.md` mandates a top-level KDoc on every test file saying
+what it holds and why. Around 138 of 186 files have one. `GameViewModelTest`,
+the largest test file in the repo, is one of the ones without.
+
+A convention three quarters kept is not yet a convention, and this one earns its
+keep: several bugs this week were found by reading a test's stated purpose and
+noticing the assertions did not serve it.
+
+**Done when:** either every test file carries the header, or the doc stops
+requiring it.
+
+**Hints:** Consider a guard in `:apps:integration` rather than a one-time sweep,
+since the sweep is what rots. It is the same shape as the other source-scanning
+tests there, and `DocReferencesResolveTest` is the closest model. Declare the
+Gradle inputs with `inputs.files(...)` or the guard will silently read nothing,
+which has happened four times in this repo.
+
+Write the headers where they are missing rather than deleting the rule. Starting
+with `GameViewModelTest` would be worth it on its own.
