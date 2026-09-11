@@ -4520,6 +4520,30 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun theLastLevelOffersNoSkipBecauseThereIsNowhereToSkipTo() = runUnitTest {
+        // The four skip tests above all run on an early level, so the guard in
+        // `skipOffer` was load-bearing and untested. Take it out and the path
+        // is: Skip on the lose sheet, `skipLevel`, `nextLevel`, `endsTheCampaign`
+        // — `campaignComplete = true` and `phase = Won`, so the campaign ending
+        // and its "999 of 1000" pill are drawn over a board the player has just
+        // lost.
+        val threshold = configOf("progression.skipAfterFailedAttempts" to 1)
+        val onTheLast = viewModel(levelId = LevelPacks.lastCampaignLevelId, config = threshold)
+
+        loseCurrent(onTheLast)
+
+        assertEquals(GamePhase.Lost, onTheLast.state.phase, "the fixture has to actually lose")
+        assertNull(onTheLast.state.skip, "the last level has no next level to be skipped to")
+
+        // The control, and what keeps the assertion above from passing for the
+        // wrong reason: the same loss one level earlier does earn the offer, so
+        // the level id is the only thing withholding it.
+        val oneEarlier = viewModel(levelId = LevelPacks.lastCampaignLevelId - 1, config = threshold)
+        loseCurrent(oneEarlier)
+        assertNotNull(oneEarlier.state.skip, "the fixture never earned an offer at all")
+    }
+
+    @Test
     fun takingTheSkipRecordsItAndOpensTheNextLevel() = runUnitTest {
         val skips = FakeSkips()
         val progress = InMemoryProgress()
