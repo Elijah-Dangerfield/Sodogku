@@ -153,164 +153,95 @@ the file.
 
 **Ask:** Owner, 2026-09-09, on iOS: *"idk whats happening but im clicking all
 over and nothing is happening Im marking things, trying to open the side pine,
-trying to go to achivements. Its not working."*
+trying to go to achivements. Its not working."* Confirmed 2026-09-10 that the
+board would not take marks either, and that it only recovered when the shake
+dialog reappeared.
 
-**UPDATE 2026-09-10, and it moves the whole diagnosis.** Owner, asked again:
-*"it wasnt just about navigation. I couldnt draw X's or do anything. It didnt
-work again until the shake dialog popped back up."*
+**The mechanism is settled. The interleaving that causes it is not.**
 
-So the earlier reading below is wrong where it says marks still register. Marks
-reached the view model and never reached the screen. Nothing on the board moved
-either.
+Three readings from the androidx and Compose Multiplatform sources, each of which
+alone narrows it, and together leave one answer:
 
-**That is one symptom, not two.** Taps are still delivered, because the view is
-still in the hierarchy and its pointer handlers still exist, which is why
-`Sending event OpenAchievements` keeps logging. What stopped is everything
-downstream of state: the board does not redraw, `repeatOnLifecycle(STARTED)`
-collectors suspend, and the router's queue fills without draining. A paused
-recomposer plus a lifecycle below STARTED produces exactly this and nothing else
-does. The `STARTED` gate is not the bug, it is the one part of the wreck that
-left a log line.
+1. `NavBackStackEntryImpl.updateState()` sets an entry's lifecycle to
+   `min(hostLifecycleState, maxLifecycle)`.
+2. `NavControllerImpl.updateBackStackLifecycle()` never assigns a `maxLifecycle`
+   below STARTED to the topmost entry, nor to the first non-`FloatingWindow`
+   entry beneath one. The `nextStarted` walk exists to guarantee exactly that.
+   **So no state of `FloatingWindowNavigator` or `FloatingWindowHost` can freeze
+   the board.**
+3. `DelegatingRouter.Bind` reads `LocalLifecycleOwner.current` from inside
+   `AppNavigation`, a sibling of `NavHost` rather than a destination, so its
+   drain gate is the **host** and no entry state reaches it.
 
-Which points at the host rather than at any of our code. On iOS,
-`ComposeUIViewController` drives both the frame clock and the lifecycle owner
-from the controller's appearance callbacks, so a controller that believes it
-disappeared and never hears that it reappeared pauses recomposition and drops
-the lifecycle, while its view keeps taking touches. The feedback panel had a
-keyboard up moments before, and `ShakeDialogRoute` arrived while that was
-tearing down. **Presenting the shake dialog again is what un-stuck it**, which is
-what a controller re-entering the appeared state would do, and is hard to explain
-any other way.
+The log signature this was reported with, `Enqueuing navigation` followed by
+nothing executing, is therefore only producible by **the host being below
+STARTED**.
 
-**UPDATE 2026-09-10, third pass. There is a reproduction now, see SD-48.** A
-separate report carries the transaction `GADFullScreenAdViewController`, so the
-same dead-controls symptom happened after a rewarded ad. That is the only native
-modal this app presents, and unlike the shake dialog it can be triggered on
-demand. Do SD-48 before spending any more time on the theory below.
+**On iOS that has exactly one cause.** `UIKitLifecycleOwner` computes CREATED as
+`!isViewAppeared || !isAppForeground`. `!isAppActive` alone yields STARTED, which
+still drains everything, and `isAppForeground` only goes false on
+`UIApplicationDidEnterBackground`. With the player looking at the screen, host
+CREATED means `isViewAppeared == false`, and that flag moves only on
+`viewDidDisappear` / `viewWillAppear` of the Compose hosting view controller. The
+only thing in this app that fires those is a full-screen modal presented over the
+host, and `present(` appears at exactly two call sites, both in
+`AdNetwork.swift`: the rewarded ad and the UMP consent form.
 
-What the ad has in common with the original report is not the dialog, it is that
-something took over the screen and the app did not fully come back. A keyboard in
-its own window, a full-screen ad view controller, a floating-window destination.
-One bug with three ways in is a better reading of the evidence than three bugs.
+**What is left is finding the interleaving** that makes a `viewWillAppear` go
+missing after an ad dismisses. That needs a device. The candidate fixes all
+change behavior in ways that are unsafe to ship unverified: presenting from a
+dedicated `UIWindow` so the host never disappears changes whether the game keeps
+running under the ad, and re-asserting with `beginAppearanceTransition` double
+-fires the keyboard manager and is documented as something not to do to a
+UIKit-managed child.
 
-**Start here:** what the feedback panel and the shake dialog do to the hosting
-`UIViewController`, whether either presents over the Compose host, and whether
-an appearance transition can be interrupted by the keyboard dismissing under it.
-Confirm the frame clock is stopped rather than assumed: an on-screen frame
-counter, or the recomposition logging that already exists, will tell the
-difference between a paused recomposer and a lifecycle-only stall in one look.
+**Two earlier diagnoses in this item were wrong, and both are worth keeping as
+corrections rather than deleting.**
 
-**What the logs showed at the time.** Only navigation looked broken, because
-only navigation logs.
+The first pass blamed the `STARTED` gate in `FloatingWindowHost`. Ruled out by (2).
 
-```
-17:11:08.182  Sending event OpenAchievements
-17:11:08.186  (DelegatingRouter) Enqueuing navigation: navigate to AchievementsRoute
-17:11:09.440  Sending event OpenAchievements     <- and eleven more like it
-                                                    with no Enqueuing line at all
-```
+The second pass argued the host must have been healthy because the shake detector
+still worked. That does not hold: `LifecycleStartEffect` at CREATED calls
+`shakeHandler.stop()`, which stops CoreMotion. "It did not work again until the
+shake dialog popped back up" reads at least as well the other way round, as the
+host coming back, the detector restarting, the shake registering, and everything
+draining at once.
 
-The first tap reached the router. The next eleven produced the event and no
-navigation, and the one that *was* enqueued never executed.
+The keyboard is also not a way in. `UIRemoteKeyboardWindow` changes neither view
+appearance nor an app-level notification, so it cannot move the lifecycle owner
+at all. Its only relevance is that it changes which window is key, which is what
+`AdNetwork.rootViewController()` reads.
 
-**The mechanism, which is the useful part.** Two separate things gate on
-`Lifecycle.State.STARTED`, and they are the two things in this trace that
-stopped:
+**Done when:** watching a rewarded ad to completion and returning to the board
+leaves every control working.
 
-- `GameFeatureEntryPoint` collects events through `ObserveEvents`, which is
-  `repeatOnLifecycle(STARTED)`. Below STARTED it stops collecting, so
-  `router.navigate` is never called and nothing is even enqueued.
-- `DelegatingRouter.setNavController` drains its channel through
-  `observeWithLifecycle(lifecycle)`, also STARTED. Below STARTED, `trySend`
-  still succeeds into an UNLIMITED channel and the command sits there. That is
-  why the queue can log an enqueue for work that never runs.
+**The instrumentation is in and it is what closes this.** `HostLifecycleWatchdog`
+logs an error when a press reaches the root while the host has been below STARTED
+for two seconds, which is a contradiction because a covered view takes no
+touches. A host held down with nobody tapping stays silent, so an ad and a
+backgrounding make no noise. This covers a blind spot in
+`NavigationQueueWatchdog`, which arms on an enqueued command and would have
+watched an empty queue throughout the original incident, since delivering the tap
+to the view model was one of the things that stopped.
 
-`sendEvent` has no lifecycle gate, which is why the events keep logging and the
-app looks alive.
+**Reproduce it like this**, on a device, with Sentry attached:
 
-So the question is not "why did navigation break" but **what is holding the
-lifecycle below STARTED while the Compose UI is still drawing and handling
-touches.**
+1. Reach `GameRoute` and trigger a rewarded ad, through Hint or the
+   continue-after-fail path. Watch it to completion and dismiss it.
+2. Tap Levels and Start over a few times.
+3. Repeat five to ten times. It is intermittent and one clean run refutes nothing.
 
-**Prime suspect: the shake dialog.** 30 seconds earlier:
+What the log settles:
 
-```
-17:10:15  Feedback forwarded to Sentry (owner_directive)
-17:10:18  Enqueuing navigation: navigate to ShakeDialogRoute
-17:10:34  Enqueuing navigation: go back
-```
-
-The shake at :18 was almost certainly spurious (the owner had just put the phone
-down after submitting feedback; the recognizer was retuned for that in a later
-commit, which reduces the trigger but does not fix this). Note the feedback
-panel had a keyboard up immediately before, and `ShakeDialogRoute` arrived while
-that was tearing down.
-
-**UPDATE 2026-09-09, from the crash log.** The stampede half is fixed and the
-stall half is not. Shaking the device during the stall restarted collection, and
-twelve banked `OpenAchievements` events -- the eleven taps from 17:11:08-17:11:16
-plus one at 17:17:45 -- drained 1.5ms apart and crashed NavController with
-`Attempted to pop Destination route=AchievementsRoute, which is not the top of
-the back stack`. Events now expire after five seconds, so a stall can no longer
-end in that crash. **The stall itself is still unexplained and is what this item
-is now only about.**
-
-Also added since: lifecycle-gated collection logs when it starts and stops,
-tagged. Reproducing this should now produce `Collection stopped for
-GameViewModel events` and `Collection stopped for navigation queue`, which is
-the evidence that was missing. Owner reports being fully on the game screen at
-the time, so a phantom window from the bug-report dialog is the standing
-suspicion.
-
-**UPDATE 2026-09-10, second pass, and it narrows the search a long way.** The
-guess above about `ComposeUIViewController` pausing is probably wrong, and the
-code says why.
-
-A feature's screen state and its events are both collected against the
-**`NavBackStackEntry`** lifecycle, not the host's. `GameFeatureEntryPoint` sits
-inside `screen<GameRoute> { }`, so its `collectAsStateWithLifecycle()` and its
-`ObserveEvents` read a `LocalLifecycleOwner` that is the entry. An entry pinned
-below STARTED gives exactly the reported symptom and nothing else does: the board
-holds its last state and never redraws, its events are never delivered, and
-touches, logging and the shake detector all keep working, because those hang off
-the host.
-
-The shake detector is the evidence for this. `ShakeHandler.start`/`stop` are
-driven by a `LifecycleStartEffect` in `App.kt` on the **host** lifecycle. If the
-host had dropped below STARTED, the detector would have been stopped and the
-shake could not have been noticed at all. It was noticed, so the host was fine
-and something below it was not.
-
-Which points at `libraries/navigation/.../floatingwindow/`, our own
-`FloatingWindowNavigator` and `FloatingWindowHost`, because that is what hosts
-both the feedback sheet and the shake dialog and it is what completes a
-transition. An entry left in `transitionsInProgress` is held below its target
-state by `NavController`, and nothing ever completes it again. Note
-`FloatingWindowHost` only calls `onTransitionComplete` from a `DisposableEffect`
-in `visibleBackStack.forEach`, so an entry that leaves the visible list without
-disposing, or one that never enters it, is never completed.
-
-**Done when:** Opening the feedback panel, submitting, then triggering the shake
-dialog and dismissing it leaves the board and navigation working.
-
-**The reporting half is done** (`NavigationQueueWatchdog`, 2026-09-10). A queue
-that has not moved for four seconds now logs an error carrying the host
-lifecycle state and every back stack entry with its own state, which is the
-reading nobody has ever taken. Reproduce it once and the log says which entry is
-pinned and at what state, which is the difference between looking at the host and
-looking at `FloatingWindowHost`.
-
-**Hints:** `libraries/navigation/impl/.../DelegatingRouter.kt` (`setNavController`,
-`clearNavController`, `enqueueNavigation`),
-`libraries/flowroutines/.../Compose.kt` (`observeWithLifecycle`). Worth checking
-whether `clearNavController` ran without a matching `setNavController` -- it
-cancels `processingJob` and replaces `viewScope` with a fresh
-`CompletableDeferred`, and nothing ever completes that again until a new
-controller is bound. On iOS, check what the feedback panel and the shake dialog
-do to the hosting `UIViewController` and therefore to the lifecycle owner.
-
-Reproduce with the log lines above rather than by guessing: `Enqueuing
-navigation` with no visible result is the signature.
+- A `HostLifecycle` error naming presses against a host below STARTED is
+  **conclusive**: the hosting view controller believes its view is off screen and
+  the ad's `viewWillAppear` never came back. The fix is on the iOS presentation
+  side.
+- `Collection stopped for navigation queue` with no matching `Collection started`
+  after the ad says the same thing from the other end.
+- Controls dead with **no** `HostLifecycle` error, and the router's stall line
+  reporting STARTED or RESUMED, means the mechanism above is wrong and the answer
+  is somewhere it was ruled out. That log is worth more than any of this.
 ## SD-34 [P1] — There is no way to test a composable
 
 **Found by:** the SD-26 investigation, 2026-09-10.
@@ -346,42 +277,6 @@ Weigh this against what it costs. A UI test tier that nobody trusts is worse
 than none, so the bar is that it runs in CI, does not flake, and fails for a real
 reason. If the first two tests cannot meet that, say so and close this rather
 than leaving a tier half built.
-## SD-48 [P1] — A rewarded ad is a way to reproduce SD-26
-
-**Ask:** Owner, 2026-09-10, on `GameRoute`: *"both the levels button and the start
-over button are not doing anything right now."*
-
-**The tag on that report is the whole point.** Sentry recorded the transaction as
-`GADFullScreenAdViewController`, so a rewarded ad had been presented over the app
-when the buttons went dead. A minute earlier the same session reported *"I just
-clicked on Level levels, but it did nothing."*
-
-SD-26 is the same symptom from a different session, where the trigger looked like
-the feedback panel and the shake dialog instead. What those have in common is
-that something took over the screen and the app did not fully come back:
-a `GADFullScreenAdViewController` presented over the Compose host, a keyboard in
-its own window, a floating-window destination. That is one bug with three ways
-in, and the ad is the one an owner can trigger on demand.
-
-**Do this before anything else on SD-26.** It has been open as a P0 with no
-reproduction, and a reproduction is worth more than another theory.
-
-**Done when:** watching a rewarded ad to completion and returning to the board
-leaves every control working, and there is a test or a log line that would have
-caught it.
-
-**Hints:** `apps/ios/iosApp/Platform/AdNetwork.swift:106` finds the root view
-controller through `connectedScenes.keyWindow.rootViewController` and presents
-from it. Check what that does to the Compose host's appearance callbacks and
-therefore to `LocalLifecycleOwner`, and check whether the host reliably returns
-to STARTED after the ad is dismissed. Note the ad is the only native modal this
-app presents, which is why it is the cleanest of the three ways in.
-
-The navigation queue watchdog added on 2026-09-10 will log an error naming the
-host lifecycle state and every back stack entry's state while this is happening.
-Reproduce it with logs attached and the answer is in the report.
-
-Provenance: Sentry SODOGKU-A and SODOGKU-9, session `95dd30d1`, 2026-09-10.
 ## SD-51 [P2] — Nothing tells a player the missing starting dog is deliberate
 
 **Ask:** Owner, 2026-09-10: *"we pretty quickly start giving us those puzzles that
@@ -506,7 +401,6 @@ or somebody writes down why a treat cannot no-op.
 **Hints:** `GameViewModel.kt:2490`. Small. Check first whether a treat genuinely
 can no-op: if the answer is that it always has something to give, the fix is a
 sentence rather than an emit, and the panel should say one booster on purpose.
-
 ## SD-61 [P1] — `:apps:server:test` is red on main and CI cannot see it
 
 **Found by:** two agents independently on 2026-09-10, each of which stashed its
@@ -532,3 +426,31 @@ a different and larger problem.
 The skip-when-absent behavior is worth keeping, but a green build that silently
 skipped its only schema test is a lie either way. A count of skipped tests in the
 CI summary is the cheap version.
+
+## SD-62 [P2] — `FloatingWindowHost` never took androidx's fix for an entry popped before it composed
+
+**Found by:** the SD-48 agent, 2026-09-10, while ruling the floating windows out
+of SD-26.
+
+`FloatingWindowHost` is a copy of androidx's `DialogHost` that predates a fix
+upstream: androidx runs a `LaunchedEffect` that completes an entry popped before
+it ever composed, and ours has no equivalent. Our `navigate` also uses
+`pushWithTransition` where upstream uses `push`, which widens the window in which
+that can happen.
+
+**This is a leak, not the stall.** `NavControllerImpl` never holds the topmost
+entry or the first non-`FloatingWindow` beneath one below STARTED, so an entry
+stuck in `transitionsInProgress` cannot freeze the board. It holds a
+`NavBackStackEntry` and its `ViewModelStore` alive for the life of the process.
+
+**Done when:** an entry popped before it composed is completed, and a test shows
+it.
+
+**Blocked on SD-34.** Proving this needs a composition under test, which this repo
+cannot do yet. Do not fix it blind: the last hand-edit to this file's transition
+bookkeeping is what put SD-26 on the wrong trail for a day.
+
+**Hints:** Diff `FloatingWindowHost` against the `DialogHost` on the
+`navigation-compose` version actually on the classpath rather than against
+memory. Decide the `pushWithTransition` question separately; it may be
+deliberate, and the git history will say.
