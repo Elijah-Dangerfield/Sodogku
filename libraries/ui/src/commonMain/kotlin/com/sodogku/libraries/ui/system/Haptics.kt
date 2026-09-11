@@ -2,6 +2,7 @@ package com.sodogku.libraries.ui.system
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -65,9 +66,18 @@ class Haptics(
 /** Defaults to silent so previews and tests need provide nothing. */
 val LocalHaptics = staticCompositionLocalOf { Haptics.Silent }
 
-/** Builds a [Haptics] bound to the current platform feedback and [enabled]. */
+/**
+ * Builds a [Haptics] bound to the current platform feedback and [enabled].
+ *
+ * Remembered, and the `remember` is the point. [Haptics] has identity equality,
+ * so a fresh instance per composition is a *changed* value everywhere one is
+ * passed on. [LocalHaptics] is static, and a static local whose value changes
+ * does not track its readers — it recomposes the whole subtree under the
+ * provider and disables skipping while it does, which is a screen's worth of
+ * work bought by a one-line allocation.
+ */
 @Composable
 fun rememberHaptics(enabled: Boolean): Haptics {
     val feedback = LocalHapticFeedback.current
-    return Haptics(feedback, enabled)
+    return remember(feedback, enabled) { Haptics(feedback, enabled) }
 }
