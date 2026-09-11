@@ -18,6 +18,15 @@ class FloatingWindowNavigator : Navigator<FloatingWindowNavigator.Destination>()
      */
     internal val backStack get() = state.backStack
 
+    /**
+     * Entries the navigator is still transitioning. An entry stays here until
+     * something calls [onTransitionComplete] for it, and `NavController` will
+     * not destroy an entry or clear its `ViewModelStore` while it is listed.
+     * [FloatingWindowHost] watches this to catch entries that were popped
+     * before they ever composed.
+     */
+    internal val transitionsInProgress get() = state.transitionsInProgress
+
     override fun navigate(
         entries: List<NavBackStackEntry>,
         navOptions: NavOptions?,

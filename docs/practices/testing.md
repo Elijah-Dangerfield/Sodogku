@@ -23,8 +23,58 @@ layer — the cheapest layer that can fail when it breaks.
   graph over real Postgres through the same `installApp` seam production
   boots, with a `JwtVerification.Static` verifier swapped in. Proves component
   + auth + repository + route integrate; the client side is Ktor's test client.
+- **Composition tests** (`androidUnitTest` in a Compose module): a real
+  composition, driven and asserted on the host JVM. Only for claims that are
+  about composition itself: effects running and disposing, recomposition, what
+  is on screen. See below.
 - **End-to-end integration** (`:apps:integration`) — the real *client* stack
   against the real server. See below.
+
+## Composition tests
+
+`FloatingWindowHostTest` (`:libraries:navigation`) is the worked example and the
+first thing in this repo that ever asserted against a composition. It drives a
+real `NavController` and the real `FloatingWindowHost` through push-then-pop and
+asserts the popped entry was released. That is a claim about `DisposableEffect`
+and recomposition, which no view-model test can reach.
+
+The recipe, to copy:
+
+```kotlin
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class MyThingTest {
+    @get:Rule val compose = createComposeRule()
+    …
+}
+```
+
+Where it lives and why: **`androidUnitTest`, not `commonTest`, and not a `jvm()`
+target.** `commonTest` also compiles for iOS, where none of the harness
+resolves. A `jvm()` target would be the Compose Multiplatform-idiomatic answer
+(`runComposeUiTest` on desktop) but it cascades through
+`:libraries:{core,ui,resources,sodogku,flowroutines,storage}`, each needing
+`actual` stubs for permission launchers and image decoding, plus a third value
+on the two-case `Platform` enum that several exhaustive `when`s read. That is a
+lot of shipped surface invented to serve tests, and it contradicts the stance
+`:apps:integration` already took: reuse the Android variants on the host JVM.
+
+Setup lives in `libraries/navigation/build.gradle.kts`. Two parts are
+load-bearing and worth copying wholesale into the next module that wants this:
+`testOptions.unitTests.isIncludeAndroidResources = true`, and the
+`stageRobolectricJars` task. The second one resolves Robolectric's Android
+framework jar through Gradle and runs Robolectric offline against the staged
+copy, instead of letting it fetch ~100MB from Maven into `~/.m2` at test time.
+Nothing caches `~/.m2` on CI, and a network call inside a test is how a tier
+earns a reputation for flaking.
+
+It runs under `./gradlew testDebugUnitTest`, so CI's existing unit-test job
+already covers it.
+
+**What this layer is not for.** It is slow (a Robolectric sandbox per class) and
+it is the easiest place in the codebase to write something that passes for the
+wrong reason. Anything a view-model test or a pure-function test can answer
+belongs there instead. Do not reach for it to cover the board's gestures.
 
 ## The integration harness (`:apps:integration`)
 
@@ -82,6 +132,7 @@ and the higher one doesn't get written.
 | Route status codes, error envelopes, auth challenge shapes | `:apps:server` route tests | not integration |
 | SQL, migrations, repository contracts | `:apps:server` Testcontainers tests | not route tests |
 | DI graph constructs against a live DB | `FullStackMeTest` | not per-repository tests |
+| Effects running/disposing, recomposition, what is on screen | composition tests | not VM tests, which cannot see a composition |
 | Client↔server contract drift (serialization, headers, auth handshake, real HTTP semantics) | `:apps:integration` | not unit tests with canned JSON |
 
 Integration tests aren't a substitute for unit tests — they're slower and

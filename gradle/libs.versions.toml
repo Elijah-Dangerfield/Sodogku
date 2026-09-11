@@ -62,6 +62,22 @@ sentryKmp = "0.22.0"
 sentryAndroidGradlePlugin = "6.21.0"
 turbine = "1.2.1"
 lifecycleProcess = "2.10.0"
+# Compose UI testing on the host JVM. `androidxComposeUiTest` must track the
+# androidx Compose version that Compose Multiplatform resolves to on the Android
+# target (`./gradlew :libraries:navigation:dependencies --configuration
+# debugCompileClasspath | grep androidx.compose.ui:ui:`). The test artifact and
+# the runtime it drives have to be the same generation.
+androidxComposeUiTest = "1.9.4"
+robolectric = "4.16.1"
+# The Android framework jar Robolectric runs against: SDK 35, the newest the
+# pinned Robolectric ships. Named here rather than left to
+# Robolectric's own Maven fetch so it lands in Gradle's dependency cache, which
+# CI already caches; otherwise every CI run downloads ~100MB at test time and a
+# Maven Central hiccup turns into a red build.
+#
+# The build number is dictated by the `robolectric` version above, not chosen.
+# Bump one and the tests fail naming the exact artifact the other one wants.
+robolectricAndroidAll = "15-robolectric-13954326-i7"
 
 [libraries]
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "androidx-security-crypto" }
@@ -87,6 +103,13 @@ androidx-benchmark-macroJunit4 = { module = "androidx.benchmark:benchmark-macro-
 androidx-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "androidx-uiautomator" }
 androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "androidx-espresso" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
+# The composition-under-test tier. Runs as an Android unit test on the host JVM
+# under Robolectric, which is the same path :apps:integration already uses; see
+# libraries/navigation/build.gradle.kts for why it is not a jvm() target.
+androidx-compose-uiTest-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version.ref = "androidxComposeUiTest" }
+androidx-compose-uiTest-manifest = { module = "androidx.compose.ui:ui-test-manifest", version.ref = "androidxComposeUiTest" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+robolectric-androidAll = { module = "org.robolectric:android-all-instrumented", version.ref = "robolectricAndroidAll" }
 compose-backhandler = { module = "org.jetbrains.compose.ui:ui-backhandler", version.ref = "composeMultiplatform" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel", version.ref = "androidx-lifecycle" }

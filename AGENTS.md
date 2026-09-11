@@ -147,6 +147,8 @@ The full reference—how to add a route, repository, migration, or config value,
 
 Conventions (hand-rolled fakes only, dispatcher choice, which layer catches which bug) live in [`docs/practices/testing.md`](docs/practices/testing.md) — read it before adding tests. The end-to-end tier is `:apps:integration`: an Android-library module whose tests run on the host JVM (`./gradlew :apps:integration:testDebugUnitTest`, needs Docker) and drive the real client stack — real `HomeViewModel`, real repositories, real HTTP client — over real TCP against a real in-process Ktor server on a Testcontainers Postgres. `HarnessSmokeTest` is the worked example; `commonMain` stays empty so iOS never links the JVM-only server.
 
+Composables can be tested too, as of SD-34. `FloatingWindowHostTest` in `:libraries:navigation` is the worked example: a real composition under Robolectric in `androidUnitTest`, driven and asserted on the host JVM, running under the plain `testDebugUnitTest` sweep. Reach for it only for claims that are *about* composition: an effect that must run or dispose, a recomposition, what is on screen. Anything a view-model or pure-function test can answer stays there, because this layer is slower and much easier to write so that it passes for the wrong reason. The recipe and the reason it is not a `jvm()` target are in `docs/practices/testing.md`.
+
 ## SEAViewModel Pattern
 
 ```kotlin

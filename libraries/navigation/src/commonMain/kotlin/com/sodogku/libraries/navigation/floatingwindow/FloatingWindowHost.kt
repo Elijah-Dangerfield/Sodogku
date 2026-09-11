@@ -2,6 +2,7 @@ package com.sodogku.libraries.navigation.floatingwindow
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -30,18 +31,41 @@ fun FloatingWindowHost(floatingWindowNavigator: FloatingWindowNavigator) {
     val visibleBackStack = rememberVisibleList(backstackState)
     visibleBackStack.PopulateVisibleList(backstackState)
 
+    val transitionsInProgress by floatingWindowNavigator.transitionsInProgress.collectAsState()
+    val awaitingDispose = remember { mutableStateListOf<NavBackStackEntry>() }
+
     visibleBackStack.forEach { backStackEntry ->
 
         val destination = backStackEntry.destination as FloatingWindowNavigator.Destination
 
         DisposableEffect(backStackEntry) {
+            awaitingDispose.add(backStackEntry)
             onDispose {
                 floatingWindowNavigator.onTransitionComplete(backStackEntry)
+                awaitingDispose.remove(backStackEntry)
             }
         }
 
         backStackEntry.LocalOwnersProvider(saveableStateHolder) {
             destination.content(backStackEntry)
+        }
+    }
+
+    // The loop above completes a transition from `onDispose`, which only ever
+    // runs for an entry that composed. Push then pop inside one frame and the
+    // entry never composes, so nothing completes it: NavController holds it at
+    // CREATED and keeps its ViewModelStore for the life of the process. Sweep
+    // those up here.
+    //
+    // The `awaitingDispose` half is not redundant. Between the pop and the
+    // dispose an entry is off the back stack but still composed, and completing
+    // it there would destroy an entry that is still on screen.
+    LaunchedEffect(transitionsInProgress, awaitingDispose) {
+        transitionsInProgress.forEach { entry ->
+            val stillListed = floatingWindowNavigator.backStack.value.contains(entry)
+            if (!stillListed && !awaitingDispose.contains(entry)) {
+                floatingWindowNavigator.onTransitionComplete(entry)
+            }
         }
     }
 }
