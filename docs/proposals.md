@@ -8,12 +8,17 @@ against, where it sits under the `features.md#remote-config` split (*config owns
 switches, the binary owns content and logic shape*), and a verdict with a confidence level.
 
 The bias throughout is toward things the code already knows and never says, and away from
-anything that adds a system. Three of the nine below are recommended against, and there is a
+anything that adds a system. Three of the eight below are recommended against, and there is a
 shorter rejected list at the end. A list where everything is a yes is not a set of
 recommendations.
 
-**Three things I found while writing this** that are not proposals, because they are gaps
-rather than ideas:
+**Proposal 4 is gone and the numbering is not closed up**, because the entries here cite each
+other by number. It argued for an ending to the campaign, from a campaign that was 500 levels
+long, and the ending shipped in `ee32208`. A proposal kept past the proposal is a second and
+worse copy of a decision.
+
+**Two things I found while writing this** that are not proposals, because they are gaps rather
+than ideas:
 
 - **All fourteen `scoring.*` config keys are read by nothing.** `GameViewModel` calls
   `Scoring.placement`, `Scoring.complete` and `Scoring.paws` without a `ScoringConfig`
@@ -21,9 +26,6 @@ rather than ideas:
 - **The in-progress board is not persisted.** `features.md#saved-progress` describes it and
   BUILD-PLAN C5 records it as delivered. There are five `@Entity` classes in the app and none
   of them is a board snapshot. Proposal 5.
-- **Clearing level 500 closes the app.** `nextLevel()` finds no level 501, sends
-  `GameEvent.NavigateBack`, and the entry point maps that to `router.goBack()` on the start
-  destination. Proposal 4.
 
 ---
 
@@ -206,51 +208,6 @@ rule cannot help with a value that is valid and wrong.
 **Verdict: fix the filter now, high confidence. Ship the technique line only in the
 first-elimination-only form, medium confidence.** The filter fix is a bug, not a feature, and
 should not wait for a decision about the other half.
-
----
-
-## 4. Finishing the campaign should not close the app
-
-**What it is.** `nextLevel()` looks up `LevelPacks.campaign.byId(current.id + 1)`, gets null at
-level 500, and sends `GameEvent.NavigateBack`, which `GameFeatureEntryPoint` maps to
-`router.goBack()`. `GameRoute` is the app's start destination, so on Android the Next level button
-closes the app. Add a fourth arrangement to `GameOutcomeSheets.kt` for the last level: the win, a
-campaign total, and a button that opens the daily instead of a button labelled Next level that
-quits.
-
-**The case for.** The `TopDog` achievement fires at 500 levels cleared, so the unlock toast does
-appear over the sheet. Then the button underneath it closes the app. That is the reward for
-clearing 500 verified boards, and it is the single cheapest emotional win left in the project.
-
-It has somewhere to send them, which is the part that matters commercially. The daily is what
-`features.md#the-daily` calls the strongest retention mechanic in the genre and it is the only
-loop that keeps earning after the campaign is spent. The most engaged player the app has is the
-one who most needs to be told the daily exists, and today they are the one the app says goodbye
-to.
-
-The components already exist in the file: `OutcomeLayout`, `Dog(pose = DogPose.Solved)`
-and `PawRating` are all imported. The campaign total folds out of
-`ProgressRepository.all()`, which the drawer already reads.
-
-**The case against.** Nobody knows how many players see this screen, and the honest prior in
-this genre is very few. `features.md#telemetry`'s first dashboard, the level drop-off curve, is
-called "*the* metric for a level-based puzzle game" and it does not exist yet: C9 is unstarted
-and there is no Grafana endpoint. Building the least-viewed screen in the app before the most
-important dashboard is the wrong order.
-
-More seriously, "something at the end of the campaign" is unbounded in the worst place if it is
-allowed to mean content. Appending levels 501 and up means regenerating `CampaignPackData.kt`,
-re-running the verification test and the difficulty re-derivation test, and bumping
-`LevelPacks.PACK_VERSION`, which BUILD-PLAN C2 warns "silently reassigns players' completed levels
-to different boards" because progress is keyed on level id. That is a data-loss-shaped risk for a
-reward almost nobody collects. And a second endgame loop would compete with the daily for the same
-player.
-
-**Config or binary.** Binary. It is a screen and a branch. **No new keys.**
-
-**Verdict: do the sheet. High confidence. Reject anything larger.** The scope has to be exactly
-one branch in one file. If it grows a mode, a new pack, or a second progression track, it has
-stopped being this proposal.
 
 ---
 
