@@ -929,7 +929,7 @@ class GameViewModel(
 
     /**
      * Pro's opening boosters, which **lift a holding to a floor and never
-     * replace it** (SPEC 5.1).
+     * replace it** (`features.md#pro`).
      *
      * The other reading — set the count to `boosters.proSniffsPerAttempt` at the
      * start of every attempt — is the one that has to be argued against, because
@@ -1783,9 +1783,10 @@ class GameViewModel(
      * every level in the game.
      *
      * The holding goes **above** the refill floor and stays there. That is the
-     * whole point of the reward: `boosters.refillTo` caps what an ad tops you up
-     * to, not what you are allowed to own (SPEC 1.5), so a player who clears
-     * levels accumulates a stash and a player who watches ads does not.
+     * whole point of the reward: `boosters.refillTo` caps what an ad tops you
+     * up to, not what you are allowed to own (`features.md#sniffs-and-treats`),
+     * so a player who clears levels accumulates a stash and a player who
+     * watches ads does not.
      *
      * Campaign only. The daily has no level ladder to count against, and its
      * ids are positions in a different pack — daily 200 is not campaign 200.
@@ -2040,8 +2041,9 @@ class GameViewModel(
      * set is what the offer has to do anyway: handing someone who has already
      * run out a single bone puts them right back here on the next guess.
      *
-     * **It cannot fail closed** (SPEC 4.2). Every non-dismissal outcome grants —
-     * no fill, no network, no SDK, ads switched off in config, a config server
+     * **It cannot fail closed** (`features.md#remote-config`). Every
+     * non-dismissal outcome grants — no fill, no network, no SDK, ads switched
+     * off in config, a config server
      * nobody can reach. With one global count that guarantee stops being
      * politeness and becomes the thing that keeps a player at zero from being
      * stuck across the whole game, so the only way to leave this without bones
@@ -2051,9 +2053,10 @@ class GameViewModel(
         // Nothing to revive on a day that is already spent.
         if (state.phase == GamePhase.Recap) return
         val levelId = state.level?.id ?: 0
-        // SPEC 5.3 names `continue_level` as "third strike, restore, keep the
-        // board", and that is precisely what this is from the lose sheet. The
-        // standing offer on a board still in play is a booster grant.
+        // `features.md#ads` names `continue_level` as "third strike, restore,
+        // keep the board", and that is precisely what this is from the lose
+        // sheet. The standing offer on a board still in play is a booster
+        // grant.
         val placement = if (state.phase == GamePhase.Lost) {
             AdPlacement.ContinueLevel
         } else {

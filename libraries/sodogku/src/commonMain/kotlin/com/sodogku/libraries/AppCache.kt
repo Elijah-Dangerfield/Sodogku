@@ -126,7 +126,7 @@ data class AppData(
     val achievementsSeenAt: Long = 0L,
 
     /**
-     * Bones held, and **the only place the count lives** (SPEC 1.4).
+     * Bones held, and **the only place the count lives** (`features.md#bones`).
      *
      * One number across the campaign and the daily. It used to be per-attempt,
      * reset to three by every `startAttempt`, which meant starting anything
@@ -193,10 +193,10 @@ data class AppData(
 
     /**
      * Whether this device owns Sodogku Pro, cached **true until proven false**
-     * (SPEC 5.2). Written only by `RealEntitlements`: set on a purchase or a
-     * restore, and cleared *only* on an explicit "not entitled" from the store.
-     * A store we could not reach leaves it alone, which is what keeps a paying
-     * customer ad-free on a train.
+     * (`features.md#pro`). Written only by `RealEntitlements`: set on a
+     * purchase or a restore, and cleared *only* on an explicit "not entitled"
+     * from the store. A store we could not reach leaves it alone, which is what
+     * keeps a paying customer ad-free on a train.
      *
      * There is no account and no server receipt store, so this plus the store's
      * own restore is the whole of the entitlement. It dies with the install,
@@ -213,7 +213,7 @@ data class AppData(
      * acceptance and there has not been one yet.
      *
      * Under the no-accounts rule there is no server-side record of consent and
-     * no need for one (SPEC 7.3).
+     * no need for one (`features.md#launch-gates-and-legal`).
      */
     val acceptedTermsVersion: Int = 0,
     val acceptedPrivacyVersion: Int = 0,

@@ -4,9 +4,9 @@ package com.sodogku.libraries.scoring
  * Every number the scoring formula uses.
  *
  * Nothing here is a constant in the formula itself. These land in remote config
- * (`scoring.*`, see docs/SPEC.md section 4), because how many points a placement
- * is worth and what counts as a three-paw clear are exactly the kind of dials
- * that want retuning against real play data without an app release.
+ * (`scoring.*`, see `features.md#remote-config`), because how many points a
+ * placement is worth and what counts as a three-paw clear are exactly the kind
+ * of dials that want retuning against real play data without an app release.
  *
  * The defaults are the shipped fallbacks, balanced on four things.
  *
@@ -109,13 +109,14 @@ data class ScoringConfig(
      * played, and the third paw at 0.85 was unreachable. Scaling the window with
      * the grid is what makes "fast" mean fast *for this board*.
      *
-     * Scaling it was necessary and was not sufficient. At 8000 the window closed
-     * after 14 seconds a move on a 7x7, and SPEC Q3 puts an ordinary daily on a
-     * 6x6 to 8x8 at three to five minutes, which is 26 to 43 seconds a move.
-     * Every ordinary run was still outside the window, so the speed term was
-     * dead for the median player on the median board and only a sprint moved the
-     * score at all. Sixteen thousand puts a three-minute 7x7 inside the window
-     * and a two-minute one comfortably inside it.
+     * Scaling it was necessary and was not sufficient. At 8000 the window
+     * closed after 14 seconds a move on a 7x7, and `features.md#the-daily` puts
+     * an ordinary daily on a 6x6 to 8x8 at three to five minutes, which is 26
+     * to 43 seconds a move. Every ordinary run was still outside the window, so
+     * the speed term was dead for the median player on the median board and
+     * only a sprint moved the score at all. Sixteen thousand puts a
+     * three-minute 7x7 inside the window and a two-minute one comfortably
+     * inside it.
      */
     val speedWindowMs: Long = 16_000,
 

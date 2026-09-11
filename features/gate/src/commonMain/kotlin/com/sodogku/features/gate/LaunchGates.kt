@@ -9,10 +9,11 @@ import com.sodogku.libraries.config.values.AppMaintenanceMode.Companion.MAINTENA
  *
  * Every function in this file is pure, and every one of them answers "block
  * nobody" for an input it does not fully understand. That is not defensiveness,
- * it is the rule SPEC 4.2 states and `docs/decisions.md` explains: a force-update
- * gate is the only config value that can brick every install at once, so a
- * missing, partial, malformed or unreachable config has to resolve to letting the
- * player play. Every one of the keys behind this defaults to 0 or `off`.
+ * it is the rule `features.md#remote-config` states and `docs/decisions.md`
+ * explains: a force-update gate is the only config value that can brick every
+ * install at once, so a missing, partial, malformed or unreachable config has
+ * to resolve to letting the player play. Every one of the keys behind this
+ * defaults to 0 or `off`.
  *
  * The inputs are plain numbers and strings rather than `ConfiguredValue`s so the
  * whole decision is testable without a config map, a DI graph or a device — see

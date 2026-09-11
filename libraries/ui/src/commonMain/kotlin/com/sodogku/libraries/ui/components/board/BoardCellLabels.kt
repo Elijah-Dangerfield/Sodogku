@@ -74,9 +74,10 @@ data class BoardCellLabels(
      * mode is on.
      *
      * A label should name the thing that is actually on the square. With the
-     * glyphs on, the glyph is the region's identity — SPEC 16 says so — and a
-     * player who turned that mode on is the one player for whom "periwinkle" is
-     * the least useful word available.
+     * glyphs on, the glyph is the region's identity —
+     * `features.md#accessibility` says so — and a player who turned that mode
+     * on is the one player for whom "periwinkle" is the least useful word
+     * available.
      */
     val glyphs: List<String>,
     val empty: String,

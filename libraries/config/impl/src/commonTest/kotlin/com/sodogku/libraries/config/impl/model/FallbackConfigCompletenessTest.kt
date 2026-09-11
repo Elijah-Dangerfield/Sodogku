@@ -7,10 +7,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * SPEC section 4.2, first hard constraint: **every declared key has a bundled
- * fallback.** The app has to be fully playable, correctly monetized and legally
- * compliant on a first launch with no network, forever, if the server never comes
- * back.
+ * `features.md#remote-config`, first hard constraint: **every declared key has
+ * a bundled fallback.** The app has to be fully playable, correctly monetized
+ * and legally compliant on a first launch with no network, forever, if the
+ * server never comes back.
  *
  * The runtime source of truth for "every declared key" is the graph's
  * `Set<QaConfigValue>` multibinding, which a unit test has no way to resolve —
@@ -35,8 +35,9 @@ class FallbackConfigCompletenessTest {
         assertTrue(
             missing.isEmpty(),
             "These config keys are declared but have no bundled fallback: $missing. " +
-                "Add each one to BundledConfigDefaults in FallbackConfigMap.kt — SPEC 4.2 " +
-                "requires the app to run correctly off the bundled map alone.",
+                "Add each one to BundledConfigDefaults in FallbackConfigMap.kt. " +
+                "features.md#remote-config requires the app to run correctly off " +
+                "the bundled map alone.",
         )
     }
 

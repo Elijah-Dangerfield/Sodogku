@@ -3281,10 +3281,11 @@ class GameViewModelTest : CoroutineTest() {
 
     @Test
     fun aWrongGuessOnTheRehearsalBoardCostsNothing() = runUnitTest {
-        // SPEC 10 asks the player to get one wrong on purpose. Charging for
-        // following instructions is the failure; charging for the *second* one
-        // used to be the rule, and a whole board that costs nothing cannot get
-        // out of step with itself the way a one-shot flag could.
+        // `features.md#onboarding-and-the-tutorial` asks the player to get one
+        // wrong on purpose. Charging for following instructions is the failure;
+        // charging for the *second* one used to be the rule, and a whole board
+        // that costs nothing cannot get out of step with itself the way a
+        // one-shot flag could.
         val cache = untaughtCache()
         val vm = viewModel(levelId = FirstGuidedLevel, cache = cache)
         vm.driveTo(TutorialStep.TryAWrongOne)
@@ -4218,7 +4219,8 @@ class GameViewModelTest : CoroutineTest() {
 
     @Test
     fun theRewardPushesAHoldingAboveTheRefillFloor() = runUnitTest {
-        // SPEC 1.5: `boosters.refillTo` caps the refill, never the holding.
+        // `features.md#sniffs-and-treats`: `boosters.refillTo` caps the refill,
+        // never the holding.
         val cache = InMemoryAppCache()
         cache.set(AppData(treats = ConsumableRefillTo))
         val vm = viewModel(levelId = RewardLevel, cache = cache)

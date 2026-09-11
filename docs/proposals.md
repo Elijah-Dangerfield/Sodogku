@@ -4,8 +4,8 @@ Punch-list item P9: propose features, argue both sides, lean conservative, and s
 one whether it belongs in remote config or in the binary.
 
 Ordered by how strongly I recommend it. Each entry states what it is, the case for, the case
-against, where it sits under the SPEC 4.1 split (*config owns numbers and switches, the binary
-owns content and logic shape*), and a verdict with a confidence level.
+against, where it sits under the `features.md#remote-config` split (*config owns numbers and
+switches, the binary owns content and logic shape*), and a verdict with a confidence level.
 
 The bias throughout is toward things the code already knows and never says, and away from
 anything that adds a system. Three of the nine below are recommended against, and there is a
@@ -18,9 +18,9 @@ rather than ideas:
 - **All fourteen `scoring.*` config keys are read by nothing.** `GameViewModel` calls
   `Scoring.placement`, `Scoring.complete` and `Scoring.paws` without a `ScoringConfig`
   argument, so every one resolves to `ScoringConfig.Default`. Proposal 1.
-- **The in-progress board is not persisted.** SPEC 13.3 describes it and BUILD-PLAN C5 records
-  it as delivered. There are five `@Entity` classes in the app and none of them is a board
-  snapshot. Proposal 5.
+- **The in-progress board is not persisted.** `features.md#saved-progress` describes it and
+  BUILD-PLAN C5 records it as delivered. There are five `@Entity` classes in the app and none
+  of them is a board snapshot. Proposal 5.
 - **Clearing level 500 closes the app.** `nextLevel()` finds no level 501, sends
   `GameEvent.NavigateBack`, and the entry point maps that to `router.goBack()` on the start
   destination. Proposal 4.
@@ -46,12 +46,12 @@ is in that state right now. Someone will eventually widen `comboMax` in the cons
 tuning pass, watch the histogram not move, and spend a day looking for the bug in the wrong
 place.
 
-It also decides the cost of every other scoring change on this list. SPEC 4.3 lists the paw
-fractions and the speed window as config precisely so that "what counts as a three-paw clear" can
-be retuned against real play data. C2 went to the trouble of keeping par and the paw thresholds
-out of the pack for the same reason, and recorded it as a decision. That whole argument is
-currently theoretical. Wire this and retuning is a console edit; leave it and retuning is a store
-release, which means it will not happen.
+It also decides the cost of every other scoring change on this list.
+`features.md#remote-config` lists the paw fractions and the speed window as config precisely so
+that "what counts as a three-paw clear" can be retuned against real play data. C2 went to the
+trouble of keeping par and the paw thresholds out of the pack for the same reason, and recorded
+it as a decision. That whole argument is currently theoretical. Wire this and retuning is a
+console edit; leave it and retuning is a store release, which means it will not happen.
 
 The change is small and it is in the direction the code already points: every `Scoring` function
 already takes the config as a parameter, so nothing needs restructuring.
@@ -60,10 +60,11 @@ already takes the config as a parameter, so nothing needs restructuring.
 `ScoringConfig`'s `init` block and by 24 tests into values a console write can set. The `init`
 block does validate (positive point values, `threePawFraction >= twoPawFraction`, fractions in
 0..1), but a `require` that fires means a thrown exception on the scoring path rather than a
-fallback, and SPEC 4.2's rule is that a config outage produces a playable game. So this needs a
-deliberate answer to "what happens when the eight numbers resolve individually and the resulting
-combination is invalid", and the honest answer is probably to catch and fall back to
-`ScoringConfig.Default` rather than to let a `require` reach a player mid-attempt.
+fallback, and `features.md#remote-config`'s rule is that a config outage produces a playable
+game. So this needs a deliberate answer to "what happens when the eight numbers resolve
+individually and the resulting combination is invalid", and the honest answer is probably to
+catch and fall back to `ScoringConfig.Default` rather than to let a `require` reach a player
+mid-attempt.
 
 There is a second, quieter cost. Scores are compared against a par derived from the same
 coefficients, and `best_paws` is stored while par is not. Once the coefficients are live, a
@@ -73,8 +74,8 @@ practice the moment the keys are live, and it is the reason proposal 2 has to be
 what it shows.
 
 **Config or binary.** Neither, and that is the point: this is the wiring that makes fourteen
-already-declared keys real. **No new keys.** The formula shape stays in the binary, as SPEC 4.4
-says.
+already-declared keys real. **No new keys.** The formula shape stays in the binary, as
+`features.md#remote-config` says.
 
 **Verdict: do it, and do it before anything else on this list. High confidence.** It is the
 cheapest item here, it fixes an established failure mode rather than adding a feature, and it
@@ -90,12 +91,12 @@ rating is computed and discarded. On the win sheet, under the existing `PawRatin
 score against the two-paw and three-paw lines: a thin bar with the player's total on it and the
 next paw marked. Nothing else changes.
 
-**The case for.** SPEC 1.3 built the rating as a fraction of par on purpose, so that speed and
-combo would be legible in the one number the header shows. Hiding par makes it illegible in the
-opposite direction: the player watches the score climb during the attempt, gets two paws at the
-end, and has no way to connect the two. The win sheet is the moment they have the app's full
-attention and the moment they decide whether to hit Next or Retry, and it currently answers
-"how did I do" with a rating whose scale is a secret.
+**The case for.** `features.md#score-and-paws` built the rating as a fraction of par on
+purpose, so that speed and combo would be legible in the one number the header shows. Hiding
+par makes it illegible in the opposite direction: the player watches the score climb during the
+attempt, gets two paws at the end, and has no way to connect the two. The win sheet is the
+moment they have the app's full attention and the moment they decide whether to hit Next or
+Retry, and it currently answers "how did I do" with a rating whose scale is a secret.
 
 It costs nothing to a player who ignores it. It is one derived `Int` on `GameState`, one
 composable, no persistence, no new module, no new state machine. And it makes the campaign's
@@ -146,20 +147,22 @@ engine's first step is an elimination, name the reasoning in one line under the 
 of the generic "These squares are ruled out".
 
 **The case for.** The first half is a straight violation of a rule the project has already
-enforced once. SPEC 1.5: "a booster is never spent for nothing", and `decisions.md` has a whole
-entry ("three tests that passed on `emptyList()`") about a sniff-spent-for-nothing bug found on a
-device and the tests that could not catch it. This is the remaining instance and it is worse than
-the one that was fixed, because it punishes precisely the player who is playing the way the game
-wants: manual X-marking on top of auto-mark is, per SPEC 1.2, "what lets a careful player record
-their own deductions". The careful player is the one who gets nothing for their charge. The fix
-is one set in one union.
+enforced once. `features.md#sniffs-and-treats`: "a booster is never spent for nothing", and
+`decisions.md` has a whole entry ("three tests that passed on `emptyList()`") about a
+sniff-spent-for-nothing bug found on a device and the tests that could not catch it. This is
+the remaining instance and it is worse than the one that was fixed, because it punishes
+precisely the player who is playing the way the game wants: manual X-marking on top of
+auto-mark is, per `features.md#the-board`, "what lets a careful player record their own
+deductions". The careful player is the one who gets nothing for their charge. The fix is one
+set in one union.
 
-The second half is a promise the spec makes and the code does not keep. SPEC 1.5 says the sniff
-"shows the technique that found them". `Deduction` carries `technique` on both variants and
-`ruledOutCells` throws it away, returning a bare `List<Int>`. There are five techniques total, so
-this is five strings, not a glossary. A hint that says *why* is the difference between a hint that
-unsticks a player once and one that teaches them to unstick themselves, and teaching is the only
-thing that makes a 500-level curve survivable.
+The second half is a promise the spec makes and the code does not keep.
+`features.md#sniffs-and-treats` says the sniff "shows the technique that found them".
+`Deduction` carries `technique` on both variants and `ruledOutCells` throws it away, returning
+a bare `List<Int>`. There are five techniques total, so this is five strings, not a glossary. A
+hint that says *why* is the difference between a hint that unsticks a player once and one that
+teaches them to unstick themselves, and teaching is the only thing that makes a 500-level curve
+survivable.
 
 **The case against.** The technique half does not have a well-defined answer, and this is not a
 detail. `ruledOutCells` runs `DeductionEngine.nextStep` in a loop until it has accumulated up to
@@ -184,8 +187,8 @@ and when the first step is a `Place` the UI falls back to today's generic line. 
 **Config or binary.** Binary: the technique names are copy and the filter is logic. One new key
 falls out of reading this code, though, and it is not really about this proposal:
 `SniffRevealLimit = 4` and `StarterDogThroughLevel = 25` were compile-time constants in
-`GameViewModel`, and both were exactly the "threshold or cap" the SPEC 4.1 rule puts in config
-next to `boosters.refillTo` and `progression.lookaheadCount`.
+`GameViewModel`, and both were exactly the "threshold or cap" the `features.md#remote-config`
+rule puts in config next to `boosters.refillTo` and `progression.lookaheadCount`.
 
 | Key | Default | What it does |
 |---|---|---|
@@ -220,19 +223,20 @@ appear over the sheet. Then the button underneath it closes the app. That is the
 clearing 500 verified boards, and it is the single cheapest emotional win left in the project.
 
 It has somewhere to send them, which is the part that matters commercially. The daily is what
-SPEC 2 calls the strongest retention mechanic in the genre and it is the only loop that keeps
-earning after the campaign is spent. The most engaged player the app has is the one who most needs
-to be told the daily exists, and today they are the one the app says goodbye to.
+`features.md#the-daily` calls the strongest retention mechanic in the genre and it is the only
+loop that keeps earning after the campaign is spent. The most engaged player the app has is the
+one who most needs to be told the daily exists, and today they are the one the app says goodbye
+to.
 
 The components already exist in the file: `OutcomeLayout`, `Dog(pose = DogPose.Solved)`
 and `PawRating` are all imported. The campaign total folds out of
 `ProgressRepository.all()`, which the drawer already reads.
 
-**The case against.** Nobody knows how many players see this screen, and the honest prior in this
-genre is very few. SPEC 14's first dashboard, the level drop-off curve, is called "*the* metric
-for a level-based puzzle game" and it does not exist yet: C9 is unstarted and there is no Grafana
-endpoint. Building the least-viewed screen in the app before the most important dashboard is the
-wrong order.
+**The case against.** Nobody knows how many players see this screen, and the honest prior in
+this genre is very few. `features.md#telemetry`'s first dashboard, the level drop-off curve, is
+called "*the* metric for a level-based puzzle game" and it does not exist yet: C9 is unstarted
+and there is no Grafana endpoint. Building the least-viewed screen in the app before the most
+important dashboard is the wrong order.
 
 More seriously, "something at the end of the campaign" is unbounded in the worst place if it is
 allowed to mean content. Appending levels 501 and up means regenerating `CampaignPackData.kt`,
@@ -252,11 +256,12 @@ stopped being this proposal.
 
 ## 5. Persist the in-progress board
 
-**What it is.** SPEC 13.3 says the board, marks, lives, score, combo and elapsed time are saved
-separately so that backgrounding mid-level resumes exactly, and calls its absence something that
-"reads as a bug". BUILD-PLAN C5 records it as delivered. It is not there. `AppDatabase` is at
-version 8 with five entities and none is a board snapshot; `GameState` lives only in the
-ViewModel. Add the table, write on every state-changing action, clear it when the attempt ends.
+**What it is.** `features.md#saved-progress` says the board, marks, lives, score, combo and
+elapsed time are saved separately so that backgrounding mid-level resumes exactly, and calls
+its absence something that "reads as a bug". BUILD-PLAN C5 records it as delivered. It is not
+there. `AppDatabase` is at version 8 with five entities and none is a board snapshot;
+`GameState` lives only in the ViewModel. Add the table, write on every state-changing action,
+clear it when the attempt ends.
 
 **The case for.** The gap is worse than losing a board. Booster spends are persisted immediately
 through `persistCounts`, so a player who force-quits or gets killed by the OS mid-attempt keeps
@@ -290,9 +295,9 @@ therefore still playable, which the daily's own decision entry already accepts.
 add a `features.resumeInProgress` flag: a kill switch on a persistence path leaves rows written
 that nothing reads.
 
-**Verdict: do it, and correct SPEC 13.3 and BUILD-PLAN C5 in the same change so the docs stop
-claiming it. Medium-high confidence.** The confidence is not higher only because it is the one
-item here with a schema bump in it.
+**Verdict: do it, and correct `features.md#saved-progress` and BUILD-PLAN C5 in the same change
+so the docs stop claiming it. Medium-high confidence.** The confidence is not higher only
+because it is the one item here with a schema bump in it.
 
 ---
 
@@ -305,11 +310,12 @@ pass `contentDescription = null`. Give the cell a semantics block built from the
 already receives, give it a custom accessibility action for committing a guess, summarise the
 auto-mark cascade in one announcement, and label the two header buttons.
 
-**The case for.** SPEC 16 opens by saying the core mechanic is colour and that accessibility is
-therefore "a design constraint, not a checkbox", then addresses only colour vision. This is a pure
-logic puzzle with no reflex component and no rendering requirement, which is exactly the genre
-screen-reader users play. The whole board state is region, row, column and one of four cell
-states, and every one of those is already a parameter on the composable.
+**The case for.** `features.md#accessibility` opens by saying the core mechanic is colour and
+that accessibility is therefore "a design constraint, not a checkbox", then addresses only
+colour vision. This is a pure logic puzzle with no reflex component and no rendering
+requirement, which is exactly the genre screen-reader users play. The whole board state is
+region, row, column and one of four cell states, and every one of those is already a parameter
+on the composable.
 
 It costs a sighted player nothing, and it is far cheaper now than later. The design system already
 does this elsewhere: `Surface`, `Dialog` and `BasicButton` all set semantics, and `IconResource`
@@ -399,16 +405,17 @@ it should. Retuning a scoring curve against a spreadsheet is how the first pass 
 the day's board is already done. No server, no push, no account. A settings row next to the
 existing toggles.
 
-**The case for.** SPEC 2 calls the daily the strongest retention mechanic in the genre and calls
-the streak freeze "the single most reliable ad impression in the app". Both depend on the player
-remembering, and nothing reminds them. A streak breaks in silence: the player finds out on
-Wednesday that Tuesday cost them the number they were proud of, and the freeze offer, its ad
-impression and the habit all go with it.
+**The case for.** `features.md#the-daily` calls the daily the strongest retention mechanic in
+the genre and calls the streak freeze "the single most reliable ad impression in the app". Both
+depend on the player remembering, and nothing reminds them. A streak breaks in silence: the
+player finds out on Wednesday that Tuesday cost them the number they were proud of, and the
+freeze offer, its ad impression and the habit all go with it.
 
-It does not touch a single non-goal. SPEC 18 rules out accounts, cloud save, social features and
-server-delivered packs; a local notification needs none of them. `DailyStatus` already carries the
-done state and `resetsIn`, and `Permission.Notifications` and a `PermissionManager` interface
-already exist in `:libraries:sodogku`, with an iOS implementation in
+It does not touch a single non-goal. `features.md#what-the-game-does-not-have` rules out
+accounts, cloud save, social features and server-delivered packs; a local notification needs
+none of them. `DailyStatus` already carries the done state and `resetsIn`, and
+`Permission.Notifications` and a `PermissionManager` interface already exist in
+`:libraries:sodogku`, with an iOS implementation in
 `apps/ios/iosApp/Platform/PermissionManager.swift`.
 
 **The case against.** It is the only item on this list that is a new system on both platforms, and
@@ -434,9 +441,9 @@ It also outruns the kill switch. `DailyStatus.enabled` is `daily.enabled && feat
 and is checked at the point of use. A notification queued yesterday fires into a disabled feature
 and opens a drawer with no card in it.
 
-And SPEC 7.1 is still open. Asking for notification permission in a cute dog game is exactly the
-surface that draws a Play Families review flag on a build that has not yet declared its target
-audience.
+And `features.md#audience-and-consent` is still open. Asking for notification permission in a
+cute dog game is exactly the surface that draws a Play Families review flag on a build that has
+not yet declared its target audience.
 
 **Config or binary.** The scheduler and the copy are binary, the switches and the hour are config.
 
@@ -460,12 +467,13 @@ store. Revisit after C13.
 **What it is.** Every `LevelDefinition` carries `difficulty` and `LevelRow` already receives the
 whole definition. Render it as a 1-to-5 indicator next to the `NxN` label.
 
-**The case for.** Difficulty is what the entire content pipeline is organised around. SPEC 1.7
-defines it as deduction depth, the generator buckets on it, and the shipped ordering deliberately
-sawtooths it so each band opens easier than the last one closed. A player scrolling the drawer sees
-only grid size, which is monotonic, so the curve the pack was built to deliver is invisible. Level
-200 and level 240 look identical and play nothing alike. It also explains scoring, since
-`difficultyBonusRate` means a harder board of the same size pays a bigger completion bonus.
+**The case for.** Difficulty is what the entire content pipeline is organised around.
+`features.md#the-campaign` defines it as deduction depth, the generator buckets on it, and the
+shipped ordering deliberately sawtooths it so each band opens easier than the last one closed.
+A player scrolling the drawer sees only grid size, which is monotonic, so the curve the pack
+was built to deliver is invisible. Level 200 and level 240 look identical and play nothing
+alike. It also explains scoring, since `difficultyBonusRate` means a harder board of the same
+size pays a bigger completion bonus.
 
 **The case against.** The pack cannot support the scale it would be drawn on.
 
@@ -481,10 +489,10 @@ tier 1, 3 to 10 are tier 2, and level 11 resets to tier 1 on a bigger grid. As a
 in a list, that is a curve to whoever designed it and a glitch to everyone else.
 
 The number also does not mean what a player will read it as. It is deduction depth, not felt
-effort: a tier-2 10x10 takes longer and hurts more than a tier-4 6x6. SPEC 14's difficulty
-calibration dashboard exists precisely because designed and real difficulty diverge, and that
-dashboard does not exist yet. Publishing the designed number before measuring the real one is
-publishing the guess.
+effort: a tier-2 10x10 takes longer and hurts more than a tier-4 6x6. `features.md#telemetry`'s
+difficulty calibration dashboard exists precisely because designed and real difficulty diverge,
+and that dashboard does not exist yet. Publishing the designed number before measuring the real
+one is publishing the guess.
 
 Finally, the row already carries `PawRating`, a three-symbol rating that counts up. A second
 rating scale on the same row, counting up differently and meaning something else, is how a
@@ -528,9 +536,9 @@ badge log.
 undoing a fact. A mark is undone by tapping it again. What is left is undoing a *wrong* guess,
 which is undoing a bone, and that is a fourth consumable wearing a different hat.
 
-**Endless or on-device generated levels.** SPEC 3 is explicit that nothing is generated on device,
-and the verification test is the only thing between an unsolvable board and the store. Generation
-also takes 42 seconds for 1,230 boards on a JVM with a warm JIT.
+**Endless or on-device generated levels.** `features.md#the-campaign` is explicit that nothing
+is generated on device, and the verification test is the only thing between an unsolvable board
+and the store. Generation also takes 42 seconds for 1,230 boards on a JVM with a warm JIT.
 
 **Reusing the daily pool as post-campaign content.** The pool wraps with `daily.poolOffset`, so
 spending it as campaign content spoils boards the daily will serve later, on the players most
@@ -543,18 +551,18 @@ softer versions too, including a global "you beat 60% of players on this board" 
 server that receives per-player results. `share.tapped` is the growth channel we have, and it works
 because it needs nobody's account.
 
-**Cloud save or a progress export code.** Already scoped as a v2 candidate in SPEC 18, and the
-export/import string is the right shape when it happens. It is not a v1 feature and it should not
-be smuggled in as one.
+**Cloud save or a progress export code.** Already scoped as a v2 candidate in
+`features.md#what-the-game-does-not-have`, and the export/import string is the right shape when
+it happens. It is not a v1 feature and it should not be smuggled in as one.
 
-**Cosmetics, dog skins, a second currency.** SPEC 18 lists it as a v2 candidate and the reasoning
-in the "three consumables, one shape" decision generalises: a second economy is a second thing to
-learn before the puzzle.
+**Cosmetics, dog skins, a second currency.** `features.md#what-the-game-does-not-have` lists it
+as a v2 candidate and the reasoning in the "three consumables, one shape" decision generalises:
+a second economy is a second thing to learn before the puzzle.
 
 **A second, deeper hint tier.** Same argument. One booster that rules squares out is a mental
 model; two boosters with different hint strengths is a purchasing decision in the middle of a
 puzzle.
 
-**A lives-regenerate-on-a-timer meter.** SPEC 1.4 already decided lives do not persist across
-attempts and do not regenerate. A timer meter is the mechanic the rewarded-continue pattern exists
-to replace, and it converts worse.
+**A lives-regenerate-on-a-timer meter.** `features.md#bones` already decided lives do not
+persist across attempts and do not regenerate. A timer meter is the mechanic the
+rewarded-continue pattern exists to replace, and it converts worse.

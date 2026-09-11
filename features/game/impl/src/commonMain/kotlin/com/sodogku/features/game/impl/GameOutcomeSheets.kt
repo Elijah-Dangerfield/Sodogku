@@ -388,8 +388,8 @@ private fun LostSheet(state: GameState, onAction: (GameAction) -> Unit, modifier
         }
         // Under both the revive and Start over, deliberately. This board is
         // still winnable and the offer to move past it should be the last thing
-        // read, not the first — SPEC 1.6 wants a rescue, not an invitation to
-        // stop thinking.
+        // read, not the first — `features.md#skip` wants a rescue, not an
+        // invitation to stop thinking.
         state.skip?.let { skip -> SkipButton(skip, onAction) }
         ButtonGhost(
             onClick = { onAction(GameAction.LevelsOpened) },
@@ -497,7 +497,7 @@ private fun SkipButton(skip: SkipOffer, onAction: (GameAction) -> Unit) {
         if (skip.available) {
             Text(stringResource(Res.string.game_skip_level))
             // Pro skips for free, so badging it would promise an ad that never
-            // plays. The cap still applies to Pro (SPEC 1.6).
+            // plays. The cap still applies to Pro (`features.md#skip`).
             if (!skip.free) {
                 RewardBadge(modifier = Modifier.padding(start = Dimension.D300))
             }

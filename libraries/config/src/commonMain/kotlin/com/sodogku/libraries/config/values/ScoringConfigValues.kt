@@ -14,7 +14,8 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 /**
  * The scoring coefficients, one key each, mirroring `ScoringConfig` in
  * `:libraries:scoring`. The formula *shape* stays in the binary; only these
- * numbers are tunable, which is the whole of SPEC section 4.1 applied to scoring.
+ * numbers are tunable, which is the whole of `features.md#remote-config`
+ * applied to scoring.
  *
  * The one thing to understand before retuning any of them: **the multipliers have
  * to spread wide, not merely exist.** The paw rating is a fraction of a par score
@@ -110,10 +111,11 @@ class ScoringComboMax(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigM
  * moves every size at once. It was a flat window until it turned out nobody
  * places inside eight seconds on a 9x9, which pinned the multiplier at 1.0 and
  * put the top paw out of reach for the whole back half of the campaign. Scaling
- * it with the grid fixed that and left it half the size it needed to be: at 8000
- * the window closed after fourteen seconds a move on a 7x7, and SPEC Q3 budgets
- * three to five minutes for a 6x6-to-8x8 daily, which is twenty-six seconds a
- * move at the fast end. The median run was still outside the window.
+ * it with the grid fixed that and left it half the size it needed to be: at
+ * 8000 the window closed after fourteen seconds a move on a 7x7, and
+ * `features.md#the-daily` budgets three to five minutes for a 6x6-to-8x8 daily,
+ * which is twenty-six seconds a move at the fast end. The median run was still
+ * outside the window.
  */
 @Inject
 @SingleIn(AppScope::class)

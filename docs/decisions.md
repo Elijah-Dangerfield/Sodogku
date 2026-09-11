@@ -252,13 +252,14 @@ surface should not offer controls that do nothing.
 
 ### What was deliberately left
 
-The dated entries below this one still describe sharing as shipped, including
-the 2026-09-07 pair on the composition local and on the share not being able to
-leak the answer. This log is append-only and says so, and those decisions were
-true when they were made. SPEC 9 is a different case and was corrected in place:
-it is the living specification, so it now records the removal rather than the
-feature. Its number is kept, because `SPEC <n>` references are scattered through
-the code and renumbering to close a gap would break all of them.
+The dated entries below this one still describe sharing as shipped, including the 2026-09-07
+pair on the composition local and on the share not being able to leak the answer. This log is
+append-only and says so, and those decisions were true when they were made. The spec's own
+sharing section was a different case and was corrected in place rather than deleted, so it
+recorded the removal rather than the feature. Its number was kept, because `SPEC <n>`
+references were scattered through the code and renumbering to close a gap would have broken all
+of them. That doc is gone now and `features.md#what-the-game-does-not-have` is where the
+removal is recorded.
 
 ---
 
@@ -270,8 +271,8 @@ load lets just have a self promo option where we promote sodogku pro".
 
 ### What was actually there
 
-An audit of every placement, because the list in SPEC 5.3 and the list with a
-caller are not the same list.
+An audit of every placement, because the list in `features.md#ads` and the list with a caller
+are not the same list.
 
 | Placement | Format | Production caller |
 | --- | --- | --- |
@@ -312,10 +313,10 @@ whole removal is one commit or none.
 
 ### The stand-in
 
-SPEC 5.3 has always said a failed ad grants the reward. What it never said is
-what the player is looking at while that happens, and the answer was nothing. A
-rewarded slot is the one moment a player volunteers their attention; handing it
-back unused on every no-fill throws away the only inventory we own outright.
+The rule that a failed ad grants the reward is old (`features.md#ads`). What it never covered
+is what the player is looking at while that happens, and the answer was nothing. A rewarded
+slot is the one moment a player volunteers their attention; handing it back unused on every
+no-fill throws away the only inventory we own outright.
 
 `RealAdGate` now asks `PaywallCoordinator.requestAdStandIn` on `NoFill`,
 `Offline`, `NotShown` and `Failed`, and the paywall goes up with its close
@@ -337,11 +338,10 @@ the dwell is shorter than the fifteen to thirty second video it replaces: a
 fallback that cost more than the ad would make a bad fill rate something to hope
 for.
 
-**The dwell holds this screen's controls and not the system back gesture.** A
-five second sheet a player cannot escape is an ad network's bad afternoon
-becoming their problem, which is the one thing SPEC 4.2 forbids outright. The
-offline block swallows back because it is the state the player is in; this is a
-pitch. What the lock buys is a default, not a cage.
+**The dwell holds this screen's controls and not the system back gesture.** A five second sheet
+a player cannot escape is an ad network's bad afternoon becoming their problem, which is the
+one thing `features.md#remote-config` forbids outright. The offline block swallows back because
+it is the state the player is in; this is a pitch. What the lock buys is a default, not a cage.
 
 **It is capped like an offer and not gated on `paywall.triggers`.** That list
 names the moments we chose to sell at, and this is not one of them; it is the
@@ -428,21 +428,19 @@ natural yield is tier-2 heavy. The new one reaches tier 3 at 23 and tier 4 at 35
 | first tier 3 | level 38 | level 23 |
 | first tier 4 | level 92 | level 35 |
 
-Grid sizes are untouched — SPEC 1.7's table still holds — because size and tier
-are separate axes and making the ramp out of bigger boards would have been the
-cheap answer to the wrong question. Each band still opens a tier below where the
-last one closed: the grid just grew, which is its own difficulty jump, so the
-reasoning gets a breather while the player learns to read a wider board. That
-keeps roughly a quarter of the back half at tier 3 rather than a flat diet of the
-ceiling.
+Grid sizes are untouched — `features.md#the-campaign`'s table still holds — because size and
+tier are separate axes and making the ramp out of bigger boards would have been the cheap
+answer to the wrong question. Each band still opens a tier below where the last one closed: the
+grid just grew, which is its own difficulty jump, so the reasoning gets a breather while the
+player learns to read a wider board. That keeps roughly a quarter of the back half at tier 3
+rather than a flat diet of the ceiling.
 
-**The daily changed too, but not into a ramp.** SPEC Q3 stands: every player
-meets the same board whatever level they are on, so it stays on 6x6 to 8x8 and
-stays shuffled. What it stopped doing is taking whatever the generator produced,
-which was 11% tier 1 and 60% tier 2 — reliably *easier* than the campaign level
-its player was on, which is the wrong signal from the thing that exists to bring
-them back. The pool is now 45% tier 2, 35% tier 3, 20% tier 4, with no tier 1 at
-all. Sizes are unchanged, so the three-to-five-minute budget is too.
+**The daily changed too, but not into a ramp.** `features.md#the-daily` stands: every player
+meets the same board whatever level they are on, so it stays on 6x6 to 8x8 and stays shuffled.
+What it stopped doing is taking whatever the generator produced, which was 11% tier 1 and 60%
+tier 2 — reliably *easier* than the campaign level its player was on, which is the wrong signal
+from the thing that exists to bring them back. The pool is now 45% tier 2, 35% tier 3, 20% tier
+4, with no tier 1 at all. Sizes are unchanged, so the three-to-five-minute budget is too.
 
 `LevelPacks.PACK_VERSION` goes to 2. Progress is keyed on level id and every id
 now points at a different board.
@@ -479,9 +477,9 @@ than thinking. It would make the game more tedious, not more thoughtful. Auto-ma
 all-or-nothing, which is what makes the right answer a player setting.
 
 **Default on, and that is not a hedge.** It is what every existing player already has, and the
-tutorial teaches auto-mark as a step — with a default of off that lesson would be a lie on first
-launch. A player who turns it off later has made the choice knowingly. SPEC 1.2 already said this;
-the toggle is what was missing.
+tutorial teaches auto-mark as a step — with a default of off that lesson would be a lie on
+first launch. A player who turns it off later has made the choice knowingly.
+`features.md#the-board` already said this; the toggle is what was missing.
 
 **The real design work is separating what the game knows from what the player has been shown.**
 Those were one set. `GameState.autoMarks` is now the deduction, computed from the placements on
@@ -509,15 +507,16 @@ its trigger is `Tap`, so `TutorialRunner` does not skip it for having nothing to
 Settings has a Replay the tutorial row, which is exactly how a purist meets the guided run.
 
 **Rejected: a `game.autoMarkDefault` remote-config key.** It was argued properly, because a
-default that can be flipped without a release is normally the right shape and SPEC 4.1 says config
-owns switches. Three things sink it. The persisted field cannot tell "never touched" from
-"explicitly on" unless it is nullable, which is the exact trap `AppData.sniffs` documents — a
-record that already says `true` is indistinguishable from a player who chose `true`. The key's
-only safe value is `true` anyway, because the tutorial teaches auto-mark and a flip to off would
-make that lesson a lie for every new install, so it is a lever nobody could ever pull. And SPEC
-4.4 already puts "anything needed before first config fetch — onboarding, tutorial, level 1"
-in the binary, which is precisely where this lands. An inert key is the failure
-`ConfigValuesAreReadTest` exists to catch, so the right number of new keys here is zero.
+default that can be flipped without a release is normally the right shape and
+`features.md#remote-config` says config owns switches. Three things sink it. The persisted
+field cannot tell "never touched" from "explicitly on" unless it is nullable, which is the
+exact trap `AppData.sniffs` documents — a record that already says `true` is indistinguishable
+from a player who chose `true`. The key's only safe value is `true` anyway, because the
+tutorial teaches auto-mark and a flip to off would make that lesson a lie for every new
+install, so it is a lever nobody could ever pull. And `features.md#remote-config` already puts
+"anything needed before first config fetch — onboarding, tutorial, level 1" in the binary,
+which is precisely where this lands. An inert key is the failure `ConfigValuesAreReadTest`
+exists to catch, so the right number of new keys here is zero.
 
 **Telemetry: `auto_mark` goes on four events**, not one. `game.level_started`,
 `game.level_completed`, `game.level_failed` and `game.commit`. It splits the funnel rather than
@@ -579,7 +578,7 @@ Android restores, and restoring onto a tutorial the player has since finished is
 anything this was solving. Swapping the board in place means a process death mid-lesson restores
 the route the player actually meant to be on, which is level 1.
 
-**The one-shot free mistake is gone.** SPEC 10 used to forgive a single wrong guess on campaign
+**The one-shot free mistake is gone.** The spec used to forgive a single wrong guess on campaign
 level 3, which needed arming in `startAttempt`, spending in `strike` and disarming in
 `completeTutorial` — three places that could disagree. A whole board that costs nothing needs none
 of them and cannot get out of step with itself.
@@ -651,8 +650,8 @@ as they do after it. One label covers the spotlight because a gated step lights 
 lit square, double tap, and the gated step advances. The `uiautomator` dump shows one node,
 `content-desc="Place a dog, row 2, column 1"`, `clickable="true"`, bounded to the lit square.
 
-**Still not verified:** VoiceOver on iOS, for the same reason as everything else in SPEC 16 —
-nothing has run on an iOS simulator on this machine.
+**Still not verified:** VoiceOver on iOS, for the same reason as everything else in
+`features.md#accessibility` — nothing has run on an iOS simulator on this machine.
 
 ---
 
@@ -697,8 +696,8 @@ transaction would have bought atomicity at the price of a dao method with one ca
 
 **Cost: one rewarded ad, at the freeze's placement, failing open.** Pro skips the ad entirely.
 Only `RewardOutcome.Dismissed` withholds the restore, so no fill, no network and an SDK failure
-all grant it, which is SPEC 4.2's rule and the same line `useFreeze` and `SkipRepositoryImpl`
-already use.
+all grant it, which is `features.md#remote-config`'s rule and the same line `useFreeze` and
+`SkipRepositoryImpl` already use.
 
 **It reuses `AdPlacement.StreakFreeze` rather than adding one.** They are the same placement in
 every sense that matters to an operator: an ad that saves a streak. A second id would need
@@ -778,7 +777,7 @@ The rematch set is keyed on `LevelResult.levelKey` (`mode:levelId`), not on the 
 daily 7 are different boards on a shared number line, which has already caused one round of bugs
 recorded further down this file, and a loss on one must not arm a rematch on the other.
 
-**It answers SPEC 8's rejected "Marathon" honestly.** That was turned down because *session*
+**It answers the rejected "Marathon" badge honestly.** That was turned down because *session*
 length is not a property of an attempt and nothing tracks it. That is still true. Cumulative time
 on the boards is a sum of `timeMs`, which is exactly a property of an attempt, so it is a badge
 this log can actually justify.
@@ -890,10 +889,10 @@ reading cursor. Folded into one string, a player who crosses a square off hears 
 Verified on a device: with TalkBack running, marking a square put **"crossed off"** on TalkBack's
 own speech-output overlay.
 
-**In colourblind mode the label names the glyph, not the hue.** "Row 3, column 4, square". SPEC 16
-says the glyph *is* the region's identity in that mode, and the one player who has turned it on is
-the one for whom "periwinkle" is the least useful word available. The `colorblind` flag was
-already a parameter on the cell; this costs a list index.
+**In colourblind mode the label names the glyph, not the hue.** "Row 3, column 4, square".
+`features.md#accessibility` says the glyph *is* the region's identity in that mode, and the one
+player who has turned it on is the one for whom "periwinkle" is the least useful word
+available. The `colorblind` flag was already a parameter on the cell; this costs a list index.
 
 **Placement is an action, not a gesture.** Committing a guess is a second tap inside 320ms,
 recognised in `GameViewModel` because the cell deliberately refuses `onDoubleTap`. Under
@@ -966,7 +965,8 @@ BUILD-PLAN C12 rather than closed.
 
 ## 2026-09-08 — a 10x10 cell cannot reach 44pt, and the number that matters is not the one drawn
 
-SPEC 16 asked for 44pt minimum touch targets verified on the smallest supported device at 10x10.
+The spec asked for 44pt minimum touch targets verified on the smallest supported
+device at 10x10.
 Ten cells across cannot: `10 × 44 = 440dp` is wider than any phone. Measured, at 10x10:
 
 | Width | Drawn cell | Reported touch bounds |
@@ -983,12 +983,12 @@ in a `uiautomator` dump, and there is no dead space between two squares. No code
 this; it was worth measuring rather than assuming, because the obvious reading of the layout says
 the gutter is dead.
 
-**Where that leaves the requirement.** 32.2dp at the assumed floor clears WCAG 2.2 AA
-(2.5.8 Target Size (Minimum), 24×24), which also exempts a target whose presentation is essential —
-a grid of ten is the puzzle. It does not clear WCAG AAA 2.5.5 or Apple's 44pt, and nothing that
-keeps ten columns can. Everything that is *not* the grid does clear it: both header icon buttons
-measure 48dp, the rule chips 48dp tall, the boosters 48dp. SPEC 16 now states the exception and
-the floor instead of a promise the geometry cannot keep.
+**Where that leaves the requirement.** 32.2dp at the assumed floor clears WCAG 2.2 AA (2.5.8
+Target Size (Minimum), 24×24), which also exempts a target whose presentation is essential — a
+grid of ten is the puzzle. It does not clear WCAG AAA 2.5.5 or Apple's 44pt, and nothing that
+keeps ten columns can. Everything that is *not* the grid does clear it: both header icon
+buttons measure 48dp, the rule chips 48dp tall, the boosters 48dp. `features.md#accessibility`
+now states the exception and the floor instead of a promise the geometry cannot keep.
 
 **What was rejected:** shrinking the board to 8x8 on narrow phones (changes the puzzle), and a
 scrollable grid (a board you cannot see at once is not a board you can reason about).
@@ -1126,9 +1126,10 @@ does not exist. Every block this raises is one the accept button can clear, and
 `LaunchGatesTest` asserts the clearing, not just the raising.
 
 **Closing the non-blocking banner is the acceptance**, and the copy says so. That is the split
-SPEC 7.3 draws: a material change forces consent, a minor one takes continued use as consent. The
-version travels on the gate object and on the action rather than being re-read at the tap, so a
-refresh landing between the frame and the tap cannot record consent to something nobody was shown.
+`features.md#launch-gates-and-legal` draws: a material change forces consent, a minor one takes
+continued use as consent. The version travels on the gate object and on the action rather than
+being re-read at the tap, so a refresh landing between the frame and the tap cannot record
+consent to something nobody was shown.
 
 ## 2026-09-07 — a maintenance gate with no message is treated as no gate
 
@@ -1137,9 +1138,9 @@ message" is exactly what a half-finished admin write looks like from the client.
 with nothing written on it: the operator's text is the entire content of the screen, so raising it
 without one strands the player on a blank apology.
 
-Both keys or neither, in both modes. This is the one rule in the gates that is a judgement rather
-than a default, and it is the shape a partial config would take, which is one of the four failure
-modes SPEC 4.2 names.
+Both keys or neither, in both modes. This is the one rule in the gates that is a judgement
+rather than a default, and it is the shape a partial config would take, which is one of the
+four failure modes `features.md#remote-config` names.
 
 Casing is forgiving on the mode itself (`Blocking` works) for the same reason the boolean parser
 is — the console takes raw text and that is not a mistake worth punishing — but anything outside
@@ -1156,7 +1157,7 @@ the app is unusable.
 
 ## 2026-09-07 — Pro's per-attempt boosters are a floor, not an assignment
 
-SPEC 5.1 says Pro "starts every attempt with 3 Sniffs and 3 Treats", and the obvious reading of
+The spec said Pro "starts every attempt with 3 Sniffs and 3 Treats", and the obvious reading of
 that sentence is `sniffs = proSniffsPerAttempt` at the top of every attempt. That reading is
 wrong, and it is wrong in the most expensive direction available: **it takes consumables away
 from a paying customer.** A Pro player who has banked nine Treats from level rewards would open
@@ -1338,17 +1339,16 @@ button and no per-day counter; `progression.lookaheadCount` describes a level
 map with silhouettes, and the level drawer deliberately shows every level with
 locks instead; `boosters.treatSchedule` has no level reward to attach to;
 `boosters.adGrantsPerDay` has nowhere to count; `boosters.proSniffsPerAttempt`
-is a Pro benefit SPEC 5.1 promises and the code does not implement.
+is a Pro benefit the spec promised and the code did not implement.
 `ads.appOpenCooldownHours` has an `AdFormat.AppOpen` that reaches the SDK and no
 `AdPlacement`, no gate and no cold-start hook to space out.
 
-`ads.failureMode` is the one worth naming on its own. `LOCK` — the level locks
-until a rewarded ad reopens it — was never built anywhere, and `RealAdGate`
-documents at length that it does not consult this key on the reward path *on
-purpose*. Wiring it would mean inventing the harsher arm of an A/B test, in the
-one place SPEC 4.2 says an outage must never be able to reach. It stays inert,
-which is the correct state for a key whose only non-default value does not
-exist.
+`ads.failureMode` is the one worth naming on its own. `LOCK` — the level locks until a rewarded
+ad reopens it — was never built anywhere, and `RealAdGate` documents at length that it does not
+consult this key on the reward path *on purpose*. Wiring it would mean inventing the harsher
+arm of an A/B test, in the one place `features.md#remote-config` says an outage must never be
+able to reach. It stays inert, which is the correct state for a key whose only non-default
+value does not exist.
 
 The rest need a screen: the upgrade gate, the maintenance screen, the legal
 re-accept sheet. Those are chunk-sized, not call-site-sized.
@@ -1560,10 +1560,11 @@ the two kinds of card drifting apart the next time the dialog padding is retuned
 
 ## 2026-09-07 — the score explainer names no numbers
 
-Every scoring coefficient is remote config (`scoring.*`, SPEC §4). Copy that says "100 points per
-dog" is a sentence that goes stale the first time anyone retunes the formula, in a build nobody
-would think to re-check. `score_explainer_body` describes the *shape* — bigger board pays more, a
-combo builds, speed stacks, finishing pays a bonus — and names no value that config can move.
+Every scoring coefficient is remote config (`scoring.*`, `features.md#remote-config`). Copy
+that says "100 points per dog" is a sentence that goes stale the first time anyone retunes the
+formula, in a build nobody would think to re-check. `score_explainer_body` describes the
+*shape* — bigger board pays more, a combo builds, speed stacks, finishing pays a bonus — and
+names no value that config can move.
 
 The level explainer takes the same line for a different reason: it reads the campaign length from
 `LevelPacks.campaign.size` rather than the 500 the spec names, so a content update that lengthens
@@ -1617,11 +1618,11 @@ them — somebody who left halfway has not had the lesson.
 
 ## 2026-09-07 — the offline grace reads the OS, not `AppState.isOffline`
 
-Running C8 on a device put the offline block screen up on full wifi. `AppState.isOffline`
-is `!osOnline || !backendReachable`, and the dev server is not deployed yet, so every
-launch was permanently "offline" as far as the ad gate could tell. SPEC 6 already said
-what the rule should be — "only the former trips the grace, since ad networks are
-reachable when our own server is down" — and there was simply no flow that expressed it.
+Running C8 on a device put the offline block screen up on full wifi. `AppState.isOffline` is
+`!osOnline || !backendReachable`, and the dev server is not deployed yet, so every launch was
+permanently "offline" as far as the ad gate could tell. `features.md#offline` already said what
+the rule should be — "only the former trips the grace, since ad networks are reachable when our
+own server is down" — and there was simply no flow that expressed it.
 
 `AppState` grew `isDeviceOffline`, the platform connectivity signal on its own, with a
 default of `get() = isOffline` so previews and test doubles that model one signal keep
@@ -1670,10 +1671,10 @@ a nag. When the game layer is free, the better version is a choice sheet in
 
 Two persisted things landed in C8 and they went to different places.
 
-The **entitlement** is one boolean in `AppData` (`isProEntitled`), where SPEC 5.2 says it
-goes. It is a fact about the player, it belongs next to the other things a person would
-recognise, and it is exactly the "don't roll a new cache for a single boolean" case
-AGENTS.md names.
+The **entitlement** is one boolean in `AppData` (`isProEntitled`), where `features.md#pro` says
+it goes. It is a fact about the player, it belongs next to the other things a person would
+recognise, and it is exactly the "don't roll a new cache for a single boolean" case AGENTS.md
+names.
 
 The **ad bookkeeping** is a separate `ad_state` cache. Five numbers — first launch,
 last interstitial, levels since, grace start, grace spent — none of which mean anything
@@ -1688,7 +1689,7 @@ reset would mean a week-long session never stopped seeing them.
 
 ## 2026-09-07 — Play Billing 8, not the 7 the spec names
 
-SPEC 5.2 says "Play Billing 7". Play stopped accepting new releases on 7 before this was
+The spec said "Play Billing 7". Play stopped accepting new releases on 7 before this was
 written, so 8.3.0 shipped instead. The migration is two things and both are already in
 `PlayStoreBilling`: `queryProductDetailsAsync` hands back a `QueryProductDetailsResult`
 rather than a bare list, and `enablePendingPurchases(PendingPurchasesParams)` is
@@ -1754,7 +1755,7 @@ for no gain.
 `LocalShareSheet` (in `:libraries:ui`) provides the launcher to the whole tree from `App.kt`,
 defaulting to a no-op so previews and tests get something harmless. `ShareButton` in the design
 system does the formatting, so a screen supplies only the two things it alone knows: what the board
-was, and what to call it. SPEC §9 wants three share points (win sheet, daily card, level-map
+was, and what to call it. The spec wanted three share points (win sheet, daily card, level-map
 long-press) and this is what keeps the second and third from being a copy of the first.
 
 **`:libraries:sharing` keeps its empty dependency list.** `ShareLauncher` returns `Unit` rather
@@ -1765,7 +1766,7 @@ present has no recovery a caller could offer. The platform impls log and move on
 
 ## 2026-09-07 — the achievements toggle hides the row that opens the grid, not the grid's contents
 
-SPEC §8 says the toggle "suppresses toasts and hides the tab". There is no tab, so the question was
+The spec said the toggle "suppresses toasts and hides the tab". There is no tab, so the question was
 what "hidden" means for a Settings row and a screen. Turning badges off removes the **Achievements
 row** from Settings; the toggle itself stays, or there would be no way back. The screen keeps an
 "achievements are off" panel behind it, which is what a deep link or a stale back stack lands on,
@@ -1814,12 +1815,12 @@ would let a screen opened a second before midnight record yesterday's board agai
 
 ## 2026-09-07 — a lost daily is spent when the player walks away, not when the bones run out
 
-**The constraint:** `daily_result` takes one row per date and never updates it (that insert-only
-rule is what makes the one-attempt lock hold whatever the clock says), and SPEC §2 allows a failed
-daily to be continued with a rewarded ad exactly like a campaign level. Those two together mean
-the result cannot be written at the moment the third bone goes: the revive's clear would then find
-the day already locked to a loss, and the player would watch an ad, finish the board, and get
-nothing.
+**The constraint:** `daily_result` takes one row per date and never updates it (that
+insert-only rule is what makes the one-attempt lock hold whatever the clock says), and
+`features.md#the-daily` allows a failed daily to be continued with a rewarded ad exactly like a
+campaign level. Those two together mean the result cannot be written at the moment the third
+bone goes: the revive's clear would then find the day already locked to a loss, and the player
+would watch an ad, finish the board, and get nothing.
 
 **Decision:** `onFailed` is written when the player leaves the loss sheet. A win writes
 `onCompleted` immediately, as it always could. Starting over is removed from the daily's loss
@@ -1918,12 +1919,12 @@ is caught by `JsonConfigValue`'s decode fallback, which is a fail-open path.
 
 ## 2026-09-07 — the console warns; the server does not refuse
 
-SPEC 4.2 says monetization keys fail open, and the admin API can write values
-that run that backwards: `ads.failureMode = "LOCK"`, `ads.offlineGraceLevels = 0`,
-a rewarded placement switched off. The server could reject those outright. It
-doesn't, because SPEC 4.2 is explicit that tightening in *config* is a live-ops
-decision and it is the shipped **defaults** that must fail open — a server that
-refuses the harsher arm also refuses the A/B test the key exists for.
+`features.md#remote-config` says monetization keys fail open, and the admin API can write
+values that run that backwards: `ads.failureMode = "LOCK"`, `ads.offlineGraceLevels = 0`, a
+rewarded placement switched off. The server could reject those outright. It doesn't, because
+`features.md#remote-config` is explicit that tightening in *config* is a live-ops decision and
+it is the shipped **defaults** that must fail open — a server that refuses the harsher arm also
+refuses the A/B test the key exists for.
 
 So the guard is a confirm sheet (`dangerousWarning`), which on prod also makes
 the operator type the environment name. That friction is the reason the list is
@@ -2235,8 +2236,8 @@ on my part (`features.check("webp_anim")` is not a real feature name); Pillow re
 fine.
 
 **Cost:** the sheet's frame count and grid are duplicated between the script's arguments and
-`AnimatedDog.kt`'s constants. A mismatch shows up as a visibly wrong animation rather than a build
-failure, which is why both are documented in SPEC section 16a.
+`AnimatedDog.kt`'s constants. A mismatch shows up as a visibly wrong animation rather than a
+build failure, which is why both are documented in `features.md#the-dog`.
 
 ## 2026-09-07 — Haptics go through one object, not through call sites
 
@@ -2366,10 +2367,10 @@ file.
 those get derived at runtime from size and difficulty in `:libraries:scoring`
 using coefficients from remote config.
 
-**Why:** baked thresholds are un-tunable. What counts as a three-paw clear is
-exactly the kind of number the config split (SPEC section 4) says belongs on the
-server, and freezing it into the pack would mean a regenerated pack and an app
-release to retune it. It also decouples C2 from C3 entirely.
+**Why:** baked thresholds are un-tunable. What counts as a three-paw clear is exactly the kind
+of number the config split (`features.md#remote-config`) says belongs on the server, and
+freezing it into the pack would mean a regenerated pack and an app release to retune it. It
+also decouples C2 from C3 entirely.
 
 ## 2026-09-07 — Uniqueness comes from targeted refinement, not random mutation
 
@@ -2413,10 +2414,9 @@ calls on every cold start, muddying logs and telemetry for the whole project.
 And every screen built on top would have to decide whether to consult a session
 that can never exist. Sodogku's only backend surface is public remote config.
 
-**Cost accepted:** progress is device-local and cannot survive a reinstall. The
-Pro entitlement still travels via store restore. If progress ever needs to move
-devices, the cheap path is an export/import code (see `SPEC.md` §18), not
-resurrecting accounts.
+**Cost accepted:** progress is device-local and cannot survive a reinstall. The Pro entitlement
+still travels via store restore. If progress ever needs to move devices, the cheap path is an
+export/import code (see `features.md#what-the-game-does-not-have`), not resurrecting accounts.
 
 ## 2026-09-07 — Rollout bucketing keys on install id, not user id
 
@@ -2767,11 +2767,10 @@ and `"banana".toBoolean()` is `false`. So a string typed into `ads.enabled`,
 `daily.enabled` or any `features.*` flag in the admin console would have turned
 that feature off on every device that fetched it — no log, no fallback, no crash.
 
-This is the one path that could make a monetization key fail *closed*, which is
-the exact guarantee SPEC 4.2 is built around, and the client-side fail-open test
-could not see it: that test reads against an *empty* map, where every key already
-falls back correctly. The hole was in the resolve of a value that was present and
-malformed.
+This is the one path that could make a monetization key fail *closed*, which is the exact
+guarantee `features.md#remote-config` is built around, and the client-side fail-open test could
+not see it: that test reads against an *empty* map, where every key already falls back
+correctly. The hole was in the resolve of a value that was present and malformed.
 
 Booleans now resolve only from "true"/"false", case-insensitively, and anything
 else is null so the declared default wins. Casing stays forgiving because the
@@ -2887,11 +2886,10 @@ already on screen. Tapping your own row is a way of closing the pane, not a
 request to start over. It restarts only when the attempt is already over, where
 refusing would strand the player on a dead board.
 
-The large one: **there was no in-progress snapshot at all.** SPEC 13.3 describes
-one and BUILD-PLAN recorded C5 as delivering it; nothing did. Booster spends were
-written to disk the instant they happened and the board they paid for was not, so
-a force-quit mid-puzzle kept the charge and lost the reasoning — the worst
-possible half to save.
+The large one: **there was no in-progress snapshot at all.** `features.md#saved-progress`
+describes one and BUILD-PLAN recorded C5 as delivering it; nothing did. Booster spends were
+written to disk the instant they happened and the board they paid for was not, so a force-quit
+mid-puzzle kept the charge and lost the reasoning — the worst possible half to save.
 
 `BoardSnapshot` lives on `AppData` rather than in Room. It is one small blob,
 there is only ever one of it, and nothing queries it; a table would have bought a
@@ -3050,8 +3048,8 @@ Mutation-checking is what caught it: reverting the fix left the test green.
 
 ## 2026-09-08 — dashboards live in the repo, and a test holds their queries to the code
 
-The six SPEC §14 dashboards are committed JSON under `ops/grafana/`, imported by hand, rather than
-created in Grafana and left there.
+The six dashboards in `features.md#telemetry` are committed JSON under `ops/grafana/`, imported
+by hand, rather than created in Grafana and left there.
 
 The immediate reason is that the only Grafana stack this session could reach belongs to a
 different project, and writing to it is not ours to do. But the arrangement is the right one
@@ -3157,15 +3155,14 @@ an argument they do not care about.
 Tracing the app for the Play Data Safety form turned up three problems that were
 only visible from the store's point of view.
 
-**Restore Purchases was unreachable.** SPEC 5.1 says it lives in Settings; it did
-not. `PaywallTrigger.Direct` was defined and requested by no UI, so the only
-routes to the paywall were a post-loss offer and the offline block. Apple rejects
-a non-consumable app with no visible restore control, and on a device with no
-account a reinstall is the only way a paying player gets their purchase back.
-Settings now has a Pro section with both, and every restore outcome says
-something — a restore that silently does nothing is the commonest reason this
-control is reported as broken, because the player cannot tell "you never bought
-it" from "we could not ask".
+**Restore Purchases was unreachable.** `features.md#pro` says it lives in Settings; it did not.
+`PaywallTrigger.Direct` was defined and requested by no UI, so the only routes to the paywall
+were a post-loss offer and the offline block. Apple rejects a non-consumable app with no
+visible restore control, and on a device with no account a reinstall is the only way a paying
+player gets their purchase back. Settings now has a Pro section with both, and every restore
+outcome says something — a restore that silently does nothing is the commonest reason this
+control is reported as broken, because the player cannot tell "you never bought it" from "we
+could not ask".
 
 **`allowBackup` was on, and Settings says the opposite.** The copy tells the
 player progress does not survive a reinstall or a move to a new phone. Auto
@@ -3197,11 +3194,10 @@ The file's own KDoc already promised "the first frame never blocks on the
 network". It was true from the second launch onwards, which is why nobody caught
 it: on a dev machine you launch the app twice and the second one is fine.
 
-`configStream` now starts from the bundled fallback and re-emits when a cached or
-fetched snapshot supersedes it. Every declared key has a bundled default
-specifically so this is possible — SPEC section 4 requires it, and the app is
-meant to be fully playable with the server switched off. Cold boot offline is now
-**3.3 seconds**, measured the same way.
+`configStream` now starts from the bundled fallback and re-emits when a cached or fetched
+snapshot supersedes it. Every declared key has a bundled default specifically so this is
+possible — `features.md#remote-config` requires it, and the app is meant to be fully playable
+with the server switched off. Cold boot offline is now **3.3 seconds**, measured the same way.
 
 A corrupt snapshot takes the same path, because an unreadable file is exactly as
 good a reason to start from the fallback as an absent one.
@@ -3365,35 +3361,34 @@ daily and the campaign each having their own three. One cause. `startAttempt` se
 board — the next level, a retry, a jump from the pane, opening the daily — was a
 free refill.
 
-`AppData.bones` already existed and was already written by the booster refill.
-Nothing ever read it. The fix is that the field is now the count: `load()` reads
-it, `startAttempt` carries whatever state holds, a strike decrements and
-persists, and the refill tops up and persists. Same shape as sniffs and treats,
-which is the point — SPEC 1.5's "one shape" now actually covers all three.
+`AppData.bones` already existed and was already written by the booster refill. Nothing ever
+read it. The fix is that the field is now the count: `load()` reads it, `startAttempt` carries
+whatever state holds, a strike decrements and persists, and the refill tops up and persists.
+Same shape as sniffs and treats, which is the point — `features.md#sniffs-and-treats`'s "one
+shape" now actually covers all three.
 
-**What happens at zero, and why it cannot strand anyone.** Running out is a wall
-across the whole game rather than the end of one attempt, so the way out has to
-be reliable in a way it did not have to be before. It is: the refill goes through
-`AdGate.showRewarded`, where `RealAdGate` returns `Dismissed` on exactly one
-path — the player closing the ad — and grants on every other, including no fill,
-no route to the network, an SDK that threw, `ads.enabled` false and a config
-server nobody can reach. SPEC 4.2's fail-open rule was already load-bearing; it
-is now the only thing between a player at zero and a locked game, so it is pinned
-by a test that walks every non-dismissal outcome and asserts both the state and
-the write to disk. **Verified on the emulator with wifi and mobile data off**: the
-refill granted three and put the board back in play.
+**What happens at zero, and why it cannot strand anyone.** Running out is a wall across the
+whole game rather than the end of one attempt, so the way out has to be reliable in a way it
+did not have to be before. It is: the refill goes through `AdGate.showRewarded`, where
+`RealAdGate` returns `Dismissed` on exactly one path — the player closing the ad — and grants
+on every other, including no fill, no route to the network, an SDK that threw, `ads.enabled`
+false and a config server nobody can reach. `features.md#remote-config`'s fail-open rule was
+already load-bearing; it is now the only thing between a player at zero and a locked game, so
+it is pinned by a test that walks every non-dismissal outcome and asserts both the state and
+the write to disk. **Verified on the emulator with wifi and mobile data off**: the refill
+granted three and put the board back in play.
 
 A board opened at zero shows the offer immediately rather than waiting for the
 guess that ends it. A wall a player only meets by losing a board to it is
 indistinguishable from a bug.
 
-**The "keep going" button is gone.** It restored one bone for the same ad as the
-button directly above it, which restored three — strictly dominated, and in a
-build where no ad inventory is served it read as a free bone for nothing, which
-is what got reported. Two controls where one is always worse is not a choice.
-There is now exactly one revive, it restores the whole set, and it keeps SPEC
-5.3's `continue_level` placement when it fires from the lose sheet and
-`booster_grant` when it fires from the standing offer on a board still in play.
+**The "keep going" button is gone.** It restored one bone for the same ad as the button
+directly above it, which restored three — strictly dominated, and in a build where no ad
+inventory is served it read as a free bone for nothing, which is what got reported. Two
+controls where one is always worse is not a choice. There is now exactly one revive, it
+restores the whole set, and it keeps `features.md#ads`'s `continue_level` placement when it
+fires from the lose sheet and `booster_grant` when it fires from the standing offer on a board
+still in play.
 
 **Pro gets no per-attempt bone floor**, deliberately, and this is the one place
 the three consumables diverge. The floor for sniffs and treats (2026-09-07) is a

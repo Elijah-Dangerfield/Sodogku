@@ -30,7 +30,7 @@ import io.opentelemetry.kotlin.logging.export.LogRecordProcessor
  *
  * Deliberately direct-to-Grafana rather than through our backend: the
  * reliability events (`net.backend_unreachable`, reconnect failures) must
- * survive a backend outage. See `docs/plans/client-app-events-otel.md`.
+ * survive a backend outage. See `docs/practices/app-events.md`.
  *
  * `session_id` / `install_id` / `is_offline` ride on every record (never as
  * resource attributes — the session rolls over mid-process on a 15-min

@@ -54,7 +54,7 @@ import kotlin.time.Duration.Companion.seconds
  * for a user who declined. Reading the form's presence instead would block ads
  * for most of the world.
  *
- * SPEC 7.1 decides the app is general-audience, so
+ * `features.md#audience-and-consent` decides the app is general-audience, so
  * `TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE` is set and `tagForUnderAgeOfConsent`
  * is deliberately left unspecified. Setting the latter turns off personalised
  * ads for everyone, which is a revenue decision nobody made.

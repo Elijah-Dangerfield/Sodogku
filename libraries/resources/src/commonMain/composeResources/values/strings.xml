@@ -219,7 +219,7 @@
     <string name="common_close">Close</string>
     <string name="common_back">Back</string>
 
-    <!-- Board accessibility (SPEC 16). Every one of these is spoken, never
+    <!-- Board accessibility (`features.md#accessibility`). Every one of these is spoken, never
          drawn, so they are written to be *heard* — short, and in the order a
          player needs them: where the square is, which colour it belongs to,
          and what is on it. The region names double as the vocabulary a player
@@ -298,7 +298,7 @@
     <string name="hint_reason_naked_set">A few colors have only the same few rows or columns left, so nothing else fits there.</string>
     <string name="hint_reason_contradiction">A dog on any of these leaves the rest of the board with no answer.</string>
 
-    <!-- Tutorial (SPEC 10). One title + body per TutorialStep; the exhaustive
+    <!-- Tutorial (`features.md#onboarding-and-the-tutorial`). One title + body per TutorialStep; the exhaustive
          `when` in TutorialCoachMark is what keeps this list honest.
 
          The whole lesson runs on one throwaway practice board, so no line here
@@ -616,7 +616,7 @@
     <string name="paywall_nothing_to_restore">No purchase found on this store account.</string>
     <string name="paywall_store_unreachable">Could not reach the store. Try again in a moment.</string>
 
-    <!-- Offline block (SPEC 6) -->
+    <!-- Offline block (`features.md#offline`) -->
     <string name="offline_block_title">No connection</string>
     <string name="offline_block_body">Sodogku is free because of the ads, and there is no way to load one right now. Reconnect to keep playing, or get Pro and play offline as much as you like.</string>
     <string name="offline_block_still_offline">Still nothing. Check wifi or mobile data.</string>
@@ -624,7 +624,7 @@
     <string name="offline_block_go_pro">Get Pro</string>
 
     <!--
-      Launch gates (SPEC 4.3 `upgrade.*` / `legal.*`, SPEC 7.3).
+      Launch gates (`features.md#remote-config` `upgrade.*` / `legal.*`, `features.md#launch-gates-and-legal`).
 
       There is deliberately no string for the maintenance body: `upgrade.maintenanceMessage`
       is raw operator-written text, because it is written during an incident and a

@@ -67,14 +67,14 @@ class PaywallFeatureEntryPoint(
             )
         }
 
-        // Deliberately still a `screen<>`. The offline block is the one thing in
-        // this app that stops a player (SPEC 6): it swallows back, it has no
-        // dismiss control of its own, and it leaves only when the network comes
-        // back or the player buys Pro. A bottom sheet is the wrong shape for
-        // that in three separate ways — a scrim you can tap, a drag you can
-        // swipe, and a page visible underneath that the block is there to stop
-        // you reaching. Being a sheet would make it dismissible, which is the
-        // one property it must not have.
+        // Deliberately still a `screen<>`. The offline block is the one thing
+        // in this app that stops a player (`features.md#offline`): it swallows
+        // back, it has no dismiss control of its own, and it leaves only when
+        // the network comes back or the player buys Pro. A bottom sheet is the
+        // wrong shape for that in three separate ways — a scrim you can tap, a
+        // drag you can swipe, and a page visible underneath that the block is
+        // there to stop you reaching. Being a sheet would make it dismissible,
+        // which is the one property it must not have.
         screen<OfflineBlockRoute> {
             val viewModel: OfflineBlockViewModel = viewModel { offlineBlockViewModelFactory() }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value

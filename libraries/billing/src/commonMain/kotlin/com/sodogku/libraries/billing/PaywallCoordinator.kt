@@ -107,7 +107,7 @@ interface PaywallCoordinator {
      * Put the offline block on screen. Not subject to the session cap: it is
      * not an offer that can nag, it is the state the player is in. Refused when
      * `paywall.offlineBlockEnabled` is off or the player is Pro (Pro is
-     * unlimited offline play, SPEC 5.1).
+     * unlimited offline play, `features.md#pro`).
      */
     fun requestOfflineBlock(): Boolean
 

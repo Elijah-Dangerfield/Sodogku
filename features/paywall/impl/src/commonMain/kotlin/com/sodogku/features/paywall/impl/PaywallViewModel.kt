@@ -19,10 +19,10 @@ import kotlin.time.Duration.Companion.seconds
  * The Pro sheet.
  *
  * The price is asked of the store rather than hardcoded or configured — it is
- * set per storefront, and SPEC 4.3 says so outright. Until the store answers,
- * the button reads "Get Pro" with no number in it, which is the honest state:
- * a placeholder price that turns out to be wrong in a currency we did not think
- * about is worse than no price.
+ * set per storefront, and `features.md#remote-config` says so outright. Until
+ * the store answers, the button reads "Get Pro" with no number in it, which is
+ * the honest state: a placeholder price that turns out to be wrong in a
+ * currency we did not think about is worse than no price.
  */
 @Inject
 class PaywallViewModel(
@@ -68,8 +68,9 @@ class PaywallViewModel(
             // The dwell holds this screen's own controls and nothing else. The
             // system back gesture never reaches here, on purpose: a five-second
             // sheet the player cannot escape is an ad network's bad afternoon
-            // becoming their problem, which is the one thing SPEC 4.2 forbids
-            // outright. What the lock buys is a default, not a cage.
+            // becoming their problem, which is the one thing
+            // `features.md#remote-config` forbids outright. What the lock buys
+            // is a default, not a cage.
             is PaywallAction.Dismiss -> if (state.secondsUntilDismissible <= 0) {
                 sendEvent(PaywallEvent.Dismiss)
             }

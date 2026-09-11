@@ -165,7 +165,7 @@ reason for the no.
 
 ## 4. Does size add difficulty at all
 
-SPEC 1.7 is right, and the column that proves it is the last one. Same boards as
+`features.md#the-campaign` is right, and the column that proves it is the last one. Same boards as
 above, rated by the shipped `Difficulty` and stepped through `DeductionEngine`:
 
 | Size | Cells | Tier mix (1/2/3/4) | Median steps | Mean steps | Steps per cell |

@@ -115,7 +115,7 @@ class AdsOfflineGraceMinutes(appConfigMap: AppConfigMap) : IntConfigValue(appCon
 
 /**
  * Per-placement enable switches for rewarded ads, keyed by the placement ids in
- * SPEC section 5.3. Structured rather than one key per placement so a new
+ * `features.md#ads`. Structured rather than one key per placement so a new
  * placement needs no new config schema.
  *
  * Read it through [isEnabled], never by indexing: an unknown or missing key

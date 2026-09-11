@@ -19,8 +19,8 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * Keeping them apart also means the ad layer can be reasoned about (and
  * force-reset in QA) without touching the file the whole app writes to.
  *
- * The **entitlement** does live in `AppData`, per SPEC 5.2 — that one is a fact
- * about the player, not machinery.
+ * The **entitlement** does live in `AppData`, per `features.md#pro` — that one
+ * is a fact about the player, not machinery.
  *
  * Per-*session* counters are deliberately not here: an interstitial ceiling
  * that survived a restart would let a player who force-quit twice never see one
@@ -42,8 +42,8 @@ data class AdState(
 
     /**
      * Epoch-ms of the **first ad gate that could not be served offline**, which
-     * is where SPEC 6 counts the grace from — not from going offline. 0 = the
-     * grace has not started.
+     * is where `features.md#offline` counts the grace from — not from going
+     * offline. 0 = the grace has not started.
      */
     val offlineGraceStartedAtMs: Long = 0L,
 

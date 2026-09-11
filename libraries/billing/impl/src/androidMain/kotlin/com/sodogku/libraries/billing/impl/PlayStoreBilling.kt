@@ -38,8 +38,8 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Play Billing.
  *
- * SPEC 5.2 says "Play Billing 7"; this is 8.x, because Play stopped accepting
- * new releases on 7 and the two API differences that matter
+ * The original spec said "Play Billing 7"; this is 8.x, because Play stopped
+ * accepting new releases on 7 and the two API differences that matter
  * (`QueryProductDetailsResult` instead of a bare list, and the mandatory
  * `PendingPurchasesParams`) are both here.
  *

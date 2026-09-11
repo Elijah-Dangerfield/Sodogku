@@ -25,13 +25,12 @@ a placeholder or a public test credential, it says so.
 
 **Both stores link to these pages, and both are live.**
 
-`pages/privacy.html` was rewritten against the code in `1ec24e0`; every
-statement traces to a file. `pages/terms.html` gained sections on ads, Sodogku
-Pro, and in-game items on 2026-09-10, written from `StoreBilling.kt`,
-`AdNetwork.kt`, the paywall strings and SPEC §5 and §6. An agent wrote both.
-A person has to read them end to end and accept them as their own, and that
-person is you. Read them in a browser at the Pages URL rather than in the
-editor, since that is what a reviewer sees.
+`pages/privacy.html` was rewritten against the code in `1ec24e0`; every statement traces to a
+file. `pages/terms.html` gained sections on ads, Sodogku Pro, and in-game items on 2026-09-10,
+written from `StoreBilling.kt`, `AdNetwork.kt`, the paywall strings and `features.md#pro` and
+§6. An agent wrote both. A person has to read them end to end and accept them as their own, and
+that person is you. Read them in a browser at the Pages URL rather than in the editor, since
+that is what a reviewer sees.
 
 Three things in the privacy policy were deliberate choices rather than
 factual checks, and you should know they were made:
@@ -121,7 +120,7 @@ Also still missing and owner-supplied:
 The bundle ID is **`com.sodogku.Sodogku`**, not `com.sodogku`
 (`apps/ios/iosApp.xcodeproj/project.pbxproj:264`, `apps/ios/fastlane/Appfile:1`).
 Android uses `com.sodogku` (`versions.properties:1`). The two stores get
-different identifiers. `docs/SPEC.md:1485` says otherwise and is stale.
+different identifiers. Anything that says otherwise is stale.
 
 **App Store Connect:**
 
@@ -243,7 +242,7 @@ object ProductIds {
 - **Play Console:** a **managed product** with id `sodogku_pro`.
 - **App Store Connect:** a **non-consumable** with id `sodogku_pro`.
 
-Intended price $4.99 (`docs/SPEC.md:603`). Never hardcode it; the runtime price
+Intended price $4.99. Never hardcode it; the runtime price
 comes from the store (`StoreBilling.kt:80-83`).
 
 Nothing crashes without them. The paywall opens, the button reads "Get Pro"
@@ -461,7 +460,7 @@ overrides it, so even a deployed server is unreachable by the client.
 
 ## 14. Decisions I need from you
 
-- **Kids category or general audience.** `docs/SPEC.md:1543-1548`, and the
+- **Kids category or general audience.** `docs/store/data-safety.md` §6, and the
   expensive one. It gates both stores' privacy questionnaires, not just the ad
   model. General audience is what the code already implements. The Apple Kids
   Category branch removes AdMob, Sentry and Grafana together and takes the
@@ -469,7 +468,7 @@ overrides it, so even a deployed server is unreachable by the client.
 - **A support email.** Both stores require a support contact and the app has
   none. `docs/store/listing.md:169` records it as undecided.
 - **How a player asks for data deletion.** Play's form asks directly and it is
-  currently unanswerable (`SPEC:1549-1553`).
+  currently unanswerable (`docs/store/data-safety.md` §7.3).
 - **A weekly streak present.** Not built. With ads narrowed to bones and sniffs
   it is pure cost with no impression behind it, and the streak already pays out
   twice through the freeze and the restore. If you want one, the suggestion is
@@ -647,17 +646,13 @@ something the app can turn off.
 
 Stated so nobody adds them by reflex.
 
-- **Push notification certificates, APNs, Firebase.** No FCM, no
-  `google-services.json`, no Firebase dependency. The app posts no
-  notifications.
-- **A separate analytics account.** Grafana Cloud is the pipe. No Google
-  Analytics, Amplitude or Firebase Analytics.
-- **A support Discord or channel.** A support *email* is needed; a channel is
-  not.
-- **A custom domain.** GitHub Pages satisfies the privacy policy URL
-  requirement. You will want one only if you use the developer website field,
-  which is where `app-ads.txt` would live.
-- **Remote config keys for the ad units or the product id.** Deliberately kept
-  out of config (`AdUnits.kt:16-18`, SPEC 4.4): changing one is a store
-  operation, and a config outage that blanked them would take ads and purchases
-  down together.
+- **Push notification certificates, APNs, Firebase.** No FCM, no `google-services.json`, no
+  Firebase dependency. The app posts no notifications.
+- **A separate analytics account.** Grafana Cloud is the pipe. No Google Analytics, Amplitude
+  or Firebase Analytics.
+- **A support Discord or channel.** A support *email* is needed; a channel is not.
+- **A custom domain.** GitHub Pages satisfies the privacy policy URL requirement. You will want
+  one only if you use the developer website field, which is where `app-ads.txt` would live.
+- **Remote config keys for the ad units or the product id.** Deliberately kept out of config
+  (`AdUnits.kt:16-18`, `features.md#remote-config`): changing one is a store operation, and a
+  config outage that blanked them would take ads and purchases down together.

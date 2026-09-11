@@ -34,7 +34,7 @@ import sodogku.libraries.resources.generated.resources.offline_block_still_offli
 import sodogku.libraries.resources.generated.resources.offline_block_title
 
 /**
- * The one screen in Sodogku that stops a player, SPEC 6.
+ * The one screen in Sodogku that stops a player, `features.md#offline`.
  *
  * Back is swallowed, the same way `AccessDeniedScreen` swallows it: there is
  * nothing behind this but the board it is protecting, and a block you can

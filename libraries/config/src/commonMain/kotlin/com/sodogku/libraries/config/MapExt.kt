@@ -31,11 +31,12 @@ fun <T : Any> Map<String, *>.getValueRecursive(path: List<String>, clazz: KClass
                 String::class -> rawValue.toString() as? T
                 // Not `toBoolean()`. That maps *everything* that is not "true"
                 // to `false`, so a string written to `ads.enabled` or
-                // `features.boosters` would turn the feature off on every device
-                // that fetched it — silently, and without falling back to the
-                // declared default. Every monetization key in SPEC 4.2 is
-                // supposed to fail open, and this was the one place that could
-                // quietly make one fail closed instead.
+                // `features.boosters` would turn the feature off on every
+                // device that fetched it — silently, and without falling back
+                // to the declared default. Every monetization key in
+                // `features.md#remote-config` is supposed to fail open, and
+                // this was the one place that could quietly make one fail
+                // closed instead.
                 //
                 // Case is still forgiving, because the admin console lets an
                 // operator type a raw value and "True" is not a mistake worth

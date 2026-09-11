@@ -69,7 +69,7 @@ private fun <T> Catching<T>.logFailure(description: String): Catching<T> = onFai
             // A ResponseException means the backend answered (an HTTP status IS
             // reachability); anything else — timeout, DNS, refused connection —
             // is the "client couldn't reach us at all" class the app-event
-            // taxonomy exists to catch (docs/plans/client-app-events-otel.md §5).
+            // taxonomy exists to catch (`docs/practices/app-events.md`).
             if (throwable !is ResponseException) {
                 networkCallLogger.logEvent(
                     "net.backend_unreachable",

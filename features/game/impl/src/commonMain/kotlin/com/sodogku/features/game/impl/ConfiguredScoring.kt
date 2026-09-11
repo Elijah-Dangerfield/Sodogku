@@ -29,8 +29,9 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * takes.
  *
  * Every key is resolved on each call rather than captured into a field at
- * construction. SPEC 4.2 wants a config change to land within the hour rather
- * than within the session, and these are singletons that outlive every board.
+ * construction. `features.md#remote-config` wants a config change to land
+ * within the hour rather than within the session, and these are singletons that
+ * outlive every board.
  *
  * **An invalid set falls back to [ScoringConfig.Default] whole, not field by
  * field.** `ScoringConfig`'s `init` throws on a bad coefficient, and it has to

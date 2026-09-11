@@ -164,9 +164,9 @@ Frames were driven with `scripts/dev/drive.py` (`text`, `tap`, `shot`) against a
 | Contains ads | Yes | N/A (declared via the label) |
 | In-app purchases | Yes, one managed product `sodogku_pro`, $4.99 | Yes, one non-consumable, same id and price |
 | Content rating | Everyone / 4+, subject to the IARC questionnaire | 4+ |
-| Target audience | 13+ on the general-audience branch (SPEC 7.1) | N/A |
+| Target audience | 13+ on the general-audience branch (`features.md#audience-and-consent`) | N/A |
 | Privacy policy URL | `pages/privacy.html` via GitHub Pages, **not yet written** | same |
-| Support URL and email | **Not yet decided** (SPEC §20) | same |
+| Support URL and email | **Not yet decided** (`docs/OWNER-TODO.md`) | same |
 
 Data safety and the privacy nutrition label are in
 [`data-safety.md`](./data-safety.md), not here.
@@ -177,10 +177,14 @@ Data safety and the privacy nutrition label are in
 
 If any of these change in code, this file is wrong:
 
-- "three rules" and their wording match the rule chips in `libraries/resources/.../strings.xml`.
-- "500 levels" and the 4x4 to 10x10 range match SPEC 1.7 and the generated pack.
-- "one solution, reachable by reasoning" matches the pack verification test (SPEC 3.3).
-- "a Sniff refuses to be spent if it has nothing to add" matches SPEC 1.5 and `game.booster_no_op`.
+- "three rules" and their wording match the rule chips in
+  `libraries/resources/.../strings.xml`.
+- "500 levels" and the 4x4 to 10x10 range match `features.md#the-campaign` and the generated
+  pack.
+- "one solution, reachable by reasoning" matches the pack verification test
+  (`features.md#the-campaign`).
+- "a Sniff refuses to be spent if it has nothing to add" matches
+  `features.md#sniffs-and-treats` and `game.booster_no_op`.
 - "no account, no sign-up" matches the whole architecture and the Settings copy.
 - "your progress lives on this phone" is what Settings says, and it has an Android caveat. See
   `data-safety.md` §7.1 before this line goes public.

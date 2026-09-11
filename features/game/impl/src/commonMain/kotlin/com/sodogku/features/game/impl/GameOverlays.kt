@@ -275,9 +275,10 @@ internal fun reasonOf(technique: Technique): StringResource = when (technique) {
  *
  * - **A step you read.** Tap anywhere to move on, so it can never trap anyone.
  * - **A step you do.** The lit square stays live and everything else is dead,
- *   which is SPEC 10's "only the correct cell is tappable". An outside tap is
- *   swallowed rather than dismissing, because dismissing would clear a lesson
- *   the player has not done yet — and the skip button is right there.
+ *   which is the "only the correct cell is tappable" rule in
+ *   `features.md#the-dog`. An outside tap is swallowed rather than dismissing,
+ *   because dismissing would clear a lesson the player has not done yet — and
+ *   the skip button is right there.
  */
 @Composable
 fun BoxScope.TutorialCoachMark(state: GameState, onAction: (GameAction) -> Unit) {

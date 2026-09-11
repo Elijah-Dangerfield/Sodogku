@@ -18,9 +18,9 @@ import sodogku.libraries.config.impl.generated.resources.Res
 
 /**
  * The config the app runs on when there is no other: first launch, no network,
- * server never comes back. SPEC section 4.2 makes this a hard constraint rather
- * than a nicety — the app has to be fully playable, correctly monetized and
- * legally compliant off this map alone, forever.
+ * server never comes back. `features.md#remote-config` makes this a hard
+ * constraint rather than a nicety — the app has to be fully playable, correctly
+ * monetized and legally compliant off this map alone, forever.
  *
  * Two layers, lowest first:
  *
@@ -57,10 +57,11 @@ open class FallbackConfigMap @Inject constructor(
  *
  * This is a second, independent statement of the numbers each `ConfiguredValue`
  * already declares as its `default`, and the duplication is the point:
- * `FallbackConfigCompletenessTest` fails if a key is missing from here or if the
- * two disagree. A key declared with no fallback is the failure SPEC section 4.2
- * names first, and it is silent at runtime — the value quietly resolves to its
- * own default and nobody finds out the map was incomplete.
+ * `FallbackConfigCompletenessTest` fails if a key is missing from here or if
+ * the two disagree. A key declared with no fallback is the failure
+ * `features.md#remote-config` names first, and it is silent at runtime — the
+ * value quietly resolves to its own default and nobody finds out the map was
+ * incomplete.
  *
  * The `telemetry.*` block is carried here even though those values are declared
  * in `:libraries:telemetry:impl`: the fallback map has to be complete across the

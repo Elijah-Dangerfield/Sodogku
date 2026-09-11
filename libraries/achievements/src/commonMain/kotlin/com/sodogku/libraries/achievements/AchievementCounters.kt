@@ -110,10 +110,10 @@ enum class Stat {
     /**
      * Whole minutes spent on boards, summed over every recorded attempt.
      *
-     * SPEC section 8 turned down a "Marathon" badge because *session* length is
-     * not a property of an attempt and nothing tracks it. Time on the boards is:
-     * it is [LevelResult.timeMs] added up, and it is the honest version of the
-     * same idea.
+     * A "Marathon" badge was turned down because *session* length is not a
+     * property of an attempt and nothing tracks it (`docs/decisions.md`).
+     * Time on the boards is: it is [LevelResult.timeMs] added up, and it is the
+     * honest version of the same idea.
      */
     MinutesPlayed,
 }
@@ -252,7 +252,7 @@ data class AchievementCounters(
 
         const val THREE_PAWS: Int = 3
 
-        /** "Any level under 30 seconds", per SPEC section 8. */
+        /** "Any level under 30 seconds", per `features.md#achievements`. */
         const val SPRINT_MS: Long = 30_000
 
         /** Fast enough that only a small board and a solved-it-already run get there. */

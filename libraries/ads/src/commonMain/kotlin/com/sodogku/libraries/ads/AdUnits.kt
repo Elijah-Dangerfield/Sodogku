@@ -13,19 +13,19 @@ import kotlin.native.ObjCName
  * develop against — requesting a *live* unit from a development build is what
  * gets an AdMob account suspended for invalid traffic.
  *
- * Nothing here is in remote config. SPEC 4.4: an ad unit id is a store
- * operation, not a live-ops number, and a config outage that emptied it would
- * take the ads down with it.
+ * Nothing here is in remote config. `features.md#remote-config`: an ad unit id
+ * is a store operation, not a live-ops number, and a config outage that emptied
+ * it would take the ads down with it.
  *
  * ## Going live
  *
- * Flip [useTestUnits] to `false` and fill in the `Live` blocks. Both are
- * one edit in one file, on purpose — the failure this guards against is a
- * half-migrated app with three real units and one test unit still in it.
- * The app id itself is *not* here: it goes in `AndroidManifest.xml`
+ * Flip [useTestUnits] to `false` and fill in the `Live` blocks. Both are one
+ * edit in one file, on purpose — the failure this guards against is a
+ * half-migrated app with three real units and one test unit still in it. The
+ * app id itself is *not* here: it goes in `AndroidManifest.xml`
  * (`com.google.android.gms.ads.APPLICATION_ID`) and `Info.plist`
  * (`GADApplicationIdentifier`), because both SDKs read it before any Kotlin
- * runs. `docs/SPEC.md` §20 lists what has to be created and where each value
+ * runs. `docs/OWNER-TODO.md` lists what has to be created and where each value
  * lands.
  */
 @ObjCName("AdUnits", exact = true)

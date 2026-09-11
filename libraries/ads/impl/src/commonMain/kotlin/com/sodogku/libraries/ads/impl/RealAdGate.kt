@@ -37,7 +37,7 @@ import kotlin.time.TimeSource
  *
  * ## The property that matters most
  *
- * **A failed ad pays the player.** SPEC 5.3: only a deliberate
+ * **A failed ad pays the player.** `features.md#ads`: only a deliberate
  * [RewardOutcome.Dismissed] withholds a reward. Every other path through
  * [showRewarded] — ads switched off, the placement disabled, no fill, an SDK
  * that threw, no network, a config server nobody can reach — ends in something
@@ -49,13 +49,14 @@ import kotlin.time.TimeSource
  * note there is no branch that returns `Dismissed` except the one where the
  * player closed the ad. `ads.failureMode = LOCK` is deliberately not consulted
  * here at all — it is an A/B arm about what the *lose sheet* offers, and wiring
- * it into the reward path is the shape of bug SPEC 4.2 forbids.
+ * it into the reward path is the shape of bug `features.md#remote-config`
+ * forbids.
  *
  * ## Everything is read at the point of use
  *
- * No config value is captured in a field. SPEC 4.2 asks for kill switches that
- * work within the hour rather than the session, and a cached `ads.enabled` is a
- * kill switch that does not.
+ * No config value is captured in a field. `features.md#remote-config` asks for
+ * kill switches that work within the hour rather than the session, and a cached
+ * `ads.enabled` is a kill switch that does not.
  */
 @OptIn(ExperimentalTime::class)
 @SingleIn(AppScope::class)
@@ -146,8 +147,9 @@ class RealAdGate(
 
         // Below every free path on purpose. Offering to sell "no more ads" to a
         // player who has not been shown one yet — day 0, inside the new-user
-        // grace — is the friction SPEC 5.3 spends a whole section avoiding, and
-        // the offline path has its own block screen to put up instead.
+        // grace — is the friction `features.md#ads` spends a whole section
+        // avoiding, and the offline path has its own block screen to put up
+        // instead.
         val offered = placement.paywallTrigger?.let { paywall.requestOffer(it) } == true
 
         // Monotonic, unlike everything else timed in this class. A rewarded ad
@@ -169,9 +171,9 @@ class RealAdGate(
 
         return when (outcome.result) {
             AdShowResult.Rewarded -> {
-                // SPEC 6: the offline grace resets on a *successful ad view*,
-                // not on reconnect. Coming back online without watching
-                // anything means the debt is still owed.
+                // `features.md#offline`: the offline grace resets on a
+                // *successful ad view*, not on reconnect. Coming back online
+                // without watching anything means the debt is still owed.
                 adState.update { it.withOfflineGraceReset() }
                 RewardOutcome.Rewarded
             }
@@ -191,11 +193,11 @@ class RealAdGate(
      * The player asked for an ad, the network had none, and they have been paid
      * anyway. Put Pro up in the space the ad was going to occupy.
      *
-     * SPEC 5.3 has always said an ad failure grants; what it never said is what
-     * the player should be looking at while that happens, and the answer used to
-     * be "nothing". A rewarded slot is the one moment a player has volunteered
-     * their attention, and handing it back unused on every no-fill throws away
-     * the only inventory we own outright.
+     * The rule that an ad failure grants is old (`features.md#ads`). What it
+     * never covered is what the player should be looking at while that happens,
+     * and the answer used to be "nothing". A rewarded slot is the one moment a
+     * player has volunteered their attention, and handing it back unused on
+     * every no-fill throws away the only inventory we own outright.
      *
      * **[outcome] is returned untouched, and that is the whole design.** The
      * stand-in is a statement here, never part of the expression that produces
@@ -232,9 +234,9 @@ class RealAdGate(
      * No route to the network, so there is no ad to serve and no chance of one.
      *
      * The grace is spent here rather than at level completion because this is
-     * the moment SPEC 6 names: "counted from the first ad gate that could not
-     * be served". The player is paid either way — what changes past the grace
-     * is that the offline block goes up behind them.
+     * the moment `features.md#offline` names: "counted from the first ad gate
+     * that could not be served". The player is paid either way — what changes
+     * past the grace is that the offline block goes up behind them.
      */
     private suspend fun offlineRewarded(placement: AdPlacement): RewardOutcome {
         val state = adState.update { current ->
@@ -274,9 +276,9 @@ class RealAdGate(
     }
 
     /**
-     * SPEC 5.3: no ads before level 5 or the first 5 minutes. Two legs because
-     * a fast player and a slow player fail different halves of the same intent,
-     * and **both** have to be past for an ad to show.
+     * `features.md#ads`: no ads before level 5 or the first 5 minutes. Two legs
+     * because a fast player and a slow player fail different halves of the same
+     * intent, and **both** have to be past for an ad to show.
      */
     private suspend fun inNewUserGrace(): Boolean {
         val levels = newUserGraceLevels()
@@ -295,8 +297,8 @@ class RealAdGate(
 
 
     /**
-     * Both legs of SPEC 6's "three levels or twenty minutes, whichever comes
-     * first".
+     * Both legs of `features.md#offline`'s "three levels or twenty minutes,
+     * whichever comes first".
      *
      * A configured **zero blocks on the first unservable gate**, and that is
      * deliberate rather than an oversight: the admin console already lists a

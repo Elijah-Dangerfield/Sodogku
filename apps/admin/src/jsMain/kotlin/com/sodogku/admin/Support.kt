@@ -100,14 +100,16 @@ internal fun randomUuid(): String = js("crypto.randomUUID()") as String
  * Three things earn a warning:
  *
  * 1. It blocks a player, or tells them to upgrade.
- * 2. It runs SPEC section 4.2's second constraint backwards — monetization keys
- *    fail *open*, and these are the values that make one fail closed.
+ * 2. It runs the second constraint in `features.md#remote-config` backwards —
+ *    monetization keys fail *open*, and these are the values that make one
+ *    fail closed.
  * 3. It changes what every player sees: a shipped feature disappears, or an ad
  *    format that ships off appears.
  *
  * Ordinary retuning earns nothing. Raising `paywall.sessionCap` or dropping
- * `ads.interstitialEveryNLevels` to 1 makes the app more aggressive, and SPEC
- * 4.2 says so in as many words: tightening in *config* is a live-ops decision
+ * `ads.interstitialEveryNLevels` to 1 makes the app more aggressive, and
+ * `features.md#remote-config` says so in as many words: tightening in *config*
+ * is a live-ops decision
  * and is fine, it is tightening the shipped defaults that is forbidden. On prod
  * a warning also makes the operator type the environment name, so warning about
  * everything would only teach them to type it without reading it.

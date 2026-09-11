@@ -79,10 +79,10 @@ interface Entitlements {
      * the purchase event.
      *
      * Optional because most callers are test doubles and the QA path, and a
-     * required parameter would have made every one of them assert something they
-     * do not care about. It is the question SPEC section 14 actually asks of the
-     * paywall board — which moment converts — and without it the board can only
-     * report that *someone* bought.
+     * required parameter would have made every one of them assert something
+     * they do not care about. It is the question `features.md#telemetry`
+     * actually asks of the paywall board — which moment converts — and without
+     * it the board can only report that *someone* bought.
      */
     suspend fun purchasePro(trigger: String? = null): PurchaseOutcome
 

@@ -21,8 +21,8 @@ interface AppState {
      * ends in a screen that blocks play. AdMob is perfectly reachable while
      * *our* server is down, and gating on [isOffline] meant a dev build with no
      * server deployed spent its offline grace on full wifi and put the block
-     * screen up. Observed on a device, 2026-09-07 — SPEC 6 already said this,
-     * and there was no flow that expressed it.
+     * screen up. Observed on a device, 2026-09-07 — `features.md#offline`
+     * already said this, and there was no flow that expressed it.
      *
      * Defaults to [isOffline] so previews and test doubles that only model one
      * signal keep compiling; `AppStateImpl` is the only implementation that has

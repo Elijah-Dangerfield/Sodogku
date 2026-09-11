@@ -314,7 +314,7 @@ class DashboardQueryContractTest {
         assertEquals(
             EXPECTED_DASHBOARDS,
             dashboards.map { it.file }.toSet(),
-            "SPEC section 14 names six dashboards and ops/grafana/ should hold one file each",
+            "features.md#telemetry names six dashboards and ops/grafana/ holds one file each",
         )
         assertEquals(
             EXPECTED_DASHBOARDS.size,

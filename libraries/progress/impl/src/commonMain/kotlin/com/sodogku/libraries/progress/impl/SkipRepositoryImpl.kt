@@ -26,8 +26,8 @@ import kotlin.time.ExperimentalTime
  * them, so a caller that assembled them itself would be a second place the
  * order could be got wrong.
  *
- * The cap applies to Pro as well (SPEC 1.6). Pro's benefit is that the skip
- * costs no ad, not that there are more of them.
+ * The cap applies to Pro as well (`features.md#skip`). Pro's benefit is that
+ * the skip costs no ad, not that there are more of them.
  */
 @OptIn(ExperimentalTime::class)
 @SingleIn(AppScope::class)

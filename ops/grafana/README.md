@@ -1,6 +1,6 @@
 # Grafana dashboards
 
-The six dashboards SPEC §14 asks for, committed as JSON. One file per dashboard.
+The six dashboards `features.md#telemetry` asks for, committed as JSON. One file per dashboard.
 
 | File | uid | Answers |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ nothing in the app surfaced it.
 ## What has to exist first
 
 **Nothing on these boards has ever rendered real data.** No Sodogku build has shipped telemetry —
-the Grafana Cloud OTLP endpoint and write token are still on the list in SPEC §20.
+the Grafana Cloud OTLP endpoint and write token are still on the list in `docs/OWNER-TODO.md`.
 
 What has been checked: every query is written against `docs/practices/app-events.md` and held to
 the `logEvent` calls that feed it by a test (see "How they are kept honest" below), and every

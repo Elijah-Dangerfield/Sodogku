@@ -10,16 +10,16 @@ stops being a good idea, and say why in the commit.
 
 ## SD-10 [P1] — The game makes no sound
 
-**Ask:** Haptics ship (`AppCache.hapticsEnabled`, `rememberHaptics`), audio does
-not exist anywhere: no clips, no player, no `soundEnabled`, and SPEC 11 still
-lists the Settings row as outstanding. Audio is one of the two things
-Meowdoku's reviewers praise unprompted, the other being its hint.
+**Ask:** Haptics ship (`AppCache.hapticsEnabled`, `rememberHaptics`), audio does not exist
+anywhere: no clips, no player, no `soundEnabled`, and `features.md#settings` records the
+absence rather than a plan. Audio is one of the two things Meowdoku's reviewers praise
+unprompted, the other being its hint.
 
 **Done when:** Dog placed, strike, level win, praise sting, button tap and
 achievement unlock all play; a Settings row silences them; and nothing plays
 over the iOS silent switch.
 
-**Hints:** SPEC 20 lists the six clips under "Art and audio" and they are still
+**Hints:** `docs/OWNER-TODO.md` lists the six clips under "Art and audio" and they are still
 unordered. Follow the haptics shape exactly: a flag in `AppCache`, a toggle in
 Settings, and playback at the screen rather than in the ViewModel.
 
@@ -60,9 +60,9 @@ binary (`CampaignPackData.kt`, `DailyPackData.kt`) and decoded lazily by
 bundled one, and falls back to the bundled pack when the fetch fails, the device
 is offline, or verification does not pass.
 
-**Hints:** This does not break SPEC 3. Generation stays offline on a JVM;
-only delivery moves. SPEC 18 lists server-delivered packs as a v1 non-goal, so
-this is a deliberate reversal and belongs in `decisions.md`.
+**Hints:** This does not break `features.md#the-campaign`. Generation stays offline on a JVM;
+only delivery moves. `features.md#what-the-game-does-not-have` lists server-delivered packs as
+a v1 non-goal, so this is a deliberate reversal and belongs in `decisions.md`.
 
 Two hazards, both sharp. Progress is keyed on level id, so a pack that removes
 or reorders ids silently reassigns a player's completed levels;
@@ -79,13 +79,12 @@ new valid configuration. "The animation there would need to be sick."
 
 **Done when:** There is a written answer with a recommendation.
 
-**Hints:** The animation is not the hard part. Every board has exactly one
-solution, and that is the entire reason a tap can be answered right or wrong
-(SPEC 1.1). A reshuffle changes the answer underneath the player, so "wrong"
-stops being a fact about the puzzle. The only version that keeps the promise is
-a precomputed chain generated offline: board 2 is a valid unique board that
-agrees with every dog already locked on board 1. Price that in the generator
-before anybody designs the screen, because nothing is generated on device.
+**Hints:** The animation is not the hard part. Every board has exactly one solution, and that
+is the entire reason a tap can be answered right or wrong (`features.md#the-board`). A
+reshuffle changes the answer underneath the player, so "wrong" stops being a fact about the
+puzzle. The only version that keeps the promise is a precomputed chain generated offline: board
+2 is a valid unique board that agrees with every dog already locked on board 1. Price that in
+the generator before anybody designs the screen, because nothing is generated on device.
 
 The cheap cousin worth costing in the same pass: the fade as pure time pressure,
 with no reshuffle at all.

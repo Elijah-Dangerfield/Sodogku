@@ -79,18 +79,19 @@ interface StoreBilling {
     /**
      * Localised price as the store formats it ("$4.99", "4,99 €"), or null when
      * the store could not be reached. Never hardcode a price: it is set per
-     * storefront and SPEC 4.3 keeps it out of config for the same reason.
+     * storefront and `features.md#remote-config` keeps it out of config for the
+     * same reason.
      */
     suspend fun priceLabel(productId: String): String?
 }
 
 /**
- * The store product. One non-consumable, SPEC 5.1.
+ * The store product. One non-consumable, `features.md#pro`.
  *
  * Same string on both stores by design — Play calls it a managed product, Apple
- * a non-consumable, and keeping the ids identical means one constant rather than
- * a platform branch on every call site. It is **not** in remote config: SPEC 4.4
- * lists the product id as a store operation.
+ * a non-consumable, and keeping the ids identical means one constant rather
+ * than a platform branch on every call site. It is **not** in remote config:
+ * `features.md#remote-config` lists the product id as a store operation.
  */
 @ObjCName("ProductIds", exact = true)
 object ProductIds {

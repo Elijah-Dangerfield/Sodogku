@@ -80,11 +80,11 @@ to write in a privacy policy, and `pages/privacy.html` already says the longer t
 What *is* collected by us rides on one pseudonymous identifier, `AppData.installId`, described
 below.
 
-**The kids-versus-general-audience question (SPEC 7.1) is still open**, and it changes the answers
-more than anything else in this document. §6 gives the answer set for each branch rather than
-picking one. Everything in §4 and §5 is written for the **general audience** branch, which is what
-the code currently implements (`AdMobAdNetwork.kt:148`,
-`TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE`).
+**The kids-versus-general-audience question (`features.md#audience-and-consent`) is still
+open**, and it changes the answers more than anything else in this document. §6 gives the
+answer set for each branch rather than picking one. Everything in §4 and §5 is written for the
+**general audience** branch, which is what the code currently implements
+(`AdMobAdNetwork.kt:148`, `TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE`).
 
 ---
 
@@ -345,13 +345,14 @@ Console Help, "Provide information for Google Play's Data safety section", the "
 
 ### Target audience and content
 
-- **Target audience questionnaire:** 13+ on the general-audience branch, per SPEC 7.1's
-  recommendation. Do not enrol in Designed for Families.
+- **Target audience questionnaire:** 13+ on the general-audience branch, per
+  `features.md#audience-and-consent`'s recommendation. Do not enrol in Designed for Families.
 - **Ads declaration:** Yes, the app contains ads.
 - **Content rating (IARC):** no violence, no user-to-user communication, no gambling, no user
-  location sharing. Simulated gambling: **no**. The `High Roller` achievement uses a slot-machine
-  emoji as its icon (visible in `docs/store/screenshots/android-phone/07-achievements.png`), which
-  is decoration, not a mechanic. Worth mentioning in the questionnaire's free text if it asks.
+  location sharing. Simulated gambling: **no**. The `High Roller` achievement uses a
+  slot-machine emoji as its icon (visible in
+  `docs/store/screenshots/android-phone/07-achievements.png`), which is decoration, not a
+  mechanic. Worth mentioning in the questionnaire's free text if it asks.
 - **Government app, news app, COVID app:** no.
 
 ---
@@ -414,12 +415,12 @@ AdMob ads is tracking. So:
 
 ---
 
-## 6. The kids branch (SPEC 7.1), and exactly what each answer becomes
+## 6. The kids branch (`features.md#audience-and-consent`), and exactly what each answer becomes
 
-The decision is unresolved, and SPEC's own decision list still carries it open. It does not merely
+The decision is unresolved, and `docs/OWNER-TODO.md` still carries it open. It does not merely
 adjust a row; on one branch it deletes the ad business and the analytics pipeline.
 
-### Branch A, general audience, 13+ (recommended by SPEC 7.1, and what the code implements)
+### Branch A, general audience, 13+ (recommended by `features.md#audience-and-consent`, and what the code implements)
 
 Everything in §4 and §5 stands as written. Concretely, the code is already correct for this branch:
 `TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE` at `AdMobAdNetwork.kt:148`, `tagForUnderAgeOfConsent` left
@@ -447,21 +448,22 @@ can still draw a Play review flag. The art should read "cute", not "preschool".
 
 **On Apple, Kids Category:**
 
-- Third-party analytics and third-party advertising are **banned outright**. That removes AdMob,
-  Sentry and the Grafana Cloud pipeline in one stroke, because all three are third parties
-  receiving data.
+- Third-party analytics and third-party advertising are **banned outright**. That removes
+  AdMob, Sentry and the Grafana Cloud pipeline in one stroke, because all three are third
+  parties receiving data.
 - The nutrition label collapses to **Data Not Collected**, with the possible exception of the
   Purchases row.
-- `:libraries:telemetry`, the Sentry tree in `AppTelemetry.kt` and `:libraries:ads` would all have
-  to be compiled out or no-op'd on iOS, and the crash pipeline replaced with something first-party.
-- Whether Game Center survives the Kids Category, and what a Kids app may do with a leaderboard,
-  I could not settle from Apple's published wording. `:libraries:leaderboards` would need an answer
-  before this branch could ship. **Not determined.**
-- The entire monetization model in SPEC §5 would need rewriting: no rewarded ads means no bone
-  refill, no continue, no skip, and no streak freeze.
+- `:libraries:telemetry`, the Sentry tree in `AppTelemetry.kt` and `:libraries:ads` would all
+  have to be compiled out or no-op'd on iOS, and the crash pipeline replaced with something
+  first-party.
+- Whether Game Center survives the Kids Category, and what a Kids app may do with a
+  leaderboard, I could not settle from Apple's published wording. `:libraries:leaderboards`
+  would need an answer before this branch could ship. **Not determined.**
+- The entire monetization model in `features.md#pro` would need rewriting: no rewarded ads
+  means no bone refill, no continue, no skip, and no streak freeze.
 
-**This is why SPEC 7.1 says resolve it before ads are wired.** Branch B is not a settings change;
-it is a different app.
+**This is why `features.md#audience-and-consent` says resolve it before ads are wired.** Branch
+B is not a settings change; it is a different app.
 
 ---
 
@@ -489,7 +491,7 @@ nothing about the listing. Nothing to do.
 ### 7.3 There is no deletion path, and no way for a player to name themselves
 
 Play's Data safety form asks whether users can request deletion of their data, and both GDPR and
-CCPA assume an erasure route. Still open, and SPEC's decision list still carries it.
+CCPA assume an erasure route. Still open, and `docs/OWNER-TODO.md` still carries it.
 
 - Device-local data goes when the app is uninstalled, and §7.1 means that is now unqualified.
 - Telemetry in Loki ages out at Grafana Cloud's retention; Sentry has its own retention.
@@ -527,7 +529,7 @@ file authored and added to the iOS target.
 (`GrafanaAppEvents.kt:139-149`). Nothing in the code forces `https`. It will be an HTTPS Grafana
 Cloud gateway in practice, but the claim on the form is only true if the configured value is.
 The Sentry half of that answer is now settled, because a Sentry DSN is an HTTPS URL by
-construction. **What this needs:** confirm the Grafana value when the account exists (SPEC §20).
+construction. **What this needs:** confirm the Grafana value when the account exists (`docs/OWNER-TODO.md`).
 
 ### 7.6 Game Center, which neither form has an obvious row for
 

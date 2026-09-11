@@ -173,7 +173,7 @@ data class AchievementSection(
 /**
  * The catalog. Client-side and shipped in the binary, not served: every
  * achievement needs an icon and copy, so a new one costs a release regardless
- * (SPEC section 4.4).
+ * (`features.md#remote-config`).
  *
  * [sections] is the source of truth and [catalog] is its flattening, so display
  * order and grant order cannot disagree and no badge can be left off the grid by

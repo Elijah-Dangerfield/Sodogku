@@ -7,12 +7,12 @@ import com.sodogku.libraries.config.ConfiguredValue
  * Every remote config key the game declares, in one list.
  *
  * At runtime nothing reads this: each value contributes itself to the graph's
- * `Set<QaConfigValue>` through anvil multibinding and is injected directly where
- * it is used. The list exists because the *test* for SPEC section 4.2's first
- * hard constraint — every declared key has a bundled fallback — cannot ask the DI
- * graph for that set outside an app. So the values are enumerable two ways, and
- * `FallbackConfigCompletenessTest` checks this list against the bundled fallback
- * map.
+ * `Set<QaConfigValue>` through anvil multibinding and is injected directly
+ * where it is used. The list exists because the *test* for
+ * `features.md#remote-config`'s first hard constraint — every declared key has
+ * a bundled fallback — cannot ask the DI graph for that set outside an app. So
+ * the values are enumerable two ways, and `FallbackConfigCompletenessTest`
+ * checks this list against the bundled fallback map.
  *
  * That leaves one seam: a new value class that is contributed to DI but never
  * added here is invisible to the test. Keep each area's list in the same file as

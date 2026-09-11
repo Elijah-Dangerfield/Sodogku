@@ -17,8 +17,8 @@ Every chunk closes the same way, and none of it is optional — the docs are how
 1. **Verify.** `./gradlew testDebugUnitTest :apps:server:test :apps:compose:assembleDebug
    :apps:compose:compileKotlinIosSimulatorArm64 detekt` all green. Run the app on a device when
    the chunk changed anything visible.
-2. **Update the docs in the same change.** `SPEC.md` when behaviour or a number changed,
-   `BUILD-PLAN.md` with the chunk's outcome and anything it discovered, `decisions.md` for any
+2. **Update the docs in the same change.** `docs/reference/features.md` when behaviour or a
+   number changed, `BUILD-PLAN.md` with the chunk's outcome and anything it discovered, `decisions.md` for any
    non-obvious call, `docs/practices/app-events.md` for any new event.
 3. **Record what was measured, not just what was chosen.** Several decisions here were made
    against numbers that contradicted the obvious guess (balanced region growth being worse,
@@ -85,7 +85,7 @@ The iOS *Kotlin* target compiles, and the Swift wrapper had its two auth files r
 - Rule validation: one per region, one per row, one per column, no king-move adjacency.
 - **Exact solver** with solution counting, stopping at 2 (we only ever need "is it unique").
 - **Technique-tier solver**: solves using progressively deeper techniques and reports the
-  shallowest tier that suffices (1 to 5, per spec 1.7).
+  shallowest tier that suffices (1 to 5, per `features.md#the-campaign`).
 - **Next-deduction finder**: given a partial board, returns the cell provable by the shallowest
   remaining technique. This is what Sniff calls.
 - Auto-mark derivation: given placements, the set of cells ruled out.
@@ -156,8 +156,8 @@ Budget real time for C2 regardless: the 9x9 and 10x10 bands are where it will be
 
 **Delivers**
 
-- `tools/level-generator`: JVM CLI implementing spec 3.1. Seeded and deterministic, so a given
-  seed reproduces a given pack.
+- `tools/level-generator`: JVM CLI implementing `features.md#the-campaign`. Seeded and
+  deterministic, so a given seed reproduces a given pack.
 - `campaign.pack` (1000 levels on the band curve) and `daily.pack` (730 levels).
 - `:libraries:levels`: pack model, asset loading, `LevelRepository`.
 - **The verification test.** Loads both shipped packs and asserts every level: contiguous
@@ -253,19 +253,19 @@ reference, and looks right by default.
 **Outcome.** All green, verified on device.
 
 - **`Dog(pose = ...)`** with six poses, downscaled per use case (620KB shipped against 8.3MB of
-  source). Originals and animated clips archived in `art/source/`; SPEC section 16a covers why the
-  clips are not wired up and why there is no Coil dependency.
+  source). Originals and animated clips archived in `art/source/`; `features.md#the-dog` covers
+  why the clips are not wired up and why there is no Coil dependency.
 - **`RegionPalette`**, ten fills plus a distinct glyph each, and **`BoardCell`** with its pop,
-  shake, auto-mark and long-press built in — so a screen cannot forget to animate a cell or wire
-  press feedback by hand.
+  shake, auto-mark and long-press built in — so a screen cannot forget to animate a cell or
+  wire press feedback by hand.
 - **`Motion`** tokens (Pop, Tap, fade, shake duration), a `Radii.Cell` token, and
   **`bounceCombinedClick`** for the tap-plus-long-press gesture the board needs.
-- **Poppins** replaces Roboto as the sans family. Already bundled with the template, geometric and
-  near-circular, so the display face got rounder with no new asset and no licensing step. Baloo 2
-  or Fredoka are drop-in if it should be rounder still.
-- **`NoRawDesignValues`** detekt rule: fails raw `dp`/`sp` literals and direct Material imports in
-  feature code, excluding `:libraries:ui` (which has to define them) and previews. It caught one
-  real violation in `HomeScreen`, which was fixed rather than baselined.
+- **Poppins** replaces Roboto as the sans family. Already bundled with the template, geometric
+  and near-circular, so the display face got rounder with no new asset and no licensing step.
+  Baloo 2 or Fredoka are drop-in if it should be rounder still.
+- **`NoRawDesignValues`** detekt rule: fails raw `dp`/`sp` literals and direct Material imports
+  in feature code, excluding `:libraries:ui` (which has to define them) and previews. It caught
+  one real violation in `HomeScreen`, which was fixed rather than baselined.
 - **Catalog page** for regions, cells and dog poses, with previews.
 
 ### Two bugs the on-device render caught that review did not
@@ -518,19 +518,20 @@ sheet and the loss sheet all read `state.isDaily`. 15 new ViewModel tests, 62 in
 
 ### What it discovered
 
-- **`AppData` does not gain a streak.** `dailyStreak`, `lastDailyDate` and `freezesUsedThisMonth`
-  were in spec 13.4 and are not stored; all three fold out of `daily_result`. SPEC updated.
-- **`daily_result` uses an `outcome` enum**, not the `completed` + `froze` booleans 13.2 sketched.
-  Four states, one of them meaningless.
+- **`AppData` does not gain a streak.** `dailyStreak`, `lastDailyDate` and
+  `freezesUsedThisMonth` were specced and are not stored; all three fold out of `daily_result`.
+  See `features.md#saved-progress`.
+- **`daily_result` uses an `outcome` enum**, not the `completed` + `froze` booleans 13.2
+  sketched. Four states, one of them meaningless.
 - **Both daily flags are read.** `daily.enabled && features.dailyChallenge`. Reading one would
-  have left the other looking operable in the admin console, which is the failure already recorded
-  against `app.minSupportedVersion`.
-- **`fallbackToDestructiveMigration` is now a data-loss bug waiting to happen.** A schema version
-  bump drops every table, which used to cost an example row and now costs the player's whole
-  campaign and their streak, with no server copy of either. Real migrations are needed before the
-  first store release — not urgent this week, unshippable after it.
-- `LevelPacks.dailyIndexFor(epochDay)` was added next to `dailyFor` so the stored `levelIndex` and
-  the board come from the same wrap.
+  have left the other looking operable in the admin console, which is the failure already
+  recorded against `app.minSupportedVersion`.
+- **`fallbackToDestructiveMigration` is now a data-loss bug waiting to happen.** A schema
+  version bump drops every table, which used to cost an example row and now costs the player's
+  whole campaign and their streak, with no server copy of either. Real migrations are needed
+  before the first store release — not urgent this week, unshippable after it.
+- `LevelPacks.dailyIndexFor(epochDay)` was added next to `dailyFor` so the stored `levelIndex`
+  and the board come from the same wrap.
 
 ### What the card discovered
 
@@ -571,8 +572,9 @@ config from the first line rather than being retrofitted.
 
 **Delivers**
 
-- Every key in spec 4.3 defined as a typed `ConfiguredValue`.
-- A **complete** `FallbackConfigMap`, plus a test that asserts every declared key has a fallback.
+- Every key in `features.md#remote-config` defined as a typed `ConfiguredValue`.
+- A **complete** `FallbackConfigMap`, plus a test that asserts every declared key has a
+  fallback.
 - A test asserting monetization keys fail open (config unavailable produces fewer ads, never
   more).
 - Admin console verified against the real key set.
@@ -584,8 +586,8 @@ flipping a value in the admin console changes app behavior on the next fetch.
 **Outcome (2026-09-07) — everything except the Fly deploy.**
 
 Client half: 57 typed `ConfiguredValue` classes across ten namespaces, a complete
-`FallbackConfigMap`, and the two SPEC 4.2 tests (`FallbackConfigCompletenessTest`,
-`MonetizationFailsOpenTest`).
+`FallbackConfigMap`, and the two `features.md#remote-config` tests
+(`FallbackConfigCompletenessTest`, `MonetizationFailsOpenTest`).
 
 Server and admin half:
 
@@ -608,7 +610,8 @@ Server and admin half:
 **Discovered.**
 
 - A mistyped boolean does not fall back to its default; `"banana".toBoolean()` is `false`, so a
-  string on `daily.enabled` turns the daily off for everyone. Written into SPEC 4.2.
+  string on `daily.enabled` turns the daily off for everyone. Written into
+  `features.md#remote-config`.
 - Declaring the registry as a `Test` task input is load-bearing. Without `inputs.file`, editing
   the registry left the drift test `UP-TO-DATE` and it passed against a file with a key deleted
   and three values wrong. Observed, not theorised.
@@ -650,7 +653,7 @@ of them, and nothing happened. That list is now **19**. What was wired:
 a feature that does not exist: skips (no button, no per-day counter), the level map with
 silhouettes (`progression.lookaheadCount` — the drawer deliberately shows every level with locks
 instead), a treat granted every N levels, a daily cap on ad grants, Pro's per-attempt boosters
-(SPEC 5.1 promises them; nothing implements them), and the app-open ad (`AdFormat.AppOpen` reaches
+(promised in the spec; nothing implemented them at the time), and the app-open ad (`AdFormat.AppOpen` reaches
 the SDK, but there is no `AdPlacement`, no gate and no cold-start hook, so the cooldown has nothing
 to space out). `ads.failureMode`'s `LOCK` arm was never built at all. The remaining five need the
 upgrade gate, the maintenance screen or the legal re-accept sheet, which are chunk-sized.
@@ -697,9 +700,9 @@ no production state was touched. The steps, in order:
 **Delivers**
 
 - `:libraries:ads` impl: AdMob on Android, AdMob on iOS via Swift through
-  `IosAppComponentFactory`. All placements from spec 5.3.
-- `:libraries:billing` impl: Play Billing 7 and StoreKit 2. Purchase, restore, entitlement cache
-  that is true-until-proven-false.
+  `IosAppComponentFactory`. All placements from `features.md#ads`.
+- `:libraries:billing` impl: Play Billing 7 and StoreKit 2. Purchase, restore, entitlement
+  cache that is true-until-proven-false.
 - UMP consent flow, ATT prompt, both before the first ad request.
 - Paywall screen and its triggers.
 - Offline grace and the offline block screen.
@@ -759,14 +762,14 @@ an ad is allowed.
 
 **Discovered.**
 
-- **The offline block fired on full wifi.** `AppState.isOffline` also means "our backend
-  is unreachable", and the dev server is not deployed. SPEC 6 already said only the OS
-  signal should trip the grace; nothing expressed it. Fixed with `AppState.isDeviceOffline`
-  — see `decisions.md`, including why no test could have caught it before the fake was
-  split in two.
-- **The first rewarded ad takes about five seconds to load**, with no visual feedback,
-  because nothing calls `AdGate.preload`. The gate warms the next ad after each show, so
-  only the first one in a session is slow. The fix is one line in the game layer, below.
+- **The offline block fired on full wifi.** `AppState.isOffline` also means "our backend is
+  unreachable", and the dev server is not deployed. `features.md#offline` already said only the
+  OS signal should trip the grace; nothing expressed it. Fixed with `AppState.isDeviceOffline`
+  — see `decisions.md`, including why no test could have caught it before the fake was split in
+  two.
+- **The first rewarded ad takes about five seconds to load**, with no visual feedback, because
+  nothing calls `AdGate.preload`. The gate warms the next ad after each show, so only the first
+  one in a session is slow. The fix is one line in the game layer, below.
 
 **What is left, and who owns it.**
 
@@ -791,7 +794,7 @@ an ad is allowed.
    plus honouring `ads.appOpenCooldownHours`, which is a deliberate revenue decision
    rather than leftover work.
 5. **The `GoogleMobileAds` SPM package is not in the Xcode project**, so iOS serves no
-   ads yet. See `SPEC.md` §20 for the exact steps.
+   ads yet. See `docs/OWNER-TODO.md` for the exact steps.
 
 ---
 
@@ -799,21 +802,21 @@ an ad is allowed.
 
 **Unblocked by** C8 (so ad and IAP events are real).
 
-**Delivers** every event in spec 14, added to `docs/practices/app-events.md` in the same change,
-plus the six Grafana dashboards. Includes the difficulty-calibration view, which is the one that
-pays for itself.
+**Delivers** every event in `features.md#telemetry`, added to `docs/practices/app-events.md` in
+the same change, plus the six Grafana dashboards. Includes the difficulty-calibration view,
+which is the one that pays for itself.
 
 **Done when** a full playthrough on a device produces the expected event stream in Loki, filtered
 by `session_id`, and every dashboard renders with real data.
 
 ### The dashboards — **WRITTEN, NOT VERIFIED** (2026-09-08)
 
-The six dashboards SPEC §14 names are committed as JSON under `ops/grafana/`, one file each, plus
-a README covering import and prerequisites. **They have never rendered a single real data point,
-and cannot until the OTLP credentials exist** (SPEC §20 — `GRAFANA_OTLP_ENDPOINT` /
-`GRAFANA_OTLP_TOKEN` are still on the to-provide list). No Sodogku build has shipped telemetry, so
-there is no Sodogku data in any Loki anywhere. This half of C9 is queries written and statically
-checked, not queries seen working.
+The six dashboards `features.md#telemetry` names are committed as JSON under `ops/grafana/`,
+one file each, plus a README covering import and prerequisites. **They have never rendered a
+single real data point, and cannot until the OTLP credentials exist** (`docs/OWNER-TODO.md` —
+`GRAFANA_OTLP_ENDPOINT` / `GRAFANA_OTLP_TOKEN` are still on the to-provide list). No Sodogku
+build has shipped telemetry, so there is no Sodogku data in any Loki anywhere. This half of C9
+is queries written and statically checked, not queries seen working.
 
 | Dashboard | Answers |
 |---|---|
@@ -854,13 +857,14 @@ modules and only `:apps:*` may depend on an impl — no unit test anywhere can c
 code path runs. The LogQL reader throws on any construct it does not understand rather than
 extracting nothing from it, which is what stops the whole check passing vacuously.
 
-**Three attributes the dashboards need and nothing emits.** Each is a one-line addition at a named
-site, listed with what it unlocks in `docs/practices/app-events.md` → "What the dashboards ask for
-and cannot have": `difficulty` on `game.level_failed` (blocks a true fail rate per tier — today the
-calibration board only sees clears), `trigger` on `iap.purchase_result` (blocks conversion by
-trigger, which is the question SPEC §14 asks of the paywall board), and `difficulty` on
-`game.booster_no_op`. None was added here — `features/game/impl` and the billing impl were being
-edited by other work.
+**Three attributes the dashboards need and nothing emits.** Each is a one-line addition at a
+named site, listed with what it unlocks in `docs/practices/app-events.md` → "What the
+dashboards ask for and cannot have": `difficulty` on `game.level_failed` (blocks a true fail
+rate per tier — today the calibration board only sees clears), `trigger` on
+`iap.purchase_result` (blocks conversion by trigger, which is the question
+`features.md#telemetry` asks of the paywall board), and `difficulty` on `game.booster_no_op`.
+None was added here — `features/game/impl` and the billing impl were being edited by other
+work.
 
 **Doc drift found and fixed.** `app.startup` and `app.jank` are emitted and were in
 `app-events.md` nowhere at all, on a page that calls itself the source of truth for dashboard
@@ -1053,13 +1057,14 @@ overlay system.
 
 **The curriculum** (`Tutorial.kt`, pure functions over a level and the board so far):
 
-- **Level 1** — the three rules one at a time off the permanent rule chips, the free starter dog,
-  then the two gestures: one tap crosses a square off, two taps place a dog. Ends on the bones.
+- **Level 1** — the three rules one at a time off the permanent rule chips, the free starter
+  dog, then the two gestures: one tap crosses a square off, two taps place a dog. Ends on the
+  bones.
 - **Level 2** — place a dog and watch auto-mark fire, with the squares *that placement just
   crossed off* lit through the scrim. Then the sniff and the treat.
-- **Level 3** — the ring of squares a dog rules out by touching, then "get one wrong on purpose"
-  on a lit square that costs no bone (SPEC 10's free wrong tap), what the red X means, and the
-  sign-off.
+- **Level 3** — the ring of squares a dog rules out by touching, then "get one wrong on
+  purpose" on a lit square that costs no bone (`features.md#onboarding-and-the-tutorial`'s free
+  wrong tap), what the red X means, and the sign-off.
 
 **What it took in the design system.** `Spotlight` grew `targetsAreLive` and `FocusScrim` grew an
 `onTargetTap`; `CoachMark` is a new component with a `@Preview`. The scrim also hands `content` the
@@ -1158,11 +1163,12 @@ handling, and 44pt touch targets verified on the smallest supported device at 10
 
 ### Accessibility half — **DONE on Android** (2026-09-08)
 
-**What a screen-reader player can do now.** Open the app, reach both header buttons by name, walk
-the board square by square hearing "Row 3, column 4, pink" and its state, cross a square off with
-the ordinary activation and hear "crossed off" back, and place a dog with double-tap-and-hold or
-the actions menu. The board disappears from the tree while anything covers it. SPEC 16 has the
-wording, the split between content and state description, and what is deliberately left unlabelled.
+**What a screen-reader player can do now.** Open the app, reach both header buttons by name,
+walk the board square by square hearing "Row 3, column 4, pink" and its state, cross a square
+off with the ordinary activation and hear "crossed off" back, and place a dog with
+double-tap-and-hold or the actions menu. The board disappears from the tree while anything
+covers it. `features.md#accessibility` has the wording, the split between content and state
+description, and what is deliberately left unlabelled.
 
 **What they still cannot do.** Complete the tutorial's "tap the lit square" steps: `FocusScrim`
 owns the touch and knows its targets only as rectangles, so lighting one as an accessible control
@@ -1172,15 +1178,16 @@ The sniff hint and the last-bone warning also announce nothing when they appear.
 
 **Measured.**
 
-- **Touch targets.** 44pt at 10x10 is geometrically impossible (ten columns of 44 is 440dp). The
-  number that matters is not the drawn cell: Compose expands a pointer node's bounds toward 48dp
-  and clips at the neighbour, so the 6dp gutter is live and a square's target is **37.3dp at 411dp
-  width, 32.2dp at the 360dp floor** against a 26.2–31.2dp drawn cell. Everything that is not a
-  board square clears 44dp — header buttons 48, rule chips 48, boosters 48. SPEC 16 states the
-  exception rather than a promise the geometry cannot keep.
+- **Touch targets.** 44pt at 10x10 is geometrically impossible (ten columns of 44 is 440dp).
+  The number that matters is not the drawn cell: Compose expands a pointer node's bounds toward
+  48dp and clips at the neighbour, so the 6dp gutter is live and a square's target is **37.3dp
+  at 411dp width, 32.2dp at the 360dp floor** against a 26.2–31.2dp drawn cell. Everything that
+  is not a board square clears 44dp — header buttons 48, rule chips 48, boosters 48.
+  `features.md#accessibility` states the exception rather than a promise the geometry cannot
+  keep.
 - **Colourblind glyph contrast** is 1.74:1–2.02:1 composited against its own fill, not the
-  1.82–2.02 that was written down. Over the 1.70 floor `RegionPaletteTest` enforces, and confirmed
-  legible on a device with the mode on.
+  1.82–2.02 that was written down. Over the 1.70 floor `RegionPaletteTest` enforces, and
+  confirmed legible on a device with the mode on.
 - **Frame time**, 40 rapid taps on a 10x10, alternating builds in one sitting: **8.4ms median /
   10.7ms p90 before, 9.2ms / 13.6ms after**, worst frame unchanged at ~20ms, budget 16.7ms. The
   first honest attempt was 11.2ms / 20.4ms and the fix was memoising the `semantics` block; see
@@ -1254,7 +1261,7 @@ This chunk changed no Kotlin. Four of these want someone who owns the code:
    `AppCache.kt:92` says the install id "dies with uninstall". On Android neither is reliably true.
    Needs a decision, then either backup rules or a copy change.
 2. **The paywall's Restore purchases button may be unreachable enough to fail App Review.**
-   SPEC 5.1 says the control "lives in Settings". It does not: Settings has no Pro row, and
+   The spec said the control "lives in Settings". It did not: Settings had no Pro row, and
    `PaywallTrigger.Direct` is defined (`RealPaywallCoordinator.kt:66`) and never requested by any
    UI. The only ways to the paywall are a coordinator offer after a loss or a skip, and the offline
    block. Apple Guideline 3.1.1 expects a restore path a user can find.
@@ -1280,9 +1287,9 @@ and `PLAYER_REPORT_LIMIT` for endpoints deleted in C0, and both the Android mani
 | iOS screenshots (6.9", and 13" if iPad is supported) | An iOS simulator. `xcode-select` still points somewhere that is not Xcode, so iOS has never run. Android renders must not be submitted as iPhone frames. |
 | Onboarding / tutorial screenshot | Ten minutes with a fresh install. Skipped here because `drive.py launch --fresh` wipes app data and another agent was mid-session on the same emulator. |
 | `PrivacyInfo.xcprivacy` | The final iOS SDK set, which is blocked on adding the Google Mobile Ads Swift package. |
-| Filing either form | The SPEC 7.1 decision, plus a deletion-request answer (finding 4). |
-| Play target-audience questionnaire | The SPEC 7.1 decision. |
-| IAP product configuration, TestFlight, internal track | Play Console, App Store Connect and AdMob accounts. SPEC §20 lists what to create and where each value lands. |
+| Filing either form | The `features.md#audience-and-consent` decision, plus a deletion-request answer (finding 4). |
+| Play target-audience questionnaire | The `features.md#audience-and-consent` decision. |
+| IAP product configuration, TestFlight, internal track | Play Console, App Store Connect and AdMob accounts. `docs/OWNER-TODO.md` lists what to create and where each value lands. |
 | Privacy policy and terms text | Nobody has written `pages/privacy.html` or `pages/terms.html`. `data-safety.md` is the input for both; the AdMob disclosure and the session-log attachment on feedback are the two paragraphs that cannot be boilerplate. |
 
 **Not verified.** The screenshot crop offsets are tuned to the current layout on a 1080x2424
@@ -1404,8 +1411,8 @@ a force-stop and relaunch; **replaying level 1** for 4,071 left the total at
 unmoved.
 
 **Also emitted:** `sniffs_used` and `treats_used` on `game.level_completed`, which
-SPEC §14 always listed. Without them a fall in median score reads as a difficulty
-change when it may be players leaning harder on hints.
+`features.md#telemetry` always listed. Without them a fall in median score reads as a
+difficulty change when it may be players leaning harder on hints.
 
 **Not verified:** iOS, as ever — `compileKotlinIosSimulatorArm64` is green and the
 app has still never run there. And the header's number is plain digits, so a
@@ -1483,7 +1490,7 @@ last third of the plan.
 
 - **AdMob and store accounts** (C8). The implementation is built against Google's published test
   ad unit ids and a StoreKit local configuration, so it runs end to end today; swapping in real
-  ids is a config change. SPEC §20 lists exactly what to create.
+  ids is a config change. `docs/OWNER-TODO.md` lists exactly what to create.
 - **Two art files that never reached disk** — the sad-dog still and the bone artwork described in
   chat. The lose sheet still uses `DogPose.HardMode` and the bones are still drawn in
   `GameShapes.drawBone`. Both are one-line swaps once the files exist.
@@ -1539,11 +1546,12 @@ badge going 3 → 4; the muted "Earned" chip on level 5 afterwards; the Skip app
 failed attempt and not on a first; a real AdMob test rewarded ad playing, the level advancing 6 →
 7, and the caption dropping from "3 skips left today" to "2".
 
-**Found on device and left as-is:** `onAttemptStarted` fires again on every *resume*, so a board
-re-entered after a process death counts as another attempt and can offer the skip one loss early.
-The alternative is a failure column on `level_progress`, which means a schema bump on a database
-that still rebuilds itself destructively. Being early with a rescue that already costs an ad and
-comes out of a daily allowance is the cheap mistake; the KDoc and SPEC §1.6 both say so.
+**Found on device and left as-is:** `onAttemptStarted` fires again on every *resume*, so a
+board re-entered after a process death counts as another attempt and can offer the skip one
+loss early. The alternative is a failure column on `level_progress`, which means a schema bump
+on a database that still rebuilds itself destructively. Being early with a rescue that already
+costs an ad and comes out of a daily allowance is the cheap mistake; the KDoc and
+`features.md#skip` both say so.
 
 **Fixed on device:** the claimed chip's first label ("Treat earned") was wide enough to squeeze the
 third paw off a completed row. It is "Earned" now, deliberately shorter than the unclaimed label so
@@ -1565,15 +1573,14 @@ It is now the count. `load()` reads it, `startAttempt` carries whatever state
 holds, a wrong guess decrements and persists in the same breath, and the refill
 tops up and persists. The bug this closes is the whole of the reported one.
 
-**At zero the wall is the game, so the door has to be reliable.** The refill goes
-through `AdGate.showRewarded`, which returns `Dismissed` on exactly one path (the
-player closing the ad) and grants on every other — no fill, no network, a thrown
-SDK, `ads.enabled` false, a config server nobody can reach. SPEC 4.2's fail-open
-rule was already there; it is now the only thing standing between a player at
-zero and a locked game, so a test walks every non-dismissal outcome and asserts
-the write to disk as well as the state. **Verified on the emulator with wifi and
-mobile data off**: three bones back, board in play. A board opened at zero shows
-the offer straight away rather than waiting for the guess that ends it.
+**At zero the wall is the game, so the door has to be reliable.** The refill goes through
+`AdGate.showRewarded`, which returns `Dismissed` on exactly one path (the player closing the
+ad) and grants on every other — no fill, no network, a thrown SDK, `ads.enabled` false, a
+config server nobody can reach. `features.md#remote-config`'s fail-open rule was already there;
+it is now the only thing standing between a player at zero and a locked game, so a test walks
+every non-dismissal outcome and asserts the write to disk as well as the state. **Verified on
+the emulator with wifi and mobile data off**: three bones back, board in play. A board opened
+at zero shows the offer straight away rather than waiting for the guess that ends it.
 
 **"Keep going" is gone.** It bought one bone with the same ad as the button
 directly above it, which bought three. Strictly dominated, and free by accident
@@ -1891,10 +1898,10 @@ the question is a comparison between two populations rather than a fact about on
 attempt. On `commit` it is required rather than nice: without it `on_marked` means
 two different things in one series.
 
-**No config key.** Argued in `decisions.md` and rejected — the persisted field
-cannot distinguish "never touched" from "explicitly on" without going nullable,
-the key's only safe value is `true` because of the tutorial, and SPEC 4.4 already
-puts anything the tutorial and level 1 need in the binary.
+**No config key.** Argued in `decisions.md` and rejected — the persisted field cannot
+distinguish "never touched" from "explicitly on" without going nullable, the key's only safe
+value is `true` because of the tutorial, and `features.md#remote-config` already puts anything
+the tutorial and level 1 need in the binary.
 
 **Not verified:** iOS. The Kotlin target compiles and every change is
 `commonMain`, but nothing has run on a simulator on this machine.
@@ -2289,8 +2296,8 @@ none of this has been seen on a device.
 
 ### S14 · Every ad is one the player asked for (2026-09-08)
 
-The audit first, because the answer changed the shape of the work. Every
-placement, with its actual production caller rather than what SPEC 5.3 claims:
+The audit first, because the answer changed the shape of the work. Every placement, with its
+actual production caller rather than what `features.md#ads` claims:
 
 | Placement | Format | Caller | Verdict |
 |---|---|---|---|

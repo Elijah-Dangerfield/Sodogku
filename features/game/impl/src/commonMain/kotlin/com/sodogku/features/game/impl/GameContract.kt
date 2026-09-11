@@ -118,9 +118,10 @@ data class GameState(
     val wrongGuesses: Set<Int> = emptySet(),
 
     /**
-     * Bones held, which is **one count across every board** (SPEC 1.4) and lives
-     * on `AppData.bones`. Mirrored here so the header can draw it; the board
-     * never owns it, and opening a level does not top it up.
+     * Bones held, which is **one count across every board**
+     * (`features.md#bones`) and lives on `AppData.bones`. Mirrored here so the
+     * header can draw it; the board never owns it, and opening a level does not
+     * top it up.
      *
      * The default is what a board built before the cache has been read shows —
      * a preview or a test — not a grant.

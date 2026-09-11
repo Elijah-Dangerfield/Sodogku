@@ -243,7 +243,7 @@ data class SettingsState(
      * "Show badges" control would be a setting with nothing behind it.
      *
      * True by default so an unreachable config leaves the feature present,
-     * which is the fail-open direction SPEC 4.2 asks for.
+     * which is the fail-open direction `features.md#remote-config` asks for.
      */
     val achievementsAvailable: Boolean = true,
 

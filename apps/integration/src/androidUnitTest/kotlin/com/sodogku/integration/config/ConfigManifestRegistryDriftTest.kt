@@ -142,8 +142,8 @@ class ConfigManifestRegistryDriftTest {
      * Set comparison against a list that is itself computed passes vacuously if
      * both sides collapse to nothing — an empty registry against an empty
      * enumeration is "in sync". Both ends are pinned here: the namespaces are
-     * the ones SPEC section 4.3 tabulates, and the count is a floor no plausible
-     * refactor drops below.
+     * the ones `features.md#remote-config` tabulates, and the count is a floor
+     * no plausible refactor drops below.
      */
     @Test
     fun bothSidesAreNonTriviallyPopulated() {
@@ -158,17 +158,17 @@ class ConfigManifestRegistryDriftTest {
         assertEquals(
             emptySet(),
             namespaces.toSet() - declaredNamespaces,
-            "SPEC 4.3 names these config namespaces but no ConfiguredValue declares one",
+            "features.md#remote-config names these namespaces but no ConfiguredValue declares one",
         )
         assertEquals(
             emptySet(),
             namespaces.toSet() - registryNamespaces,
-            "SPEC 4.3 names these config namespaces but $REGISTRY_NAME has no entry under one",
+            "features.md#remote-config names these namespaces but $REGISTRY_NAME has no entry under one",
         )
         assertTrue(
             registry.size >= MINIMUM_KEY_COUNT,
-            "$REGISTRY_NAME has ${registry.size} entries. SPEC 4.3 tabulates far more than " +
-                "$MINIMUM_KEY_COUNT, so this is a truncated file, not a smaller key set.",
+            "$REGISTRY_NAME has ${registry.size} entries. features.md#remote-config lists far " +
+                "more than $MINIMUM_KEY_COUNT, so this is a truncated file, not a smaller key set.",
         )
     }
 }

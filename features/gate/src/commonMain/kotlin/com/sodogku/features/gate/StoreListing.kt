@@ -8,9 +8,9 @@ import com.sodogku.libraries.core.Platform
  *
  * **Not remote config**, unlike almost everything else the gates read. Changing
  * where the app is listed is a store operation, not a live-ops one — the same
- * argument SPEC 4.4 makes for the product id — and a force-update wall whose only
- * button is driven by the config that raised the wall has one failure mode too
- * many.
+ * argument `features.md#remote-config` makes for the product id — and a
+ * force-update wall whose only button is driven by the config that raised the
+ * wall has one failure mode too many.
  *
  * Android derives the URL from the application id, so it is correct for every
  * flavour without anyone maintaining a table. iOS cannot: the App Store addresses

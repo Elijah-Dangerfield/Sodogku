@@ -98,8 +98,8 @@ The `Set<AutoInit>` is resolved at app start (`Application.onCreate` on Android,
 Sodogku has **no auth, no accounts, and no user-scoped server state**. The template's
 `:libraries:identity`, its Supabase auth screens, the session-expired recovery route, and the
 `UserScopedSyncer` / `UserScopedDataReset` machinery were all deleted in C0 — see
-`docs/decisions.md`. Don't reintroduce them; if you find yourself wanting a user id, read the
-"switching phones" section of `docs/SPEC.md` first.
+`docs/decisions.md`. Don't reintroduce them; if you find yourself wanting a user id, read
+`docs/reference/features.md#what-the-game-does-not-have` first.
 
 What survives, and why:
 
@@ -136,9 +136,10 @@ above. It reuses the client's conventions—kotlin-inject + anvil DI (`ServerSco
 resource—and degrades gracefully (boots with no DB at all). It's a plain JVM module, so it applies
 plugins directly rather than via a convention plugin.
 
-Remote config is the live-ops lever and the reason the server exists. `docs/SPEC.md` §4 owns the
-rule for what belongs in config versus the binary; every key needs a `FallbackConfigMap` entry and
-monetization keys must fail *open* toward the player.
+Remote config is the live-ops lever and the reason the server exists.
+`docs/reference/features.md#remote-config` owns the rule for what belongs in config versus the
+binary; every key needs a `FallbackConfigMap` entry and monetization keys must fail *open* toward
+the player.
 
 The full reference—how to add a route, repository, migration, or config value, plus the auth, persistence, and testing patterns—lives in [`apps/server/README.md`](apps/server/README.md). Read it before touching the server.
 

@@ -39,11 +39,12 @@ import kotlin.time.ExperimentalTime
  * The launch gates, resolved live.
  *
  * **Every config value is read at the moment the gate is decided, never captured
- * at construction.** SPEC 4.2 asks for exactly that for the kill switches, and it
- * is the difference between an operator's change landing on the next foreground
- * and landing after a force-quit nobody is going to perform mid-incident. The
- * trigger is `configStream()` combined with the `AppData` the record lives in, so
- * a config refresh *or* an acceptance re-runs the whole decision.
+ * at construction.** `features.md#remote-config` asks for exactly that for the
+ * kill switches, and it is the difference between an operator's change landing
+ * on the next foreground and landing after a force-quit nobody is going to
+ * perform mid-incident. The trigger is `configStream()` combined with the
+ * `AppData` the record lives in, so a config refresh *or* an acceptance re-runs
+ * the whole decision.
  *
  * **Nothing thrown in here can raise a gate.** The resolution is wrapped in
  * [Catching] and a failure resolves to [LaunchGates] with nothing gated — a
@@ -183,10 +184,11 @@ class LaunchGateViewModel(
             // again.
             is NoticeGate.SoftUpdate -> persist { it.copy(softUpdateDismissedFor = notice.versionCode) }
 
-            // Closing the "terms have moved" banner is the acceptance. The banner
-            // says so; it is the non-material half of SPEC 7.3, where continuing
-            // to play is consent and the blocking sheet is what a material change
-            // gets instead.
+            // Closing the "terms have moved" banner is the acceptance. The
+            // banner says so; it is the non-material half of
+            // `features.md#launch-gates-and-legal`, where continuing to play is
+            // consent and the blocking sheet is what a material change gets
+            // instead.
             is NoticeGate.LegalUpdated -> record(notice.termsVersion, notice.privacyVersion)
 
             is NoticeGate.Maintenance -> {

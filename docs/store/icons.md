@@ -1,7 +1,7 @@
 # App icon and store artwork: what ships today, what has to be replaced
 
 Audited 2026-09-08 against the tree at that date. Nothing here was changed; the icon redraw is on
-the user's list (SPEC §20) and two of the files below are template placeholders that will fail
+the user's list (`docs/OWNER-TODO.md`) and two of the files below are template placeholders that will fail
 review.
 
 ---
@@ -49,7 +49,7 @@ Below API 26, the flat `mipmap-*/ic_launcher.webp` and `ic_launcher_round.webp` 
 
 All of these were replaced with the dog art in commit `df270fc`, "feat: replace the template
 launcher icon with the dog". The icon on the emulator today is a cream dog head with tan ears and
-**no sudoku grid and no numerals**, so the specific problem called out in SPEC §20 does not affect
+**no sudoku grid and no numerals**, so the specific problem called out in `docs/OWNER-TODO.md` does not affect
 the Android launcher. It affects the source PNG and the store listing icon.
 
 | File | Size | Content |
@@ -184,7 +184,7 @@ tucked under its chin, showing 3, 7, 1 and 9. Sodogku has no numbers on any boar
 promises a game the app is not.
 
 It is **not** what the launcher ships. The launcher art (§2.2) is a plain dog head from the same
-set and has no grid. The appmark is source art awaiting the redraw described in SPEC §20: a
+set and has no grid. The appmark is source art awaiting the redraw described in `docs/OWNER-TODO.md`: a
 colour-region grid instead of digits.
 
 If a redraw is slow to arrive, the cheapest interim is the plain dog head already in

@@ -87,8 +87,8 @@ class SkipRepositoryImplTest : CoroutineTest() {
 
     @Test
     fun anAdThatFailsStillGrantsTheSkip() = runUnitTest {
-        // SPEC 4.2: an ad network outage may never be the reason a player is
-        // stuck. Only a deliberate dismissal withholds.
+        // `features.md#remote-config`: an ad network outage may never be the
+        // reason a player is stuck. Only a deliberate dismissal withholds.
         listOf(
             RewardOutcome.NoFill,
             RewardOutcome.Offline,

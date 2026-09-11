@@ -78,8 +78,9 @@ class IOSAdNetwork: NSObject, AdNetwork {
         await requestConsent()
         await requestTrackingAuthorization()
         guard canRequestAds() else { return }
-        // SPEC 7.1 calls the app general-audience. Set before `start()`, as on
-        // Android, so no request can go out ahead of the configuration.
+        // `features.md#audience-and-consent` calls the app general-audience.
+        // Set before `start()`, as on Android, so no request can go out ahead
+        // of the configuration.
         //
         // `.unspecified` is this SDK's current spelling of Android's
         // `TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE`: the age-treatment enum
@@ -221,9 +222,10 @@ class IOSAdNetwork: NSObject, AdNetwork {
 
     #endif
 
-    /// SPEC 7.2: ATT goes in front of the first ad request, and it is asked at
-    /// a moment where the value is legible — which is why `prepare()` is called
-    /// lazily by the first ad gate rather than at launch.
+    /// `features.md#audience-and-consent`: ATT goes in front of the first ad
+    /// request, and it is asked at a moment where the value is legible — which
+    /// is why `prepare()` is called lazily by the first ad gate rather than at
+    /// launch.
     private func requestTrackingAuthorization() async {
         #if canImport(AppTrackingTransparency)
         guard #available(iOS 14.5, *) else { return }

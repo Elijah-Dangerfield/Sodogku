@@ -74,7 +74,7 @@ import sodogku.libraries.resources.generated.resources.paywall_store_unreachable
 import sodogku.libraries.resources.generated.resources.paywall_subtitle
 
 /**
- * The Pro offer, SPEC 5.1.
+ * The Pro offer, `features.md#pro`.
  *
  * Five benefits, one price, and a way out. No countdown, no crossed-out
  * "regular price", no second screen that appears when you decline: this is a
@@ -373,10 +373,10 @@ private fun Benefit(text: String) {
  *
  * **The right half is empty when the store has not answered**, and that is the
  * designed state rather than a hole in the layout. The price is per-storefront
- * and only the store knows it (SPEC 4.3); today no product exists at all, so
- * this is what every build renders. A placeholder price that turns out to be
- * wrong in a currency nobody thought about is worse than no price, and a button
- * that reads "Get Pro" on its own is a complete sentence.
+ * and only the store knows it (`features.md#remote-config`); today no product
+ * exists at all, so this is what every build renders. A placeholder price that
+ * turns out to be wrong in a currency nobody thought about is worse than no
+ * price, and a button that reads "Get Pro" on its own is a complete sentence.
  */
 @Composable
 private fun BuyButton(priceLabel: String?, enabled: Boolean, onClick: () -> Unit) {

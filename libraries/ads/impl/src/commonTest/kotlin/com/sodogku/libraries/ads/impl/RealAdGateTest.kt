@@ -26,7 +26,8 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * [RealAdGate], which owns two things worth testing separately.
  *
- * **Fail-open.** SPEC 5.3 and 4.2: only a deliberate dismissal withholds a
+ * **Fail-open.** `features.md#ads` and `features.md#remote-config`: only a
+ * deliberate dismissal withholds a
  * reward. Most of these tests assert on the *pair* — the outcome the caller
  * gets **and** whether the network was asked at all — because an implementation
  * that just returned `Rewarded` unconditionally would satisfy half of them.
@@ -107,7 +108,7 @@ class RealAdGateTest : CoroutineTest() {
         // `ads.failureMode = LOCK` is an A/B arm about what the lose sheet
         // offers. If it could change a reward outcome, an outage or a mistyped
         // config value would lock players out of levels — the exact thing
-        // SPEC 4.2 forbids.
+        // `features.md#remote-config` forbids.
         network.outcome = AdShowOutcome(AdShowResult.Rewarded)
         val withDefault = gate().showRewarded(AdPlacement.ContinueLevel)
 
@@ -280,7 +281,8 @@ class RealAdGateTest : CoroutineTest() {
         // Found on a device, 2026-09-07: the offline block went up on full
         // wifi, because `AppState.isOffline` also means "our server is
         // unreachable" and the dev server is not deployed. AdMob does not care
-        // whether our backend is up. SPEC 6 says only the OS signal counts.
+        // whether our backend is up. `features.md#offline` says only the OS
+        // signal counts.
         appState.isOffline.value = true
         appState.isDeviceOffline.value = false
         network.outcome = AdShowOutcome(AdShowResult.Rewarded)

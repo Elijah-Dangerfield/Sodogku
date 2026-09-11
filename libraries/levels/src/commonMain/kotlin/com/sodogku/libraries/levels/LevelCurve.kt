@@ -102,9 +102,10 @@ data class LevelShape(val size: Int, val difficulty: Int)
  *
  * ### The daily curve
  *
- * Deliberately not a ramp, per SPEC Q3 — a daily is a three-to-five-minute
- * habit and every player meets the same board whatever level they are on. It
- * stays on mid-sized grids and is shuffled rather than ordered.
+ * Deliberately not a ramp, per `features.md#the-daily` — a daily is a
+ * three-to-five-minute habit and every player meets the same board whatever
+ * level they are on. It stays on mid-sized grids and is shuffled rather than
+ * ordered.
  *
  * What it does not do any more is draw whatever the generator happened to
  * produce, which was 11% tier 1 and 60% tier 2. That made the daily reliably

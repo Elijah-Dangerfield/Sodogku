@@ -143,7 +143,7 @@ cannot leave by tapping anywhere.
 Replaying from Settings clears the flag and arms the run again, so a small number of repeat
 `tutorial.completed` events per install is expected rather than a bug.
 
-**There is no `tutorial.skipped`**, though SPEC §14 names one. A skip is `tutorial.completed` with
+**There is no `tutorial.skipped`**, though the spec named one. A skip is `tutorial.completed` with
 `skipped=true` and a `last_step`: both endings write `AppData.hasCompletedTutorial` and both are
 the end of the tutorial, so two events for one transition would mean every funnel had to remember
 to union them, and the one that forgot would undercount completion silently.
@@ -205,7 +205,7 @@ neither gates nor prices would be a segment nobody asked a question of.
 because level ids are ambiguous without it — the two packs share a number line, so `level_id: 7`
 names two different boards and any query that groups by it silently mixes them.
 
-`daily.streak_broken` is specced in SPEC §14 and **not emitted.** Nothing on the client is told
+`daily.streak_broken` was specced and is **not emitted.** Nothing on the client is told
 when a streak ends: the streak is folded from stored results on every read, so a broken one is
 simply a smaller number next time somebody asks. Firing the event would need a remembered
 "streak as of last read" to compare against, which is exactly the counter that design refuses.
@@ -231,9 +231,10 @@ incident from the other end, and it never fires for the players who simply stop 
 
 ## Monetization
 
-`ads.result` is the one to watch. SPEC 4.2 requires that an ad failure never costs the player the
-reward, so `outcome=Rewarded` with a non-null `error_kind` is the **correct** and expected
-combination — a dashboard that treats it as an anomaly has the rule backwards.
+`ads.result` is the one to watch. `features.md#remote-config` requires that an ad failure never
+costs the player the reward, so `outcome=Rewarded` with a non-null `error_kind` is the
+**correct** and expected combination — a dashboard that treats it as an anomaly has the rule
+backwards.
 
 Every ad and purchase event has its row under [Advertising and purchases](#advertising-and-purchases)
 below. There used to be a shorter copy of that table here, and the two had drifted: this one still
@@ -284,19 +285,19 @@ The one thing a board genuinely cannot have is a two-series `by (booster)` split
 run dry. The argument is above the table. The panel keeps the split so the day that changes it
 draws itself, and its title names the sniff so nobody reads the single series as half a chart.
 
-Specced in SPEC §14 and emitted by nothing at all: `achievement.unlocked`, `share.tapped`,
+Specced once and emitted by nothing at all: `achievement.unlocked`, `share.tapped`,
 `legal.terms_prompt_shown`, `legal.terms_accepted`, `game.level_abandoned`. The first two belong to
 C10's UI half and the legal pair to C11; `game.level_abandoned` has no trigger on the client, since
 leaving a board is a navigation event and not a state transition the view model is told about. None
 of them has a panel, because a panel for an event nothing emits is a chart that lies.
 
-Two more SPEC §14 names that are deliberately *not* coming, argued elsewhere on this page:
+Two more specced names that are deliberately *not* coming, argued elsewhere on this page:
 `daily.streak_broken` and `tutorial.skipped`.
 
 ## Advertising and purchases
 
 Emitted by `RealAdGate` (`:libraries:ads:impl`), `RealPaywallCoordinator` and
-`RealEntitlements` (`:libraries:billing:impl`). `placement` is the id from SPEC 5.3
+`RealEntitlements` (`:libraries:billing:impl`). `placement` is the id from `features.md#ads`
 (`continue_level`, `booster_grant`, `skip_level`, `streak_freeze`), it lives on
 `AdPlacement.configId`, and it is the same string `ads.rewardedPlacements` is keyed on, so a
 config change and its effect on the funnel line up without a lookup table. Every event that
@@ -321,7 +322,7 @@ where a suppression is still interesting, because it means a reward was paid for
 
 The ad funnel is `ads.gate_shown` → `ads.result`, split by `placement` and platform.
 `outcome=NoFill` is the number to watch: every one of those is a reward given away, and
-SPEC 5.3 says that is the correct behaviour, so the dashboard is measuring cost rather
+`features.md#ads` says that is the correct behaviour, so the dashboard is measuring cost rather
 than a fault.
 
 **No production event shadows a per-record key.** `GrafanaLogTree` stamps `is_offline` on every

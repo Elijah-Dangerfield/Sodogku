@@ -9,9 +9,9 @@ package com.sodogku.libraries.progress
  * interface that answers "what has this player done" would make every caller of
  * it depend on advertising.
  *
- * The cap is on everyone, Pro included (SPEC 1.6). Pro skips for free rather
- * than more often — without that a Pro player reaches the end of the pack in a day
- * and has nothing left to play.
+ * The cap is on everyone, Pro included (`features.md#skip`). Pro skips for free
+ * rather than more often — without that a Pro player reaches the end of the
+ * pack in a day and has nothing left to play.
  */
 interface SkipRepository {
 
@@ -45,9 +45,9 @@ sealed interface SkipResult {
     /**
      * The player closed the ad early.
      *
-     * The only outcome that withholds the skip. `NoFill`, `Offline` and a failed
-     * SDK all grant it — SPEC 4.2: an ad network outage may never be the reason
-     * a player is stuck on a board.
+     * The only outcome that withholds the skip. `NoFill`, `Offline` and a
+     * failed SDK all grant it — `features.md#remote-config`: an ad network
+     * outage may never be the reason a player is stuck on a board.
      */
     data object Declined : SkipResult
 }
