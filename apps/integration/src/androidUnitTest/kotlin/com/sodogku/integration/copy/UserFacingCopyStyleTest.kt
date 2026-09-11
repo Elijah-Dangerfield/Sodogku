@@ -110,6 +110,53 @@ class UserFacingCopyStyleTest {
         )
     }
 
+    @Test
+    fun onlyTheResourcesModuleDeclaresStrings() {
+        // What a translator is sent is a file, and what comes back is a file.
+        // A second one that a feature happens to own has to be found, sent,
+        // reconciled and merged separately, and that cost is paid again on
+        // every language rather than once.
+        //
+        // `features/streak/impl` had its own, deliberately: nothing outside the
+        // feature rendered that copy and a shared file is a shared merge
+        // conflict. That is a fair argument and it lost, so this is here to
+        // stop it being re-won quietly by whoever adds the next feature.
+        //
+        // Scoped to `composeResources`. `apps/compose/src/androidMain/res` also
+        // has a `values/strings.xml` and has to: the manifest and the launcher
+        // shortcuts read it before any Kotlin runs.
+        val owner = File(repoRoot(), OWNER)
+        val strays = composeResourceStrings().filterNot { it.startsWith(owner) }
+
+        assertTrue(
+            strays.isEmpty(),
+            "Player-facing copy lives in $OWNER so that one file is the whole " +
+                "translation batch. Move these into it:\n" +
+                strays.joinToString("\n") { "  ${it.relativeTo(File(repoRoot()))}" },
+        )
+    }
+
+    /**
+     * Every `strings.xml` under a `composeResources` folder, in any module.
+     *
+     * The locale folder is matched on a `values` prefix rather than the exact
+     * name, so `values-es` is covered the day the first translation lands,
+     * which is the whole reason this rule exists.
+     */
+    private fun composeResourceStrings(): List<File> {
+        val files = File(repoRoot()).walkTopDown()
+            .onEnter { it.name !in setOf("build", ".git", ".claude") }
+            .filter { it.isFile && it.name == "strings.xml" }
+            .filter { it.parentFile.name.startsWith("values") }
+            .filter { it.parentFile.parentFile?.name == "composeResources" }
+            .toList()
+
+        // A floor, so a walk that stopped matching reports it instead of
+        // passing over an empty list, which is what a working run looks like.
+        assertTrue(files.isNotEmpty(), "found no composeResources strings.xml at all, so the walk is broken")
+        return files
+    }
+
     /** Every `values/strings.xml` in the repo, not only the shared one. */
     private fun resourceFiles(): List<File> {
         val root = File(repoRoot())
@@ -155,7 +202,14 @@ class UserFacingCopyStyleTest {
         /** Long enough that a body was captured rather than just an attribute. */
         const val SENTENCE = 60
 
-        /** Shared resources plus the per-feature ones. A floor, so a broken walk reports it. */
+        /** The one module that owns player-facing copy. */
+        const val OWNER = "libraries/resources/src/commonMain/composeResources"
+
+        /**
+         * The shared file plus the Android app's own `res/values/strings.xml`,
+         * which stays where it is because the manifest reads it. A floor, so a
+         * broken walk reports it rather than passing over nothing.
+         */
         const val MIN_RESOURCE_FILES = 2
 
         val COMMENT = Regex("""<!--.*?-->""", RegexOption.DOT_MATCHES_ALL)

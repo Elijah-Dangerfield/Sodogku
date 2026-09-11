@@ -118,6 +118,11 @@ tasks.withType<Test>().configureEach {
     // strings.xml to something the rule forbids left the task UP-TO-DATE and the
     // suite green, and it only went red under `--rerun-tasks`. A test that
     // passes because Gradle did not run it is not a test.
+    //
+    // `onlyTheResourcesModuleDeclaresStrings` now leans on this hardest of all,
+    // because the thing it watches for is a file appearing somewhere no other
+    // input covers. Narrow this back to the shared module and that guard stops
+    // running on exactly the change it exists to catch.
     inputs.files(
         rootProject.fileTree(repo) {
             include("**/composeResources/**/*.xml")
