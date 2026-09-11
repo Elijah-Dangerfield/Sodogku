@@ -305,13 +305,6 @@ data class GameState(
     /** Pro can jump to any level in the drawer, not just the ones reached. */
     val isPro: Boolean = false,
 
-    /**
-     * True when advancing will play an ad first, so the win sheet can badge the
-     * button rather than springing one on the player. Wired to the config-driven
-     * frequency gate in C7; nothing sets it yet.
-     */
-    val adBeforeNextLevel: Boolean = false,
-
     /** The free dog on early levels, so the UI can mark it as not the player's doing. */
     val starterDogCell: Int? = null,
 

@@ -222,13 +222,11 @@ private fun WonSheet(state: GameState, onAction: (GameAction) -> Unit, modifier:
                 onClick = { onAction(GameAction.NextLevel) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
+                // No badge. Advancing plays no ad and cannot: the interstitial
+                // was deleted along with every format the player does not ask
+                // for, so the only thing a badge here could promise is something
+                // this app decided not to do.
                 Text(stringResource(Res.string.game_next_level))
-                // The badge marks the moments an ad is coming, so the tap is never a
-                // surprise. It only appears when one is actually due (C7 wires the
-                // frequency gate; nothing is due yet).
-                if (state.adBeforeNextLevel) {
-                    RewardBadge(modifier = Modifier.padding(start = Dimension.D300))
-                }
             }
         }
     }

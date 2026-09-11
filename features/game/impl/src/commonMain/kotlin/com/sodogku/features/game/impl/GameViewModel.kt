@@ -267,10 +267,19 @@ class GameViewModel(
      * True while the app is in the background, so [elapsedMs] reads the
      * accumulator alone.
      *
-     * A flag rather than a nullable [attemptStartedAt]: the mark is also the
-     * baseline for the speed bonus, and making it null for a background would
-     * push that decision through every call site to answer a question it does
-     * not have.
+     * A flag rather than a nullable [attemptStartedAt]: the mark stays valid
+     * either way, so nothing that reads it has to answer "and what if there is
+     * no attempt". [holdClock]'s idempotence is this flag's other job — Android
+     * dispatches `onStart` into the first foreground as well as on every return,
+     * and a second background must not fold the same span in twice.
+     *
+     * **It does not pause the speed bonus**, which this used to claim. `place`
+     * measures its window from [lastPlacementAt], and nothing on the background
+     * edge re-marks that, so the first placement after a phone call scores at the
+     * base rate. Left that way deliberately: it is one placement's multiplier and
+     * it errs toward paying the player less, which is the direction a timing
+     * error should fail in. [refill] and [refillBones] *do* re-mark, because a
+     * delay the game itself imposed to show an ad is not the player being slow.
      */
     private var clockPaused = false
     private var lastTappedCell: Int? = null
@@ -470,9 +479,7 @@ class GameViewModel(
             is GameAction.BoosterRefillRequested -> action.refill(action.consumable)
             GameAction.DismissBoosterPrompt -> action.updateState { it.copy(boosterPrompt = null) }
             GameAction.Retry -> action.restart()
-            GameAction.DismissWarning -> action.updateState {
-                it.copy(warning = null, hintCells = emptySet(), hintReason = null)
-            }
+            GameAction.DismissWarning -> action.updateState { it.copy(warning = null) }
             GameAction.ApplyHint -> action.applyHint()
             GameAction.DiscardHint -> action.updateState {
                 it.copy(hintCells = emptySet(), hintReason = null)
@@ -1037,6 +1044,13 @@ class GameViewModel(
             leaveRehearsal()
             return
         }
+        // Reached by a *second* Skip, and only by that. `TutorialCoachMark` holds
+        // the card through the scrim's fade-out, so its button stays live for a
+        // few frames after the first tap has already left the rehearsal — and by
+        // then `rehearsing` is false and there is no step left to clear. It stays
+        // because the branch needs an ending: a `skipTutorial` that returns
+        // without clearing the card would be a worse thing to be wrong about than
+        // an update that writes what is already true.
         updateState { it.copy(tutorial = null, tutorialCells = emptySet()) }
     }
 
