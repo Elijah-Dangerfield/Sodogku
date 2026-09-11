@@ -1030,8 +1030,10 @@ decision. Everything interesting (uniqueness, difficulty, hints, pack verificati
 testable with no Compose, no DI, no platform code.
 
 Board rendering lives in `:features:game:impl`, but reusable bouncy primitives (`BounceClick.kt`,
-`Pulsate.kt`, the color and typography resource system) already exist in `:libraries:ui` and
-should be extended there.
+the color and typography resource system) already exist in `:libraries:ui` and should be extended
+there. `Pulsate.kt` was named here too and is gone: it had no caller, and unlike everything else in
+`:libraries:ui` it never checked `LocalReduceAnimations`. The pulse that does exist is
+`BoardControl(attention = …)`.
 
 ### 12.1 GameViewModel
 
