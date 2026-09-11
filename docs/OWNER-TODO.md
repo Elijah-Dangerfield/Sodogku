@@ -342,7 +342,9 @@ matching field in both consoles. Play: Policy → App content → Data safety.
 Apple: App Store Connect → your app → App Privacy.
 
 Worth knowing which changes actually move a row, since most do not: a new SDK, a
-new `logEvent` attribute, and anything that starts calling `Telemetry.setUser`.
+new `logEvent` attribute, and anything that starts handing an identity to Sentry.
+That last one is now a test rather than a thing to remember —
+`NoIdentitySeamsTest` fails the build if the seam comes back.
 
 ---
 

@@ -14,7 +14,9 @@ SDK, or a telemetry attribute changes.** The four things most likely to invalida
   and common code, and the Swift package list in `apps/ios/iosApp.xcodeproj/project.pbxproj` for
   iOS, where the ad SDK and Sentry actually arrive,
 - a new destination for anything the player types,
-- anything that starts calling `Telemetry.setUser`.
+- anything that starts handing an identity to Sentry. `Telemetry` has no `setUser` and the
+  feedback path takes no email, and `NoIdentitySeamsTest` (`:apps:integration`) fails the build if
+  either comes back, so this one now tells you rather than waiting to be checked.
 
 Line numbers rot faster than facts. The 2026-09-08 citations into `AppTelemetry.kt` had drifted by
 up to forty lines by the time of this pass while every claim they supported was still true, so a
@@ -39,7 +41,7 @@ sit in. **Nothing here adds or removes a Google Play data type.** Two Apple ques
 | 7 | **Streak storage** | The streak was folded out of `daily_result`. | A new local table, `play_day`, one row per local date the player finished any board (`PlayDayDao.kt:35`), carried by database version 9 (`AppDatabase.kt:22-30`). Device-local, no payload beyond the date. | **No field changes.** It never leaves the device. |
 | 8 | **Telemetry attributes** | The registry as it stood. | `game.level_completed` now carries `strikes_used` (wrong guesses this attempt) and `paws` (a five-paw rating), plus `sniffs_used` / `treats_used` / `auto_mark` (`GameViewModel.kt:1549-1563`). New event `leaderboard.submitted` with `board` and `value` (`RealLeaderboards.kt:156-160`). | **No field changes.** All of it is gameplay measurement under App activity and Product Interaction, which were already declared. |
 | 9 | **Restore purchases** | Filed as a finding: no reachable restore control, an App Review risk. | Settings has one, always present whether or not the player is Pro (`SettingsScreen.kt:201-205`). | **Nothing for a form.** Closed in §8. |
-| 10 | **`setUser` and accounts** | No accounts, `setUser` never called. | **Unchanged, and re-verified.** See §1. | Nothing. |
+| 10 | **`setUser` and accounts** | No accounts, `setUser` never called. | **The seam is gone entirely.** `Telemetry.setUser` and the unused `email` parameter on `captureUserFeedback` were deleted on 2026-09-10 (SD-46); a test now fails the build if either returns. See §1. | Nothing. |
 
 ---
 
@@ -53,12 +55,11 @@ tables. So:
 
 - Nothing the app collects can be linked by us to a name, an email or an account, because none
   exists.
-- `Telemetry.setUser(email, name, id)` is declared at
-  `libraries/sodogku/src/commonMain/kotlin/com/sodogku/libraries/Telemetry.kt:6` and implemented at
-  `libraries/sodogku/impl/src/commonMain/kotlin/com/sodogku/libraries/sodogku/impl/AppTelemetry.kt:127`,
-  and **nothing calls it**. Re-run on 2026-09-10: `grep -rn "setUser(" --include=*.kt .` returns
-  exactly three hits, the declaration, the override, and the `Sentry.setUser` call inside that
-  override (`AppTelemetry.kt:132`). No email or name reaches Sentry.
+- **There is no `setUser` on `Telemetry` at all, and no email anywhere on the feedback path.**
+  Both existed and neither had a caller, which is a worse state than it sounds: a one-line call is
+  the natural thing to write the day someone adds a contact field, and nothing would have failed.
+  They were deleted on 2026-09-10 (SD-46) and `NoIdentitySeamsTest` in `:apps:integration` scans
+  the source tree and fails the build if either comes back. No email or name can reach Sentry.
 - `sendDefaultPii = false` (`AppTelemetry.kt:415`, applied at `:351`), so the Sentry SDK does not
   attach IP or user agent on its own.
 
@@ -565,12 +566,11 @@ Written down rather than fixed, per this chunk's scope. Re-checked on 2026-09-10
    as Supabase OAuth return trips, and `apps/ios/iosApp/Info.plist:72-80` says the same in its
    comment above `CFBundleURLTypes`. Comments only, but a store reviewer reading the manifest sees
    an auth flow the app does not have.
-7. **`Telemetry.setUser` is a loaded gun, and it is the one scope writer with no guard.** It is
-   implemented and reachable, and would put an email into Sentry the moment anyone called it,
-   invalidating §1 and most of §5. Worth a comment on the interface saying so, or deleting it since
-   there are no accounts. Separately, `setCurrentRoute`, `setSession`, `setInstallId` and
-   `setContext` all begin with `if (!Sentry.isEnabled()) return` (`AppTelemetry.kt:145,158,163,168`)
-   and `setUser` (`:127-138`) does not, so it alone would call into the SDK before or without init.
+7. ~~**`Telemetry.setUser` is a loaded gun, and it is the one scope writer with no guard.**~~
+   **Closed 2026-09-10 (SD-46).** It was deleted rather than guarded, along with the unused `email`
+   on `captureUserFeedback`, and `NoIdentitySeamsTest` fails the build if either returns. The
+   remaining scope writers — `setCurrentRoute`, `setSession`, `setInstallId`, `setContext` — all
+   still begin with `if (!Sentry.isEnabled()) return`.
 8. **Two KDocs still describe the account era.** `AppCache.kt:154-156` says the install id is
    "sent as X-Install-Id on authenticated requests so the server can associate anonymous accounts
    from the same install", and the `UserScopedClearer` KDoc below `AppData` describes resetting

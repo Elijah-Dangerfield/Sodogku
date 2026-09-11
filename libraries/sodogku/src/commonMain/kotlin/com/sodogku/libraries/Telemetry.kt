@@ -1,13 +1,18 @@
 package com.sodogku.libraries.sodogku
 
+/**
+ * There is deliberately no `setUser` here, and `captureUserFeedback` takes no
+ * email. Both existed, both compiled, and neither had a caller — a one-line
+ * `telemetry.setUser(email, …)` is the natural thing to write the day someone
+ * adds a contact field to the feedback form, and it would make two published
+ * sentences false: `pages/privacy.html` says the app never gives Sentry a name,
+ * an email address or a user id, and that the form has no email field. A seam
+ * that only exists to be misused is worse than no seam. If contact details are
+ * ever wanted, they go in the message body, which is what the policy already
+ * describes.
+ */
 interface Telemetry {
     fun initialize()
-
-    fun setUser(
-        email: String?,
-        name: String?,
-        id: String?
-    )
 
     /**
      * Records the user's current navigation route on the crash-reporting
@@ -79,7 +84,6 @@ interface Telemetry {
         kind: FeedbackKind,
         eventId: String?,
         errorCode: Int?,
-        email: String? = null,
         screenshots: List<ByteArray> = emptyList(),
         includeLogs: Boolean = true,
     )

@@ -1226,8 +1226,8 @@ documents under `docs/store/`, plus real screenshots.
   the server does with it; the Grafana pipeline's payload and resource attributes; Sentry's scope
   and its `sendDefaultPii = false`; AdMob's advertising id, UMP and ATT; Play Billing and StoreKit;
   the feedback path and its session-log attachment; and everything in Room that never leaves. The
-  no-accounts decision is stated as the load-bearing fact it is: `Telemetry.setUser` exists and is
-  never called, so no email or name reaches any third party.
+  no-accounts decision is stated as the load-bearing fact it is: there is no `setUser` on
+  `Telemetry` and no email on the feedback path, so no email or name can reach any third party.
 - **`docs/store/listing.md`.** Title, subtitle, short and long description, App Store keywords with
   character counts, categorisation, and the screenshot plan with what each frame is meant to prove.
   Draft copy, written to be argued with.

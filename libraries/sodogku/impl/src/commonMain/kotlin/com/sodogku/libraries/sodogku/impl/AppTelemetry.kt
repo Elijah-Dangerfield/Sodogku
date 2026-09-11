@@ -22,7 +22,6 @@ import io.sentry.kotlin.multiplatform.Attachment
 import io.sentry.kotlin.multiplatform.Scope
 import io.sentry.kotlin.multiplatform.Sentry
 import io.sentry.kotlin.multiplatform.SentryOptions
-import io.sentry.kotlin.multiplatform.protocol.User
 import io.sentry.kotlin.multiplatform.SentryLevel
 import io.sentry.kotlin.multiplatform.protocol.UserFeedback
 import me.tatarka.inject.annotations.Inject
@@ -140,24 +139,6 @@ private class ConfiguredTelemetry(
         }
     }
 
-    override fun setUser(
-        email: String?,
-        name: String?,
-        id: String?
-    ) {
-        // Same best-effort guard as every other scope writer below. Nothing
-        // calls this today, and the guard is what makes that visible: with it,
-        // a disabled build cannot hand identity to the SDK even by accident.
-        if (!Sentry.isEnabled()) return
-        Sentry.setUser(
-            User(
-                id = id,
-                email = email,
-                username = name
-            )
-        )
-    }
-
     override fun setCurrentRoute(route: String) {
         // Best-effort: when Sentry isn't initialized (e.g. disabled
         // environment) configureScope has no scope to mutate, so skip quietly
@@ -197,7 +178,6 @@ private class ConfiguredTelemetry(
         kind: FeedbackKind,
         eventId: String?,
         errorCode: Int?,
-        email: String?,
         screenshots: List<ByteArray>,
         includeLogs: Boolean,
     ) {
@@ -219,7 +199,6 @@ private class ConfiguredTelemetry(
         }
 
         val isBugReport = kind == FeedbackKind.BugReport
-        val sanitizedEmail = email?.trim()?.takeIf { it.isNotBlank() }
 
         // The legacy User Feedback API only persists feedback attached to an
         // event Sentry has already ingested — an empty or unknown event id is
@@ -295,7 +274,8 @@ private class ConfiguredTelemetry(
                 append('\n')
                 append(payload)
             }
-            sanitizedEmail?.let { this.email = it }
+            // No `email`. `UserFeedback` has the field; the form has no box to
+            // fill it from, and the privacy policy says so out loud.
         }
 
         Sentry.captureUserFeedback(feedback)
@@ -307,7 +287,6 @@ private class ConfiguredTelemetry(
                 errorCode?.let { scope.extra("error_code", it) }
             }
             scope.extra("payload_length", payload.length)
-            scope.extra("has_email", sanitizedEmail != null)
             scope.extra("attached_logs", logDump != null)
             scope.extra("attached_screenshots", screenshots.count { it.isNotEmpty() })
             "Feedback forwarded to Sentry (${kind.tag})"
