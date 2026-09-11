@@ -91,7 +91,13 @@ The events that motivated shipping direct-to-Grafana: what never reaches the bac
 |---|---|---|
 | `net.backend_unreachable` | `operation`, `error_kind` (timeout / exception class) | Shared `NetworkCall` failure path, non-HTTP failures only — an HTTP status IS reachability |
 | `net.offline_banner` | `visible`, `os_online`, `backend_reachable` | Each edge of the app-wide offline banner (`AppStateImpl`), carrying which signal drove it |
-| `conn.regained` | — | Reserved for offline→online recovery signals (`ConnectivityEdgeDispatcher` drives the app event; emit here if you need it in Loki). Apps with a long-lived socket should extend the `conn.*` namespace: `conn.reconnecting` (`attempt`), `conn.recovered` (`attempts`, `downtime_ms`), `conn.reconnect_failed` (`attempts`) |
+
+**The `conn.*` namespace is reserved and empty.** `conn.regained` had a row here and nothing has
+ever emitted it: `ConnectivityEdgeDispatcher` drives the app-level event and no `logEvent` call
+sits on it, so a panel written from that row would have rendered empty forever. It is named here
+rather than tabled so the namespace stays claimed. An app with a long-lived socket would extend it
+with `conn.reconnecting` (`attempt`), `conn.recovered` (`attempts`, `downtime_ms`) and
+`conn.reconnect_failed` (`attempts`); Sodogku has no socket, so it has none of them.
 
 ## Product funnels
 
@@ -102,7 +108,7 @@ accounts, so the template's auth step went with `:libraries:identity` in C0.
 |---|---|---|
 | `onboarding.step_viewed` | `step` (always `welcome`) | Entry resolves and the player has not onboarded before. One step, because there is one screen |
 | `onboarding.completed` | `duration_sec`, `skipped_tutorial` | The welcome screen is dismissed toward home. `skipped_tutorial=true` writes `hasCompletedTutorial` immediately, so those players appear nowhere in the tutorial funnel at all — count them here or the funnel describes a self-selected minority |
-| `onboarding.abandoned` | `step` | `onCleared` without having reached home. A process death on the welcome screen looks like this too |
+| `onboarding.abandoned` | `step` | `onCleared` without having reached home: the player navigated away, or the screen was torn down. **A process death does not look like this.** `onCleared` does not run when the OS kills the process, so those players appear in `onboarding.step_viewed` and in neither ending. The gap between step views and the two endings is the closest thing to a count of them |
 
 ### Tutorial
 
@@ -122,9 +128,11 @@ it. `DashboardQueryContractTest` is what catches a query left behind a change li
 on exactly this attribute, which is the whole reason the test exists.
 
 **The practice board emits no `game.*` events at all.** No `game.level_started`, no `game.commit`,
-no completion or failure. Its board id is not a level id and its taps are dictated by a script, so
-folding them into the play funnels would answer questions about real play with the tutorial's
-answers. What the tutorial has to say it says here.
+no `game.drag`, no completion or failure. Its board id is not a level id and its taps are dictated
+by a script, so folding them into the play funnels would answer questions about real play with the
+tutorial's answers. What the tutorial has to say it says here. `GameViewModelTest`
+`theRehearsalEmitsNothingUnderGame` holds it: the guards were untested for long enough that all
+three could be removed with every game test still green.
 
 `step` is the enum name and not an index on purpose: the curriculum will be reordered — it already
 has been — and a funnel keyed on position would silently start comparing two different lessons.
@@ -155,6 +163,9 @@ a session join.
 | `game.level_started` | `level_id`, `size`, `difficulty`, `attempt_number`, `mode`, `auto_mark` | Every attempt, including a retry after a loss and a jump from the level pane. Not on resume from background |
 | `game.level_completed` | `level_id`, `size`, `difficulty`, `duration_ms`, `score`, `paws`, `strikes_used`, `sniffs_used`, `treats_used`, `attempt_number`, `mode`, `auto_mark` | The last dog lands. `duration_ms` is monotonic from the attempt's start, so backgrounding does not inflate it. `score` is what was **banked** — net of the boosters `sniffs_used` and `treats_used` count, and the same number the record and the lifetime total get. Without those two, a fall in median score reads as a difficulty change when it may be players leaning harder on hints, and the two want opposite fixes. `strikes_used` is wrong guesses **this attempt**, counted rather than derived from the bone holding — bones are global now, so a mid-board refill would otherwise report a clean sheet |
 | `game.level_failed` | `level_id`, `difficulty`, `duration_ms`, `dogs_placed`, `attempt_number`, `mode`, `auto_mark` | The last bone goes. `dogs_placed` is how far they got, which is the difference between "too hard" and "unlucky". Since bones went global this is not always the *third* strike of the attempt: a board opened at zero can end on the first |
+| `game.commit` | `level_id`, `correct`, `on_marked`, `mode`, `auto_mark` | Every deliberate placement, the second of two taps. `on_marked` says the square was already **drawing** a cross, so a rise there is a *legibility* problem, the crosses not reading as "ruled out", rather than a difficulty one. It is the drawn set and not the deduction behind it, so a square whose cross the player tapped away does not count, and with `auto_mark=false` it can only ever be a cross the player drew. Read the two attributes together or the series means two different things at once |
+| `game.drag` | `squares`, `marking`, `level_id`, `mode`, `auto_mark` | One per stroke, when the finger comes up having changed at least one square. Reported as one gesture rather than as a run of marks, because the question it was built to answer is whether anybody drags at all, and a per-square event cannot tell four squares in one stroke from four separate taps. `marking` says which way the stroke went: crosses on, or crosses off |
+| `game.hint_applied` | `squares`, `level_id`, `mode` | The player accepted the crosses a sniff proposed. Against `game.booster_used` with `booster=sniff` this is the take-up rate: a hint people look at and discard is a hint that did not land, and the two events are the only way to tell that from one they never asked for |
 | `game.campaign_completed` | `level_id` | The last level in the pack is cleared and the ending sheet replaces the win sheet. The only measurement of how many players ever finish, which is the question the ending's own proposal could not answer. It fires per *arrival*, not once per player: there is no remembered "already finished" flag, so a player who replays the last board fires it again. Count distinct installs, not records |
 | `daily.started` | `date`, `streak` | Today's board is opened from the card. `level_id` is deliberately absent: it is a position in the daily pool and means nothing next to a campaign id |
 | `daily.completed` | `date`, `streak`, `score` | A daily clear is written. `streak` is the number *after* the write, so it is the run the player just extended |
@@ -164,7 +175,7 @@ a session join.
 | `daily.streak_restored` | `days`, `streak` | A rewarded ad bridged a whole run of missed days. Shares the `streak_freeze` ad placement with `daily.freeze_used`, so these two events are the only way to tell the two products apart in reporting. `days` is what makes that worth doing: a restore is priced the same as a freeze and buys two or three times as much, so its rate against the freeze's is the number that says whether the reach is set anywhere near right |
 | `game.bones_refilled` | `level_id`, `to`, `placement` | The one way back from zero: the standing ad offer on the board, or the revive on the lose sheet. `to` is the resulting holding, not the amount granted — the refill never reduces, so the two differ above the floor. `placement` is the id the ad events carry, not the enum name: `continue_level` from the lose sheet, `booster_grant` from the standing offer on the board. That is the split `ads.rewardedPlacements` gates on, and it is what lets "of the `continue_level` ads that were rewarded, how many actually refilled the board" be `ads.result` joined to this on one literal. Replaced `game.continued`, whose button granted a single bone for the same ad and is gone |
 | `game.booster_used` | `booster` (`sniff`/`treat`), `level_id` | A charge is actually spent |
-| `game.booster_no_op` | `booster`, `level_id`, `difficulty` | A booster was asked for and **declined to spend**, because it had nothing to show. Should be rare; a rise means the hint engine is running out of things to say earlier than it should, which is a difficulty-calibration signal and not a UI one |
+| `game.booster_no_op` | `booster` (always `sniff`), `level_id`, `difficulty` | A booster was asked for and **declined to spend**, because it had nothing to show. Should be rare; a rise means the hint engine is running out of things to say earlier than it should, which is a difficulty-calibration signal and not a UI one. **Only the sniff path emits it.** A treat that finds nowhere to place a dog closes its prompt and reports nothing, so a split `by (booster)` can only ever show one series. Read it as the sniff's rate, not as a comparison between the two |
 | `game.booster_refilled` | `booster`, `to` | An ad topped a consumable up. `to` is the resulting holding, not the amount granted — refills never reduce, so the two differ for anyone above the floor |
 | `game.level_reward_granted` | `level_id`, `booster` (always `treat`), `held` | A **first** clear on a level `boosters.treatSchedule` pays on paid out. A replay pays nothing and emits nothing, so counting these counts rewards and not clears. `held` is the resulting holding, which is what tells you whether the reward is accumulating into a stash or being spent as fast as it arrives |
 | `game.level_skipped` | `level_id`, `attempt_number`, `skips_left_today` | A rewarded ad bought a way past a level. `attempt_number` is how many goes it took before giving up, which is the number that says whether the level is hard or broken. `skips_left_today` at 0 marks the players the daily cap is actually binding on |
@@ -187,13 +198,6 @@ when a streak ends: the streak is folded from stored results on every read, so a
 simply a smaller number next time somebody asks. Firing the event would need a remembered
 "streak as of last read" to compare against, which is exactly the counter that design refuses.
 The same fact is derivable server-side from the gaps between `daily.completed` events.
-
-## Onboarding the player
-
-| Event | Attributes | Fires |
-|---|---|---|
-| `tutorial.step_viewed` | `level_id`, `step` | Each coach mark in the guided run over levels 1 to 3. `step` names the lesson, not its index, so inserting one does not shift the meaning of every prior data point |
-| `tutorial.completed` | `last_step`, `skipped` | Once, when the script ends or the player skips. `last_step` on a skip is the whole value of the event: it says *where* people give up, which is the only actionable thing a tutorial funnel produces |
 
 ## Launch gates
 
@@ -219,15 +223,11 @@ incident from the other end, and it never fires for the players who simply stop 
 reward, so `outcome=Rewarded` with a non-null `error_kind` is the **correct** and expected
 combination — a dashboard that treats it as an anomaly has the rule backwards.
 
-| Event | Attributes | Fires |
-|---|---|---|
-| `ads.gate_shown` | `placement`, `device_offline` | An ad gate is reached, before any request. Paired with `ads.result` this gives the fill rate per placement without a join to the network's own reporting |
-| `ads.result` | `placement`, `outcome`, `error_kind`, `latency_ms`, `reason`, `grace_levels_used` | Every gate resolves, including the ones that resolved by failing open. `latency_ms` is what tells you whether a rewarded ad is worth preloading |
-| `ads.offline_block` | `placement`, `grace_levels_used` | The offline grace ran out and the block screen went up. Should be rare; a rise means the grace is too tight |
-| `iap.purchase_result` | `outcome`, `error_kind`, `trigger` | A purchase flow ends, in any way |
-| `purchase.failed` | `product_id`, `error`, `attempt`, `final` | A store call failed and is being retried. `final` marks the attempt that gave up |
-
-| `game.commit` | `level_id`, `correct`, `on_marked`, `mode`, `auto_mark` | Every deliberate placement, the second of two taps. `on_marked` says the square was already **drawing** a cross — a rise there is a *legibility* problem, the crosses not reading as "ruled out", rather than a difficulty one. It is the drawn set and not the deduction behind it, so a square whose cross the player tapped away does not count, and with `auto_mark=false` it can only ever be a cross the player drew. Read the two attributes together or the series means two different things at once |
+Every ad and purchase event has its row under [Advertising and purchases](#advertising-and-purchases)
+below. There used to be a shorter copy of that table here, and the two had drifted: this one still
+listed `purchase.failed`, which nothing has ever emitted (the only occurrence of the name in the
+tree is a fixture in `GrafanaLogTreeTest`), and it was missing `iap.paywall_shown`,
+`iap.restore_result` and `ads.stand_in` entirely.
 
 ### The one that pays for itself
 
@@ -246,18 +246,21 @@ to exist before it renders anything.
 
 ## What the dashboards ask for and cannot have
 
-`ops/grafana/` is written against this page, and a query is held to it by
-`DashboardQueryContractTest` — a panel referencing an attribute nothing emits fails the build
-rather than rendering an empty chart that reads as "nobody has played yet". One thing the boards
-want is genuinely missing, and it is a one-line addition at a named site:
+`ops/grafana/` is written against this page, and both directions are held by
+`DashboardQueryContractTest`: a panel referencing an attribute nothing emits fails the build rather
+than rendering an empty chart that reads as "nobody has played yet", and an emitted event with no
+row here, or a row here that nothing emits, fails it too. The page can still be wrong about *what a
+row says*, which is the half a test cannot read. It can no longer be wrong about which events
+exist.
 
-| Wanted | Where it belongs | What it unlocks |
-|---|---|---|
-| `trigger` on `iap.purchase_result` | `RealEntitlements.purchase()` — the coordinator knows which offer opened | **Conversion by trigger**, which is the question SPEC §14 asks of the paywall board. `iap.paywall_shown` splits by trigger and the buy side does not, so conversion is one blended number |
+**Nothing on the boards is missing an attribute today.** Two entries used to sit here and both are
+closed: `trigger` on `iap.purchase_result` is emitted (`RealEntitlements.purchase()` takes it from
+`PaywallRoute` through `PaywallViewModel`), so conversion by trigger is a real split rather than
+one blended number, and `difficulty` on `game.booster_no_op` was added at the one site that emits
+it.
 
-`difficulty` on `game.booster_no_op` was listed here too and has since been added — `GameViewModel`
-emits it at the one `booster_no_op` site, with a comment saying why. There is one such site, not
-"both booster paths" as this page used to claim.
+The one thing a board genuinely cannot have is a `by (booster)` split on `game.booster_no_op`: the
+treat path closes its prompt silently, so that series has one member. See the row above.
 
 Specced in SPEC §14 and emitted by nothing at all: `achievement.unlocked`, `share.tapped`,
 `legal.terms_prompt_shown`, `legal.terms_accepted`, `game.level_abandoned`. The first two belong to
@@ -286,18 +289,11 @@ where a suppression is still interesting, because it means a reward was paid for
 
 | Event | Attributes | Fires |
 |---|---|---|
-| `ads.gate_shown` | `placement`, `device_offline` | A rewarded gate is entered, or an interstitial passes all three frequency gates. `is_offline` is the **device** signal (`AppState.isDeviceOffline`), not the banner one — our backend being down is not an ad-network outage. No `level_id`: the gate is called from the game and the daily and does not know which |
-
-**`ads.gate_shown` is the one event that shadows a per-record key.** `GrafanaLogTree` stamps
-`is_offline` on every record from `AppState.isOffline`; this event then writes its own from
-`isDeviceOffline`, and the event's value wins, because `forward` applies the per-record stamp
-first and the event's extras after. Two different meanings under one key, and which one survives
-is decided by the order of two lines that say nothing about it — so `EventAttributeShadowingTest`
-pins it. If that ever has to change, rename the event's attribute (`device_offline`) rather than
-reordering the stamping, and fix `ops/grafana/ad-funnel.json` in the same change.
+| `ads.gate_shown` | `placement`, `device_offline` | A rewarded gate is entered. `device_offline` is the **device** signal (`AppState.isDeviceOffline`), not the banner one, because our backend being down is not an ad-network outage. No `level_id`: the gate is called from the game and the daily and does not know which |
 | `ads.result` | `placement`, `outcome`, `latency_ms`, `error_kind`, `reason`, `grace_levels_used` | Every terminal state of a gate. `outcome` is an `AdShowResult` name (`Rewarded` / `Dismissed` / `Completed` / `NoFill` / `Offline` / `NotShown` / `Failed`) **or** the synthetic `granted_without_ad`, which carries `reason` (`pro`, `ads_disabled`, `placement_disabled`, `new_user_grace`). `latency_ms` spans prepare-plus-load-plus-watch, so it is dominated by how long the player watched — read its floor, not its mean. It is measured on a monotonic `TimeSource`, not on the wall clock: a rewarded ad is a thirty-second window and a phone steps its clock on network time sync, often right after connectivity returns, which is when the first ad after an offline stretch is asked for |
 | `ads.offline_block` | `placement`, `grace_levels_used` | The offline grace is spent and the block screen is requested. One per gate past the grace, so a repeat count is a player stuck offline rather than a bug |
-| `iap.paywall_shown` | `trigger` | An offer the coordinator **accepted** (`continue_level` / `skip_level` / `direct`), or an offline block. Refusals — capped, disabled, already Pro — emit nothing, so the ratio of this to `ads.gate_shown` is the offer rate rather than the attempt rate |
+| `ads.stand_in` | `placement`, `reason`, `shown` | A rewarded ad the player asked for could not be served, so Pro was offered in the space the ad was going to occupy. `reason` is why the ad failed (`no_fill`, `offline`, `not_shown`, or the SDK's own error kind) and `shown` is whether the coordinator accepted. It refuses for a Pro player, for a disabled stand-in, and past the session cap, so the false rate here is the cap doing its job. Not emitted at all when the gate already offered Pro on the way in |
+| `iap.paywall_shown` | `trigger`, and `placement` + `reason` on the ad stand-in only | An offer the coordinator **accepted** (`continue_level` / `skip_level` / `direct`), an offline block, or the ad stand-in (`ad_unavailable`). Refusals (capped, disabled, already Pro) emit nothing, so the ratio of this to `ads.gate_shown` is the offer rate rather than the attempt rate. `ad_unavailable` is the one trigger nobody chose: it fires on an ad network having no inventory, which is why it carries the `placement` and the `reason` the ad failed for, and why splitting by trigger matters before reading a conversion number |
 | `iap.purchase_result` | `outcome`, `error_kind`, `trigger` | `outcome` is `PurchaseOutcome.name` (`Success` / `Cancelled` / `AlreadyOwned` / `Unavailable` / `Failed`); `error_kind` is present only on `Failed` and is the store's own code (`billing_6`, `storekit_2`, `purchase_pending`) |
 | `iap.restore_result` | `outcome` | `RestoreOutcome.name`: `Restored` / `NothingToRestore` / `Failed`. A rise in `Failed` is a store-reachability signal, not a customer-support one — it means we could not ask, and the cached entitlement was left alone |
 
@@ -305,6 +301,14 @@ The ad funnel is `ads.gate_shown` → `ads.result`, split by `placement` and pla
 `outcome=NoFill` is the number to watch: every one of those is a reward given away, and
 SPEC 5.3 says that is the correct behaviour, so the dashboard is measuring cost rather
 than a fault.
+
+**No production event shadows a per-record key.** `GrafanaLogTree` stamps `is_offline` on every
+record from `AppState.isOffline`, and the extras are applied after it, so an event writing its own
+`is_offline` would silently win, replacing the app-wide banner signal with whatever the event meant
+and leaving the outcome to the order of two lines that say nothing about it. `ads.gate_shown` is
+the event that would do it, and it emits `device_offline` precisely so that it does not.
+`EventAttributeShadowingTest` still pins the ordering, because the property worth keeping is that
+the *rule* is known rather than that no event currently breaks it.
 
 ## Warn+ log forwarding (not events)
 

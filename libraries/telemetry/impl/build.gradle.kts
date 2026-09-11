@@ -72,11 +72,17 @@ kotlin {
 tasks.withType<Test>().configureEach {
     val repo = rootProject.layout.projectDirectory
     val dashboards = rootProject.file("ops/grafana")
+    // The registry is the third artifact the same test reads, and it has the
+    // same problem: editing only the markdown would otherwise leave this task
+    // UP-TO-DATE and a drifted page green.
+    val registry = rootProject.file("docs/practices/app-events.md")
 
     systemProperty("sodogku.repoRoot", repo.asFile.absolutePath)
     systemProperty("sodogku.grafanaDashboards", dashboards.absolutePath)
+    systemProperty("sodogku.appEventsRegistry", registry.absolutePath)
 
     inputs.dir(dashboards).withPropertyName("grafanaDashboards")
+    inputs.file(registry).withPropertyName("appEventsRegistry")
     // A filtered tree rather than `inputs.dir`, because the directories
     // wholesale sweep in `*/build/**`, which is another task's output.
     inputs.files(

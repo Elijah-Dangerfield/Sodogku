@@ -50,6 +50,45 @@ class DashboardQueryContractTest {
 
     private val dashboards: List<Dashboard> = readDashboards()
     private val emitted: Map<String, Map<String, List<String>>> = scanLogEventCalls()
+    private val registry: Set<String> = readRegistryEvents()
+
+    /**
+     * The registry calls itself the source of truth and says the code wins when
+     * the two disagree. Both halves of that had rotted: three emitted events had
+     * no row (`game.drag`, `game.hint_applied`, `ads.stand_in`) and two rows
+     * named events nothing emits (`purchase.failed`, `conn.regained`).
+     *
+     * Neither shape is visible from anywhere else. The dashboards are written
+     * from this page, as it asks them to be, so an event with no row is an event
+     * no panel will ever be written against, and a row with no event is a panel
+     * written against nothing, which the dashboard check above only catches
+     * once somebody has already built the panel.
+     */
+    @Test
+    fun everyEmittedEventHasARowInTheRegistry() {
+        val missing = (emitted.keys - registry).sorted()
+
+        assertTrue(
+            missing.isEmpty(),
+            "These events are emitted and the registry does not list them, so the next panel will " +
+                "be written as though they do not exist:\n" + missing.joinToString("\n") { "  $it" } +
+                "\n\nAdd a row to docs/practices/app-events.md in the same change as the emit site.",
+        )
+    }
+
+    @Test
+    fun everyRegistryRowNamesAnEventSomethingEmits() {
+        val orphaned = (registry - emitted.keys).sorted()
+
+        assertTrue(
+            orphaned.isEmpty(),
+            "The registry has a table row for these and no `logEvent` call emits them, so a panel " +
+                "written from the page would render empty forever:\n" +
+                orphaned.joinToString("\n") { "  $it" } +
+                "\n\nAn event that is deliberately not coming belongs in prose on that page, next " +
+                "to the argument for why, not in a table of what fires.",
+        )
+    }
 
     @Test
     fun everyQueriedEventIsActuallyEmitted() {
@@ -311,6 +350,24 @@ class DashboardQueryContractTest {
             "the class-name detector rejects values that survive minification",
         )
 
+        assertTrue(
+            registry.size >= MINIMUM_REGISTERED_EVENTS,
+            "only found ${registry.size} events in the registry, so the markdown parse is broken",
+        )
+        assertEquals(
+            setOf("game.level_started"),
+            parseRegistryEvents(
+                """
+                | Event | Attributes | Fires |
+                |---|---|---|
+                | `game.level_started` | `level_id` | Every attempt |
+
+                Prose about `app.launched`, which is not a row.
+                """.trimIndent(),
+            ),
+            "the registry parse reads prose as rows, or misses rows",
+        )
+
         val parsed = parseQuery(
             "quantile_over_time(0.5, {service_name=\"sodogku-client\"} | event_name=\"game.level_completed\" " +
                 "| mode=\"campaign\" | unwrap duration_ms [1d]) by (difficulty)",
@@ -350,11 +407,48 @@ class DashboardQueryContractTest {
 
 private const val REPO_ROOT_PROPERTY = "sodogku.repoRoot"
 private const val DASHBOARD_DIR_PROPERTY = "sodogku.grafanaDashboards"
+private const val REGISTRY_PROPERTY = "sodogku.appEventsRegistry"
 
 /** Floors, not real counts — see [DashboardQueryContractTest.bothReadersCanActuallyFail]. */
 private const val MINIMUM_EMITTED_EVENTS = 25
 private const val MINIMUM_CHECKED_PAIRS = 40
 private const val MINIMUM_SOURCE_FILES = 200
+private const val MINIMUM_REGISTERED_EVENTS = 25
+
+/**
+ * Every table on the registry page that lists events has this header, and
+ * nothing else does. Matching on it rather than on "a table" keeps the prose
+ * tables, the ones arguing about what is deliberately *not* emitted, out of
+ * the parse.
+ */
+private val REGISTRY_TABLE_HEADER = Regex("""\|\s*Event\s*\|\s*Attributes\s*\|\s*Fires\s*\|""")
+
+/** The event named in the first column of every row of those tables. */
+private fun readRegistryEvents(): Set<String> {
+    val file = File(
+        System.getProperty(REGISTRY_PROPERTY)
+            ?: error("$REGISTRY_PROPERTY is unset, libraries/telemetry/impl/build.gradle.kts should supply it"),
+    )
+    if (!file.isFile) error("no event registry at ${file.absolutePath}")
+    return parseRegistryEvents(file.readText())
+}
+
+private fun parseRegistryEvents(markdown: String): Set<String> {
+    val events = mutableSetOf<String>()
+    var inTable = false
+    markdown.lineSequence().forEach { line ->
+        val trimmed = line.trim()
+        when {
+            REGISTRY_TABLE_HEADER.matches(trimmed) -> inTable = true
+            !trimmed.startsWith("|") -> inTable = false
+            inTable -> {
+                val name = trimmed.trim('|').substringBefore('|').trim().trim('`')
+                if (name.matches(EVENT_NAME)) events += name
+            }
+        }
+    }
+    return events
+}
 
 private val EXPECTED_DASHBOARDS = setOf(
     "level-drop-off.json",
