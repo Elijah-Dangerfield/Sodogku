@@ -269,7 +269,7 @@ class GameViewModel(
      *
      * A flag rather than a nullable [attemptStartedAt]: the mark stays valid
      * either way, so nothing that reads it has to answer "and what if there is
-     * no attempt". [holdClock]'s idempotence is this flag's other job — Android
+     * no attempt". [holdClock]'s idempotence is this flag's other job: Android
      * dispatches `onStart` into the first foreground as well as on every return,
      * and a second background must not fold the same span in twice.
      *
@@ -1006,6 +1006,20 @@ class GameViewModel(
         // Hold the spotlight where it is until the cross has finished drawing or
         // the dog has finished landing. The player did what they were asked; the
         // lesson is the seeing of it, not the advancing past it.
+        //
+        // **This is the only suspension in a handler in this file, and it stops
+        // the whole action loop** for up to `Motion.PlacementPulseMillis`. `tap`
+        // stamps `lastTapAt` when the action is *dequeued*, not when the finger
+        // landed, so two single taps either side of a settle come off the queue
+        // together and read as a double tap: a commit the player never made.
+        //
+        // Safe only because a settle can happen nowhere but the rehearsal:
+        // `currentStep` is non-null only after `TutorialRunner.begin`, and
+        // `startAttempt` calls that for `rehearsal = true` and nothing else. A
+        // strike there is forgiven, so the worst case costs nothing. Teach a
+        // lesson on a real board and this becomes a stray bone; the fix then is
+        // to stamp the tap where the gesture arrives rather than where it is
+        // handled, not to shorten the settle.
         delay(Tutorial.settleMillis(trigger))
 
         val finished = tutorial.advance()
@@ -1046,7 +1060,7 @@ class GameViewModel(
         }
         // Reached by a *second* Skip, and only by that. `TutorialCoachMark` holds
         // the card through the scrim's fade-out, so its button stays live for a
-        // few frames after the first tap has already left the rehearsal — and by
+        // few frames after the first tap has already left the rehearsal, and by
         // then `rehearsing` is false and there is no step left to clear. It stays
         // because the branch needs an ending: a `skipTutorial` that returns
         // without clearing the card would be a worse thing to be wrong about than
@@ -1416,6 +1430,12 @@ class GameViewModel(
 
     private suspend fun GameAction.place(cell: Int) {
         val level = state.level ?: return
+        // Captured, because `advanceTutorial` below can flip it. The last step of
+        // the script ends in `leaveRehearsal`, which sets `rehearsing = false` and
+        // starts level 1, while `level`, `placed` and `scored` down here are all
+        // still the demo board's. The question the win check has to ask is "was
+        // *this* placement a rehearsal one", not "are we rehearsing now".
+        val rehearsal = rehearsing
         val row = level.board.rowOf(cell)
         val since = lastPlacementAt.elapsedNow().inWholeMilliseconds
         lastPlacementAt = clock.markNow()
@@ -1483,12 +1503,17 @@ class GameViewModel(
         // lags this update by a dispatch — re-reading would drop the points for
         // the very placement that won the level.
         //
-        // The rehearsal cannot get here: its script places three dogs on a
-        // five-row board and then hands over to level 1. The guard is here
-        // because `win` writes progress, achievements and a level record, and
-        // the cost of being wrong about that is a player credited with clearing
-        // a level that does not exist.
-        if (placed.isComplete && !rehearsing) win(level, scored.card)
+        // The guard is here because `win` writes progress, achievements and a
+        // level record, and the cost of being wrong about it is a player credited
+        // with clearing a level that does not exist.
+        //
+        // `rehearsal` rather than `rehearsing`, for the reason `scored.card` is
+        // handed on rather than re-read: both moved during `advanceTutorial`.
+        // Today the two readings agree, because the script places three dogs on a
+        // five-row board and `TutorialBoardTest` asserts that for both curricula.
+        // So this is not a fix. It is what keeps them agreeing if a step is ever
+        // added.
+        if (placed.isComplete && !rehearsal) win(level, scored.card)
     }
 
     /**
@@ -1954,6 +1979,11 @@ class GameViewModel(
         // The streak itself is unaffected either way — a run through yesterday
         // stands all day today, including after today has been played and lost.
         val streak = if (isDaily) currentStreak() else NoStreak
+        // `state.score` may or may not already carry the strike that got us here,
+        // because the caller's `updateBoard` lags by a dispatch. It does not
+        // matter: `Scoring.strike` only zeroes the combo, so applying it twice
+        // lands on the same card. The one read in this file that survives the lag
+        // by what it calls rather than by capturing first.
         val lost = Scoring.strike(state.score)
         val earnedBadges = recordAttempt(
             level,

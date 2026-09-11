@@ -104,7 +104,9 @@ class TutorialBoardTest {
 
         assertTrue(
             !placed.isComplete,
-            "the script finishes the board, which would fire the win sheet over the last coach mark",
+            "the script fills the demo board, which leaves every lesson after it with " +
+                "nothing to point at. It is also the invariant `place` names when it " +
+                "explains why the rehearsal cannot reach `win`",
         )
     }
 
@@ -186,7 +188,9 @@ class TutorialBoardTest {
         assertTrue(gated > 0, "no step was checked, so the walk asserts nothing")
         assertTrue(
             !placed.isComplete,
-            "the script finishes the board, which would fire the win sheet over the last coach mark",
+            "the script fills the demo board, which leaves every lesson after it with " +
+                "nothing to point at. It is also the invariant `place` names when it " +
+                "explains why the rehearsal cannot reach `win`",
         )
     }
 
