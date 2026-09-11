@@ -346,60 +346,6 @@ Weigh this against what it costs. A UI test tier that nobody trusts is worse
 than none, so the bar is that it runs in CI, does not flake, and fails for a real
 reason. If the first two tests cannot meet that, say so and close this rather
 than leaving a tier half built.
-## SD-35 [P2] — Remote config offers a targeting axis that can never match
-
-**Found by:** the SD-32 agent, 2026-09-10, while clearing account-era leftovers.
-
-The admin console still offers a "uuid (for allow/deny + rollout)" input,
-`RuleEditor` seeds `userAllow` from it, and the server deserializes
-`ResolveRequest.userId` and then discards it. There are no accounts, so there is
-no user id to match on and there never will be under the current design.
-
-So an operator can author a rule, save it, see it listed, and have it silently
-never fire. A control that looks like it works and does not is worse than a
-missing one, because the operator debugs the feature instead of the console.
-
-**Done when:** the axis is either removed from the console and the request
-shape, or it is wired to something that exists (the install id is the obvious
-candidate, and is what every other targeting decision already uses).
-
-**Hints:** Prefer removing it. Install-id targeting sounds free and is not: it
-would make config resolution depend on an identifier the privacy policy
-describes as device-scoped, which is a policy question rather than a code one.
-Touches `:apps:admin` and possibly a migration.
-## SD-36 [P2] — `docs/store/data-safety.md` answers against code that no longer exists
-
-**Found by:** the SD-32 agent, 2026-09-10.
-
-Items 5, 6 and 8 cite `DELETE_ACCOUNT_LIMIT`, `PLAYER_REPORT_LIMIT` and manifest
-comments that were deleted with the account machinery. The file is a dated
-derivation record rather than the form itself, so nothing is broken today, but a
-store form filled from it would be answering Google about a code state that has
-not existed since C0.
-
-**Done when:** the three items are re-derived against the code that exists, or
-the file says at the top which date it was true on and that it must be re-derived
-before use.
-
-**Hints:** Cheaper than it looks. The owner has already filed the form once, so
-this is about the next time rather than this time. Decide first whether the file
-is worth keeping at all: if the answer is "re-derive it when asked", a two-line
-note beats a stale nine-item table.
-## SD-37 [P2] — `ConfigValuesAreReadTest` walks directories Gradle is writing
-
-**Found by:** the SD-32 agent, 2026-09-10, after it failed once and passed on
-re-run with no change.
-
-It walks `apps/**` including `build/` directories, and `FileTreeWalk` throws when
-a file vanishes underneath it. A test that fails once in twenty for a reason that
-has nothing to do with what it asserts is a test people re-run instead of read.
-
-**Done when:** the walk cannot see a generated directory.
-
-**Hints:** `UserFacingCopyStyleTest` had the same class of bug and the fix is
-already there to copy: an `onEnter` filter excluding `build`, `.git` and
-`.claude`. Check every other source-walking test in `:apps:integration` in the
-same pass rather than fixing the one that happened to fail.
 ## SD-48 [P1] — A rewarded ad is a way to reproduce SD-26
 
 **Ask:** Owner, 2026-09-10, on `GameRoute`: *"both the levels button and the start
@@ -560,3 +506,29 @@ or somebody writes down why a treat cannot no-op.
 **Hints:** `GameViewModel.kt:2490`. Small. Check first whether a treat genuinely
 can no-op: if the answer is that it always has something to give, the fix is a
 sentence rather than an emit, and the panel should say one booster on purpose.
+
+## SD-61 [P1] — `:apps:server:test` is red on main and CI cannot see it
+
+**Found by:** two agents independently on 2026-09-10, each of which stashed its
+own work to confirm the failure predates it.
+
+`DatabaseSchemaTest.migrationsCreateAppConfigTable` asserts `app_config_values`
+is empty after migrations. `V4__app_config.sql:25` seeds three kill-switch rows
+into it. So the test fails deterministically on any machine with Docker running.
+
+**The reason nobody noticed is the worse half.** The test is skipped via JUnit
+`Assume` when Docker is absent, and CI has no Docker, so it has never run there.
+A test that is red everywhere it executes and skipped everywhere it is watched
+is not a test, and it has been in that state since C0.
+
+**Done when:** the assertion matches what the migrations actually do, and either
+CI runs this suite with Docker or the suite says out loud that it did not run.
+
+**Hints:** Decide which side is wrong before editing either. If `app_config_values`
+is meant to ship seeded, the assertion is stale and the seed is the contract. If
+it is meant to be empty, `V4` is seeding production data in a migration, which is
+a different and larger problem.
+
+The skip-when-absent behavior is worth keeping, but a green build that silently
+skipped its only schema test is a lie either way. A count of skipped tests in the
+CI summary is the cheap version.
