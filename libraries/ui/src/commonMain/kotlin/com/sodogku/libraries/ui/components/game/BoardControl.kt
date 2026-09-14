@@ -319,7 +319,23 @@ private const val BoneAspect = 1.45f
 private const val BoneTilt = -20f
 
 private const val AttentionMillis = 1_100
-private const val AttentionRestMillis = 2_400L
+
+/**
+ * The gap between one beat and the next.
+ *
+ * Down from 2.4s. The detector hands this component a burst of a fixed length
+ * and the burst is the frequency budget, so the rest is what decides how much
+ * movement actually happens inside one — at 2.4s a seven-second burst held two
+ * beats and a stump of a third, and the owner's report was that he was not
+ * seeing them. At 1.4s the same burst holds nearly three whole beats without
+ * the button being allowed to ask for any more of the player's time than it
+ * already was.
+ *
+ * It does not go to zero. The stillness between beats is what stops this
+ * reading as a loading spinner: a thing that moves continuously is a thing the
+ * eye stops resolving as a request.
+ */
+private const val AttentionRestMillis = 1_400L
 
 private const val Tau = 6.2831855f
 
@@ -359,8 +375,15 @@ private const val ShakeCycles = 2.5f
  * The art is inside the circle rather than being the control, so unlike
  * [AttentionScale] this one is not limited by the touch target — nothing the
  * player is reaching for moves. It is limited by taste instead.
+ *
+ * Eighteen, up from ten, and this is the lever [AttentionScale] names for
+ * exactly this complaint: the owner asked to see the picture shake and not just
+ * the button breathe. Ten degrees on a 28dp bone is about two and a half dp at
+ * the tips, which is a lean; eighteen is a shake. The damping still takes it to
+ * nothing by the end of the beat, so the louder swing is spent in the first
+ * third of the movement and the control is at rest for the rest of it.
  */
-private const val ShakeDegrees = 10f
+private const val ShakeDegrees = 18f
 
 @Preview
 @Composable
