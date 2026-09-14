@@ -134,3 +134,118 @@ read of Meowdoku (Oakever Games, 10M+ installs, #1 free puzzle) against what we
 ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
+
+## SD-111 [P1] — Rethink what giving up on the daily board leaves behind
+
+**Ask:** "I gave up on today's board and when I revisited it it just shows me
+this we might need to rethink what giving up means . I don't think the user
+should be able to give up. I don't know if there should be a total failure
+state. I think you should probably always be able to just start from the
+beginning. I don't know, but let's rethink this and see how we could probably
+improve the user experience"
+
+**Done when:** Returning to a daily board after running out of bones no longer
+dead-ends. Whatever replaces it, there is a way back into the same puzzle from
+the start.
+
+**Hints:** The attached screenshot is the dead end: a dimmed board behind an
+"Out of bones for today / Sep 9" card whose only control is a LEVELS button.
+Streak reads 0, score 1.8K, bones 0/6. Related: SD-115 is the report that the
+LEVELS button on this card does nothing, so the card is currently a dead end in
+both senses. The owner floats a failure page in the SD-115 report too.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-5 · session
+95dd30d1-9ca1-4614-816c-a71e02b191d8 · 2026-09-10
+
+## SD-112 [P2] — Bigger timer text, and a booster pulse you actually notice
+
+**Ask:** "let's make the timer text just slightly bigger and let's make the
+pulsing of those buttons on the bottom a little bit more noticeable. like I
+wanna see them With the icon shaking in The middle a little bit more. And I
+honestly haven't been seeing them that much. We probably need a better algorithm
+for deciding when they should pulse."
+
+**Done when:** The timer under the board is a step larger, and the booster
+buttons pulse with visible icon movement.
+
+**Hints:** Three asks in one report, filed as one. The other two are the pulse
+animation itself (the owner wants the icon shaking, not just the button
+breathing) and the rule that decides when a booster pulses at all, which he says
+fires too rarely to see. Filed from GameRoute.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-6 · session
+95dd30d1-9ca1-4614-816c-a71e02b191d8 · 2026-09-10
+
+## SD-113 [P2] — Hold back the no-starting-dog puzzles, and say so the first time
+
+**Ask:** "i've noticed that we pretty quickly start giving us those puzzles that
+don't have a starting dog. I don't know if that should be the case to be honest
+I think that should probably start much later in the year's progress. And maybe
+the first time that they see one we should let them know that there's no
+starting dog on purpose and that they should be able to deduce it. Like maybe a
+little tool tip or something"
+
+**Done when:** Boards with no pre-placed dog start appearing later in the
+progression than they do now, and the first one a player meets says out loud
+that the empty start is deliberate.
+
+**Hints:** Two parts, the ramp and the one-time tooltip. "the year's progress" is
+dictation for the level progression. The generator's starting-dog decision and
+the difficulty ramp in `libraries/scoring` are where to look first.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-7 · session
+95dd30d1-9ca1-4614-816c-a71e02b191d8 · 2026-09-10
+
+## SD-114 [P2] — Bring the achievements page in line with the rest of the app
+
+**Ask:** "The UI of the achievements page honestly isn't really in a line with
+what we're going for. Let's see if we can make this a little bit more In line
+with the rest of the app. Think Duolingo"
+
+**Done when:** The achievements screen reads as the same app as the board and
+the outcome sheets.
+
+**Hints:** Filed from AchievementsRoute. The screen is
+`features/achievements/impl/.../AchievementsScreen.kt`. "Think Duolingo" is the
+reference; `docs/reference/meowdoku.md` has the existing competitor look notes.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-8 · session
+95dd30d1-9ca1-4614-816c-a71e02b191d8 · 2026-09-10
+
+## SD-115 [P1] — The Levels and Start over buttons do nothing
+
+**Ask:** "both the levels button and the start over button are not doing
+anything right now", and from a minute earlier: "I just clicked on Level levels,
+but it did nothing."
+
+**Done when:** Both buttons navigate. Tapping Levels opens the level list and
+tapping Start over restarts the puzzle.
+
+**Hints:** Two reports, forty seconds apart, same session, same defect. The
+second one names both buttons. Start at `GameOutcomeSheets.kt` in
+`features/game/impl` and the routes it dispatches. Worth checking against
+SODOGKU-3, an unresolved `IllegalStateException` about popping
+`AchievementsRoute` when it is not the top of the back stack, filed from the
+same period. The first report also asks two design questions that are not this
+item: whether Levels belongs on that dialog at all, and whether there should be
+a failure page with a restart-from-zero, which is SD-111.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-A and
+https://elijah-dangerfield.sentry.io/issues/SODOGKU-9 · session
+95dd30d1-9ca1-4614-816c-a71e02b191d8 · 2026-09-10
+
+## SD-116 [P1] — Five paws looks unearnable
+
+**Ask:** "I don't know how I possibly could've earned five paws. I did this in
+five seconds with no mistakes", and a minute later: "yeah, I am crushing these
+puzzles, but still not getting five paws"
+
+**Done when:** A clean, fast solve awards five paws, or the thresholds are shown
+to be right and the reason a five-second flawless solve falls short is written
+down.
+
+**Hints:** Two reports, eighty seconds apart, same session, both from GameRoute.
+The standing thresholds live in `libraries/scoring/.../Standing.kt` and
+`ScoringConfig.kt`, wired up in
+`features/game/impl/.../ConfiguredScoring.kt`. Note the history: SD-88 through
+SD-92 came out of a review of this same slice and found a compression bug in
+`Standing.Sharp`, so check whether the top band is reachable at all for the
+sizes being played rather than only reading the constants.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-B and
+https://elijah-dangerfield.sentry.io/issues/SODOGKU-C · session
+fd9affc0-cc4e-4386-a0d6-5eecef3753e0 · 2026-09-10
