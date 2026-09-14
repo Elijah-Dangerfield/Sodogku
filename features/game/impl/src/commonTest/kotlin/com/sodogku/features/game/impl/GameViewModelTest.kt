@@ -1747,6 +1747,44 @@ class GameViewModelTest : CoroutineTest() {
         assertTrue(vm.state.score.total > 0)
     }
 
+    /**
+     * SD-116, stated as the run the owner actually played: a small early board,
+     * no mistakes, a few seconds end to end, and the top of the ladder for it.
+     *
+     * Driven through the screen rather than through `Scoring`, because that is
+     * the half the report lived in. `Scoring.paws` defaults `placements` to the
+     * grid size, and `LevelCurve.opensWithStarterDog` hands the first levels of
+     * every band a dog the player never places — so a `win` that lets that
+     * argument default rates the run against a par it was never offered the
+     * placements for, and the highest-combo one at that. On the tester's build
+     * that was about a tenth of par, which put a flawless five-second 4x4 at
+     * 84.9% and one thousandth under the top rung.
+     *
+     * `ScoringTest.aStarterDogIsNotChargedToTheRunThatDidNotPlaceIt` pins the
+     * arithmetic and cannot see the call site, so every scoring test stays green
+     * while the wiring loses the argument again. Both board shapes, because the
+     * starter-dog one is the only one that can tell the two apart and a test on
+     * the plain board alone would pass either way.
+     */
+    @Test
+    fun aFastFlawlessSolveEarnsEveryPaw() = runUnitTest {
+        val plain = viewModel()
+        solve(plain)
+
+        assertEquals(Scoring.MAX_PAWS, plain.state.paws, "a flawless quick solve of ${level.size}x${level.size}")
+        assertEquals(Standing.Flawless, plain.state.standing)
+
+        val starterDog = viewModel(levelId = StarterDogLevel, cache = taughtCache())
+        solveCurrent(starterDog)
+
+        assertEquals(
+            Scoring.MAX_PAWS,
+            starterDog.state.paws,
+            "a flawless quick solve of a board that opened with a dog already down",
+        )
+        assertEquals(Standing.Flawless, starterDog.state.standing)
+    }
+
     @Test
     fun tappingAnAutoMarkedCellDoesNothing() = runUnitTest {
         val vm = viewModel()
