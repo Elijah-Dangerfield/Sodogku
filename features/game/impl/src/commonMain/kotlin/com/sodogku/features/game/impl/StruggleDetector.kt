@@ -56,13 +56,14 @@ package com.sodogku.features.game.impl
  *
  * A player reading carefully and a player with no idea do look identical for a
  * while. That is unavoidable and it is the reason the answer to a false positive
- * has to stay cheap: the most this can ever do is beat a button twice.
+ * has to stay cheap: the most this can ever do is beat a button for seven
+ * seconds and then stop on its own.
  *
  * The old code argued that one wrong guess is not struggling because everybody
  * gets one and the tutorial *instructs* one. Both are still true; neither is an
  * argument against reacting to it. The tutorial is handled by not running this
  * at all on the rehearsal board, and "everybody gets one" is handled by the
- * burst being three pulses of a button rather than anything the player has to
+ * burst being a few pulses of a button rather than anything the player has to
  * dismiss.
  *
  * ## What stops it nagging
@@ -71,8 +72,21 @@ package com.sodogku.features.game.impl
  * placement ends the burst immediately — the player is unstuck and the button
  * stops. Otherwise the burst runs for [burstMs] and then goes quiet for
  * [quietMs] whether or not the player is still stuck, so **the most attention
- * this can ever ask for is one burst of roughly three pulses every thirty
- * seconds.**
+ * this can ever ask for is one burst every twenty seconds.**
+ *
+ * That cap was thirty seconds and the owner's report on a tester build was that
+ * he was not seeing the button at all. Thirty seconds of silence is a long time
+ * to hold a nudge back from somebody who is, by the detector's own reckoning,
+ * still stuck the whole way through it — a player stuck for a minute got two
+ * chances to notice, and either of them could land while they were looking at
+ * the other end of the board. Twenty gives three, and the button is still still
+ * for two thirds of the time.
+ *
+ * Twenty is a floor rather than a number that wants to go lower. [burstMs] is
+ * unchanged, so what moved is only the gap, and the gap has to stay longer than
+ * the burst: a rest shorter than the movement it separates stops reading as a
+ * pause and starts reading as a stutter, which is the permanent nag this cap
+ * exists to prevent.
  *
  * ## The clock
  *
@@ -265,18 +279,32 @@ internal class StruggleDetector(
          * How much longer a player who has not been crossing off gets before a
          * drought counts.
          *
-         * Two, which puts the shortest possible drought at forty seconds. That
-         * is a long time to be looking at a puzzle with nothing to show for it,
-         * and it is meant to be: this arm exists to catch the player nothing
-         * else can see, not to be the arm that usually fires.
+         * One and a half, which puts the shortest possible drought at thirty
+         * seconds. It was two, and forty seconds turned out to be long enough
+         * that this arm was hardly ever the one that fired — which defeats the
+         * point of it, since it exists to catch the player no other arm can see.
+         *
+         * Thirty rather than twenty. The gap between this and [StallFloorMs] is
+         * the whole of the benefit of the doubt a player gets for not having
+         * crossed anything off, and collapsing it would be removing the
+         * distinction rather than tuning it: somebody who has read the board for
+         * half a minute without marking it is plausibly still reading, and
+         * somebody who has done that for a full minute plausibly is not.
          */
-        const val DroughtMultiple = 2f
+        const val DroughtMultiple = 1.5f
 
-        /** Two full pulses of the button, and part of a third. */
+        /**
+         * How long the button is allowed to beat for.
+         *
+         * Unchanged at seven seconds, deliberately, because the fix for "I was
+         * not seeing it" is more chances to catch one and a louder beat inside
+         * it, not a button that goes on longer. How many beats fit in seven
+         * seconds is `BoardControl`'s business and it now fits nearly three.
+         */
         const val BurstMs = 7_000L
 
-        /** [BurstMs] plus this is the thirty seconds in the class KDoc. */
-        const val QuietMs = 23_000L
+        /** [BurstMs] plus this is the twenty seconds in the class KDoc. */
+        const val QuietMs = 13_000L
 
         /** Below this many gaps there is no pace, only a first impression. */
         const val PaceSampleFloor = 2

@@ -247,6 +247,48 @@ class StruggleDetectorTest {
         )
     }
 
+    /**
+     * The cap, written as the number rather than as the constants that make it.
+     *
+     * Every other test here mirrors the detector's defaults, so a burst and a
+     * quiet period that both drifted would keep agreeing with each other. This
+     * one is the promise in the class KDoc spelled out: a player who stays stuck
+     * is asked again inside twenty seconds. It went up to thirty once and the
+     * owner stopped seeing the button at all.
+     */
+    @Test
+    fun aPlayerWhoStaysStuckIsAskedAgainInsideTwentySeconds() {
+        val detector = StruggleDetector()
+        detector.onStruck(0)
+        detector.nudging(0)
+        // Ends the first burst and opens the quiet period.
+        detector.nudging(Burst)
+
+        assertTrue(
+            detector.nudging(TwentySeconds),
+            "a player stuck for twenty seconds got one burst and then silence",
+        )
+    }
+
+    /**
+     * The other half of the same complaint, also in absolute time.
+     *
+     * The player who reads the board without crossing anything off is the one
+     * the drought arm exists for, and at forty seconds it was rarely the arm
+     * that fired.
+     */
+    @Test
+    fun aPlayerWhoNeverCrossesOffIsAskedInsideThirtySeconds() {
+        val detector = StruggleDetector()
+        detector.onMarked(0)
+        touchThrough(detector, from = Beat, to = ThirtySeconds - Beat)
+
+        assertTrue(
+            detector.nudging(ThirtySeconds),
+            "half a minute of reading the board and nothing to show for it went unnoticed",
+        )
+    }
+
     @Test
     fun aDeliberatePlayersOwnPaceRaisesTheBar() {
         // Three placements forty seconds apart, so 2.5x their median is a
@@ -399,7 +441,9 @@ class StruggleDetectorTest {
         const val Second = 1_000L
         const val TwoSeconds = 2_000L
         const val FiveSeconds = 5_000L
+        const val TwentySeconds = 20_000L
         const val TwentyFiveSeconds = 25_000L
+        const val ThirtySeconds = 30_000L
         const val FortySeconds = 40_000L
         const val TwoMinutes = 120_000L
         const val FiveMinutes = 300_000L
@@ -422,9 +466,9 @@ class StruggleDetectorTest {
         const val StallFloor = 20_000L
         const val StallPaceMultiple = 2.5f
         const val Burst = 7_000L
-        const val Quiet = 23_000L
+        const val Quiet = 13_000L
         const val MarksBeforeStall = 6
-        const val DroughtMultiple = 2f
+        const val DroughtMultiple = 1.5f
 
         /** Enough placements to be past the detector's pace sample floor. */
         const val PlacementsForAPace = 3

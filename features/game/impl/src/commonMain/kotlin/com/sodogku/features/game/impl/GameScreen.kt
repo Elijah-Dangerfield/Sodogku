@@ -911,16 +911,17 @@ private fun BoardClock(elapsed: StateFlow<Long>, targetMs: Long, modifier: Modif
     ) {
         Text(
             text = elapsedLabel(millis).orEmpty(),
-            // One step up the body scale, and the last one available: this is
-            // now the largest type under the board, which is right, because it
-            // is the only thing there that changes while the player watches.
+            // One more step up the body scale, and now genuinely the last one:
+            // B700 is the top of the scale. This is the largest type under the
+            // board, which is right, because it is the only thing there that
+            // changes while the player watches.
             //
-            // The step is deliberately small. The caption beside it is the
+            // Two points, not a redesign. The caption beside it is the
             // load-bearing half of this row — a target is what makes the clock
             // mean anything — and the two have to stay readable as one line, so
             // the clock gets enough size to be read at a glance without
             // becoming a heading the caption hangs off.
-            typography = AppTheme.typography.Body.B600.Medium,
+            typography = AppTheme.typography.Body.B700.Medium,
             color = AppTheme.colors.textSecondary,
         )
         // Nothing at all on a level with no best time. An empty state here
