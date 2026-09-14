@@ -20,6 +20,7 @@ import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.FeatureBoosters
 import com.sodogku.libraries.config.values.ProgressionSkipAfterFailedAttempts
 import com.sodogku.libraries.config.values.ProgressionStarterDogLevelsPerBand
+import com.sodogku.libraries.config.values.ProgressionStarterDogOpeningLevels
 import com.sodogku.libraries.config.values.ScoringBasePerPlacement
 import com.sodogku.libraries.config.values.ScoringBoosterPenaltyRate
 import com.sodogku.libraries.config.values.ScoringComboMax
@@ -2229,13 +2230,56 @@ class GameViewModelTest : CoroutineTest() {
 
     @Test
     fun theDogIsGoneOnceABandIsUnderway() = runUnitTest {
-        BandFirstLevels.forEach { levelId ->
+        // Only the bands that start past the opening run. Inside it the answer
+        // is the run's, not the band window's, and
+        // `theOpeningRunOutlastsTheFirstBandsWindow` below is the test for that.
+        BandFirstLevels.filter { it > DefaultStarterDogOpeningLevels }.forEach { levelId ->
             val past = levelId + DefaultStarterDogLevelsPerBand
             val vm = viewModel(levelId = past, cache = taughtCache())
 
             assertEquals(0, vm.state.dogsPlaced, "level $past is past the window")
             assertEquals(null, vm.state.starterDogCell, "level $past is past the window")
         }
+    }
+
+    @Test
+    fun theOpeningRunOutlastsTheFirstBandsWindow() = runUnitTest {
+        // SD-113: the report was that the empty boards arrive too quickly. The
+        // band window alone ran out at level 4. These are the levels the run
+        // covers that no band window would.
+        listOf(4, 14, DefaultStarterDogOpeningLevels).forEach { levelId ->
+            val vm = viewModel(levelId = levelId, cache = taughtCache())
+
+            assertEquals(1, vm.state.dogsPlaced, "level $levelId is inside the opening run")
+            assertNotNull(vm.state.starterDogCell, "level $levelId is inside the opening run")
+        }
+    }
+
+    @Test
+    fun theFirstBoardAPlayerOpensEmptyIsTheOneAfterTheRun() = runUnitTest {
+        val vm = viewModel(levelId = FirstEmptyBoard, cache = taughtCache())
+
+        assertEquals(0, vm.state.dogsPlaced)
+        assertEquals(null, vm.state.starterDogCell)
+    }
+
+    @Test
+    fun theOpeningRunIsRemoteConfig() = runUnitTest {
+        // The owner was not sure the threshold was right, which is the argument
+        // for a key rather than a constant.
+        val widened = configOf("progression.starterDogOpeningLevels" to FirstEmptyBoard)
+        assertNotNull(
+            viewModel(levelId = FirstEmptyBoard, cache = taughtCache(), config = widened).state.starterDogCell,
+        )
+        assertEquals(
+            null,
+            viewModel(
+                levelId = 4,
+                cache = taughtCache(),
+                config = configOf("progression.starterDogOpeningLevels" to 0),
+            ).state.starterDogCell,
+            "zero leaves the band window as the only source, and level 4 is past it",
+        )
     }
 
     @Test
@@ -5684,6 +5728,7 @@ class GameViewModelTest : CoroutineTest() {
         proTreatsPerAttempt = BoostersProTreatsPerAttempt(config),
         skipAfterFailedAttempts = ProgressionSkipAfterFailedAttempts(config),
         starterDogLevelsPerBand = ProgressionStarterDogLevelsPerBand(config),
+        starterDogOpeningLevels = ProgressionStarterDogOpeningLevels(config),
         achievementsEnabled = FeatureAchievements(config),
         boostersEnabled = FeatureBoosters(config),
         adsEnabled = AdsEnabled(config),
@@ -5931,6 +5976,16 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Mirrors `ProgressionStarterDogLevelsPerBand.default`. */
         const val DefaultStarterDogLevelsPerBand = 3
+
+        /** Mirrors `ProgressionStarterDogOpeningLevels.default`. */
+        const val DefaultStarterDogOpeningLevels = 16
+
+        /**
+         * The first campaign board that opens with nothing placed. Written out
+         * rather than derived from [DefaultStarterDogOpeningLevels], so the
+         * off-by-one is asserted and not assumed.
+         */
+        const val FirstEmptyBoard = 17
 
         /**
          * The first level at each grid size, 4x4 through 10x10. Spelled out
