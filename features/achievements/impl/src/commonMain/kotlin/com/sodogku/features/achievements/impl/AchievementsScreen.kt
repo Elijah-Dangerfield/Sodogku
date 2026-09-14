@@ -426,7 +426,7 @@ private fun SpotlightCard(badge: Badge, celebrated: Boolean, onClick: () -> Unit
                 ) {
                     ProgressRow(
                         progressPercent = badge.progress,
-                        shape = Radii.R400.shape,
+                        shape = Radii.Progress.shape,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
@@ -509,6 +509,10 @@ private fun BadgeTile(badge: Badge, onClick: () -> Unit) {
         // than only the ones that happen to have started — a line that appears
         // and disappears down a grid is what made the old page look ragged.
         //
+        // The same C300 the spotlight rows, the stat pills and the win sheet use
+        // for a line of metadata. It was a step below that, which made the
+        // smallest text on the page the one carrying the only number on the tile.
+        //
         // Nothing on a mystery badge: its numbers are zeroed upstream, and even
         // "0 / 1" would say "one clear does it".
         if (!badge.mystery) {
@@ -518,7 +522,7 @@ private fun BadgeTile(badge: Badge, onClick: () -> Unit) {
                 } else {
                     badge.progressLabel()
                 },
-                typography = AppTheme.typography.Caption.C200,
+                typography = AppTheme.typography.Caption.C300,
                 color = if (badge.unlocked) {
                     AppTheme.colors.accentPrimary
                 } else {
@@ -540,6 +544,11 @@ private fun BadgeTile(badge: Badge, onClick: () -> Unit) {
  * scrim that stopped at the top bar because it could only cover its own
  * sibling. A new surface should get all of that from the design system without
  * its author knowing the rules exist.
+ *
+ * Scrolls, like `GameDialogHost` does. `Dialog` sizes itself to its content and
+ * then stops at the window, so a long badge description at the largest system
+ * font pushes the Close button off the bottom of a card that cannot move — the
+ * player is left looking at a dialog they can only leave by pressing back.
  */
 @Composable
 private fun BadgeDetailDialog(badge: Badge, onDismiss: () -> Unit) {
@@ -547,7 +556,9 @@ private fun BadgeDetailDialog(badge: Badge, onDismiss: () -> Unit) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Dimension.D500),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
         ) {
             Text(text = badge.face(), typography = AppTheme.typography.Display.D1400)
             Text(
@@ -578,7 +589,7 @@ private fun BadgeDetailDialog(badge: Badge, onDismiss: () -> Unit) {
             // 0/1 bar would still say "one clear does it".
             if (!badge.unlocked && !badge.mystery) {
                 Text(text = badge.progressLabel(), typography = AppTheme.typography.Body.B600)
-                ProgressRow(progressPercent = badge.progress, shape = Radii.R400.shape)
+                ProgressRow(progressPercent = badge.progress, shape = Radii.Progress.shape)
             }
             ButtonPrimary(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(Res.string.common_close))

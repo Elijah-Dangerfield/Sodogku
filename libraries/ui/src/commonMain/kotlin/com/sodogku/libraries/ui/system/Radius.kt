@@ -53,6 +53,18 @@ object Radii {
     val Card get() = R400
 
     /**
+     * A progress bar's track and its fill.
+     *
+     * A pill, not a softened rectangle. Everything else in the app that reads as
+     * a small horizontal measure — the HUD pills, the dog counter, the unlock
+     * toast, the board controls — is [Round], and a bar with 8dp corners sitting
+     * under them looks like it came from a different app. It also keeps the fill
+     * the same shape as the track at every value, so a bar at four percent is a
+     * short pill rather than a sliver with two square ends.
+     */
+    val Progress get() = Round
+
+    /**
      * One board square, as a proportion rather than a fixed corner.
      *
      * A 4x4 gives a cell three times the size of a 10x10's, and 8dp of corner on
