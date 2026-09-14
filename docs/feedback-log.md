@@ -52,3 +52,23 @@ All ten carriers were already resolved in Sentry before this run, which predates
 the ledger. The eight that became TODOs were left resolved rather than reopened;
 the ledger and the TODO ids are the trace. Flagged to the owner.
 -->
+
+<!--
+Follow-up, 2026-09-14, after the six items were worked.
+
+**Four of the six were already fixed before they were filed.** Every carrier
+event carries `commit_sha` and `AppTelemetry` puts it there so triage can tell
+whether a report is already fixed on a later commit. This run did not read it.
+The reports came from `74f66d5` and `f182418`; `main` was 160 to 177 commits
+past them.
+
+- SD-114, the achievements page: fixed by `d8b2d6c` a day after the report.
+- SD-116, five paws: a real bug on that build, fixed by `ab0c189` 22 hours after
+  the report.
+- SD-115, the two dead buttons: one half fixed by SD-54, the other by SD-49.
+- SD-113's tooltip half: already shipped as SD-51.
+
+Filed as SD-117 so the skill stops doing this. The per-report lines above are
+left as written, because the ledger is append-only and what it records is what
+the pass decided at the time.
+-->

@@ -135,117 +135,60 @@ ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
 
-## SD-111 [P1] — Rethink what giving up on the daily board leaves behind
+## SD-117 [P1] — Teach feedback triage to check the reported build against the log
 
-**Ask:** "I gave up on today's board and when I revisited it it just shows me
-this we might need to rethink what giving up means . I don't think the user
-should be able to give up. I don't know if there should be a total failure
-state. I think you should probably always be able to just start from the
-beginning. I don't know, but let's rethink this and see how we could probably
-improve the user experience"
+**Ask:** Every feedback carrier event carries `commit_sha`, and `AppTelemetry`
+puts it there on purpose: its comment says the provenance is so triage can tell
+"whether it's already fixed on a later commit". The `feedback-triage` skill never
+reads it. The 2026-09-14 pass filed SD-111 through SD-116 from reports against
+builds 160 to 177 commits behind `main`, and four of the six were already fixed.
 
-**Done when:** Returning to a daily board after running out of bones no longer
-dead-ends. Whatever replaces it, there is a way back into the same puzzle from
-the start.
+**Done when:** the skill's read-the-report step requires resolving `commit_sha`
+against the log and saying how far behind the report is, and its file-it step
+requires checking whether the behavior still exists on `HEAD` before writing an
+item. An item filed anyway carries the distance in its provenance line.
 
-**Hints:** The attached screenshot is the dead end: a dimmed board behind an
-"Out of bones for today / Sep 9" card whose only control is a LEVELS button.
-Streak reads 0, score 1.8K, bones 0/6. Related: SD-115 is the report that the
-LEVELS button on this card does nothing, so the card is currently a dead end in
-both senses. The owner floats a failure page in the SD-115 report too.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-5 · session
-95dd30d1-9ca1-4614-816c-a71e02b191d8 · 2026-09-10
+**Hints:** The skill is `.claude/skills/feedback-triage/SKILL.md`. Step 2 also
+still tells the reader to pull the Sentry feedback twin for the text, which is
+not reachable from the Sentry MCP for this project — the text is on the carrier,
+in the `feedback_message` extra and the `feedback.txt` attachment, both added in
+26fcba1. Fix both instructions in one pass. `docs/feedback-log.md` has the
+tooling notes from that run.
 
-## SD-112 [P2] — Bigger timer text, and a booster pulse you actually notice
+## SD-118 [P2] — Delete the daily failure state's leftovers
 
-**Ask:** "let's make the timer text just slightly bigger and let's make the
-pulsing of those buttons on the bottom a little bit more noticeable. like I
-wanna see them With the icon shaking in The middle a little bit more. And I
-honestly haven't been seeing them that much. We probably need a better algorithm
-for deciding when they should pulse."
+**Ask:** SD-111 stopped `toResult` reading a `Failed` row, so nothing reaches the
+dead-end card any more. `DailyCardState.Failed` in `libraries/ui` and the
+`daily_out_of_bones` string now have no live caller, and the `DailyOutcome.Failed`
+branches in `LevelDrawer.DailyCardSlot` and `DailyStreak.missedDayBefore` survive
+only for `when` exhaustiveness.
 
-**Done when:** The timer under the board is a step larger, and the booster
-buttons pulse with visible icon movement.
+**Done when:** the unreachable state and its copy are gone, or there is a written
+reason to keep them.
 
-**Hints:** Three asks in one report, filed as one. The other two are the pulse
-animation itself (the owner wants the icon shaking, not just the button
-breathing) and the rule that decides when a booster pulses at all, which he says
-fires too rarely to see. Filed from GameRoute.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-6 · session
-95dd30d1-9ca1-4614-816c-a71e02b191d8 · 2026-09-10
+**Hints:** Left in deliberately rather than removed during SD-111, because a
+cross-module deletion while four other agents were live in the tree was the
+riskier half of the change. `DailyOutcome.Failed` itself must stay in the enum:
+dropping the name makes `toResult` fail to *parse* those rows, which reaches the
+same outcome by accident and costs the parse failure its own meaning. Four
+`DailyStreakTest` cases now pin behavior for an input the repository cannot
+produce; decide whether they are a guard on the pure fold or dead weight.
 
-## SD-113 [P2] — Hold back the no-starting-dog puzzles, and say so the first time
+## SD-119 [P2] — A `Surface` overload that takes a semantics label
 
-**Ask:** "i've noticed that we pretty quickly start giving us those puzzles that
-don't have a starting dog. I don't know if that should be the case to be honest
-I think that should probably start much later in the year's progress. And maybe
-the first time that they see one we should let them know that there's no
-starting dog on purpose and that they should be able to deduce it. Like maybe a
-little tool tip or something"
+**Ask:** `BadgeTile`, `SpotlightCard`, `GameOutcomeSheets.OutcomeLayout` and
+`LevelDrawer.LevelRow` each hand-roll `bounceClick + clearAndSetSemantics + clip
++ background + border + padding`, which is the body of the design system's
+`Surface`. Four copies of one thing.
 
-**Done when:** Boards with no pre-placed dog start appearing later in the
-progression than they do now, and the first one a player meets says out loud
-that the empty start is deliberate.
+**Done when:** those call sites use `Surface`, or the duplication has a reason
+written down next to it.
 
-**Hints:** Two parts, the ramp and the one-time tooltip. "the year's progress" is
-dictation for the level progression. The generator's starting-dog decision and
-the difficulty ramp in `libraries/scoring` are where to look first.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-7 · session
-95dd30d1-9ca1-4614-816c-a71e02b191d8 · 2026-09-10
-
-## SD-114 [P2] — Bring the achievements page in line with the rest of the app
-
-**Ask:** "The UI of the achievements page honestly isn't really in a line with
-what we're going for. Let's see if we can make this a little bit more In line
-with the rest of the app. Think Duolingo"
-
-**Done when:** The achievements screen reads as the same app as the board and
-the outcome sheets.
-
-**Hints:** Filed from AchievementsRoute. The screen is
-`features/achievements/impl/.../AchievementsScreen.kt`. "Think Duolingo" is the
-reference; `docs/reference/meowdoku.md` has the existing competitor look notes.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-8 · session
-95dd30d1-9ca1-4614-816c-a71e02b191d8 · 2026-09-10
-
-## SD-115 [P1] — The Levels and Start over buttons do nothing
-
-**Ask:** "both the levels button and the start over button are not doing
-anything right now", and from a minute earlier: "I just clicked on Level levels,
-but it did nothing."
-
-**Done when:** Both buttons navigate. Tapping Levels opens the level list and
-tapping Start over restarts the puzzle.
-
-**Hints:** Two reports, forty seconds apart, same session, same defect. The
-second one names both buttons. Start at `GameOutcomeSheets.kt` in
-`features/game/impl` and the routes it dispatches. Worth checking against
-SODOGKU-3, an unresolved `IllegalStateException` about popping
-`AchievementsRoute` when it is not the top of the back stack, filed from the
-same period. The first report also asks two design questions that are not this
-item: whether Levels belongs on that dialog at all, and whether there should be
-a failure page with a restart-from-zero, which is SD-111.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-A and
-https://elijah-dangerfield.sentry.io/issues/SODOGKU-9 · session
-95dd30d1-9ca1-4614-816c-a71e02b191d8 · 2026-09-10
-
-## SD-116 [P1] — Five paws looks unearnable
-
-**Ask:** "I don't know how I possibly could've earned five paws. I did this in
-five seconds with no mistakes", and a minute later: "yeah, I am crushing these
-puzzles, but still not getting five paws"
-
-**Done when:** A clean, fast solve awards five paws, or the thresholds are shown
-to be right and the reason a five-second flawless solve falls short is written
-down.
-
-**Hints:** Two reports, eighty seconds apart, same session, both from GameRoute.
-The standing thresholds live in `libraries/scoring/.../Standing.kt` and
-`ScoringConfig.kt`, wired up in
-`features/game/impl/.../ConfiguredScoring.kt`. Note the history: SD-88 through
-SD-92 came out of a review of this same slice and found a compression bug in
-`Standing.Sharp`, so check whether the top band is reachable at all for the
-sizes being played rather than only reading the constants.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-B and
-https://elijah-dangerfield.sentry.io/issues/SODOGKU-C · session
-fd9affc0-cc4e-4386-a0d6-5eecef3753e0 · 2026-09-10
+**Hints:** The reason they are not `Surface` today is real and was checked on a
+device: `Surface(onClick=)` applies its `bounceClick` *inside* the caller's
+modifier, so a `clearAndSetSemantics` passed in sits above the clickable and
+clears the click action along with the labels. `bounceClick`'s own KDoc records
+that two tidier variants were tried and neither reached the tree. So the fix is
+an overload that takes the semantics label as a parameter and applies it in the
+right order, not a call-site conversion. Found while auditing the achievements
+screen for SD-114.
