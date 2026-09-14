@@ -48,6 +48,12 @@ internal fun streakOn(today: LocalDate, outcomes: Map<LocalDate, DailyOutcome>):
  * Missed means no row at all. A day the player attempted and lost is not missed
  * and cannot be bought back — they had their turn, and letting an ad undo a loss
  * would make the bones on the daily meaningless.
+ *
+ * The [DailyOutcome.Failed] branch is kept for exhaustiveness and no longer
+ * fires: since SD-111 the repository drops those rows on the way out of the
+ * database, so a day given up on by an older build arrives here as `null` and is
+ * offered like any other missed day. Losing a day on the bones has never written
+ * a row, so the rule above is untouched by that.
  */
 internal fun missedDayBefore(today: LocalDate, outcomes: Map<LocalDate, DailyOutcome>): LocalDate? {
     var day = if (outcomes[today] == DailyOutcome.Completed) today else today.previousDay()

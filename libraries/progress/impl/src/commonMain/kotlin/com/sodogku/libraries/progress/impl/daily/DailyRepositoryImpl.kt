@@ -47,7 +47,8 @@ import kotlin.time.ExperimentalTime
  *
  * Both writes go through `insertIfAbsent`, so the one-attempt rule is enforced by
  * the primary key rather than by a check the caller could skip. There is
- * deliberately no update path on this table at all.
+ * deliberately no update path on this table: the only thing [write] can take
+ * away is a `Failed` row, which [toResult] no longer reads as a result at all.
  */
 @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
 @SingleIn(AppScope::class)
@@ -129,6 +130,11 @@ class DailyRepositoryImpl(
         paws: Int,
         timeMs: Long,
     ) {
+        // The forfeit's leavings, cleared on the way past. Nothing reads a
+        // `Failed` row any more, but it still holds the primary key for its
+        // date — so a day given up on by an older build would take the clear
+        // that this day is now open for and quietly drop it on the floor.
+        dao.deleteWithOutcome(date.toString(), DailyOutcome.Failed.name)
         val inserted = dao.insertIfAbsent(
             DailyResultEntity(
                 date = date.toString(),
@@ -195,10 +201,23 @@ private const val IGNORED = -1L
  * are not symmetric: a dropped row costs the player a day of streak they can see
  * and freeze, while a row invented at the wrong date silently shifts every
  * calculation that walks past it.
+ *
+ * **A `Failed` row is dropped too, and that is SD-111.** It is recognised rather
+ * than left to fall out of the `firstOrNull` above — a name that stops parsing
+ * would take any *future* outcome down with it, and the point here is this one
+ * reading and no other. Only Give up on today ever wrote one, SD-49 removed it,
+ * and the rows it left behind were doing one thing: holding a player out of a
+ * board they could still play, on a recap whose only control was the way out.
+ * The owner's line was that there should probably be no failure state and that
+ * you should always be able to start from the beginning, so a day that was given
+ * up on is now a day that was never played. It opens on its board, it counts as
+ * missed rather than spent, and a freeze or a restore can cover it — which is
+ * more than it could ever get back before.
  */
 internal fun DailyResultEntity.toResult(): DailyResult? {
     val parsedDate = Catching { LocalDate.parse(date) }.getOrNull() ?: return null
     val parsedOutcome = DailyOutcome.entries.firstOrNull { it.name == outcome } ?: return null
+    if (parsedOutcome == DailyOutcome.Failed) return null
     return DailyResult(
         date = parsedDate,
         levelIndex = levelIndex,

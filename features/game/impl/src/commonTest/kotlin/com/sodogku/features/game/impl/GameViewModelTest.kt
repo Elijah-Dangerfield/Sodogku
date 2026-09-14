@@ -3321,30 +3321,6 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(3, vm.state.paws)
     }
 
-    /**
-     * Nothing writes a `Failed` row any more, but rows written by the build that
-     * had Give up on today are on players' disks. The recap still has to read
-     * them, or the fold quietly drops days out of somebody's history.
-     */
-    @Test
-    fun aDayForfeitedByAnOlderBuildStillOpensOnItsResult() = runUnitTest {
-        val givenUp = DailyResult(
-            date = DailyDate,
-            levelIndex = DailyLevel - 1,
-            outcome = DailyOutcome.Failed,
-            score = 0,
-            paws = 0,
-            timeMs = 45_000,
-        )
-        val vm = viewModel(
-            isDaily = true,
-            daily = FakeDaily(levelId = DailyLevel, result = givenUp),
-        )
-
-        assertEquals(GamePhase.Recap, vm.state.phase)
-        assertEquals(DailyOutcome.Failed, vm.state.dailyRecap?.outcome)
-    }
-
     @Test
     fun theCardStillOffersASpentDay() = runUnitTest {
         // The drawer's half. `playDaily` refused once the day was over, so the

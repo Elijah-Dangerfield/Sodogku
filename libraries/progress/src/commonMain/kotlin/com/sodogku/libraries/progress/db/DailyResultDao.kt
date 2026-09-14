@@ -52,6 +52,24 @@ interface DailyResultDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfAbsent(row: DailyResultEntity): Long
 
+    /**
+     * Drops the row for [date] when it carries [outcome], and does nothing
+     * otherwise.
+     *
+     * **Not an update path**, and the narrowness is the point: it can only take a
+     * row away, and only one whose outcome the caller already named. It exists
+     * for `Failed`, which nothing has written since SD-49 removed Give up on
+     * today and which SD-111 stopped reading as a result at all. A row nobody
+     * reads still owns the primary key for its date, so without this the clear
+     * that the day is now open for would be refused by [insertIfAbsent] and bank
+     * nothing.
+     *
+     * A `Completed` row is never passed here. One attempt per day is still the
+     * table's rule, and it is still the primary key that keeps it.
+     */
+    @Query("DELETE FROM daily_result WHERE date = :date AND outcome = :outcome")
+    suspend fun deleteWithOutcome(date: String, outcome: String)
+
     @Query("SELECT * FROM daily_result ORDER BY date")
     fun observeAll(): Flow<List<DailyResultEntity>>
 

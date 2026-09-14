@@ -45,7 +45,6 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.daily_date
 import sodogku.libraries.resources.generated.resources.daily_done
-import sodogku.libraries.resources.generated.resources.daily_out_of_bones
 import sodogku.libraries.resources.generated.resources.dogs_a11y
 import sodogku.libraries.resources.generated.resources.daily_play
 import sodogku.libraries.resources.generated.resources.daily_review
@@ -408,22 +407,23 @@ private fun LostSheet(state: GameState, onAction: (GameAction) -> Unit, modifier
  * and it opens the level pane rather than popping — this route has a deep link,
  * so it is sometimes the start destination (SD-54).
  *
- * [DailyOutcome.Failed] is now a **legacy** reading. The only thing that ever
- * wrote one was Give up on today, which SD-49 removed, so the failed branch
- * exists for days already sitting on disk rather than for any a player can still
- * produce. A day that is lost and not cleared writes no row at all and opens on
- * its board.
+ * **Every day that reaches this sheet was finished**, which is why nothing here
+ * commiserates and why the time is no longer gated on anything. It used to have
+ * a second face: a [DailyOutcome.Failed] row drew "Out of bones for today" over
+ * a dimmed board, with the way out as its only control and no way back into the
+ * puzzle. That is the dead end SD-111 was filed about, and it is gone at the
+ * source — `toResult` no longer reads a `Failed` row as a result, so a day given
+ * up on by an older build opens on its board from the beginning like any other
+ * unplayed day. The sheet cannot be reached without a result, and the three
+ * outcomes that remain all mean the day is over.
  */
 @Composable
 private fun DailyRecapSheet(state: GameState, onAction: (GameAction) -> Unit, modifier: Modifier) {
     val recap = state.dailyRecap
     OutcomeLayout(modifier) {
-        val cleared = recap?.outcome != DailyOutcome.Failed
-        Dog(pose = if (cleared) DogPose.Solved else DogPose.HardMode)
+        Dog(pose = DogPose.Solved)
         Text(
-            text = stringResource(
-                if (cleared) Res.string.daily_done else Res.string.daily_out_of_bones,
-            ),
+            text = stringResource(Res.string.daily_done),
             typography = AppTheme.typography.Heading.H700,
             textAlign = TextAlign.Center,
         )
@@ -437,8 +437,9 @@ private fun DailyRecapSheet(state: GameState, onAction: (GameAction) -> Unit, mo
                 typography = AppTheme.typography.Caption.C300,
                 color = AppTheme.colors.textSecondary,
             )
-            // Recalled, not awarded. A day that was given up on has neither, and
-            // three empty paws would read as a nought-out-of-three score.
+            // Recalled, not awarded. Still gated on the number: a frozen or a
+            // restored day is worth zero, and three empty paws would read as a
+            // nought-out-of-three score rather than as a day nobody played.
             if (recap.paws > 0) PawRating(paws = recap.paws, animated = false)
             if (recap.score > 0) {
                 Text(
@@ -448,10 +449,9 @@ private fun DailyRecapSheet(state: GameState, onAction: (GameAction) -> Unit, mo
                 )
             }
             // Recalled like everything else on this sheet, so no roll and no
-            // paws. Gated on the clear as well as on the number: a failed day
-            // carries the time it ran for, and "Solved in 2:10" over a board
-            // nobody solved is the sheet lying about the day it exists to show.
-            elapsedLabel(recap.timeMs).takeIf { cleared }?.let { time ->
+            // paws. [elapsedLabel] is null at zero, which is what keeps a frozen
+            // or restored day from claiming it was solved in no time at all.
+            elapsedLabel(recap.timeMs)?.let { time ->
                 Text(
                     text = stringResource(Res.string.game_time_taken, time),
                     typography = AppTheme.typography.Body.B600,

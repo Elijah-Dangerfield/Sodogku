@@ -157,12 +157,28 @@ class DailyRepositoryImplTest : CoroutineTest() {
     }
 
     @Test
-    fun aDayFailedByAnOlderBuildStaysFailed() = runUnitTest {
-        // Nothing writes `Failed` any more — SD-49 removed Give up on today and
-        // `onFailed` with it, and a run that merely goes out of bones writes
-        // nothing so the day stays open. Rows written by the build that had it
-        // are on players' disks, and they still spend the day: the primary key
-        // refuses the later clear exactly as it refuses a second one.
+    fun aDayForfeitedByAnOlderBuildIsOpenAgain() = runUnitTest {
+        // SD-111, and the whole of it. Give up on today went in SD-49, but the
+        // rows it wrote are on players' disks, and the owner had one: today's
+        // board answered with a recap saying "Out of bones for today" whose only
+        // control was the way out, and no route back into the puzzle at all.
+        // A day nobody can play is what that row amounts to now, so it stops
+        // being a result.
+        val repo = repository()
+        val today = repo.status().date
+        dao.put(today, DailyOutcome.Failed)
+
+        val before = repo.status()
+        assertNull(before.result, "a day given up on is a day that was never played")
+        assertTrue(before.playable, "and today's board is there to be started from the beginning")
+    }
+
+    @Test
+    fun clearingADayForfeitedByAnOlderBuildStillWritesAndBanks() = runUnitTest {
+        // The trap the reading change opens on its own. The row nobody reads
+        // still owns the primary key for its date, so `insertIfAbsent` would
+        // refuse the clear and `write` would bank nothing — a day the player
+        // was invited back into, finished, and got no result and no score for.
         val repo = repository()
         val today = repo.status().date
         dao.put(today, DailyOutcome.Failed)
@@ -170,10 +186,34 @@ class DailyRepositoryImplTest : CoroutineTest() {
         repo.onCompleted(today, score = 900, paws = 3, timeMs = 30_000)
 
         val status = repo.status()
-        assertEquals(DailyOutcome.Failed, status.result?.outcome)
-        assertEquals(0, status.result?.score, "a day already on disk cannot be rewritten")
-        assertTrue(!status.playable)
-        assertEquals(emptyList(), ledger.calls, "and the refused write banks nothing")
+        assertEquals(DailyOutcome.Completed, status.result?.outcome)
+        assertEquals(900, status.result?.score)
+        assertTrue(!status.playable, "one attempt per day is still the rule")
+        assertEquals(listOf(900), ledger.calls)
+        assertEquals(1, repo.history().size, "and the day holds one row, not two")
+    }
+
+    @Test
+    fun aDayForfeitedByAnOlderBuildCanBeFrozen() = runUnitTest {
+        // What the player used to get back for a forfeit was nothing: the row
+        // broke the streak and `missedDayBefore` refused to offer a freeze over
+        // it, because a day you attempted is not a day you missed. Unread, it is
+        // a missed day like any other, and the freeze reconnects the run.
+        val repo = repository()
+        clock.set(Instant.parse("2026-09-05T20:00:00Z"))
+        repo.onCompleted(repo.status().date, score = 500, paws = 2, timeMs = 60_000)
+        clock.set(Instant.parse("2026-09-06T20:00:00Z"))
+        dao.put(repo.status().date, DailyOutcome.Failed)
+        clock.set(Instant.parse("2026-09-07T20:00:00Z"))
+        repo.onCompleted(repo.status().date, score = 700, paws = 3, timeMs = 60_000)
+        assertEquals(1, repo.status().streak, "the forfeit is still sitting in the middle of the run")
+
+        val applied = repo.useFreeze()
+
+        assertTrue(applied is FreezeResult.Applied, "the forfeited day was not offered")
+        // Two rather than three: a frozen day bridges the gap, it does not count
+        // as a day played. What it buys is the day on the far side of it.
+        assertEquals(2, repo.status().streak, "and bridging it joined the two ends back up")
     }
 
     @Test
@@ -757,6 +797,10 @@ private class FakeDailyResultDao : DailyResultDao {
         if (rows.value.containsKey(row.date)) return CONFLICT_IGNORED
         rows.value = rows.value + (row.date to row)
         return 1L
+    }
+
+    override suspend fun deleteWithOutcome(date: String, outcome: String) {
+        rows.value = rows.value.filterNot { (key, row) -> key == date && row.outcome == outcome }
     }
 
     override fun observeAll(): Flow<List<DailyResultEntity>> = rows.map { it.sorted() }
