@@ -6,6 +6,54 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-14 — a day that was given up on is a day that was never played
+
+SD-49 removed Give up on today. It did not remove the rows Give up had already
+written, and SD-111 is the owner meeting one of his own: he opened the daily and
+got a dimmed board under a card reading "Out of bones for today / Sep 9" whose
+only control was the way out. *"I don't think the user should be able to give
+up. I don't know if there should be a total failure state. I think you should
+probably always be able to just start from the beginning."*
+
+**The `Failed` row stops being a result.** `DailyResultEntity.toResult` returns
+null for one, so a day carrying one reads as a day with nothing against it:
+`DailyStatus.result` is null, the card offers it, the route opens on its board
+rather than on a recap, and the board starts from nothing. That is the owner's
+constraint met at the one place every reader goes through, rather than as a
+special case in the game screen and a second one on the drawer card.
+
+**Not a new control on the recap.** The obvious build is a Start over button on
+the dead-end card, and it is the wrong one: it leaves the failure state in the
+app and adds a way out of it, when what the owner said is that the failure state
+should not be there. It would also have to explain itself — a card that says the
+day is over and offers to replay it is two claims that disagree.
+
+**The row has to go when the day is finished for real**, and that is the part
+that is easy to miss. The row nobody reads still owns the primary key for its
+date, so `insertIfAbsent` would have refused the clear and `write` would have
+banked nothing: a player invited back into a board, finishing it, and getting no
+result and no score. `DailyResultDao.deleteWithOutcome(date, outcome)` is the
+narrowest thing that fixes it — it can only remove a row, and only one whose
+outcome the caller named. One attempt per day is still the primary key's rule and
+a `Completed` row is never passed to it.
+
+**`DailyOutcome.Failed` stays in the enum.** Dropping the name would make
+`toResult` fail to parse those rows, which is the same outcome by accident
+instead of on purpose, and it would take the parse failure's meaning with it. It
+is now a name that exists to be recognised and ignored.
+
+**What the player gets back is more than they lost.** A forfeited day used to
+break the streak and refuse a freeze over it, because `missedDayBefore` treats a
+day you attempted as a day you did not miss. Unread, it is an ordinary missed
+day: freezable, restorable, and bridgeable. That is the opposite of what Give up
+did, which the earlier entry describes as a button whose entire effect was to
+destroy something of the player's.
+
+The recap sheet keeps only its cleared face, and the "Out of bones for today"
+card in the design system keeps its state with nothing mapping to it.
+
+---
+
 ## 2026-09-11 — the outbox doc is deleted, because this app cannot have one
 
 The outbox page under `docs/practices/` was a set of instructions nobody could

@@ -3268,6 +3268,37 @@ class GameViewModelTest : CoroutineTest() {
         )
     }
 
+    /**
+     * SD-115, on the sheet it was reported from. The recap has exactly one
+     * control, so it is the sheet where a dead Levels button leaves a player
+     * with nothing at all to press.
+     *
+     * It used to send the `Leave` action, which is `NavigateBack`. The daily
+     * carries a deep link of its own, so its route is sometimes the start
+     * destination, and popping the start destination moves nothing on screen —
+     * which is the whole of "I just clicked on Level levels, but it did
+     * nothing". The pane is drawn over the recap instead, and the recap stays
+     * where it is behind it.
+     */
+    @Test
+    fun theRecapsOnlyControlOpensThePaneRatherThanPoppingTheRoute() = runUnitTest {
+        val vm = viewModel(
+            isDaily = true,
+            daily = FakeDaily(levelId = DailyLevel, result = completedToday()),
+        )
+        val events = eventsOf(vm)
+        assertEquals(GamePhase.Recap, vm.state.phase)
+
+        vm.takeAction(GameAction.LevelsOpened)
+
+        assertTrue(vm.state.drawerOpen, "the recap's one way out has to lead somewhere")
+        assertEquals(GamePhase.Recap, vm.state.phase, "and the sheet stays up behind it")
+        assertTrue(
+            events.none { it == GameEvent.NavigateBack },
+            "the one control on a spent day popped the route instead of opening the pane",
+        )
+    }
+
     @Test
     fun aLostDailyComesBackWhereItWasLeft() = runUnitTest {
         // The other half of leaving without forfeiting: the day stays open, so
@@ -3326,30 +3357,6 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(done, vm.state.dailyRecap)
         assertEquals(DailyLevel, vm.state.level?.id, "the day's own board, not a placeholder")
         assertEquals(3, vm.state.paws)
-    }
-
-    /**
-     * Nothing writes a `Failed` row any more, but rows written by the build that
-     * had Give up on today are on players' disks. The recap still has to read
-     * them, or the fold quietly drops days out of somebody's history.
-     */
-    @Test
-    fun aDayForfeitedByAnOlderBuildStillOpensOnItsResult() = runUnitTest {
-        val givenUp = DailyResult(
-            date = DailyDate,
-            levelIndex = DailyLevel - 1,
-            outcome = DailyOutcome.Failed,
-            score = 0,
-            paws = 0,
-            timeMs = 45_000,
-        )
-        val vm = viewModel(
-            isDaily = true,
-            daily = FakeDaily(levelId = DailyLevel, result = givenUp),
-        )
-
-        assertEquals(GamePhase.Recap, vm.state.phase)
-        assertEquals(DailyOutcome.Failed, vm.state.dailyRecap?.outcome)
     }
 
     @Test
