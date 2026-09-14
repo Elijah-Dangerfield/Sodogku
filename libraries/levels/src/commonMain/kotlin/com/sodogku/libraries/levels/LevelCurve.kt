@@ -187,23 +187,39 @@ object LevelCurve {
     /**
      * Whether campaign level [levelId] opens with one dog already placed.
      *
-     * Position at a grid size rather than an absolute id, because what the free
-     * dog is for is the auto-mark cascade, and the cascade is worth watching
-     * again every time the grid grows. Keyed on one number it ran out inside
-     * the 5x5 band and never came back for a player's first 7x7 or first 10x10,
-     * which are the boards where it says the most.
+     * Two windows, and a level inside either one gets the dog.
+     *
+     * [openingLevels] is `progression.starterDogOpeningLevels`: an unbroken run
+     * from level 1, so the *first* board that opens empty is
+     * `openingLevels + 1`. Per-band alone put it at level 4, three boards into a
+     * first session, and a player who has not yet worked out what a region is
+     * reads an empty grid as a board that failed to load rather than as a board
+     * with a first move in it. The run is the answer to that: the empty start is
+     * a thing the game asks for once the rules are known, not part of learning
+     * them.
+     *
+     * [levelsPerBand] is `progression.starterDogLevelsPerBand`, counted from the
+     * first level at a grid *size* rather than from an absolute id, because what
+     * the free dog is for is the auto-mark cascade and the cascade is worth
+     * watching again every time the grid grows. Keyed on one number it ran out
+     * inside the 5x5 band and never came back for a player's first 7x7 or first
+     * 10x10, which are the boards where it says the most.
      *
      * The grid is the trigger and the band is not, which only became a visible
      * difference when the campaign grew past 500 on a grid that had stopped
      * growing. See [positionAtSize].
      *
-     * [levelsPerBand] is `progression.starterDogLevelsPerBand`. Zero or less
-     * hands out none, which is how the whole head start is switched off from
-     * the console without shipping a build.
+     * Zero or less switches a window off. Both at zero hands out no dogs at all,
+     * which is how the whole head start is withdrawn from the console without
+     * shipping a build. An id off the curve is never given one either way.
      */
-    fun opensWithStarterDog(levelId: Int, levelsPerBand: Int): Boolean {
-        if (levelsPerBand <= 0) return false
+    fun opensWithStarterDog(levelId: Int, levelsPerBand: Int, openingLevels: Int): Boolean {
+        // Before either window, so that a level nobody generated — id 0, or one
+        // past the end of the pack — cannot be handed a dog by the opening run
+        // just for carrying a small number.
         val position = positionAtSize(levelId) ?: return false
+        if (levelId <= openingLevels) return true
+        if (levelsPerBand <= 0) return false
         return position < levelsPerBand
     }
 

@@ -11,6 +11,7 @@
   { "path": "progression.skipAfterFailedAttempts", "type": "int", "default": 2, "description": "Failed attempts on a level before Skip is offered." },
   { "path": "progression.lookaheadCount", "type": "int", "default": 5, "description": "Unplayed levels shown as silhouettes past the current one." },
   { "path": "progression.starterDogLevelsPerBand", "type": "int", "default": 3, "description": "Levels at the start of each grid-size band that open with one dog already placed." },
+  { "path": "progression.starterDogOpeningLevels", "type": "int", "default": 16, "description": "Levels from the start of the campaign that open with one dog already placed. The first board with none is the next one after this." },
   { "path": "boosters.startingSniffs", "type": "int", "default": 3, "description": "Sniffs a brand-new player starts with." },
   { "path": "boosters.startingTreats", "type": "int", "default": 3, "description": "Treats a brand-new player starts with." },
   { "path": "boosters.treatSchedule", "type": "json", "default": [ { "fromLevel": 1, "everyNLevels": 3 }, { "fromLevel": 21, "everyNLevels": 6 }, { "fromLevel": 61, "everyNLevels": 12 }, { "fromLevel": 151, "everyNLevels": 25 } ], "description": "Which levels pay a free Treat. Each band applies from its fromLevel until the next one starts; a level pays when it is a multiple of that band's everyNLevels." },

@@ -72,6 +72,11 @@ class ProgressionLookaheadCount(appConfigMap: AppConfigMap) : IntConfigValue(app
  * 21 free dogs where the old fixed cap of 25 gave 25, so this spreads the head
  * start out rather than widening it.
  *
+ * It is no longer the only source. [ProgressionStarterDogOpeningLevels] covers
+ * an unbroken run from level 1 as well, which overlaps the first two bands'
+ * windows, so the shipped total is 16 plus the five later bands' 3 apiece — 31
+ * rather than 21.
+ *
  * Zero or less hands out none.
  */
 @Inject
@@ -81,6 +86,41 @@ class ProgressionStarterDogLevelsPerBand(appConfigMap: AppConfigMap) : IntConfig
     override val name = "Starter dog levels per band"
     override val path = "progression.starterDogLevelsPerBand"
     override val default = 3
+}
+
+/**
+ * How many levels from the very start of the campaign open with one dog already
+ * placed, whatever `LevelCurve` position they sit at.
+ *
+ * A run rather than a per-band window, and it exists because the per-band window
+ * alone put the first empty board at level 4. Three boards in, a player has seen
+ * the auto-mark cascade three times and has not yet had to start one, so an
+ * empty grid reads as a board that failed to load. The complaint that produced
+ * this key was exactly that: the boards with no starting dog arrive too quickly
+ * to read as a deliberate ask.
+ *
+ * Sixteen, which puts the first empty board at level 17. Two reasons for that
+ * number and not a rounder one. It clears the whole 4x4 band, levels 1 to 10,
+ * which the tutorial runs in front of — the empty start is never part of
+ * learning the rules. And it lands inside the flat tier-2 5x5 run, levels 11 to
+ * 22, rather than on the ramp: `LevelCurve` puts the first tier-3 board at 23,
+ * so the player meets the empty start six boards *before* the reasoning gets
+ * deeper, on a tier they have already cleared six times. Two new things on one
+ * board is what a threshold of 22 would have bought.
+ *
+ * The first empty board a player reaches also gets the one-time note that says
+ * it is deliberate and deducible — `shouldNoteEmptyBoard` in `:features:game`.
+ * Moving this key moves which board that lands on.
+ *
+ * Zero or less hands out none, leaving the per-band window as the only source.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class ProgressionStarterDogOpeningLevels(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Starter dog opening levels"
+    override val path = "progression.starterDogOpeningLevels"
+    override val default = 16
 }
 
 /**
@@ -192,6 +232,7 @@ fun progressionConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>
     ProgressionSkipAfterFailedAttempts(appConfigMap),
     ProgressionLookaheadCount(appConfigMap),
     ProgressionStarterDogLevelsPerBand(appConfigMap),
+    ProgressionStarterDogOpeningLevels(appConfigMap),
     BoostersStartingSniffs(appConfigMap),
     BoostersStartingTreats(appConfigMap),
     BoostersTreatSchedule(appConfigMap),

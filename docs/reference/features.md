@@ -187,13 +187,34 @@ it was finished would be an ad-free treat printer. The level pane marks every ro
 pays and marks the collected ones as spent, so the ladder is visible before it is walked.
 Campaign only, because the daily's ids are positions in another pack.
 
-**The free dog.** A level near the start of each **grid size** opens with one dog already
-placed. Not the start of each band: the six consecutive 10x10 bands count as one stretch,
-so the position is measured from the first level at that size. `progression
-.starterDogLevelsPerBand` (3) says how many, which works out to 21 free dogs across the
-seven sizes. It exists to fire the auto-mark cascade before the player has reasoned about
-anything, and that lesson is worth repeating every time the board gets wider. It scores
-nothing, never appears on a resumed board, and never appears on the daily.
+**The free dog.** Two windows, and a level inside either one opens with one dog already
+placed.
+
+`progression.starterDogOpeningLevels` (16) is an unbroken run from level 1, so **the first
+board a player ever opens empty is level 17**. Per-band alone put that at level 4, which
+was reported from a tester build as arriving far too quickly: three boards in, a player has
+watched the auto-mark cascade three times and never started one, so an empty grid reads as
+a board that failed to load. Sixteen clears the whole tutorial-guided 4x4 band and lands
+the first empty board inside the flat tier-2 5x5 run, six levels before the ramp reaches
+tier 3 at level 23 — the empty start and a step up in reasoning are not asked for on the
+same board.
+
+`progression.starterDogLevelsPerBand` (3) is a window at the start of each **grid size**.
+Not the start of each band: the six consecutive 10x10 bands count as one stretch, so the
+position is measured from the first level at that size. It exists to fire the auto-mark
+cascade before the player has reasoned about anything, and that lesson is worth repeating
+every time the board gets wider. The two windows overlap on the first two sizes, so the
+shipped total is 31 free dogs rather than 21.
+
+The dog scores nothing, never appears on a resumed board, and never appears on the daily.
+
+**The empty-board note.** The first board a player reaches with no dog on it says so, once
+per install: a card titled "Empty on purpose" that states nothing is missing and that one
+dog per colour, row and column is enough to work the first one out. It waits four seconds
+of the attempt clock so it lands on a board that has finished drawing, and any placement or
+cross cancels it unshown — somebody who has started has already worked out the board is
+real. The flag is `AppData.hasSeenEmptyBoardNote` and it is written on the tick that shows
+the card, not on open and not on dismiss. Never on the daily, never on the rehearsal.
 
 **Pro** opens every attempt with a floor of `boosters.proSniffsPerAttempt` and
 `boosters.proTreatsPerAttempt` (3 and 3). A floor, never an assignment: a Pro player
@@ -1417,14 +1438,14 @@ day).
 
 ### The keys
 
-51 declared keys. Defaults below are the shipped fallbacks.
+52 declared keys. Defaults below are the shipped fallbacks.
 
 **`ads.*`**: `enabled` (true), `newUserGraceLevels` (5), `newUserGraceMinutes` (5),
 `failureMode` (`CONTINUE`, unread), `offlineGraceLevels` (3), `offlineGraceMinutes` (20),
 `rewardedPlacements` (all four on; an unknown id resolves enabled).
 
 **`progression.*`**: `skipsPerDay` (3), `skipAfterFailedAttempts` (2), `lookaheadCount` (5,
-unread), `starterDogLevelsPerBand` (3).
+unread), `starterDogLevelsPerBand` (3), `starterDogOpeningLevels` (16).
 
 **`boosters.*`**: `startingSniffs` (3), `startingTreats` (3), `treatSchedule` (every 3rd from
 level 1, 6th from 21, 12th from 61, 25th from 151), `adGrantsPerDay` (5, unread),

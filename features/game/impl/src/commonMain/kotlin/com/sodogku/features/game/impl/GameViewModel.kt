@@ -24,6 +24,7 @@ import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.FeatureBoosters
 import com.sodogku.libraries.config.values.ProgressionSkipAfterFailedAttempts
 import com.sodogku.libraries.config.values.ProgressionStarterDogLevelsPerBand
+import com.sodogku.libraries.config.values.ProgressionStarterDogOpeningLevels
 import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.core.logging.KLog
@@ -195,6 +196,13 @@ class GameViewModel(
      * than the next launch.
      */
     private val starterDogLevelsPerBand: ProgressionStarterDogLevelsPerBand,
+    /**
+     * How far the unbroken opening run of free dogs reaches, counted from level
+     * 1. The board after it is the first a player ever opens empty, and the one
+     * the empty-board note is written for. Read per board open, like the band
+     * window beside it.
+     */
+    private val starterDogOpeningLevels: ProgressionStarterDogOpeningLevels,
     private val achievementsEnabled: FeatureAchievements,
     private val boostersEnabled: FeatureBoosters,
     /**
@@ -908,7 +916,11 @@ class GameViewModel(
         val giveStarter = resume == null && when {
             rehearsal -> true
             isDaily -> false
-            else -> LevelCurve.opensWithStarterDog(level.id, starterDogLevelsPerBand())
+            else -> LevelCurve.opensWithStarterDog(
+                levelId = level.id,
+                levelsPerBand = starterDogLevelsPerBand(),
+                openingLevels = starterDogOpeningLevels(),
+            )
         }
         val opening = when {
             resume != null -> Solution(resume.placements.toIntArray())
