@@ -750,10 +750,18 @@
          split was avoiding. -->
     <string name="streak_title">Streak</string>
 
-    <string name="streak_longest">Longest run: %1$d days</string>
+    <!-- A plural because the record starts at one, and "Longest run: 1 days" is
+         on the same page as the number it is describing. -->
+    <plurals name="streak_longest">
+        <item quantity="one">Longest run: %1$d day</item>
+        <item quantity="other">Longest run: %1$d days</item>
+    </plurals>
     <string name="streak_longest_none">No run to beat yet</string>
     <string name="streak_calendar_title">The last five weeks</string>
-    <string name="streak_empty_body">Play the daily puzzle and this fills in. Miss a day and it starts again.</string>
+    <!-- Any board, not the daily. The streak stopped being the daily's and this
+         line did not follow, which left the page telling a player who had just
+         cleared six campaign boards that they had done nothing. -->
+    <string name="streak_empty_body">Finish a board and this fills in. Miss a day and it starts again.</string>
 
     <!-- One per day cell. Spoken, not printed: the grid itself shows a colour. -->
     <string name="streak_day_completed">Played</string>

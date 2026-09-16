@@ -1,6 +1,7 @@
 package com.sodogku.libraries.progress.impl.streak
 
 import com.sodogku.libraries.progress.streak.StreakPrompt
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 
 /**
@@ -10,6 +11,7 @@ import kotlinx.serialization.Serializable
  * config or a cache, so each rule below is one assertion rather than a scenario.
  */
 internal fun promptFor(
+    today: LocalDate,
     streak: Int,
     boardsCleared: Int,
     state: StreakPromptState,
@@ -20,7 +22,7 @@ internal fun promptFor(
     // than leaving it to whichever branch is written first.
     intentionIsDue(boardsCleared, state) -> StreakPrompt.Intention
 
-    celebrationIsDue(streak, state) -> StreakPrompt.Celebrate(streak)
+    celebrationIsDue(today, streak, state) -> StreakPrompt.Celebrate(streak)
 
     else -> StreakPrompt.None
 }
@@ -55,14 +57,27 @@ private fun intentionIsDue(boardsCleared: Int, state: StreakPromptState): Boolea
  * A run that is only acknowledged four times a month is a run nobody is keeping
  * for its own sake.
  *
- * A streak of one is excluded because the intention moment is already that
- * conversation, and two pages about the same day is one too many.
+ * A streak of one counts once the intention moment has been spent, and not
+ * before. Until then it is the intention's to talk about, and two pages about
+ * the same day is one too many. After it, a run of one is not a player starting
+ * out, it is a player who came back to a run that had broken, which is the one
+ * day they are most likely to break it again (SD-121). Saying nothing to them
+ * was the old rule reading every 1 as "brand new".
  *
- * [StreakPromptState.celebratedStreak] is what stops it firing twice for the
- * same day: the number only moves when the date does.
+ * [StreakPromptState.celebratedOn] is what stops it firing twice for the same
+ * day. A date rather than the run's length, and the difference is the whole of
+ * SD-121's second half: a player who turns up once a week restarts at one every
+ * time, so "celebrate when the number changes" congratulates them once and never
+ * again. The number is the same every visit. The day never is.
  */
-private fun celebrationIsDue(streak: Int, state: StreakPromptState): Boolean =
-    streak >= FirstCelebratedStreak && streak != state.celebratedStreak
+private fun celebrationIsDue(
+    today: LocalDate,
+    streak: Int,
+    state: StreakPromptState,
+): Boolean = streak >= firstCelebratedStreak(state) && state.celebratedOn != today
+
+private fun firstCelebratedStreak(state: StreakPromptState): Int =
+    if (state.intentionShown) FirstCelebratedRestart else FirstCelebratedStreak
 
 /**
  * What has already been said, and the only streak state that is stored rather
@@ -81,18 +96,25 @@ data class StreakPromptState(
     val intentionShown: Boolean = false,
 
     /**
-     * The streak the last celebration was for, or `0`.
+     * The day the streak last took the screen, or `null`.
      *
-     * A single number rather than a set of days already celebrated, and that is
-     * a decision: a run that breaks at 30 and climbs back to 7 gets its page
-     * again, because it is a different run and the player did the work twice. A
-     * set would silently retire each number for the life of the install.
+     * The intention moment writes it too. That page prints the run the player
+     * already has, so it is that run's celebration, and leaving this unset
+     * behind it would let the next board of the same day say the same thing
+     * again.
+     *
+     * One date rather than the set of every day already celebrated, which is
+     * all the rule needs: the prompt is only ever asked for on a day the player
+     * has just finished a board, so "not today" is the whole of "not again".
      */
-    val celebratedStreak: Int = 0,
+    val celebratedOn: LocalDate? = null,
 )
 
 /** Boards cleared before the intention moment is offered. */
 internal const val IntentionAfterBoards = 2
 
-/** The first run worth a page. One is the intention moment's job. */
+/** The first run worth a page before the intention. One is its job. */
 internal const val FirstCelebratedStreak = 2
+
+/** And after it, when a run of one is a run that started over. */
+internal const val FirstCelebratedRestart = 1

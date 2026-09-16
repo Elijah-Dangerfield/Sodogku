@@ -68,18 +68,29 @@ class StreakRepositoryImpl(
 
     override suspend fun pendingPrompt(): StreakPrompt {
         val played = dao.all().toDates()
+        val day = today()
         return promptFor(
-            streak = playStreakOn(today(), played),
+            today = day,
+            streak = playStreakOn(day, played),
             boardsCleared = progress.all().count { it.state == LevelState.Completed },
             state = prompts.get(),
         )
     }
 
+    /**
+     * Both pages spend the day, and the intention spends it too.
+     *
+     * It prints the run the player already has, so it is that run's celebration
+     * and the next board of the same day has nothing left to say.
+     */
     override suspend fun onPromptShown(prompt: StreakPrompt) {
         when (prompt) {
             StreakPrompt.None -> Unit
-            StreakPrompt.Intention -> prompts.update { it.copy(intentionShown = true) }
-            is StreakPrompt.Celebrate -> prompts.update { it.copy(celebratedStreak = prompt.streak) }
+            StreakPrompt.Intention -> prompts.update {
+                it.copy(intentionShown = true, celebratedOn = today())
+            }
+
+            is StreakPrompt.Celebrate -> prompts.update { it.copy(celebratedOn = today()) }
         }
     }
 

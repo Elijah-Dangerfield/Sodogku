@@ -109,7 +109,7 @@ private fun StreakBody(state: StreakState, modifier: Modifier = Modifier) {
         // the same weight is a page that opens by saying you used to be better.
         Text(
             text = if (state.longest > 0) {
-                stringResource(Res.string.streak_longest, state.longest)
+                pluralStringResource(Res.plurals.streak_longest, state.longest, state.longest)
             } else {
                 stringResource(Res.string.streak_longest_none)
             },

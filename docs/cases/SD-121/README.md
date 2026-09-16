@@ -123,7 +123,7 @@ streak ceremony, and the streak page does not say "1 days".
 - `libraries/progress/impl/.../streak/StreakPrompts.kt` owns `promptFor` and the
   two constants. It is a pure function of three arguments, so every rule in it is
   one assertion rather than a scenario, and a test for this costs nothing.
-  `StreakFold.kt` beside it owns the run arithmetic.
+  `PlayStreak.kt` beside it owns the run arithmetic.
 - `StreakPromptState` is the stored half: `intentionShown` and
   `celebratedStreak`. Whatever distinguishes "new player at 1" from "returning
   player back at 1" has to come from there or from the fold, because `promptFor`

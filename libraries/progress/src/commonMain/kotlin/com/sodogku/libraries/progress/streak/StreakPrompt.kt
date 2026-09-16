@@ -17,9 +17,13 @@ sealed interface StreakPrompt {
      * The full-screen "start your streak" moment, shown once ever.
      *
      * Only offered to a player who has cleared enough of the campaign to have
-     * chosen to keep going, and who has never played a daily. Telling somebody
-     * to start a streak they are already three days into is a lie, and they
-     * would be right to trust the next thing we say less.
+     * chosen to keep going. The "and has never played a daily" half went with
+     * the streak no longer being the daily's — every finished board feeds it
+     * now, so there is no daily to have played.
+     *
+     * It is also that run's celebration rather than only an ask: the page prints
+     * the number, so the day it is shown on is spent and the streak does not
+     * take the screen twice (SD-121).
      */
     data object Intention : StreakPrompt
 

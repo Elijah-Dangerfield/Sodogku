@@ -137,31 +137,6 @@ ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
 
-## SD-121 [P1] — No streak ceremony when the streak starts or increments
-
-**Ask:** "I just came back every one day and completed a puzzle which should've
-increment in my streak, but I didn't see it. Increment like I didn't get a
-celebration page or anything like that."
-
-**Done when:** completing a board on a day that starts or extends the play
-streak shows the streak ceremony, and the streak page does not say "1 days".
-
-**Case file:** `docs/cases/SD-121/` — the streak page screenshot the owner filed
-as evidence, the full session log, and the reason the leading theory is that
-`pendingPrompt()` returned `None`. It also explains why the streak reading 1 is
-arithmetically correct and must not be "fixed".
-
-**Hints:** Root cause found and written up in the case file: `promptFor` in
-`StreakPrompts.kt` excludes a streak of 1, because `FirstCelebratedStreak` is 2
-and the intention moment is meant to cover that day instead. That holds for a
-brand-new player and not for a returning one whose streak broke and restarted at
-1, which is this report. The fix belongs in `promptFor`, not in
-`offerStreakCeremony`. Pairs with SD-127, the missing lost-streak moment: a run
-that restarts at 1 is the run that just broke.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-P and
-https://elijah-dangerfield.sentry.io/issues/SODOGKU-Q · session
-1ba50ef1-4f55-4832-870f-ce8b91da99c3 · 2026-09-16
-
 ## SD-122 [P1] — Five paws for a solve that took a while
 
 **Ask:** "I got 5 bones even tho I took a while." He means paws. Level 16, a 5x5
@@ -255,7 +230,7 @@ once, and the app does something with that moment rather than silently showing a
 
 **Hints:** `StreakPrompt` has exactly three cases today, `None`, `Intention` and
 `Celebrate(streak)`, and there is no `Lost`. Breaking a run is completely silent:
-the fold in `StreakFold.kt` just returns a smaller number and `StreakScreen`
+the fold in `PlayStreak.kt` just returns a smaller number and `StreakScreen`
 draws it. Adding a fourth case is the shape, and `promptFor` is a pure function
 of three arguments so the rule costs one assertion to test.
 

@@ -139,6 +139,47 @@ class StreakRepositoryImplTest : CoroutineTest() {
     }
 
     @Test
+    fun theIntentionSpendsTheDaySoTheNextBoardIsQuiet() = runUnitTest {
+        // The page prints the run, so it is that run's celebration. Without the
+        // day going with it, the next board of the same day opens a second page
+        // about the day the player was just congratulated for.
+        seed(completedDaysBack = listOf(0))
+        progress.completedLevels = 2
+        val repo = repository()
+
+        repo.onPromptShown(repo.pendingPrompt())
+
+        assertEquals(LocalDate(2026, 9, 7), prompts.value.celebratedOn)
+        assertEquals(StreakPrompt.None, repo.pendingPrompt())
+    }
+
+    @Test
+    fun aRunThatStartedOverIsCelebratedRatherThanPassedOverAsBrandNew() = runUnitTest {
+        // SD-121. Played Monday, missed Tuesday, played Wednesday: a run of one
+        // again, and a player who had the intention moment long ago.
+        seed(completedDaysBack = listOf(0, 2))
+        progress.completedLevels = 16
+        prompts.value = StreakPromptState(intentionShown = true)
+
+        assertEquals(StreakPrompt.Celebrate(1), repository().pendingPrompt())
+    }
+
+    @Test
+    fun aSecondRestartAtOneIsCelebratedToo() = runUnitTest {
+        // The rule has to key on the day rather than on the run's length, or a
+        // player whose runs are all one day long is congratulated once and then
+        // never again: the number is 1 every time they come back.
+        seed(completedDaysBack = listOf(0))
+        progress.completedLevels = 16
+        prompts.value = StreakPromptState(
+            intentionShown = true,
+            celebratedOn = LocalDate(2026, 9, 2),
+        )
+
+        assertEquals(StreakPrompt.Celebrate(1), repository().pendingPrompt())
+    }
+
+    @Test
     fun skippedLevelsAreNotClears() = runUnitTest {
         progress.completedLevels = 1
         progress.skippedLevels = 5
@@ -162,7 +203,7 @@ class StreakRepositoryImplTest : CoroutineTest() {
         repo.onPromptShown(offered)
 
         assertEquals(StreakPrompt.None, repo.pendingPrompt())
-        assertEquals(7, prompts.value.celebratedStreak)
+        assertEquals(LocalDate(2026, 9, 7), prompts.value.celebratedOn)
     }
 
     @Test
