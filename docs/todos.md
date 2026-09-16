@@ -137,25 +137,6 @@ ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
 
-## SD-122 [P1] — Five paws for a solve that took a while
-
-**Ask:** "I got 5 bones even tho I took a while." He means paws. Level 16, a 5x5
-board, flawless, 86 seconds, five paws.
-
-**Done when:** a flawless but unhurried solve lands below the top rung, a
-flawless quick solve still earns five paws, and SD-116's regression test still
-passes.
-
-**Case file:** `docs/cases/SD-122/` — the win sheet, the move-by-move timing from
-the log, and why `ab0c189` over-correcting is the first thing to test rather than
-the first thing to assume.
-
-**Hints:** This is the mirror of SD-116, which was that five paws could not be
-earned at all. Sweep the ladder across board sizes before touching a constant,
-and rule out a live remote-config override first.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-N · session
-1ba50ef1-4f55-4832-870f-ce8b91da99c3 · 2026-09-16
-
 ## SD-123 [P2] — Make the win sheet a full-screen celebration, not a dialog
 
 **Ask:** "I'd prefer this not be a dialog and instead be a slide up page or a
@@ -327,3 +308,62 @@ deprecation is wrong or it needs a replacement.
 **Hints:** Found by the SD-119 agent while converting four call sites onto
 `Surface`. `SurfaceSemanticsTest` in `:libraries:ui` `androidUnitTest` is the
 composition-tier worked example for asserting what any of these expose.
+
+## SD-131 [P1] — Remote config has no origin, so no shipped build can read it
+
+**Ask:** AGENTS.md calls remote config "the live-ops lever and the reason the
+server exists". It is wired end to end and it cannot work: `DefaultNetworkConfig`
+is the only production `NetworkConfig` binding and its `baseUrl` is `""`.
+Nothing replaces it anywhere. Every config read in every shipped build falls back
+to `FallbackConfigMap`, and the `:apps:admin` console edits values no device will
+ever fetch.
+
+**Done when:** a release build reads config from the real server, or it is
+written down that config is a compile-time table and the console is a staging
+tool. Either is a fine answer. Believing the first while shipping the second is
+not.
+
+**Hints:** `libraries/networking/impl/.../DefaultNetworkConfig.kt` says in its
+own KDoc how it expects to be replaced: bind your own `NetworkConfig` with
+`replaces = [DefaultNetworkConfig::class]`, reading the base URL out of
+BuildConfig per variant. That replacement was never written. `NetworkClientImpl`
+line 95 skips `url()` entirely when the base URL is blank, which is why this
+fails as a relative-URL request to `http://localhost` rather than as anything
+that names the real cause — the SD-122 session log shows exactly that, an
+NSURLError -1004 against `http://localhost/v1/app-config`.
+
+Found while ruling out a live config override for SD-122. It mattered there and
+it will matter to every item that assumes a value can be tuned without a release:
+right now none of them can. Check whether the monetization keys' "fail open
+toward the player" rule still holds when the server is unreachable by
+construction, since that is the state every install is in.
+
+## SD-132 [P2] — Decide whether the score should measure the attempt or the interval
+
+**Ask:** The speed multiplier is charged per placement, against the gap before
+it. So a player who reads the whole board, works the whole thing out, and then
+taps the answer out scores **0.92 to 0.98 of par on every grid size**, whether
+the reading took thirty seconds or five minutes. By score alone that run is
+indistinguishable from a sprint.
+
+**Done when:** there is a decision, written down, on whether that is the game we
+want. It may well be — rewarding a player who solves it in their head before
+touching anything is defensible. But right now it is a side effect of where the
+clock is read, not a choice anybody made.
+
+**Hints:** SD-122 moved `fivePawFraction` to 0.89 and that rung now sits in the
+middle of the measured gap, which is as far as tuning goes: **no threshold below
+0.92 closes this**, because the run genuinely reaches the fast band. Closing it
+means the speed term reading the attempt rather than the interval, which changes
+every score in the game and needs its own sweep.
+
+The same seam holds the question the SD-122 case file asked to raise rather than
+decide: the reported run had a **63-second pause** before its first placement,
+and the clock cannot tell a player staring at a board from one who put the phone
+down to answer the door. Both are charged the same. Whether an idle cap belongs
+here is the owner's call and is part of the same decision.
+
+`libraries/scoring/.../ScoringConfig.kt` documents the bands, and its
+`fivePawFraction` KDoc states this limitation in the place somebody tuning the
+number will read it. `PawLadderReachabilityTest` and `ScoringTest` sweep the
+ladder and are where a new speed term would have to prove itself.

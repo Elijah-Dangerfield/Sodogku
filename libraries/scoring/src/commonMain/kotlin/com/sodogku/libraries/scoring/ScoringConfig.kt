@@ -181,9 +181,42 @@ data class ScoringConfig(
      * two strikes anywhere, past the window    0.44 .. 0.51   one paw
      * one strike, past the window              0.57 .. 0.62   two paws
      * clean, past the window                   0.67 .. 0.75   three paws
-     * clean, 2500ms a row (a considered pace)  0.79 .. 0.84   four paws
-     * clean, 900ms a row (fast for the board)  0.92 .. 0.94   five paws
+     * clean, 2500ms a row (a considered pace)  0.79 .. 0.86   four paws
+     * clean, 900ms a row (fast for the board)  0.92 .. 0.95   five paws
      * ```
+     *
+     * Those two rows read the full sweep, starter-dog boards included. They used
+     * to be quoted full-board only, at 0.79 to 0.84 and 0.92 to 0.94, which is
+     * the same asymmetry the cut below had.
+     *
+     * The first three cuts are measured against the *full-board* ceiling of the
+     * band below, because a board that hands out a starter dog has one fewer
+     * placement against the same completion bonus and so sits a couple of points
+     * of par higher; that overlap is a property of the shape and the rung below
+     * it stays reachable either way.
+     *
+     * **[fivePawFraction] is the exception, and it was 0.85 for five days
+     * because of it.** Measured against the full-board ceiling alone the
+     * considered-pace band tops out at 0.841, so 0.85 looked like it cleared it.
+     * Counting every shape the band reaches 0.866, and a real run is never
+     * played at one steady pace anyway: the reported 5x5 spent 85 of its 86
+     * seconds in two gaps and placed its last two dogs a second apart, which is
+     * the two highest combo multipliers of the run at nearly the full speed
+     * bonus. It came out at 0.871 of par and took the top rung for a solve the
+     * player described as taking a while. The gap between the considered band
+     * (0.866) and the fast band (0.924) is nearly six points of par wide and
+     * 0.85 was not in it; 0.89 sits near the middle, so a run a little brisker
+     * than considered no longer clears the top rung and a genuinely fast one
+     * still does with three points to spare.
+     *
+     * What moving the cut does **not** fix, and what nothing at this layer can:
+     * a player who reads the whole board and then taps the answer out scores
+     * 0.92 to 0.98 of par on every grid size however long the reading took,
+     * because the speed multiplier is per placement and one long gap is all the
+     * thinking has to go into. By score alone that run is indistinguishable
+     * from a sprint. Making the two distinguishable means the clock measuring
+     * the attempt rather than the interval, which is a design question and not
+     * a tuning one.
      *
      * The first two rows were one row, reading 0.48 to 0.49 and labelled "two
      * strikes, past the speed window", and both
@@ -223,7 +256,7 @@ data class ScoringConfig(
     val twoPawFraction: Double = 0.53,
     val threePawFraction: Double = 0.64,
     val fourPawFraction: Double = 0.77,
-    val fivePawFraction: Double = 0.85,
+    val fivePawFraction: Double = 0.89,
 
     /**
      * Combined-multiplier cutoffs for the floating praise text.

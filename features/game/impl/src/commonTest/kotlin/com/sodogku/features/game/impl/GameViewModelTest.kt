@@ -1873,6 +1873,44 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(Standing.Flawless, starterDog.state.standing)
     }
 
+    /**
+     * SD-122, the same claim in the other direction, replayed from the run the
+     * owner reported: level 16, a 5x5 that opened with a dog, no mistakes, and
+     * eighty-six seconds on the clock. It came back with all five paws and he
+     * said so.
+     *
+     * The pauses are the ones in the session log rather than a steady pace, and
+     * that is the whole point of replaying them. Sixty-three seconds before the
+     * first dog, twenty-two before the second, then two placed a second apart —
+     * which are the two highest combo multipliers of the run arriving at nearly
+     * the full speed bonus. Every sweep that placed the ladder played a board at
+     * one pace end to end, so the shape of a real run, where the thinking is
+     * concentrated and the last moves are the cascade falling out, was never
+     * measured. A uniform pace cannot reproduce this: at the average of these
+     * four gaps the run scores 0.74 of par and rates three.
+     *
+     * `Standing.Flawless` still, and deliberately asserted. The run had no
+     * mistakes in it and the verdict reads lives rather than pace, so taking a
+     * paw off must not also take the word away — that pairing has been wrong
+     * once already, which is what `Standing`'s KDoc is about.
+     */
+    @Test
+    fun aFlawlessSolveThatTookAWhileDoesNotEarnEveryPaw() = runUnitTest {
+        val vm = viewModel(levelId = ReportedSlowSolveLevel, cache = taughtCache())
+
+        solveCurrent(vm, pauses = ReportedSlowSolvePauses)
+
+        assertEquals(GamePhase.Won, vm.state.phase)
+        assertEquals(ScoringConfig.MAX_LIVES, vm.state.livesRemaining, "the run took no strikes")
+        assertTrue(
+            vm.state.paws < Scoring.MAX_PAWS,
+            "a flawless 5x5 that took ${ReportedSlowSolvePauses.sumOf { it.inWholeSeconds }}s " +
+                "should not reach the top rung, but earned ${vm.state.paws}",
+        )
+        assertTrue(vm.state.paws >= Scoring.FOUR_PAWS, "a clean run at this pace is still worth four")
+        assertEquals(Standing.Flawless, vm.state.standing, "no bones were spent")
+    }
+
     @Test
     fun tappingAnAutoMarkedCellDoesNothing() = runUnitTest {
         val vm = viewModel()
@@ -5993,6 +6031,30 @@ class GameViewModelTest : CoroutineTest() {
         }
     }
 
+    /**
+     * The same solve with [pauses] on the clock, one before each dog the player
+     * actually places.
+     *
+     * The starter dog's row is skipped rather than committed and ignored, so a
+     * pause is spent on a placement that scores and the list lines up with the
+     * gaps a session log would show. `commit` advances the clock by `SettleGap`
+     * of its own, which lands inside the next pause and makes the run a shade
+     * slower than the list says — the safe direction for a test about a run
+     * scoring too high.
+     */
+    private fun solveCurrent(vm: GameViewModel, pauses: List<Duration>) {
+        val open = assertNotNull(vm.state.level, "nothing to solve — the board never opened")
+        val cells = (0 until open.size)
+            .map { row -> open.board.cellAt(row, open.solution[row]) }
+            .filter { it != vm.state.starterDogCell }
+        assertEquals(cells.size, pauses.size, "one pause per dog the player places")
+
+        cells.forEachIndexed { index, cell ->
+            clock += pauses[index]
+            vm.commit(cell)
+        }
+    }
+
     /** Spends every bone on the open board. */
     private fun loseCurrent(vm: GameViewModel) {
         val open = assertNotNull(vm.state.level)
@@ -6097,6 +6159,28 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Past the starter-dog band, so the board opens empty. */
         const val PlainLevel = 200
+
+        /**
+         * The board in the SD-122 report: a 5x5 inside the starter-dog opening
+         * run, so the player places four dogs rather than five.
+         */
+        const val ReportedSlowSolveLevel = 16
+
+        /**
+         * The gaps between that run's four placements, from its session log,
+         * rounded to the second the win sheet renders.
+         *
+         * Eighty-six seconds end to end, and eighty-five of them in the first
+         * two pauses. Written out rather than reduced to a pace because the
+         * distribution is the bug: a steady pace averaging the same total rates
+         * three paws, and this rated five.
+         */
+        val ReportedSlowSolvePauses = listOf(
+            63.seconds,
+            22.seconds,
+            1.seconds,
+            1.seconds,
+        )
 
         /**
          * A shipped board whose opening sniff has more than one reason in it: 4

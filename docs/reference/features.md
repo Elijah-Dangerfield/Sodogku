@@ -300,7 +300,7 @@ wins:
 
 | Paws | Fraction of par | Config key |
 |---|---|---|
-| 5 | 0.85 | `scoring.fivePawFraction` |
+| 5 | 0.89 | `scoring.fivePawFraction` |
 | 4 | 0.77 | `scoring.fourPawFraction` |
 | 3 | 0.64 | `scoring.threePawFraction` |
 | 2 | 0.53 | `scoring.twoPawFraction` |
@@ -1455,7 +1455,7 @@ level 1, 6th from 21, 12th from 61, 25th from 151), `adGrantsPerDay` (5, unread)
 (0.08), `comboMax` (2.0), `speedWindowMs` (16000), `speedMaxMultiplier` (2.0),
 `livesBonusRate` (0.8), `difficultyBonusRate` (0.2), `boosterPenaltyRate` (0.15),
 `twoPawFraction` (0.53), `threePawFraction` (0.64), `fourPawFraction` (0.77),
-`fivePawFraction` (0.85), and the four praise cutoffs `nicePraiseAt` (1.5), `greatPraiseAt`
+`fivePawFraction` (0.89), and the four praise cutoffs `nicePraiseAt` (1.5), `greatPraiseAt`
 (1.9), `excellentPraiseAt` (2.4), `perfectPraiseAt` (2.9).
 
 **`daily.*`**: `enabled` (true), `freezesPerMonth` (2), `restoreMaxDays` (3),

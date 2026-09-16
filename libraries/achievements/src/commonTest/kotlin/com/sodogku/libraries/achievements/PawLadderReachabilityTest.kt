@@ -45,11 +45,18 @@ import kotlin.test.assertTrue
  *   a player on this board cannot earn it. This is the direction every one of
  *   the four bugs failed.
  * - **Distinguishing**, across the curve. No run in the band below a rung may
- *   reach it, or the rung says nothing. Checked on full boards only, and over
- *   the whole curve rather than per shape: a board that hands out a starter dog
- *   has one fewer placement against the same completion bonus, so its bands sit
- *   a point or two of par higher and overlap the full-board ones. That overlap
- *   is a property of the shape, not a tuning error.
+ *   reach it, or the rung says nothing. Checked over the whole curve rather than
+ *   per shape, and for the lower rungs on full boards only: a board that hands
+ *   out a starter dog has one fewer placement against the same completion bonus,
+ *   so its bands sit a point or two of par higher and overlap the full-board
+ *   ones. That overlap is a property of the shape, not a tuning error.
+ *
+ * The top rung is held to every shape instead, which is the fifth instance and
+ * the first one a player reported rather than a sweep found. `fivePawFraction`
+ * was 0.85, the considered-pace band tops out at 0.841 on a full board, and
+ * this test looked no further — but at 0.858 on a starter-dog board the cut was
+ * inside the band it was meant to be above, and a flawless 5x5 that took
+ * eighty-six seconds came out with all five paws.
  */
 class PawLadderReachabilityTest {
 
@@ -125,12 +132,13 @@ class PawLadderReachabilityTest {
         val failures = mutableListOf<String>()
 
         CUTS.forEach { cut ->
-            val ceiling = shippedShapes()
-                .filter { (shape, placements) -> placements == shape.size }
-                .maxOf { (shape, placements) -> fractionOf(shape, placements, cut.below) }
+            val measured = shippedShapes()
+                .filter { (shape, placements) -> cut.separatesEveryShape || placements == shape.size }
+            val ceiling = measured.maxOf { (shape, placements) -> fractionOf(shape, placements, cut.below) }
+            val over = if (cut.separatesEveryShape) "a run on any shape" else "a full-board run"
             if (ceiling >= cut.threshold(CONFIG)) {
-                failures += "${cut.name} at ${cut.threshold(CONFIG)} separates nothing: a full-board " +
-                    "run in the '${cut.below}' band already scores ${percent(ceiling)}% of par"
+                failures += "${cut.name} at ${cut.threshold(CONFIG)} separates nothing: $over " +
+                    "in the '${cut.below}' band already scores ${percent(ceiling)}% of par"
             }
         }
 
@@ -270,6 +278,19 @@ class PawLadderReachabilityTest {
         val threshold: (ScoringConfig) -> Double,
         val below: Band,
         val above: Band,
+        /**
+         * Whether the band below has to stay under this rung on *every* shape
+         * rather than only on full boards.
+         *
+         * True for the top rung alone. The starter-dog overlap is real and the
+         * lower rungs live with it, because nobody counts the difference between
+         * two paws and three. Five is the rung a player counts, and letting it
+         * be checked on full boards only is exactly how 0.85 shipped: the
+         * considered-pace band cleared it by two and a half points of par on a
+         * starter-dog board, which put the cut inside the band it was supposed
+         * to sit above.
+         */
+        val separatesEveryShape: Boolean = false,
     )
 
     private companion object {
@@ -319,6 +340,7 @@ class PawLadderReachabilityTest {
                 "fivePawFraction", { it.fivePawFraction },
                 below = Band(0, UNHURRIED_MS_PER_ROW),
                 above = Band(0, FAST_MS_PER_ROW),
+                separatesEveryShape = true,
             ),
         )
     }

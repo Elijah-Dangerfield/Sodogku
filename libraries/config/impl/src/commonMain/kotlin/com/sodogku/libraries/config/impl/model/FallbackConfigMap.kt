@@ -106,7 +106,7 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
         "twoPawFraction" to 0.53,
         "threePawFraction" to 0.64,
         "fourPawFraction" to 0.77,
-        "fivePawFraction" to 0.85,
+        "fivePawFraction" to 0.89,
         "nicePraiseAt" to 1.5,
         "greatPraiseAt" to 1.9,
         "excellentPraiseAt" to 2.4,

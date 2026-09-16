@@ -229,14 +229,26 @@ class ScoringFourPawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(app
     override val default = 0.77
 }
 
-/** Fraction of par at which the fifth and last paw is awarded. See [ScoringTwoPawFraction]. */
+/**
+ * Fraction of par at which the fifth and last paw is awarded. See
+ * [ScoringTwoPawFraction].
+ *
+ * The one rung a player notices being wrong, and the one to be careful with in
+ * both directions: too high and "I am crushing these and still not getting five
+ * paws", too low and "I got five paws even though I took a while". It has been
+ * reported both ways. At 0.85 it sat a fraction of a point above the ceiling of
+ * the considered-pace band rather than in the gap above it, so any run a little
+ * brisker than considered cleared it — including one whose thinking was
+ * concentrated into a couple of long pauses. 0.89 is near the middle of the
+ * measured gap; `ScoringConfig` has the numbers.
+ */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
 class ScoringFivePawFraction(appConfigMap: AppConfigMap) : DoubleConfigValue(appConfigMap) {
     override val name = "Five paw fraction of par"
     override val path = "scoring.fivePawFraction"
-    override val default = 0.85
+    override val default = 0.89
 }
 
 /**

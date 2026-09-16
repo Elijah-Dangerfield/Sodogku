@@ -32,7 +32,7 @@
   { "path": "scoring.twoPawFraction", "type": "double", "default": 0.53, "description": "Fraction of par at which the second paw is awarded." },
   { "path": "scoring.threePawFraction", "type": "double", "default": 0.64, "description": "Fraction of par at which the third paw is awarded." },
   { "path": "scoring.fourPawFraction", "type": "double", "default": 0.77, "description": "Fraction of par at which the fourth paw is awarded." },
-  { "path": "scoring.fivePawFraction", "type": "double", "default": 0.85, "description": "Fraction of par at which the fifth and last paw is awarded." },
+  { "path": "scoring.fivePawFraction", "type": "double", "default": 0.89, "description": "Fraction of par at which the fifth and last paw is awarded." },
   { "path": "scoring.nicePraiseAt", "type": "double", "default": 1.5, "description": "Combined-multiplier cutoff for the Nice praise." },
   { "path": "scoring.greatPraiseAt", "type": "double", "default": 1.9, "description": "Combined-multiplier cutoff for Great." },
   { "path": "scoring.excellentPraiseAt", "type": "double", "default": 2.4, "description": "Combined-multiplier cutoff for Excellent." },

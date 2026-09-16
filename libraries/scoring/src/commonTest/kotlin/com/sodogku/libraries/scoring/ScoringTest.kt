@@ -387,6 +387,18 @@ class ScoringTest {
         // full-board ones by a point or two of par. That overlap is a property
         // of the shape and not a tuning error.
         //
+        // **The top rung is the exception and is measured against every shape in
+        // both directions.** Letting it be separated on full boards alone is how
+        // 0.85 shipped: the considered-pace band tops out at 0.841 on a full
+        // board and 0.866 counting starter-dog ones, so the cut cleared the
+        // number this test was looking at and sat inside the band it was meant
+        // to be above. The consequence is not a couple of points on a shape
+        // nobody plays much — the top rung is the one a player counts, and the
+        // report that followed was a flawless 5x5 that took eighty-six seconds
+        // and got all five. The rungs below can afford the overlap because
+        // nobody notices the difference between two paws and three; this one
+        // cannot.
+        //
         // The whole table goes in the failure message, because a broken tuning is
         // only diagnosable next to the numbers it was measured against.
         val rows = mutableListOf<String>()
@@ -409,11 +421,13 @@ class ScoringTest {
         }
 
         val failures = mutableListOf<String>()
-        fun cut(name: String, threshold: Double, below: String, above: String) {
-            val ceilingBelow = fullBoardBands.getValue(below).max()
+        fun cut(name: String, threshold: Double, below: String, above: String, everyShapeBelow: Boolean) {
+            val bandBelow = if (everyShapeBelow) everyShapeBands else fullBoardBands
+            val shapes = if (everyShapeBelow) "a run on any shape" else "a full-board run"
+            val ceilingBelow = bandBelow.getValue(below).max()
             val floorAbove = everyShapeBands.getValue(above).min()
             if (ceilingBelow >= threshold) {
-                failures += "$name at $threshold does not separate anything: a full-board run " +
+                failures += "$name at $threshold does not separate anything: $shapes " +
                     "in the '$below' band already reaches ${percent(ceilingBelow)}% of par"
             }
             if (floorAbove < threshold) {
@@ -425,18 +439,22 @@ class ScoringTest {
         cut(
             "twoPawFraction", config.twoPawFraction,
             below = bandKey(2, SLOW_MS_PER_ROW), above = bandKey(1, SLOW_MS_PER_ROW),
+            everyShapeBelow = false,
         )
         cut(
             "threePawFraction", config.threePawFraction,
             below = bandKey(1, SLOW_MS_PER_ROW), above = bandKey(0, SLOW_MS_PER_ROW),
+            everyShapeBelow = false,
         )
         cut(
             "fourPawFraction", config.fourPawFraction,
             below = bandKey(0, SLOW_MS_PER_ROW), above = bandKey(0, UNHURRIED_MS_PER_ROW),
+            everyShapeBelow = false,
         )
         cut(
             "fivePawFraction", config.fivePawFraction,
             below = bandKey(0, UNHURRIED_MS_PER_ROW), above = bandKey(0, FAST_MS_PER_ROW),
+            everyShapeBelow = true,
         )
 
         val table = everyShapeBands.entries.joinToString("\n") { (key, values) ->
