@@ -297,6 +297,48 @@ class GameViewModel(
     private var lastTapAt: ComparableTimeMark? = null
 
     /**
+     * Whether this attempt started with nothing to spend, and has not yet been
+     * told what that means.
+     *
+     * The bones offer used to open on the *door* of such a board — the whole of
+     * SD-120, reported twice — on the argument that meeting the player before
+     * the guess that ends the attempt is kinder than meeting them at it. That
+     * argument was right about the moment and wrong about the door: it fired on
+     * a board nobody had touched, every time, so the dialog became the thing
+     * the player dismissed on the way in rather than the thing that told them
+     * anything.
+     *
+     * This keeps what it was protecting. Armed by [startAttempt] when the board
+     * opens at zero, spent by the first strike that would otherwise end the
+     * attempt, which is exactly the wrong guess the old comment was worried
+     * about — the offer now arrives *on* it instead of an hour early.
+     */
+    private var openedWithNoBones = false
+
+    /**
+     * The strike count a deferred [lose] is holding, or null when nothing is
+     * deferred.
+     *
+     * When [strike] hands the player the bones offer instead of the ending, the
+     * loss has to wait for their answer, and it can only be resumed with the
+     * count [lose] was going to be given. Held rather than read back later for
+     * the reason [lose]'s own KDoc gives: `state` lags [updateState] by a
+     * dispatch, so re-reading reports one strike fewer than the player took.
+     */
+    private var lossAwaitingBoosterPrompt: Int? = null
+
+    /**
+     * What opened the booster prompt that is currently up, for the `trigger`
+     * attribute both of its events carry.
+     *
+     * A field because the pair is split across two actions — the prompt is
+     * opened by one and closed by another, with the player's thinking time in
+     * between — and `game.booster_prompt_closed` is only worth joining to
+     * `game.booster_prompt_shown` if both say which offer they are about.
+     */
+    private var boosterPromptTrigger = BoosterPromptTrigger.Pill
+
+    /**
      * Whether the square was crossed off when the player started a double tap.
      *
      * A field rather than a read at the commit site, because the commit runs on
@@ -556,16 +598,32 @@ class GameViewModel(
             is GameAction.DragCrossed -> action.paint(action.cell)
             GameAction.DragEnded -> action.endStroke()
             is GameAction.BoosterTapped -> action.boosterTapped(action.consumable)
-            is GameAction.BoosterConfirmed -> action.spend(action.consumable)
-            is GameAction.BoosterRefillRequested -> action.refill(action.consumable)
-            GameAction.DismissBoosterPrompt -> action.updateState { it.copy(boosterPrompt = null) }
+            is GameAction.BoosterConfirmed -> {
+                closeBoosterPrompt(BoosterPromptOutcome.Used)
+                action.spend(action.consumable)
+            }
+
+            is GameAction.BoosterRefillRequested -> {
+                closeBoosterPrompt(BoosterPromptOutcome.Refill)
+                action.refill(action.consumable)
+            }
+
+            GameAction.DismissBoosterPrompt -> action.dismissBoosterPrompt()
             GameAction.Retry -> action.restart()
             GameAction.DismissWarning -> action.updateState { it.copy(warning = null) }
             GameAction.ApplyHint -> action.applyHint()
             GameAction.DiscardHint -> action.updateState {
                 it.copy(hintCells = emptySet(), hintReason = null)
             }
-            GameAction.RefillBones -> action.refillBones()
+            // The standing offer under the board and the revive on the lose
+            // sheet arrive here with no prompt open, and [closeBoosterPrompt] is
+            // a no-op for them. The bones pill does not: it opens the prompt,
+            // whose ad button is `BoosterRefillRequested`, so the only way this
+            // action closes a prompt is a future caller doing it.
+            GameAction.RefillBones -> {
+                closeBoosterPrompt(BoosterPromptOutcome.Refill)
+                action.refillBones()
+            }
             is GameAction.BonesChanged -> action.updateState {
                 it.copy(livesRemaining = action.bones)
             }
@@ -588,6 +646,7 @@ class GameViewModel(
             // nothing.
             GameAction.OpenStreak -> sendEvent(GameEvent.OpenStreak(streak = 0))
             GameAction.DismissFreezeMessage -> action.updateState { it.copy(freezeMessage = null) }
+
             GameAction.OpenPrivacy -> sendEvent(GameEvent.OpenPrivacy)
             GameAction.OpenTerms -> sendEvent(GameEvent.OpenTerms)
             GameAction.OpenFeedback -> sendEvent(GameEvent.OpenFeedback)
@@ -952,6 +1011,17 @@ class GameViewModel(
         val banked = bankedScores(level)
 
         updateBoard {
+            // Inside the transform rather than off `state`, for the reason
+            // `refillBones` captures its own number there: `state` is a derived
+            // flow that lags `updateState` by a dispatch, and [load] may have
+            // written the holding one line ago.
+            //
+            // Never on the rehearsal, which spends no bones — its wrong guess is
+            // a lesson rather than a strike, so there is no wall to warn about,
+            // and `BoosterPrompt` composes above `TutorialCoachMark` so the
+            // offer would land on top of the first coach mark.
+            openedWithNoBones = !rehearsal && it.livesRemaining <= 0
+            lossAwaitingBoosterPrompt = null
             GameState(
                 level = level,
                 placed = opening,
@@ -976,16 +1046,18 @@ class GameViewModel(
                 // pane, the daily — handed out a free set of three.
                 livesRemaining = it.livesRemaining,
                 strikesThisAttempt = strikesThisAttempt,
-                // A board opened with nothing to spend meets the offer straight
-                // away rather than on the guess that ends it. The prompt's
-                // refill goes through the same fail-open ad path as every other
-                // one, so this is a wall with a door in it and never a lock.
+                // Nothing at the door. This used to open the bones offer on any
+                // board starting at zero, and SD-120 is that line reported
+                // twice: the dialog met the player before they had touched the
+                // board, on every such board, which is how an explanation turns
+                // into something you dismiss without reading.
                 //
-                // Never on the rehearsal, which spends no bones: its wrong guess
-                // is a lesson rather than a strike, so there is no wall to warn
-                // about. `BoosterPrompt` composes above `TutorialCoachMark`, so
-                // the offer would land on top of the first coach mark.
-                boosterPrompt = if (!rehearsal && it.livesRemaining <= 0) Consumable.Bone else null,
+                // The promise it was making is kept by [openedWithNoBones],
+                // armed just below. The offer still arrives before the attempt
+                // can end for want of a bone — it arrives on the guess that
+                // would have ended it, which is the moment the old comment was
+                // actually arguing for.
+                boosterPrompt = null,
                 score = resume?.let { saved ->
                     ScoreCard(
                         total = saved.score,
@@ -1701,6 +1773,29 @@ class GameViewModel(
             // rehearsal; this one was missed because it is reached through a
             // number rather than through a branch.
             forgiven -> Unit
+            // The one strike SD-120 moved the offer onto. A board opened at zero
+            // ends on its first wrong guess, and the player has had no bone to
+            // spend and so no reason to have thought about them — so this is the
+            // last moment the offer is still worth anything, and it goes up
+            // *instead of* the ending rather than after it.
+            //
+            // The loss is deferred, not cancelled: taking the ad puts the board
+            // back in play with a full set, and every other way out of the
+            // prompt runs [resolveDeferredLoss], which ends the attempt exactly
+            // as this branch would have. Deferring rather than losing-then-
+            // reviving is the point — the lose sheet's revive already exists and
+            // works, but it comes after `game.level_failed` and a `LevelResult`
+            // are on the record, so a player who buys their way out of a board
+            // they never got to play would still be carrying the failure.
+            //
+            // Once per attempt. After a refill the player is in the ordinary
+            // three-strike game, where the ending is the lose sheet.
+            remaining <= 0 && openedWithNoBones -> {
+                openedWithNoBones = false
+                lossAwaitingBoosterPrompt = strikes
+                openBoosterPrompt(Consumable.Bone, BoosterPromptTrigger.OutOfBones)
+            }
+
             remaining <= 0 -> lose(strikes)
             remaining == 1 && !warnedAboutLastBone -> {
                 warnedAboutLastBone = true
@@ -2242,9 +2337,17 @@ class GameViewModel(
             // standing offer and the lose sheet have nothing open. Leaving it
             // would re-offer the ad the player just closed.
             updateState { it.copy(boosterPrompt = null) }
+            // Closing the ad on the out-of-bones offer is the player declining
+            // it, so the strike that raised it finishes what it started.
+            resolveDeferredLoss()
             return
         }
 
+        // The bones are back, so there is no ending left to resume. Cleared
+        // before the state write rather than after, because everything below
+        // suspends and a second action must not find a loss still pending
+        // against a board that is playing again.
+        lossAwaitingBoosterPrompt = null
         lastPlacementAt = clock.markNow()
         warnedAboutLastBone = false
         var topped = 0
@@ -2561,10 +2664,75 @@ class GameViewModel(
         // then silently stopped for the rest of the install while keeping its
         // press animation and its accessibility label.
         if (consumable == Consumable.Bone || !explained || countOf(consumable) <= 0) {
-            updateState { it.copy(boosterPrompt = consumable) }
+            openBoosterPrompt(consumable, BoosterPromptTrigger.Pill)
             return
         }
         spend(consumable)
+    }
+
+    /**
+     * Puts the booster prompt up and says so.
+     *
+     * The one way in, so that `game.booster_prompt_shown` cannot go missing the
+     * way it did for the whole life of the offer this replaces — SD-120 was
+     * reported twice against a dialog that left no trace at all, so nobody could
+     * say how often it fired without playing the game and counting.
+     */
+    private suspend fun GameAction.openBoosterPrompt(
+        consumable: Consumable,
+        trigger: BoosterPromptTrigger,
+    ) {
+        boosterPromptTrigger = trigger
+        logger.logEvent(
+            "game.booster_prompt_shown",
+            "booster" to consumable.name.lowercase(),
+            "level_id" to (state.level?.id ?: 0),
+            "trigger" to trigger.wireName,
+        )
+        updateState { it.copy(boosterPrompt = consumable) }
+    }
+
+    /**
+     * The other half of the pair: one record for every way the prompt comes
+     * down, named for what the player did with it.
+     *
+     * Reads the prompt off `state` rather than taking it as a parameter, which
+     * is what makes it safe to call from the actions that *may* be closing a
+     * prompt and may not — `RefillBones` arrives from the standing offer and
+     * from the lose sheet with nothing open, and those are refills rather than
+     * prompt outcomes. Called *before* the handler that clears the prompt, for
+     * the same reason.
+     */
+    private fun closeBoosterPrompt(outcome: BoosterPromptOutcome) {
+        val consumable = state.boosterPrompt ?: return
+        logger.logEvent(
+            "game.booster_prompt_closed",
+            "booster" to consumable.name.lowercase(),
+            "level_id" to (state.level?.id ?: 0),
+            "trigger" to boosterPromptTrigger.wireName,
+            "outcome" to outcome.wireName,
+        )
+    }
+
+    private suspend fun GameAction.dismissBoosterPrompt() {
+        closeBoosterPrompt(BoosterPromptOutcome.Dismissed)
+        updateState { it.copy(boosterPrompt = null) }
+        resolveDeferredLoss()
+    }
+
+    /**
+     * Ends the attempt [strike] handed to the prompt instead of ending itself.
+     *
+     * Every exit from the out-of-bones offer that does not refill runs through
+     * here, so "Not now", the scrim tap and an ad the player closed all land on
+     * the same ending the strike would have reached on its own. The refill path
+     * clears the field instead, which is what makes taking the ad a
+     * continuation rather than a revive.
+     */
+    private suspend fun GameAction.resolveDeferredLoss() {
+        val strikes = lossAwaitingBoosterPrompt ?: return
+        lossAwaitingBoosterPrompt = null
+        lose(strikes)
     }
 
     private suspend fun GameAction.spend(consumable: Consumable) {
@@ -2574,8 +2742,12 @@ class GameViewModel(
             Consumable.Sniff -> useSniff()
             Consumable.Treat -> useTreat()
             // Bones are spent by guessing wrong, never by tapping. The button is
-            // an explainer and a refill offer, nothing else.
-            Consumable.Bone -> updateState { it.copy(boosterPrompt = null) }
+            // an explainer and a refill offer, nothing else — so closing it is
+            // the same exit "Not now" takes, deferred loss and all.
+            Consumable.Bone -> {
+                updateState { it.copy(boosterPrompt = null) }
+                resolveDeferredLoss()
+            }
         }
     }
 
@@ -3045,6 +3217,49 @@ class GameViewModel(
  */
 internal fun endsTheCampaign(levelId: Int, isDaily: Boolean): Boolean =
     !isDaily && levelId >= LevelPacks.lastCampaignLevelId
+
+/**
+ * Which offer the booster prompt is, as the `trigger` attribute of
+ * `game.booster_prompt_shown` and `game.booster_prompt_closed`.
+ *
+ * The pair exists because SD-120 could not be answered from data: the prompt
+ * had no events at all, so "how often does this fire, and does anyone take it"
+ * was a question only the owner playing the game could answer. It is the shape
+ * `ads.gate_shown` / `ads.result` already uses — one record when the offer goes
+ * up, one for every way it comes down — and the two are joined on this.
+ *
+ * An enum rather than the literals, because the dashboards key on the wire
+ * value and a typo in one of the two call sites would split a funnel in half
+ * without failing anything.
+ */
+internal enum class BoosterPromptTrigger(val wireName: String) {
+    /** The booster's own control: the bones pill in the HUD, or a booster tap. */
+    Pill("pill"),
+
+    /**
+     * The wrong guess that would have ended an attempt started at zero bones.
+     * The one SD-120 moved here from the board opening.
+     */
+    OutOfBones("out_of_bones"),
+}
+
+/**
+ * How the booster prompt came down, as the `outcome` attribute of
+ * `game.booster_prompt_closed`.
+ *
+ * [Refill] is the player *asking* for the ad and says nothing about whether one
+ * played or whether bones landed — that is `ads.result` and
+ * `game.bones_refilled`, joined on the level. Keeping the two apart is what
+ * lets "offers taken" be read separately from "offers that paid out", which is
+ * the split a fail-open gate makes interesting.
+ */
+internal enum class BoosterPromptOutcome(val wireName: String) {
+    Refill("refill"),
+    Used("used"),
+
+    /** "Not now", the scrim, and the system back gesture, which all arrive here. */
+    Dismissed("dismissed"),
+}
 
 /**
  * A drag across the board, while it is happening.
