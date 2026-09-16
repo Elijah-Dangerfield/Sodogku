@@ -357,7 +357,6 @@
     <string name="daily_streak_none">No streak yet</string>
     <string name="daily_play">Play today’s board</string>
     <string name="daily_done">Today’s board is done</string>
-    <string name="daily_out_of_bones">Out of bones for today</string>
     <string name="daily_today">Today’s board</string>
     <string name="daily_resets_hours">New board in %1$dh %2$dm</string>
     <string name="daily_resets_minutes">New board in %1$dm</string>
