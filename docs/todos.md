@@ -212,8 +212,13 @@ as evidence, the full session log, and the reason the leading theory is that
 `pendingPrompt()` returned `None`. It also explains why the streak reading 1 is
 arithmetically correct and must not be "fixed".
 
-**Hints:** `StreakPrompts.pendingPrompt()` and `GameViewModel.offerStreakCeremony()`.
-Zero streak events in a session with two wins is the whole diagnosis.
+**Hints:** Root cause found and written up in the case file: `promptFor` in
+`StreakPrompts.kt` excludes a streak of 1, because `FirstCelebratedStreak` is 2
+and the intention moment is meant to cover that day instead. That holds for a
+brand-new player and not for a returning one whose streak broke and restarted at
+1, which is this report. The fix belongs in `promptFor`, not in
+`offerStreakCeremony`. Pairs with SD-127, the missing lost-streak moment: a run
+that restarts at 1 is the run that just broke.
 Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-P and
 https://elijah-dangerfield.sentry.io/issues/SODOGKU-Q · session
 1ba50ef1-4f55-4832-870f-ce8b91da99c3 · 2026-09-16
@@ -314,3 +319,31 @@ is not covered by it, which may be the whole answer. The generator is
 you whether a change to generation broke an invariant; do not weaken it.
 Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-J · session
 bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
+
+## SD-127 [P2] — There is no "you lost your streak" moment
+
+**Ask:** The owner, after filing SD-121: "the main issue i had with the streak
+one is no 'you lost your streak' ceremony. At which point we might have offered a
+streak store or freeze or something idk. But we should have an experience either
+way IMO."
+
+**Done when:** a player who comes back after breaking a run is told it broke,
+once, and the app does something with that moment rather than silently showing a
+1 where a 12 used to be.
+
+**Hints:** `StreakPrompt` has exactly three cases today, `None`, `Intention` and
+`Celebrate(streak)`, and there is no `Lost`. Breaking a run is completely silent:
+the fold in `StreakFold.kt` just returns a smaller number and `StreakScreen`
+draws it. Adding a fourth case is the shape, and `promptFor` is a pure function
+of three arguments so the rule costs one assertion to test.
+
+Two things to hold on to. The owner says **"an experience either way"**, so build
+the moment even if nothing is offered in it; a page that only exists to sell
+something is the version he did not ask for. And the freeze-or-store half is
+**deliberately not in this item**: what a freeze even means is undecided and
+sitting in `docs/backlog.md` as SD-28, which has to be answered before anything
+can be offered here. Ship the acknowledgement, leave a seam for the offer.
+
+Build it with SD-121, which is the same seam from the other side: the returning
+player whose streak restarted at 1 is exactly the player whose streak just broke,
+and today they get nothing from either direction.

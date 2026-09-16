@@ -114,6 +114,15 @@ longer the same feature.
 - **Where does one come from?** The owner's instinct is earning them. Options
   worth weighing: a reward for a run length (7 days pays one), a level reward
   alongside the Treat, an ad, or a Pro perk. Each implies a different cap.
+
+  He came back to this on 2026-09-16 and picked the level-reward option out of
+  that list: *"bones shouldnt be the only gift right? streak freezes too."* So a
+  freeze becomes one of the things the first-clear reward can pay, alongside the
+  Treat and bones, rather than a currency with its own source. That is the
+  cheapest of the four to build and the only one that needs no new surface, but
+  it couples the freeze budget to campaign progress, which is a different shape
+  from the daily's per-month cap and cannot coexist with it unchanged. Decide
+  which budget survives before building either.
 - **Is it spent or automatic?** Duolingo's is bought in advance and spent
   silently on the missed day, which is why it feels like insurance rather than a
   refund. Spending it after the fact turns a broken streak into a shop prompt at

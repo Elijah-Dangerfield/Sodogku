@@ -69,10 +69,44 @@ val prompt = Catching { streak.pendingPrompt() }
 ```
 
 "Failed to read the streak prompt" is **not** in the log, so the call did not
-throw. Two `Won` events means `win()` ran twice. So the most likely reading is
-that `pendingPrompt()` returned `StreakPrompt.None` on a day the streak went
-from nothing to 1. Verify that before changing anything; the alternative is that
-`offerStreakCeremony` is not reached from the path these wins took.
+throw. Two `Won` events means `win()` ran twice, so `pendingPrompt()` returned
+`StreakPrompt.None`.
+
+## Root cause, found 2026-09-16
+
+`StreakPrompts.promptFor` has exactly three outcomes, and on the day in question
+all three were unavailable:
+
+```kotlin
+private fun celebrationIsDue(streak: Int, state: StreakPromptState): Boolean =
+    streak >= FirstCelebratedStreak && streak != state.celebratedStreak
+```
+
+`FirstCelebratedStreak` is **2**. His streak was **1**. So the celebration was
+never due, and the intention moment had long since been spent, because
+`intentionIsDue` is `!state.intentionShown && boardsCleared >= 2` and fires once
+ever.
+
+**The exclusion is deliberate and its reasoning is written down.** From the
+comment on `celebrationIsDue`: "A streak of one is excluded because the intention
+moment is already that conversation, and two pages about the same day is one too
+many."
+
+That reasoning is sound for the player it was written for, who reaches a streak
+of 1 within minutes of installing and gets the intention page instead. **It does
+not hold for a returning player whose streak broke and restarted at 1.** They
+have already seen the intention moment, months ago, and they get nothing. That
+is the defect: the exclusion assumes streak 1 always means "brand new", and it
+also means "started again".
+
+So this is not a broken ceremony. It is a rule with a case it does not cover, and
+the fix belongs in `promptFor`, not in `offerStreakCeremony`.
+
+Worth noting the owner reached the same place from the other direction: his
+follow-up was that the bigger gap is there being no "you lost your streak"
+moment at all. A run that restarts at 1 is exactly the run that just broke. That
+half is filed separately as SD-127; the two want designing together even though
+only this one is a bug.
 
 Also worth a look: `game.level_reward_granted` fired for level 15 and not for
 level 16. That may well be correct, since the treat schedule pays on some levels
@@ -86,8 +120,14 @@ streak ceremony, and the streak page does not say "1 days".
 
 ## Hints
 
-- `libraries/progress/impl/.../streak/StreakPrompts.kt` owns `pendingPrompt()`.
+- `libraries/progress/impl/.../streak/StreakPrompts.kt` owns `promptFor` and the
+  two constants. It is a pure function of three arguments, so every rule in it is
+  one assertion rather than a scenario, and a test for this costs nothing.
   `StreakFold.kt` beside it owns the run arithmetic.
+- `StreakPromptState` is the stored half: `intentionShown` and
+  `celebratedStreak`. Whatever distinguishes "new player at 1" from "returning
+  player back at 1" has to come from there or from the fold, because `promptFor`
+  reads no clock and no cache and should stay that way.
 - `GameViewModel.offerStreakCeremony()` is the single call site, and its doc
   comment explains why it is called from the finished board and nowhere else.
   Keep that.
