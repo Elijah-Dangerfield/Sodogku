@@ -65,20 +65,32 @@ phase adds the fan-out.
    twice.
 2. **One subagent per remaining report**, in parallel. Give each the issue id, the
    kind, and this instruction set:
-   - Read the carrier event and the feedback twin. Read the attached
-     `session-log.txt` and screenshots.
+   - Read the carrier event: the `feedback_message` extra, the tags, the attached
+     `session-log.txt` and screenshots. There is no reachable feedback twin.
+   - **Resolve `commit_sha` against the log and say how far behind `HEAD` the
+     report is.** If a later commit already fixed it, that is a no-action naming
+     the fixing sha, not a TODO.
    - `owner_directive` is an instruction, not a data point. Do not investigate
      whether it is worth doing. Restate it as a TODO and stop.
    - `bug_report` and `feedback` get the investigation in the triage skill:
      the log first, then the screenshot, then `session_id` correlation in Loki.
+   - Say whether it is a **bug** (the app doing what it was not built to do) or a
+     **directive** (the app working as built, wanted different). For a bug, also
+     return the case-file material: what the screenshot shows, what the log
+     proves, where in the code it comes from, and any telemetry that is missing.
    - **Write no files and touch no Sentry state.** Return a single block:
-     proposed title, priority, `Ask`, `Done when`, `Hints`, the provenance line,
-     and either `file` or `no-action: <reason>`.
+     proposed title, priority, `bug` or `directive`, `Ask`, `Done when`, `Hints`,
+     the provenance line, and either `file` or `no-action: <reason>`.
 3. **You write the results, serially.** Assign each `SD-<n>` yourself by
-   incrementing the highest in the file, append to `docs/todos.md` in the format
-   that file documents, append one ledger line per report either way, then comment
-   on the Sentry issue with the TODO id (filed) or resolve it (no action).
-4. Commit: `docs: triage <n> feedback reports`. Push.
+   incrementing the highest across the whole git history, append to
+   `docs/todos.md` in the format that file documents, write `docs/cases/SD-<n>/`
+   for every bug (saving the log and screenshots to disk, since the Sentry URLs
+   expire), and append one ledger line per report either way.
+4. **Then set Sentry state, per the triage skill's rule.** A directive is
+   commented with its TODO id and **resolved**. A bug is commented with its TODO
+   id and case-file path and **left unresolved**. A no-action is commented and
+   resolved. The unresolved list is then exactly the list of known live defects.
+5. Commit: `docs: triage <n> feedback reports`. Push.
 
 An owner directive that is plainly a person-only job (buy the account, sign the
 policy) goes straight to `docs/OWNER-TODO.md` instead of `docs/todos.md`, with its
@@ -116,6 +128,14 @@ After each worker returns:
    `git add -p`), commit with a conventional message naming the item
    (`fix: a sniff says what proved it (SD-11)`), delete the item's section from
    `docs/todos.md` in that same commit, and push.
+
+   **Then close the bug's Sentry issue, if it had one.** An item with a
+   `docs/cases/SD-<n>/` directory came from a report that was deliberately left
+   unresolved because it was still broken. It is not broken now, so comment the
+   fixing commit sha on every Sentry issue the case file names and resolve them.
+   Delete the case directory in the same commit as the fix; it is scaffolding for
+   the work, not a record of it, and the commit is the record. Skipping this is
+   how the unresolved list rots into a list of things that were fixed months ago.
 3. If red and the fix is close, send the worker back once with the failure. If it
    is still red, `git checkout -- . && git clean -fd`, leave the item in the
    queue, and record the failure and what was learned in the item's `Hints` and

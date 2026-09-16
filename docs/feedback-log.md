@@ -72,3 +72,30 @@ Filed as SD-117 so the skill stops doing this. The per-report lines above are
 left as written, because the ledger is append-only and what it records is what
 the pass decided at the time.
 -->
+- 2026-09-12 · b526ab384f7f497185c02a42d5f5832a · owner_directive · todo: SD-124 Give the streak celebration the number flip it was asked for · https://elijah-dangerfield.sentry.io/issues/SODOGKU-G
+- 2026-09-12 · ea426cbebe0447c9942086134a98d2fe · owner_directive · todo: SD-123 Make the win sheet a full-screen celebration, not a dialog (its dark-mode ask noted in the item, not filed) · https://elijah-dangerfield.sentry.io/issues/SODOGKU-H
+- 2026-09-12 · 5d6b12c052254b2cb82fbbfde7b9155a · owner_directive · todo: SD-120 The Bones prompt opens on every board started with zero bones (bug, left unresolved, case file) · https://elijah-dangerfield.sentry.io/issues/SODOGKU-E
+- 2026-09-12 · c6803e4c6cf94d5aaada86752e151361 · owner_directive · todo: SD-125 "You have 0" in the Bones dialog is too small, and maybe unneeded · https://elijah-dangerfield.sentry.io/issues/SODOGKU-F
+- 2026-09-12 · 2f30d82954914d2fb497b5587c414643 · owner_directive · no-action: already fixed by SD-113 (694576d). Reported from aeae187, before the starter-dog opening run; at the shipped default of 16 opening levels, level 8 opens with a dog · https://elijah-dangerfield.sentry.io/issues/SODOGKU-K
+- 2026-09-12 · bd9bd19424c740f09c7f7cbda53f8e16 · owner_directive · todo: SD-126 Review the generated daily boards for how they open · https://elijah-dangerfield.sentry.io/issues/SODOGKU-J
+- 2026-09-16 · 7f68d9fd52ce45318c9c670a56bc1c38 · owner_directive · todo: SD-120 The Bones prompt opens on every board started with zero bones (bug, left unresolved, case file) · https://elijah-dangerfield.sentry.io/issues/SODOGKU-M
+- 2026-09-16 · a6a6e916b1a34e50a2fc186a4d2bbf85 · owner_directive · todo: SD-122 Five paws for a solve that took a while (bug, left unresolved, case file); its full-screen-celebration half folded into SD-123 · https://elijah-dangerfield.sentry.io/issues/SODOGKU-N
+- 2026-09-16 · 7f7b252b5b184b559f65dc81ff13690f · owner_directive · todo: SD-121 No streak ceremony when the streak starts or increments (bug, left unresolved, case file) · https://elijah-dangerfield.sentry.io/issues/SODOGKU-P
+- 2026-09-16 · 68340f73a4424c86a2178da3a3298c59 · owner_directive · todo: SD-121 (evidence only — the streak page screenshot the owner filed for SODOGKU-P; bug, left unresolved) · https://elijah-dangerfield.sentry.io/issues/SODOGKU-Q
+
+<!--
+Run of 2026-09-16, owner directives only. Ten reports, six TODOs, one no-action.
+
+First pass under the new rule: a directive is resolved in Sentry as soon as it
+has a TODO, and only a bug stays unresolved. Three bugs stayed open, each with a
+case file under `docs/cases/`: SD-120, SD-121, SD-122. All three reproduce on
+`05b633b`, which is HEAD.
+
+The staleness check that SD-117 asked for was run on all ten. Only SODOGKU-K was
+stale. The Sep 12 batch came from `aeae187`, twelve commits back, and the Sep 16
+batch came from `05b633b` itself.
+
+SODOGKU-Q is a second report filed fifteen seconds after SODOGKU-P purely to
+carry a screenshot for it. The ledger keeps its own line, because the ledger is
+one line per report, but it produced no TODO of its own.
+-->

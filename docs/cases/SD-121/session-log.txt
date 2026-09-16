@@ -1,0 +1,71 @@
+2026-09-16T15:42:21.979600Z INFO Telemetry: Sentry initialized for dev-ios-debug
+2026-09-16T15:42:21.995638Z DEBUG AppConfigRepository: Config emitted
+2026-09-16T15:42:21.995647Z DEBUG ConnectivityEdge: init: observing isOffline; ignoring the initial value, edge-only on true→false
+2026-09-16T15:42:21.996297Z INFO GrafanaAppEvents: Grafana app events disabled: no OTLP credentials in this build
+2026-09-16T15:42:21.998526Z DEBUG ReviewPrompt: Watching level 10 for a review prompt
+2026-09-16T15:42:22.027353Z INFO -: App Event: ColdBoot
+2026-09-16T15:42:22.028962Z INFO SessionTracker: Started session 1 uuid=1ba50ef1-4f55-4832-870f-ce8b91da99c3 (reason=ColdBoot)
+2026-09-16T15:42:22.029292Z INFO -: App Event: OnForeground(isColdBoot=true)
+2026-09-16T15:42:22.029554Z INFO -: app.foregrounded
+2026-09-16T15:42:22.030277Z INFO -: app.launched
+2026-09-16T15:42:22.031347Z DEBUG SessionTelemetry: Telemetry session set to 8f7f012e-cb69-4838-924f-41c46eebb3cb (#0)
+2026-09-16T15:42:22.034480Z DEBUG SessionTelemetry: Telemetry session set to 1ba50ef1-4f55-4832-870f-ce8b91da99c3 (#1)
+2026-09-16T15:42:22.132401Z WARN AppRecompose: App recomposed (this should be rare)
+2026-09-16T15:42:22.134021Z DEBUG Recompose/App: Recomposed 1 times
+2026-09-16T15:42:22.269134Z DEBUG AppNav: Resolving start destination: hasUserOnboarded=true → Game(level 15)
+2026-09-16T15:42:22.301442Z INFO DelegatingRouter: Binding nav controller
+2026-09-16T15:42:22.303307Z DEBUG DelegatingRouter: Setting nav controller
+2026-09-16T15:42:22.311153Z INFO -: Collection started for LaunchGateViewModel events (lifecycle reached STARTED)
+2026-09-16T15:42:22.311734Z INFO -: Collection started for GameViewModel events (lifecycle reached STARTED)
+2026-09-16T15:42:22.324800Z INFO Game: game.level_started
+2026-09-16T15:42:22.421706Z INFO AppState: net.offline_banner
+2026-09-16T15:42:22.427552Z INFO -: Collection started for navigation queue (lifecycle reached STARTED)
+2026-09-16T15:42:22.983983Z DEBUG Entitlements: Store unreachable; keeping the cached entitlement
+2026-09-16T15:42:23.004442Z DEBUG Entitlements: Store unreachable; keeping the cached entitlement
+2026-09-16T15:42:25.762144Z WARN NetworkCall: Exception in http request: Error Domain=NSURLErrorDomain Code=-1004 "Could not connect to the server." UserInfo={_kCFStreamErrorCodeKey=61, NSUnderlyingError=0x11938f390 {Error Domain=kCFErrorDomainCFNetwork Code=-1004 "(null)" UserInfo={_NSURLErrorNWPathKey=satisfied (Path is satisfied), interface: lo0, _kCFStreamErrorCodeKey=61, _kCFStreamErrorDomainKey=1}}, _NSURLErrorFailingURLSessionTaskErrorKey=LocalDataTask <06342792-C671-4660-8190-319723909BC3>.<4>, _NSURLErrorRelatedURLSessionTaskErrorKey=(
+    "LocalDataTask <06342792-C671-4660-8190-319723909BC3>.<4>"
+), NSLocalizedDescription=Could not connect to the server., NSErrorFailingURLStringKey=http://localhost/v1/app-config, NSErrorFailingURLKey=http://localhost/v1/app-config, _kCFStreamErrorDomainKey=1}
+2026-09-16T15:42:25.762902Z INFO NetworkCall: net.backend_unreachable
+2026-09-16T15:42:25.768604Z WARN AppConfigRepository: Exception in http request: Error Domain=NSURLErrorDomain Code=-1004 "Could not connect to the server." UserInfo={_kCFStreamErrorCodeKey=61, NSUnderlyingError=0x11938f390 {Error Domain=kCFErrorDomainCFNetwork Code=-1004 "(null)" UserInfo={_NSURLErrorNWPathKey=satisfied (Path is satisfied), interface: lo0, _kCFStreamErrorCodeKey=61, _kCFStreamErrorDomainKey=1}}, _NSURLErrorFailingURLSessionTaskErrorKey=LocalDataTask <06342792-C671-4660-8190-319723909BC3>.<4>, _NSURLErrorRelatedURLSessionTaskErrorKey=(
+    "LocalDataTask <06342792-C671-4660-8190-319723909BC3>.<4>"
+), NSLocalizedDescription=Could not connect to the server., NSErrorFailingURLStringKey=http://localhost/v1/app-config, NSErrorFailingURLKey=http://localhost/v1/app-config, _kCFStreamErrorDomainKey=1}
+2026-09-16T15:42:41.174550Z INFO -: Sending event Marked
+2026-09-16T15:42:41.335253Z INFO Game: game.commit
+2026-09-16T15:42:41.351035Z INFO -: Sending event PlacedDog
+2026-09-16T15:42:45.496108Z INFO -: Sending event Marked
+2026-09-16T15:42:45.665078Z INFO Game: game.commit
+2026-09-16T15:42:45.693213Z INFO -: Sending event PlacedDog
+2026-09-16T15:42:46.614481Z INFO -: Sending event Marked
+2026-09-16T15:42:46.778794Z INFO Game: game.commit
+2026-09-16T15:42:46.801772Z INFO -: Sending event PlacedDog
+2026-09-16T15:42:47.622722Z INFO -: Sending event Marked
+2026-09-16T15:42:47.795673Z INFO Game: game.commit
+2026-09-16T15:42:47.823884Z INFO -: Sending event PlacedDog
+2026-09-16T15:42:47.825558Z INFO Game: game.level_completed
+2026-09-16T15:42:47.890209Z INFO Game: game.level_reward_granted
+2026-09-16T15:42:47.890610Z INFO -: Sending event Won
+2026-09-16T15:42:48.363327Z INFO Leaderboards: leaderboard.submitted
+2026-09-16T15:42:48.638041Z INFO Leaderboards: leaderboard.submitted
+2026-09-16T15:42:48.982802Z WARN GameCenter: Game Center would not describe com.sodogku.leaderboard.weekly_score: The requested operation could not be completed because this application is not recognized by Game Center.
+2026-09-16T15:42:49.291636Z INFO Game: game.level_started
+2026-09-16T15:42:49.343623Z WARN GameCenter: Game Center would not describe com.sodogku.leaderboard.weekly_score: The requested operation could not be completed because this application is not recognized by Game Center.
+2026-09-16T15:43:45.937973Z INFO Telemetry: Feedback forwarded to Sentry (owner_directive)
+2026-09-16T15:43:52.021005Z INFO -: Sending event Marked
+2026-09-16T15:43:52.167801Z INFO Game: game.commit
+2026-09-16T15:43:52.193762Z INFO -: Sending event PlacedDog
+2026-09-16T15:44:13.838397Z INFO -: Sending event Marked
+2026-09-16T15:44:13.989180Z INFO Game: game.commit
+2026-09-16T15:44:14.013441Z INFO -: Sending event PlacedDog
+2026-09-16T15:44:14.763593Z INFO -: Sending event Marked
+2026-09-16T15:44:14.946598Z INFO Game: game.commit
+2026-09-16T15:44:14.973782Z INFO -: Sending event PlacedDog
+2026-09-16T15:44:15.770116Z INFO -: Sending event Marked
+2026-09-16T15:44:15.928578Z INFO Game: game.commit
+2026-09-16T15:44:15.957012Z INFO -: Sending event PlacedDog
+2026-09-16T15:44:15.957860Z INFO Game: game.level_completed
+2026-09-16T15:44:16.003015Z INFO -: Sending event Won
+2026-09-16T15:44:19.424354Z INFO Leaderboards: leaderboard.submitted
+2026-09-16T15:44:19.823398Z WARN GameCenter: Game Center would not describe com.sodogku.leaderboard.weekly_score: The requested operation could not be completed because this application is not recognized by Game Center.
+2026-09-16T15:44:20.034591Z WARN GameCenter: Game Center would not describe com.sodogku.leaderboard.weekly_score: The requested operation could not be completed because this application is not recognized by Game Center.
+2026-09-16T15:45:04.924057Z INFO Telemetry: Feedback forwarded to Sentry (owner_directive)
+2026-09-16T15:45:06.367083Z INFO Game: game.level_started

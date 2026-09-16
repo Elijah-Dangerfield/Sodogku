@@ -48,7 +48,9 @@ annoying.
 
 ## Items
 
-<!-- Newest at the bottom. -->## SD-6 [P2] — Standing code review, by an agent that did not write the code
+<!-- Newest at the bottom. -->
+
+## SD-6 [P2] — Standing code review, by an agent that did not write the code
 
 **Ask:** A recurring review pass looking for better ways of doing things:
 additions worth making, cleanup worth doing, tests worth having. Not a lint run,
@@ -135,26 +137,6 @@ ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
 
-## SD-117 [P1] — Teach feedback triage to check the reported build against the log
-
-**Ask:** Every feedback carrier event carries `commit_sha`, and `AppTelemetry`
-puts it there on purpose: its comment says the provenance is so triage can tell
-"whether it's already fixed on a later commit". The `feedback-triage` skill never
-reads it. The 2026-09-14 pass filed SD-111 through SD-116 from reports against
-builds 160 to 177 commits behind `main`, and four of the six were already fixed.
-
-**Done when:** the skill's read-the-report step requires resolving `commit_sha`
-against the log and saying how far behind the report is, and its file-it step
-requires checking whether the behavior still exists on `HEAD` before writing an
-item. An item filed anyway carries the distance in its provenance line.
-
-**Hints:** The skill is `.claude/skills/feedback-triage/SKILL.md`. Step 2 also
-still tells the reader to pull the Sentry feedback twin for the text, which is
-not reachable from the Sentry MCP for this project — the text is on the carrier,
-in the `feedback_message` extra and the `feedback.txt` attachment, both added in
-26fcba1. Fix both instructions in one pass. `docs/feedback-log.md` has the
-tooling notes from that run.
-
 ## SD-118 [P2] — Delete the daily failure state's leftovers
 
 **Ask:** SD-111 stopped `toResult` reading a `Failed` row, so nothing reaches the
@@ -192,3 +174,143 @@ that two tidier variants were tried and neither reached the tree. So the fix is
 an overload that takes the semantics label as a parameter and applies it in the
 right order, not a call-site conversion. Found while auditing the achievements
 screen for SD-114.
+
+## SD-120 [P1] — The Bones prompt opens on every board started with zero bones
+
+**Ask:** "I get the out of bones message at the start of every game. idk if that
+makes any sense. maybe we need to not do that. maybe just when you run out or
+make a mistake after running out idk", and four days earlier: "we show this
+dialog way too much. is it every on resume of every puzzle. it's popping up a
+lot"
+
+**Done when:** a player who starts a board with zero bones is not shown the
+dialog before they have done anything, and still finds out about bones before an
+attempt ends because of them.
+
+**Case file:** `docs/cases/SD-120/` — both screenshots, the Sep 16 session log,
+the trigger line, and why the current behavior was built that way on purpose.
+Read it before changing the condition.
+
+**Hints:** `GameViewModel.startAttempt` sets `boosterPrompt` when
+`livesRemaining <= 0`. There is no telemetry for the prompt being shown, so
+nobody can measure whether the fix worked; adding it is part of this item.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-M and
+https://elijah-dangerfield.sentry.io/issues/SODOGKU-E · session
+1ba50ef1-4f55-4832-870f-ce8b91da99c3 · 2026-09-16
+
+## SD-121 [P1] — No streak ceremony when the streak starts or increments
+
+**Ask:** "I just came back every one day and completed a puzzle which should've
+increment in my streak, but I didn't see it. Increment like I didn't get a
+celebration page or anything like that."
+
+**Done when:** completing a board on a day that starts or extends the play
+streak shows the streak ceremony, and the streak page does not say "1 days".
+
+**Case file:** `docs/cases/SD-121/` — the streak page screenshot the owner filed
+as evidence, the full session log, and the reason the leading theory is that
+`pendingPrompt()` returned `None`. It also explains why the streak reading 1 is
+arithmetically correct and must not be "fixed".
+
+**Hints:** `StreakPrompts.pendingPrompt()` and `GameViewModel.offerStreakCeremony()`.
+Zero streak events in a session with two wins is the whole diagnosis.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-P and
+https://elijah-dangerfield.sentry.io/issues/SODOGKU-Q · session
+1ba50ef1-4f55-4832-870f-ce8b91da99c3 · 2026-09-16
+
+## SD-122 [P1] — Five paws for a solve that took a while
+
+**Ask:** "I got 5 bones even tho I took a while." He means paws. Level 16, a 5x5
+board, flawless, 86 seconds, five paws.
+
+**Done when:** a flawless but unhurried solve lands below the top rung, a
+flawless quick solve still earns five paws, and SD-116's regression test still
+passes.
+
+**Case file:** `docs/cases/SD-122/` — the win sheet, the move-by-move timing from
+the log, and why `ab0c189` over-correcting is the first thing to test rather than
+the first thing to assume.
+
+**Hints:** This is the mirror of SD-116, which was that five paws could not be
+earned at all. Sweep the ladder across board sizes before touching a constant,
+and rule out a live remote-config override first.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-N · session
+1ba50ef1-4f55-4832-870f-ce8b91da99c3 · 2026-09-16
+
+## SD-123 [P2] — Make the win sheet a full-screen celebration, not a dialog
+
+**Ask:** "I'd prefer this not be a dialog and instead be a slide up page or a
+bottom sheet that's full screen to achieve the same result. bouncy animations
+still wanted, duo lingo style." Said again four days later: "I'd like this to be
+full screen. like the Duolingo lesson celebration. but just a dialog."
+
+**Done when:** finishing a level presents a full-screen slide-up rather than a
+centred dialog, and the paws and score arrive with movement rather than already
+drawn.
+
+**Hints:** The sheet today is the "Flawless / five paws / Score, Time, Mistakes /
+NEXT LEVEL" card in `GameOutcomeSheets.kt`. Use `bottomSheet<>` rather than a
+full `screen<>`; AGENTS.md argues for it and the backstack stays one deep.
+Anything that animates forever needs a fixed value under `LocalInspectionMode`,
+and never read an animated value during composition.
+
+**The same report also asks for dark mode**, defaulting to the device setting,
+which is a separate piece of work and is not in this item. Promote it to its own
+if you want it.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-H · session
+bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
+
+## SD-124 [P2] — Give the streak celebration the number flip it was asked for
+
+**Ask:** "this isn't really much like duo lingo in the way I want. I want a slide
+up and a smooth animation of a streak flipping from 1 to 2 with a bouncy
+celebration"
+
+**Done when:** the streak ceremony slides up, the number animates from the old
+run to the new one, and it lands with a bounce.
+
+**Hints:** `StreakScreen.kt` and `StreakViewModel.kt` in `features/streak/impl`.
+`StreakRoute(celebrating = n)` already carries the number being celebrated, and
+`GameAction.OpenStreak` deliberately passes 0 so a page the player asked for
+animates nothing. That distinction is what makes the flip possible, so keep it.
+Depends on SD-121: there is no point animating a ceremony that never opens.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-G · session
+bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
+
+## SD-125 [P2] — "You have 0" in the Bones dialog is too small, and maybe unneeded
+
+**Ask:** "the 'you have zero' is too small but also not needed. look for other
+usages of that font size to see if we need to increase it"
+
+**Done when:** the line is gone, or it is legible at the size the rest of the app
+uses for a line of metadata. The second half of the ask is the real work: find
+the other call sites of that size and decide whether the size itself is wrong.
+
+**Hints:** The line sits under the body copy in the Bones dialog, above WATCH AN
+AD FOR 3. The bone pills in the HUD already say the same thing, which is
+presumably why he calls it unneeded. SD-114 found the same class of problem on
+the achievements screen, where a `Caption.C200` counter at 6sp was the smallest
+text on the page; check whether this is another C200.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-F · session
+bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
+
+## SD-126 [P2] — Review the generated daily boards for how they open
+
+**Ask:** "maybe I'm just dumb but this daily board seems way too hard to solve
+without a starter dog or a single square color. maybe we should review our boards
+we generated?"
+
+**Done when:** there is an answer, backed by the generator, to whether a daily
+can open with no starter dog and no single-cell region, and whether that is a
+board a player can reasonably start.
+
+**Hints:** The screenshot is a 7x7 daily, streak 2, 0/7 dogs, three bones, one X
+placed. Every colour region on it has two or more cells and no dog is pre-placed,
+so there is no forced opening move. SD-113 added a starter-dog opening run for
+the **campaign** (`progression.starterDogOpeningLevels`, default 16); the daily
+is not covered by it, which may be the whole answer. The generator is
+`tools/.../levelgen/Generator.kt` and the difficulty model is
+`libraries/puzzle/.../Difficulty.kt`. `LevelPackVerificationTest` is what tells
+you whether a change to generation broke an invariant; do not weaken it.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-J · session
+bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
