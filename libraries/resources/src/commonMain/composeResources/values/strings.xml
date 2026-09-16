@@ -275,7 +275,6 @@
     <string name="booster_use">Use one</string>
     <string name="booster_watch_ad">Watch an ad for %1$d</string>
     <string name="booster_not_now">Not now</string>
-    <string name="booster_have">You have %1$d</string>
     <string name="hint_title">No dogs here</string>
 
     <!-- What proved it, one line per Technique, mapped by an exhaustive `when` in

@@ -20,7 +20,6 @@ import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.booster_bone_body
 import sodogku.libraries.resources.generated.resources.booster_bone_title
-import sodogku.libraries.resources.generated.resources.booster_have
 import sodogku.libraries.resources.generated.resources.booster_not_now
 import sodogku.libraries.resources.generated.resources.booster_sniff_body
 import sodogku.libraries.resources.generated.resources.booster_sniff_title
@@ -73,12 +72,11 @@ fun BoosterPrompt(
                 color = AppTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
             )
-            Text(
-                text = stringResource(Res.string.booster_have, held),
-                typography = AppTheme.typography.Caption.C300,
-                color = AppTheme.colors.textSecondary,
-            )
-
+            // No "You have N" line. It said, at 8sp, what the HUD pills and the
+            // board controls behind this dialog already draw at full size, and
+            // the count it was repeating is the one thing on this screen the
+            // player cannot miss. SD-125.
+            //
             // "Use one" only appears when there is one to use. Offering it at
             // zero and failing silently is how a button teaches distrust.
             if (held > 0 && consumable != Consumable.Bone) {

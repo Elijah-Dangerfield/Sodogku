@@ -187,7 +187,13 @@ fun DailyCard(
             )
             Text(
                 text = stringResource(Res.string.daily_freeze_remaining, freezesRemaining),
-                typography = AppTheme.typography.Caption.C200,
+                // C300, like the reset line above it. These three are one column
+                // of metadata in one card, in the same colour and for the same
+                // reader, and two of them were a step smaller than the third for
+                // no reason anyone could name — which put the only two *numbers*
+                // on the card at the smallest size in the app. Same call SD-114
+                // made on the achievement tiles.
+                typography = AppTheme.typography.Caption.C300,
                 color = AppTheme.colors.textSecondary,
             )
         }
@@ -201,7 +207,7 @@ fun DailyCard(
             )
             Text(
                 text = stringResource(Res.string.daily_restore_days, restoreDays),
-                typography = AppTheme.typography.Caption.C200,
+                typography = AppTheme.typography.Caption.C300,
                 color = AppTheme.colors.textSecondary,
             )
         }
