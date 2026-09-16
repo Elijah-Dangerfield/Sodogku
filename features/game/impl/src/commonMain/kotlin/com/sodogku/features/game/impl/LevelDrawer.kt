@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
@@ -35,7 +36,7 @@ import com.sodogku.libraries.progress.LevelRecord
 import com.sodogku.libraries.progress.LevelState
 import com.sodogku.libraries.progress.daily.DailyOutcome
 import com.sodogku.libraries.progress.daily.DailyStatus
-import com.sodogku.libraries.ui.bounceClick
+import com.sodogku.libraries.ui.components.Surface
 import com.sodogku.libraries.ui.components.dog.Dog
 import com.sodogku.libraries.ui.components.dog.DogPose
 import com.sodogku.libraries.ui.components.game.DailyCard
@@ -51,7 +52,6 @@ import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
 import com.sodogku.system.Radii
-import com.sodogku.system.clip
 import kotlinx.datetime.number
 import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
@@ -292,80 +292,87 @@ private fun LevelRow(
     paysReward: Boolean,
     onPick: (Int) -> Unit,
 ) {
-    val background = when {
-        isCurrent -> AppTheme.colors.accentPrimary.color.copy(alpha = CurrentTint)
-        else -> AppTheme.colors.surfaceSecondary.color
-    }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimension.D400),
-        modifier = Modifier
-            .fillMaxWidth()
-            .bounceClick(enabled = unlocked) { onPick(level.id) }
-            .clip(Radii.Card)
-            .background(background)
-            .padding(horizontal = Dimension.D500, vertical = Dimension.D400),
+    Surface(
+        color = when {
+            isCurrent -> AppTheme.colors.accentPrimary.withAlpha(CurrentTint)
+            else -> AppTheme.colors.surfaceSecondary
+        },
+        contentColor = AppTheme.colors.onSurfaceSecondary,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = unlocked,
+        radius = Radii.Card,
+        onClick = { onPick(level.id) },
+        bounceScale = Motion.PressScale,
+        contentPadding = PaddingValues(
+            horizontal = Dimension.D500,
+            vertical = Dimension.D400,
+        ),
     ) {
-        if (unlocked) {
-            Dog(pose = DogPose.Still, size = Dimension.D1100)
-        } else {
-            // Not decorative: the padlock is the only thing on the row that says
-            // this level cannot be opened. The dog beside an unlocked one is,
-            // because the row's own state is what it means and the row says it.
-            Icon(
-                icon = Icons.Lock(stringResource(Res.string.levels_locked)),
-                color = AppTheme.colors.textDisabled,
-            )
-        }
-        Column(modifier = Modifier.weight(RowFill)) {
-            Text(
-                text = level.id.toString(),
-                typography = AppTheme.typography.Heading.H600,
-                color = if (unlocked) AppTheme.colors.text else AppTheme.colors.textDisabled,
-            )
-            Text(
-                text = stringResource(Res.string.levels_size, level.size, level.size),
-                typography = AppTheme.typography.Caption.C300,
-                color = AppTheme.colors.textSecondary,
-            )
-            // The best of the runs, which is what `LevelRecord` keeps and what
-            // makes the row worth coming back to. Absent rather than zeroed on a
-            // level that has been attempted and not finished: there is no time
-            // to beat until somebody finishes one.
-            elapsedLabel(record.bestTimeMs)?.let { time ->
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimension.D400),
+        ) {
+            if (unlocked) {
+                Dog(pose = DogPose.Still, size = Dimension.D1100)
+            } else {
+                // Not decorative: the padlock is the only thing on the row that says
+                // this level cannot be opened. The dog beside an unlocked one is,
+                // because the row's own state is what it means and the row says it.
+                Icon(
+                    icon = Icons.Lock(stringResource(Res.string.levels_locked)),
+                    color = AppTheme.colors.textDisabled,
+                )
+            }
+            Column(modifier = Modifier.weight(RowFill)) {
                 Text(
-                    text = stringResource(Res.string.levels_best_time, time),
+                    text = level.id.toString(),
+                    typography = AppTheme.typography.Heading.H600,
+                    color = if (unlocked) AppTheme.colors.text else AppTheme.colors.textDisabled,
+                )
+                Text(
+                    text = stringResource(Res.string.levels_size, level.size, level.size),
                     typography = AppTheme.typography.Caption.C300,
                     color = AppTheme.colors.textSecondary,
                 )
+                // The best of the runs, which is what `LevelRecord` keeps and what
+                // makes the row worth coming back to. Absent rather than zeroed on a
+                // level that has been attempted and not finished: there is no time
+                // to beat until somebody finishes one.
+                elapsedLabel(record.bestTimeMs)?.let { time ->
+                    Text(
+                        text = stringResource(Res.string.levels_best_time, time),
+                        typography = AppTheme.typography.Caption.C300,
+                        color = AppTheme.colors.textSecondary,
+                    )
+                }
+                // Only a cleared level has a rating to show. An unlocked one that
+                // has been attempted and lost would otherwise render three empty
+                // paws, which reads as a nought-out-of-three score rather than as
+                // "not finished yet".
+                if (record.state == LevelState.Completed) {
+                    PawRating(
+                        paws = record.bestPaws,
+                        size = Dimension.D700,
+                        // A recalled rating, not a fresh one. See PawRating.
+                        animated = false,
+                        modifier = Modifier.padding(top = Dimension.D200),
+                    )
+                }
             }
-            // Only a cleared level has a rating to show. An unlocked one that
-            // has been attempted and lost would otherwise render three empty
-            // paws, which reads as a nought-out-of-three score rather than as
-            // "not finished yet".
-            if (record.state == LevelState.Completed) {
-                PawRating(
-                    paws = record.bestPaws,
-                    size = Dimension.D700,
-                    // A recalled rating, not a fresh one. See PawRating.
-                    animated = false,
-                    modifier = Modifier.padding(top = Dimension.D200),
+            // Cleared levels keep the chip rather than dropping it, so the column
+            // stays a straight line down 500 rows — but as the spent version, since
+            // the Treat is paid on the first clear and this one has already been
+            // collected.
+            if (paysReward) {
+                LevelRewardChip(
+                    label = if (record.state == LevelState.Completed) {
+                        stringResource(Res.string.levels_reward_claimed)
+                    } else {
+                        stringResource(Res.string.levels_reward_treat, LevelRewardTreats)
+                    },
+                    claimed = record.state == LevelState.Completed,
                 )
             }
-        }
-        // Cleared levels keep the chip rather than dropping it, so the column
-        // stays a straight line down 500 rows — but as the spent version, since
-        // the Treat is paid on the first clear and this one has already been
-        // collected.
-        if (paysReward) {
-            LevelRewardChip(
-                label = if (record.state == LevelState.Completed) {
-                    stringResource(Res.string.levels_reward_claimed)
-                } else {
-                    stringResource(Res.string.levels_reward_treat, LevelRewardTreats)
-                },
-                claimed = record.state == LevelState.Completed,
-            )
         }
     }
 }

@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.inspectable
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -37,6 +39,35 @@ import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.libraries.ui.components.text.Text
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
+/**
+ * A pressable surface: the shape, the fill, the border and the press.
+ *
+ * ### Why [contentDescription] is a parameter and not something you pass in [modifier]
+ *
+ * [bounceClick] ends in `clickable`, which merges everything below it, so a card
+ * with three labels inside is read out as three fragments in a row. Clearing
+ * first is what turns it into one sentence, and `clearAndSetSemantics` is the
+ * only thing that does it — see [bounceClick]'s own doc for the two tidier
+ * variants that were tried on a device and never reached the tree.
+ *
+ * A caller cannot do that clearing itself. Everything in [modifier] is applied
+ * *above* the clickable, so a `clearAndSetSemantics` there clears the click
+ * action along with the labels and the surface stops being a control. Given as a
+ * parameter it is applied directly under the clickable, where the merge picks up
+ * the name and the click action survives. That ordering is the whole point of
+ * the parameter and `SurfaceSemanticsTest` holds it.
+ *
+ * [role] sits between the two for the same reason: below the clearing call it
+ * would be cleared, above the clickable it lands on a node of its own.
+ *
+ * ### Why the press is applied before the fill
+ *
+ * A `graphicsLayer` only transforms what is drawn inside it, so a bounce applied
+ * after the background scales the content and leaves the card holding still —
+ * the text shrinks away from its own border. Applied first, the border, the
+ * shadow and the fill scale with it, which is what every hand-rolled press in
+ * the app was doing before this took it over.
+ */
 @Composable
 @NonRestartableComposable
 fun Surface(
@@ -53,14 +84,27 @@ fun Surface(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     indication: Indication? = null,
     role: Role? = null,
+    contentDescription: String? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable () -> Unit,
 ) {
     Box(
         modifier = modifier
+            .bounceClick(
+                enabled = enabled,
+                scaleDown = bounceScale,
+                indication = indication,
+                mutableInteractionSource = interactionSource,
+                onClick = onClick,
+            )
             .thenIfNotNull(role) {
                 semantics {
                     this.role = it
+                }
+            }
+            .thenIfNotNull(contentDescription) {
+                clearAndSetSemantics {
+                    this.contentDescription = it
                 }
             }
             .background(
@@ -70,13 +114,6 @@ fun Surface(
                 clip = true,
                 alpha = alpha,
                 border = border
-            )
-            .bounceClick(
-                enabled = enabled,
-                scaleDown = bounceScale,
-                indication = indication,
-                mutableInteractionSource = interactionSource,
-                onClick = onClick,
             )
             .padding(contentPadding),
         propagateMinConstraints = true

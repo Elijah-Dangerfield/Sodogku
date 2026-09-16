@@ -1,6 +1,5 @@
 package com.sodogku.features.game.impl
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.sodogku.libraries.ui.PreviewContent
+import com.sodogku.libraries.ui.components.Surface
 import com.sodogku.libraries.ui.components.button.ButtonGhost
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.button.ButtonSecondary
@@ -35,7 +35,6 @@ import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Radii
-import com.sodogku.system.clip
 import kotlinx.datetime.LocalDate
 import kotlin.time.Duration.Companion.hours
 import kotlinx.datetime.number
@@ -529,17 +528,21 @@ private fun SkipButton(skip: SkipOffer, onAction: (GameAction) -> Unit) {
  */
 @Composable
 private fun OutcomeLayout(modifier: Modifier, content: @Composable () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Dimension.D600),
+    Surface(
+        color = AppTheme.colors.surfacePrimary,
+        contentColor = AppTheme.colors.onSurfacePrimary,
         modifier = modifier
             .padding(horizontal = Dimension.D800)
-            .fillMaxWidth()
-            .clip(Radii.Card)
-            .background(AppTheme.colors.surfacePrimary.color)
-            .padding(ModalDialogDefaults.ContentPadding),
+            .fillMaxWidth(),
+        radius = Radii.Card,
+        contentPadding = ModalDialogDefaults.ContentPadding,
     ) {
-        content()
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Dimension.D600),
+        ) {
+            content()
+        }
     }
 }
 

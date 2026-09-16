@@ -4,10 +4,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,20 +25,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import com.sodogku.features.achievements.AchievementCopy
 import com.sodogku.libraries.achievements.AchievementGroup
 import com.sodogku.libraries.achievements.AchievementId
 import com.sodogku.libraries.ui.Border
 import com.sodogku.libraries.ui.PreviewContent
-import com.sodogku.libraries.ui.border
-import com.sodogku.libraries.ui.bounceClick
 import com.sodogku.libraries.ui.components.FullScreenLoader
 import com.sodogku.libraries.ui.components.NonLazyVerticalGrid
 import com.sodogku.libraries.ui.components.ProgressRow
 import com.sodogku.libraries.ui.components.Screen
+import com.sodogku.libraries.ui.components.Surface
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.dialog.Dialog
 import com.sodogku.libraries.ui.components.dog.Dog
@@ -55,13 +52,12 @@ import com.sodogku.libraries.ui.screenContentPadding
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
+import com.sodogku.system.Motion
 import com.sodogku.system.Radii
 import com.sodogku.system.VerticalSpacerD300
 import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.system.VerticalSpacerD700
 import com.sodogku.system.VerticalSpacerD800
-import com.sodogku.system.clip
-import com.sodogku.system.thenIf
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -384,70 +380,72 @@ private fun StaggeredEntry(index: Int, animated: Boolean, content: @Composable (
 private fun SpotlightCard(badge: Badge, celebrated: Boolean, onClick: () -> Unit) {
     val spoken = badge.spoken()
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimension.D500),
-        modifier = Modifier
-            // Before the clip and the background, or only the label scales.
-            .bounceClick(onClick = onClick)
-            // `bounceClick` ends in `clickable`, which merges everything below
-            // it, so a plain `contentDescription` here would be read out *and*
-            // then followed by each label in turn. Clearing first is what makes
-            // the row one sentence instead of four fragments, and the click
-            // action survives because it is applied further out in the chain.
-            .clearAndSetSemantics { contentDescription = spoken }
-            .fillMaxWidth()
-            .thenIf(celebrated) {
-                border(Border(AppTheme.colors.accentPrimary, Dimension.D50), Radii.Card)
-            }
-            .clip(Radii.Card)
-            .background(AppTheme.colors.surfacePrimary.color)
-            .padding(horizontal = Dimension.D600, vertical = Dimension.D500),
+    Surface(
+        color = AppTheme.colors.surfacePrimary,
+        contentColor = AppTheme.colors.onSurfacePrimary,
+        modifier = Modifier.fillMaxWidth(),
+        radius = Radii.Card,
+        border = if (celebrated) Border(AppTheme.colors.accentPrimary, Dimension.D50) else null,
+        onClick = onClick,
+        bounceScale = Motion.PressScale,
+        // A parameter rather than a `clearAndSetSemantics` on the modifier
+        // above: passed in, it would clear the click action along with the
+        // labels. See `Surface`.
+        contentDescription = spoken,
+        contentPadding = PaddingValues(
+            horizontal = Dimension.D600,
+            vertical = Dimension.D500,
+        ),
     ) {
-        Text(text = badge.face(), typography = AppTheme.typography.Display.D800)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimension.D500),
+        ) {
+            Text(text = badge.face(), typography = AppTheme.typography.Display.D800)
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = if (celebrated) {
-                    stringResource(Res.string.achievements_earned)
-                } else {
-                    stringResource(AchievementCopy.groupName(badge.group))
-                },
-                typography = AppTheme.typography.Caption.C300,
-                color = AppTheme.colors.accentPrimary,
-            )
-            Text(text = badge.displayName(), typography = AppTheme.typography.Body.B600)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (celebrated) {
+                        stringResource(Res.string.achievements_earned)
+                    } else {
+                        stringResource(AchievementCopy.groupName(badge.group))
+                    },
+                    typography = AppTheme.typography.Caption.C300,
+                    color = AppTheme.colors.accentPrimary,
+                )
+                Text(text = badge.displayName(), typography = AppTheme.typography.Body.B600)
 
-            if (!celebrated) {
-                VerticalSpacerD300()
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Dimension.D400),
-                ) {
-                    ProgressRow(
-                        progressPercent = badge.progress,
-                        shape = Radii.Progress.shape,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = badge.progressLabel(),
-                        typography = AppTheme.typography.Caption.C300,
-                        color = AppTheme.colors.textSecondary,
-                    )
+                if (!celebrated) {
+                    VerticalSpacerD300()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Dimension.D400),
+                    ) {
+                        ProgressRow(
+                            progressPercent = badge.progress,
+                            shape = Radii.Progress.shape,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = badge.progressLabel(),
+                            typography = AppTheme.typography.Caption.C300,
+                            color = AppTheme.colors.textSecondary,
+                        )
+                    }
                 }
             }
-        }
 
-        // The same trophy the unlock toast puts at the trailing edge of every
-        // pill, and for the same reason: the glyph on the left varies, so
-        // nothing else on the row says "you earned something" rather than
-        // "here is a thing".
-        if (celebrated) {
-            Icon(
-                icon = Icons.Trophy.decorative,
-                size = IconSize.Small,
-                color = AppTheme.colors.accentPrimary,
-            )
+            // The same trophy the unlock toast puts at the trailing edge of
+            // every pill, and for the same reason: the glyph on the left
+            // varies, so nothing else on the row says "you earned something"
+            // rather than "here is a thing".
+            if (celebrated) {
+                Icon(
+                    icon = Icons.Trophy.decorative,
+                    size = IconSize.Small,
+                    color = AppTheme.colors.accentPrimary,
+                )
+            }
         }
     }
 }
@@ -464,72 +462,75 @@ private fun SpotlightCard(badge: Badge, celebrated: Boolean, onClick: () -> Unit
 private fun BadgeTile(badge: Badge, onClick: () -> Unit) {
     val spoken = badge.spoken()
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = Modifier
-            // Before the clip and the background, or only the label scales.
-            .bounceClick(onClick = onClick)
-            // See `SpotlightCard`: `clickable` merges descendants, so the tile's
-            // three labels would otherwise be read one after another.
-            .clearAndSetSemantics { contentDescription = spoken }
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            // The earned outline is in the card's own shape and sits *outside*
-            // the clip. Both halves matter: a square border on a rounded card
-            // loses its corners, and a border drawn inside the clip has its
-            // outer edge shaved off by it.
-            .thenIf(badge.unlocked) {
-                border(Border(AppTheme.colors.accentPrimary, Dimension.D50), Radii.Card)
-            }
-            .clip(Radii.Card)
-            .background(AppTheme.colors.surfacePrimary.color)
-            .padding(Dimension.D300),
+    Surface(
+        color = AppTheme.colors.surfacePrimary,
+        contentColor = AppTheme.colors.onSurfacePrimary,
+        modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+        radius = Radii.Card,
+        // The earned outline is in the card's own shape and sits *outside* the
+        // clip. Both halves matter: a square border on a rounded card loses its
+        // corners, and a border drawn inside the clip has its outer edge shaved
+        // off by it. `Surface` does both.
+        border = if (badge.unlocked) Border(AppTheme.colors.accentPrimary, Dimension.D50) else null,
+        onClick = onClick,
+        bounceScale = Motion.PressScale,
+        // See `SpotlightCard`: the tile's three labels would otherwise be read
+        // one after another.
+        contentDescription = spoken,
+        contentPadding = PaddingValues(Dimension.D300),
     ) {
-        // The glyph still carries the state, but it is dimmed rather than
-        // ghosted: a locked badge has to look like something to want. Read in a
-        // graphicsLayer lambda rather than in composition, per the DS rule.
-        Text(
-            text = badge.face(),
-            typography = AppTheme.typography.Display.D1000,
-            modifier = Modifier.graphicsLayer {
-                alpha = if (badge.unlocked) 1f else LockedGlyphAlpha
-            },
-        )
-        VerticalSpacerD300()
-        Text(
-            text = badge.displayName(),
-            typography = AppTheme.typography.Caption.C300,
-            color = if (badge.unlocked) AppTheme.colors.text else AppTheme.colors.textSecondary,
-            textAlign = TextAlign.Center,
-            maxLines = MaxNameLines,
-        )
-        // A number, not a bar. "4 / 10" is the information a bar was carrying,
-        // in one line of caption type, and it is on every locked badge rather
-        // than only the ones that happen to have started — a line that appears
-        // and disappears down a grid is what made the old page look ragged.
-        //
-        // The same C300 the spotlight rows, the stat pills and the win sheet use
-        // for a line of metadata. It was a step below that, which made the
-        // smallest text on the page the one carrying the only number on the tile.
-        //
-        // Nothing on a mystery badge: its numbers are zeroed upstream, and even
-        // "0 / 1" would say "one clear does it".
-        if (!badge.mystery) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            // The glyph still carries the state, but it is dimmed rather than
+            // ghosted: a locked badge has to look like something to want. Read
+            // in a graphicsLayer lambda rather than in composition, per the DS
+            // rule.
             Text(
-                text = if (badge.unlocked) {
-                    stringResource(Res.string.achievements_earned)
-                } else {
-                    badge.progressLabel()
+                text = badge.face(),
+                typography = AppTheme.typography.Display.D1000,
+                modifier = Modifier.graphicsLayer {
+                    alpha = if (badge.unlocked) 1f else LockedGlyphAlpha
                 },
-                typography = AppTheme.typography.Caption.C300,
-                color = if (badge.unlocked) {
-                    AppTheme.colors.accentPrimary
-                } else {
-                    AppTheme.colors.textSecondary
-                },
-                maxLines = 1,
             )
+            VerticalSpacerD300()
+            Text(
+                text = badge.displayName(),
+                typography = AppTheme.typography.Caption.C300,
+                color = if (badge.unlocked) AppTheme.colors.text else AppTheme.colors.textSecondary,
+                textAlign = TextAlign.Center,
+                maxLines = MaxNameLines,
+            )
+            // A number, not a bar. "4 / 10" is the information a bar was
+            // carrying, in one line of caption type, and it is on every locked
+            // badge rather than only the ones that happen to have started — a
+            // line that appears and disappears down a grid is what made the old
+            // page look ragged.
+            //
+            // The same C300 the spotlight rows, the stat pills and the win
+            // sheet use for a line of metadata. It was a step below that, which
+            // made the smallest text on the page the one carrying the only
+            // number on the tile.
+            //
+            // Nothing on a mystery badge: its numbers are zeroed upstream, and
+            // even "0 / 1" would say "one clear does it".
+            if (!badge.mystery) {
+                Text(
+                    text = if (badge.unlocked) {
+                        stringResource(Res.string.achievements_earned)
+                    } else {
+                        badge.progressLabel()
+                    },
+                    typography = AppTheme.typography.Caption.C300,
+                    color = if (badge.unlocked) {
+                        AppTheme.colors.accentPrimary
+                    } else {
+                        AppTheme.colors.textSecondary
+                    },
+                    maxLines = 1,
+                )
+            }
         }
     }
 }

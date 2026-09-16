@@ -137,25 +137,6 @@ ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
 
-## SD-119 [P2] — A `Surface` overload that takes a semantics label
-
-**Ask:** `BadgeTile`, `SpotlightCard`, `GameOutcomeSheets.OutcomeLayout` and
-`LevelDrawer.LevelRow` each hand-roll `bounceClick + clearAndSetSemantics + clip
-+ background + border + padding`, which is the body of the design system's
-`Surface`. Four copies of one thing.
-
-**Done when:** those call sites use `Surface`, or the duplication has a reason
-written down next to it.
-
-**Hints:** The reason they are not `Surface` today is real and was checked on a
-device: `Surface(onClick=)` applies its `bounceClick` *inside* the caller's
-modifier, so a `clearAndSetSemantics` passed in sits above the clickable and
-clears the click action along with the labels. `bounceClick`'s own KDoc records
-that two tidier variants were tried and neither reached the tree. So the fix is
-an overload that takes the semantics label as a parameter and applies it in the
-right order, not a call-site conversion. Found while auditing the achievements
-screen for SD-114.
-
 ## SD-121 [P1] — No streak ceremony when the streak starts or increments
 
 **Ask:** "I just came back every one day and completed a puzzle which should've
@@ -319,3 +300,55 @@ the same column and colour. Accessibility is the real argument here, not taste:
 these sizes do not scale the way a system font setting expects, and SD-114's
 review found the two worst defects in `libraries/ui` were both about what a
 screen reader hears.
+
+## SD-129 [P2] — Confirm on a device that the whole card presses, not just its text
+
+**Ask:** SD-119 moved `bounceClick` above the fill inside `Surface`. Every
+clickable `Surface` in the app now scales its border, shadow and fill along with
+its content, where before the content shrank away from a border that held still.
+
+**Done when:** somebody has pressed `Card`, `CardSecondary`, `NoticeBanner`,
+`StreakButton` and `IconButton` on a device and said whether the new press is
+right. If it is not, the fix is a parameter, not a revert: the four SD-119 call
+sites need the new order to keep the press they already had.
+
+**Hints:** `Surface.kt`, the `Box` modifier chain, and the KDoc section "Why the
+press is applied before the fill". `bounceClick` is `graphicsLayer` then
+`clickable`, and a `graphicsLayer` only transforms what is drawn below it, which
+is the whole mechanism. `BasicButton` already works around the old order by
+wrapping a non-clickable `Surface` in a `Box` that carries the press — if the new
+order is right, that workaround comes out under SD-130.
+
+## SD-130 [P2] — Fold the three hand-rolled presses in `libraries/ui` back onto `Surface`
+
+**Ask:** Three design-system components build their own press rather than using
+the DS component that exists for it, each for a reason that SD-119 partly
+removed.
+
+**Done when:** each of the three either calls `Surface` or has the reason it
+cannot written next to it.
+
+**The three:**
+
+- `BasicButton` lines 95-110 wraps a *non*-clickable `Surface` in a `Box`
+  carrying `bounceClick`, purely to get the press outside the fill. SD-119 made
+  that the default order, so this should now be a plain `Surface(onClick =)`.
+  Depends on SD-129 confirming the new order is the one we want.
+- `CircleIcon` lines 32-42 puts a raw `Modifier.clickable` on a non-clickable
+  `Surface`, so it has no press animation and no `Role.Button` — it is the only
+  pressable surface in the DS that does not bounce.
+- `ListItem` lines 163-166 rolls its own because `bounceClick` is a `composed {}`
+  helper that cannot contribute a role or a toggled state. `Surface` now applies
+  `role` in the right place; a `toggled` parameter beside it would likely finish
+  the job.
+
+**Also here, because it blocks writing tests for any of the above:**
+`ColorResource` is `@Deprecated` at class level with no non-deprecated way to
+name a literal colour, so `SurfaceSemanticsTest` needs a class-level
+`@Suppress("DEPRECATION")` to say `ColorResource.White`. `Screen.kt:31` and
+`Button.kt:378` carry the same suppression inside the DS itself. Either the
+deprecation is wrong or it needs a replacement.
+
+**Hints:** Found by the SD-119 agent while converting four call sites onto
+`Surface`. `SurfaceSemanticsTest` in `:libraries:ui` `androidUnitTest` is the
+composition-tier worked example for asserting what any of these expose.
