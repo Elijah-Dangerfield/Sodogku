@@ -137,25 +137,6 @@ ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
 
-## SD-118 [P2] — Delete the daily failure state's leftovers
-
-**Ask:** SD-111 stopped `toResult` reading a `Failed` row, so nothing reaches the
-dead-end card any more. `DailyCardState.Failed` in `libraries/ui` and the
-`daily_out_of_bones` string now have no live caller, and the `DailyOutcome.Failed`
-branches in `LevelDrawer.DailyCardSlot` and `DailyStreak.missedDayBefore` survive
-only for `when` exhaustiveness.
-
-**Done when:** the unreachable state and its copy are gone, or there is a written
-reason to keep them.
-
-**Hints:** Left in deliberately rather than removed during SD-111, because a
-cross-module deletion while four other agents were live in the tree was the
-riskier half of the change. `DailyOutcome.Failed` itself must stay in the enum:
-dropping the name makes `toResult` fail to *parse* those rows, which reaches the
-same outcome by accident and costs the parse failure its own meaning. Four
-`DailyStreakTest` cases now pin behavior for an input the repository cannot
-produce; decide whether they are a guard on the pure fold or dead weight.
-
 ## SD-119 [P2] — A `Surface` overload that takes a semantics label
 
 **Ask:** `BadgeTile`, `SpotlightCard`, `GameOutcomeSheets.OutcomeLayout` and
