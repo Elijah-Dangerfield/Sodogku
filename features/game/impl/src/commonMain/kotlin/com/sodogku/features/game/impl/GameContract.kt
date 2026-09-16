@@ -420,6 +420,24 @@ data class GameState(
     val freezeMessage: FreezeMessage? = null,
 
     /**
+     * Whether the last bone refill was handed over with no ad shown.
+     *
+     * The player tapped a button that says "Watch an ad for 3", and then no ad
+     * played: they are inside the new-user grace, ads are off, or the network
+     * had nothing to serve and the gate paid out anyway. Before this the bones
+     * simply appeared and nothing said why, which reads either as a bug or as
+     * nothing at all.
+     *
+     * **Not set for Pro**, who bought the absence of ads and are not being done
+     * a favour by it.
+     *
+     * Deliberately outside [isCovered]: this is a toast that leaves on its own
+     * timer, it blocks nothing, and a board with one on it is still a board the
+     * player can play.
+     */
+    val freeBonesGrant: Boolean = false,
+
+    /**
      * The stored result of a day that is already spent, set only in
      * [GamePhase.Recap]. This is what the daily route shows instead of refusing
      * to open, which is what used to strand a player in the campaign.
@@ -967,6 +985,9 @@ sealed interface GameAction {
     /** The streak badge in the level pane was tapped. */
     data object OpenStreak : GameAction
     data object DismissFreezeMessage : GameAction
+
+    /** The free-bones toast finished, on its own timer or on a tap. */
+    data object DismissFreeBonesGrant : GameAction
     data object OpenSettings : GameAction
 
     /** The trophy beside the gear. */

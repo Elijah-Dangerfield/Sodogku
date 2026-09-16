@@ -62,6 +62,20 @@ sealed interface RewardOutcome {
 
     /** The SDK failed. [kind] is for telemetry, never for the player. */
     data class Failed(val kind: String) : RewardOutcome
+
+    /**
+     * The reward was given without an ad being shown at all: the player is Pro,
+     * ads are switched off in config, this placement is disabled, or they are
+     * inside the new-user grace. [reason] matches `ads.result`'s own `reason`.
+     *
+     * Distinct from [Rewarded], which it used to be folded into, because the
+     * caller is the only thing that can tell the player anything and it could
+     * not tell these two apart. Granting an ad's worth of bones with no ad is
+     * the game being generous, and a screen that wants to say so needs to know
+     * it happened. **It grants exactly as [Rewarded] does** — callers ask
+     * `!= Dismissed`, and this is not `Dismissed`.
+     */
+    data class GrantedWithoutAd(val reason: String) : RewardOutcome
 }
 
 /**

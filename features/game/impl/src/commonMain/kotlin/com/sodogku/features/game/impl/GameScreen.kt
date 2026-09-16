@@ -83,6 +83,8 @@ import sodogku.libraries.resources.generated.resources.game_rule_no_touching
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_line
 import sodogku.libraries.resources.generated.resources.game_rule_one_per_region
 import sodogku.libraries.resources.generated.resources.game_bones_remaining
+import sodogku.libraries.resources.generated.resources.game_free_bones_label
+import sodogku.libraries.resources.generated.resources.game_free_bones_title
 import sodogku.libraries.resources.generated.resources.game_bones_refill
 import sodogku.libraries.resources.generated.resources.game_booster_sniff
 import sodogku.libraries.resources.generated.resources.game_booster_treat
@@ -236,6 +238,28 @@ fun GameScreen(
                         )
                     },
                     onDismiss = {},
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(padding)
+                        .padding(top = Dimension.D700),
+                )
+            }
+
+            // The one acknowledgement of a refill nobody paid for. Same toast as
+            // a badge unlock and for the same reason: it is a moment worth
+            // marking that must not cost the player a tap, on a board they are
+            // in the middle of. Never stacked with the badges — a refill happens
+            // on a board in play and badges land when one ends.
+            if (state.freeBonesGrant) {
+                UnlockToasts(
+                    items = listOf(
+                        UnlockToastItem(
+                            glyph = FreeBonesGlyph,
+                            label = stringResource(Res.string.game_free_bones_label),
+                            title = stringResource(Res.string.game_free_bones_title),
+                        ),
+                    ),
+                    onDismiss = { onAction(GameAction.DismissFreeBonesGrant) },
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(padding)
@@ -1035,6 +1059,13 @@ private val DailyDotSize = Dimension.D400
  * The same currency should be the same object. A differently coloured bone on
  * the button that refills them would read as a different thing being offered.
  */
+/**
+ * The bone on the free-refill toast, in the same register as the badge glyphs
+ * the same component draws. The HUD's bones are vector art rather than text and
+ * cannot be a toast glyph, which takes a string.
+ */
+private const val FreeBonesGlyph = "\uD83E\uDDB4"
+
 private val BoneGold = Color(0xFFF5C043)
 private val BoneGoldEdge = Color(0xFFC8871B)
 

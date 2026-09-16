@@ -659,32 +659,119 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun aBoardOpenedAtZeroMeetsTheOfferRatherThanTheNextWrongGuess() = runUnitTest {
-        // Being at zero is a wall, and a wall the player only discovers by
-        // losing a board to it is indistinguishable from a bug. The prompt it
-        // opens is the same one the bone button shows, whose refill cannot fail
-        // closed.
+    fun aBoardOpenedAtZeroSaysNothingUntilThePlayerDoesSomething() = runUnitTest {
+        // This used to open the bones dialog here, on the door, and SD-120 is
+        // that line reported twice: a board nobody had touched, every time. The
+        // offer did not go away, it moved — see the two tests below.
         val cache = InMemoryAppCache()
         cache.set(AppData(bones = 0))
 
         val vm = viewModel(cache = cache)
 
         assertEquals(GamePhase.Playing, vm.state.phase, "the board is still markable")
-        assertEquals(Consumable.Bone, vm.state.boosterPrompt)
+        assertNull(vm.state.boosterPrompt, "the offer met the player at the door again")
     }
 
     @Test
-    fun aStrikeAtZeroDoesNotDriveTheCountNegative() = runUnitTest {
+    fun theFirstWrongGuessOnABoardOpenedAtZeroOffersBonesInsteadOfEndingIt() = runUnitTest {
+        // The other half of SD-120, and the promise the door prompt was keeping:
+        // a player still has to find out about bones *before* an attempt ends
+        // because of them. A board opened at zero ends on its first wrong guess,
+        // so this is the last moment the offer is worth anything.
         val cache = InMemoryAppCache()
         cache.set(AppData(bones = 0))
         val vm = viewModel(cache = cache)
-        vm.takeAction(GameAction.DismissBoosterPrompt)
 
         vm.commit(wrongCellIn(row = 0))
 
-        assertEquals(GamePhase.Lost, vm.state.phase)
+        assertEquals(Consumable.Bone, vm.state.boosterPrompt, "the wrong guess said nothing")
+        assertEquals(GamePhase.Playing, vm.state.phase, "the attempt ended before the offer landed")
+    }
+
+    @Test
+    fun turningDownTheOutOfBonesOfferEndsTheAttempt() = runUnitTest {
+        // The loss is deferred by the offer, never cancelled by it. "Not now"
+        // has to reach exactly the ending the strike would have.
+        val cache = InMemoryAppCache()
+        cache.set(AppData(bones = 0))
+        val vm = viewModel(cache = cache)
+        vm.commit(wrongCellIn(row = 0))
+
+        vm.takeAction(GameAction.DismissBoosterPrompt)
+        settle()
+
+        assertEquals(GamePhase.Lost, vm.state.phase, "declining the offer left the board in limbo")
         assertEquals(0, vm.state.livesRemaining)
         assertEquals(0, cache.get().bones, "a negative holding would refill up to itself")
+    }
+
+    @Test
+    fun takingTheOutOfBonesOfferKeepsTheAttemptAliveWithNoFailureRecorded() = recordingEvents { events ->
+        runUnitTest {
+            // Why the loss is deferred rather than taken and then revived. The
+            // lose sheet's revive already restores the board, but it arrives
+            // after `game.level_failed` and a `LevelResult` are on the record,
+            // so a player who bought their way out of a board they never got to
+            // play would still be carrying the failure.
+            val cache = InMemoryAppCache()
+            cache.set(AppData(bones = 0))
+            val vm = viewModel(cache = cache)
+            vm.commit(wrongCellIn(row = 0))
+
+            vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Bone))
+            settle()
+
+            assertEquals(GamePhase.Playing, vm.state.phase, "the refill did not put the board back")
+            assertEquals(ConsumableRefillTo, vm.state.livesRemaining)
+            assertTrue(
+                events.attributesOf("game.level_failed").isEmpty(),
+                "an attempt the player bought out of was still recorded as failed",
+            )
+        }
+    }
+
+    @Test
+    fun theOutOfBonesOfferIsMadeOncePerAttempt() = runUnitTest {
+        // After a refill the player is in the ordinary three-strike game, where
+        // the ending is the lose sheet and its revive. A second deferral here
+        // would be an offer the player has already answered.
+        val cache = InMemoryAppCache()
+        cache.set(AppData(bones = 0))
+        val vm = viewModel(cache = cache)
+        vm.commit(wrongCellIn(row = 0))
+        vm.takeAction(GameAction.BoosterRefillRequested(Consumable.Bone))
+        settle()
+
+        repeat(ConsumableRefillTo) { vm.commit(tappableWrongCell(vm)) }
+
+        assertEquals(GamePhase.Lost, vm.state.phase, "the offer was made twice on one attempt")
+    }
+
+    @Test
+    fun theBonesOfferReportsItselfAtBothEnds() = recordingEvents { events ->
+        runUnitTest {
+            // SD-120 could not be measured at all: the prompt emitted nothing,
+            // so "how often does this fire and does anyone take it" was a
+            // question only the owner playing the game could answer.
+            val cache = InMemoryAppCache()
+            cache.set(AppData(bones = 0))
+            val vm = viewModel(cache = cache)
+
+            vm.commit(wrongCellIn(row = 0))
+            settle()
+            vm.takeAction(GameAction.DismissBoosterPrompt)
+            settle()
+
+            assertEquals(
+                listOf("out_of_bones"),
+                events.attributesOf("game.booster_prompt_shown").map { it["trigger"] },
+            )
+            assertEquals(
+                listOf("out_of_bones" to "dismissed"),
+                events.attributesOf("game.booster_prompt_closed")
+                    .map { it["trigger"] to it["outcome"] },
+            )
+        }
     }
 
     @Test
@@ -2156,6 +2243,59 @@ class GameViewModelTest : CoroutineTest() {
 
         assertEquals(GamePhase.Lost, vm.state.phase)
         assertEquals(0, vm.state.livesRemaining)
+    }
+
+    @Test
+    fun bonesThatArriveWithNoAdSaySo() = runUnitTest {
+        // The player pressed a button that says "Watch an ad for 3" and no ad
+        // played. Before this the bones simply appeared, which reads as a bug or
+        // as nothing at all. Every outcome here already grants — that is the
+        // fail-open rule and this changes none of it — so the only thing under
+        // test is whether the game acknowledges what it just did.
+        listOf(
+            RewardOutcome.NoFill,
+            RewardOutcome.Offline,
+            RewardOutcome.Failed("boom"),
+            RewardOutcome.GrantedWithoutAd("new_user_grace"),
+        ).forEach { outcome ->
+            val cache = InMemoryAppCache()
+            cache.set(AppData(bones = 0))
+            val vm = viewModel(adGate = FixedAdGate(outcome), cache = cache)
+
+            vm.takeAction(GameAction.RefillBones)
+            settle()
+
+            assertEquals(ConsumableRefillTo, vm.state.livesRemaining, "$outcome withheld bones")
+            assertTrue(vm.state.freeBonesGrant, "$outcome was a free grant and went unremarked")
+        }
+    }
+
+    @Test
+    fun anAdThatActuallyPlayedIsNotAFavour() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(bones = 0))
+        val vm = viewModel(adGate = FixedAdGate(RewardOutcome.Rewarded), cache = cache)
+
+        vm.takeAction(GameAction.RefillBones)
+        settle()
+
+        assertEquals(ConsumableRefillTo, vm.state.livesRemaining)
+        assertFalse(vm.state.freeBonesGrant, "the player watched the ad they were offered")
+    }
+
+    @Test
+    fun proIsNotToldItIsBeingDoneAFavour() = runUnitTest {
+        // Pro bought the absence of ads. Thanking them for it every refill turns
+        // the thing they paid for into a recurring notification.
+        val cache = InMemoryAppCache()
+        cache.set(AppData(bones = 0))
+        val vm = viewModel(entitlements = ProEntitlements(), cache = cache)
+
+        vm.takeAction(GameAction.RefillBones)
+        settle()
+
+        assertEquals(ConsumableRefillTo, vm.state.livesRemaining)
+        assertFalse(vm.state.freeBonesGrant)
     }
 
     @Test

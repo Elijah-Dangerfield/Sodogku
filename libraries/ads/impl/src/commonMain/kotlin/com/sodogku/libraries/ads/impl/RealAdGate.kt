@@ -272,7 +272,7 @@ class RealAdGate(
             "outcome" to "granted_without_ad",
             "reason" to reason,
         )
-        return RewardOutcome.Rewarded
+        return RewardOutcome.GrantedWithoutAd(reason)
     }
 
     /**
