@@ -28,7 +28,6 @@ import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.daily_done
 import sodogku.libraries.resources.generated.resources.daily_freeze_cta
 import sodogku.libraries.resources.generated.resources.daily_freeze_remaining
-import sodogku.libraries.resources.generated.resources.daily_out_of_bones
 import sodogku.libraries.resources.generated.resources.daily_play
 import sodogku.libraries.resources.generated.resources.daily_resets_hours
 import sodogku.libraries.resources.generated.resources.daily_resets_minutes
@@ -49,9 +48,6 @@ enum class DailyCardState {
     Current,
 
     Completed,
-
-    /** Played and ran out of bones. Spent exactly like a clear. */
-    Failed,
 }
 
 /**
@@ -156,12 +152,6 @@ fun DailyCard(
                     color = AppTheme.colors.textSecondary,
                 )
             }
-
-            DailyCardState.Failed -> Text(
-                text = stringResource(Res.string.daily_out_of_bones),
-                typography = AppTheme.typography.Body.B500,
-                color = AppTheme.colors.textSecondary,
-            )
         }
 
         // A finished day still opens, on its result rather than its board. The

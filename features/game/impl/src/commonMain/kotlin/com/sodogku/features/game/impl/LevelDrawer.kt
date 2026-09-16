@@ -257,16 +257,16 @@ private fun DailyCardSlot(
         state = when (status.result?.outcome) {
             null -> if (isCurrentBoard) DailyCardState.Current else DailyCardState.Open
             DailyOutcome.Completed -> DailyCardState.Completed
-            // Unreachable since SD-111: the repository stopped reading a
-            // `Failed` row as a result, so a day given up on by an older build
-            // comes back as `null` above and the card offers it again. The
-            // branch stays because the `when` is over the enum, and the enum
-            // keeps the name so rows on disk carrying it can be recognised.
-            DailyOutcome.Failed -> DailyCardState.Failed
-            // A freeze or a restore only ever covers a *missed* day, so today
-            // cannot be either — but a clock moved backwards can put one here,
-            // and "out of bones" would be a lie about a day nobody played.
-            DailyOutcome.Frozen, DailyOutcome.Restored -> DailyCardState.Completed
+            // None of these three is a day the player worked through, and all
+            // three still draw as done. A freeze or a restore only ever covers
+            // a *missed* day, so today cannot be either — but a clock moved
+            // backwards can put one here, and the card has nothing to offer on
+            // a day it has a row for. `Failed` cannot arrive at all: since
+            // SD-111 the repository drops those rows, so a day given up on by
+            // an older build comes back as `null` above and is offered again.
+            // The enum keeps the name so those rows stay recognisable, which
+            // is why the `when` still has to answer for it.
+            DailyOutcome.Failed, DailyOutcome.Frozen, DailyOutcome.Restored -> DailyCardState.Completed
         },
         paws = status.result?.paws ?: 0,
         resetsIn = status.resetsIn,

@@ -18,6 +18,16 @@ import kotlin.test.assertTrue
  *
  * Persistence, the ad and the monthly cap are the repository's; this file only
  * knows dates and outcomes.
+ *
+ * **The four cases that feed a [DailyOutcome.Failed] day in are about the fold,
+ * not about the app.** Since SD-111 the repository drops those rows before the
+ * fold sees them, so no player can produce this input any more. They are kept
+ * because [DailyOutcome.Failed] is still in the enum on purpose, which leaves
+ * the folds with a branch they have to answer for, and an untested branch is
+ * the one that gets quietly merged into the wrong bucket. Read them as "this is
+ * what the walk does with a legacy row", never as a rule a player can hit — the
+ * live rule is that a day given up on opens on its board again, and it is
+ * pinned in `DailyRepositoryImplTest`.
  */
 class DailyStreakTest {
 

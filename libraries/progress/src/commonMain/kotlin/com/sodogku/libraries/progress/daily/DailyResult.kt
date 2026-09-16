@@ -17,10 +17,16 @@ enum class DailyOutcome {
      * control that did was Give up on today, and a run that merely goes out of
      * bones leaves the day open so it can be revived or restarted.
      *
-     * It stays because rows carrying it are on players' disks and the fold has
-     * to keep reading them — deleting the name would make those rows unparseable
-     * and `toResult` would drop them, which silently shortens somebody's
-     * history. Every rule below that names it is about that history.
+     * **It has no writer and is not deleted, on purpose.** Rows carrying it are
+     * still on players' disks, and since SD-111 `toResult` recognises the name
+     * and skips them so the day opens on its board again. Deleting the name
+     * would skip them too — by failing to parse — which reaches the same place
+     * by accident and costs the parse failure its own meaning: a name that
+     * stops parsing takes any *future* outcome down with it, and the drop here
+     * is meant to be about this one reading and no other.
+     *
+     * So the folds in `DailyStreak` still have to answer for it even though it
+     * can no longer reach them, and their branches say so where they sit.
      */
     Failed,
 
