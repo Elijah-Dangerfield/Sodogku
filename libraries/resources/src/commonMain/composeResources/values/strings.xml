@@ -68,6 +68,11 @@
     <string name="game_next_level">Next level</string>
     <string name="game_last_bone_title">One chance left</string>
     <string name="game_last_bone_body">Tap anywhere to keep going.</string>
+    <!-- The toast on a bone refill that cost nothing: the player pressed a
+         button offering an ad, no ad played, and the bones arrived anyway.
+         Never shown to Pro, who bought the absence of ads. -->
+    <string name="game_free_bones_label">No ad needed</string>
+    <string name="game_free_bones_title">Throwing you a bone</string>
     <!-- Shown once, on the first board that opens with no dog already placed.
          It says the board is deliberate and names the rules, and it must never
          say where a dog goes. -->

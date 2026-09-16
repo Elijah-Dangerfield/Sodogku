@@ -65,7 +65,10 @@ class RealAdGateTest : CoroutineTest() {
 
         val rewarded = gate().showRewarded(AdPlacement.ContinueLevel)
 
-        assertEquals(RewardOutcome.Rewarded, rewarded)
+        // `GrantedWithoutAd`, not `Rewarded`: both grant, and the difference is
+        // that the game can tell a reward it gave away from one the player sat
+        // through. Pro is the one free grant nothing thanks the player for.
+        assertEquals(RewardOutcome.GrantedWithoutAd("pro"), rewarded)
         assertEquals(emptyList(), network.shown, "Pro was shown an ad")
     }
 
@@ -125,7 +128,7 @@ class RealAdGateTest : CoroutineTest() {
         val outcome = gate(ads = mapOf("enabled" to false))
             .showRewarded(AdPlacement.SkipLevel)
 
-        assertEquals(RewardOutcome.Rewarded, outcome)
+        assertEquals(RewardOutcome.GrantedWithoutAd("ads_disabled"), outcome)
         assertEquals(emptyList(), network.shown, "A kill switch must not still request an ad")
     }
 
@@ -135,7 +138,7 @@ class RealAdGateTest : CoroutineTest() {
             ads = mapOf("rewardedPlacements" to mapOf("skip_level" to false)),
         ).showRewarded(AdPlacement.SkipLevel)
 
-        assertEquals(RewardOutcome.Rewarded, outcome)
+        assertEquals(RewardOutcome.GrantedWithoutAd("placement_disabled"), outcome)
         assertEquals(emptyList(), network.shown)
     }
 
@@ -158,7 +161,10 @@ class RealAdGateTest : CoroutineTest() {
         progress.unlocked = 2
 
         val early = gate(ads = config)
-        assertEquals(RewardOutcome.Rewarded, early.showRewarded(AdPlacement.BoosterGrant))
+        assertEquals(
+            RewardOutcome.GrantedWithoutAd("new_user_grace"),
+            early.showRewarded(AdPlacement.BoosterGrant),
+        )
         assertEquals(emptyList(), network.shown, "Level 2 is inside the level leg")
 
         // Past the level leg but not the clock leg.
@@ -444,7 +450,13 @@ class RealAdGateTest : CoroutineTest() {
         val placementOff = gate(ads = mapOf("rewardedPlacements" to mapOf("booster_grant" to false)))
             .showRewarded(AdPlacement.BoosterGrant)
 
-        assertEquals(listOf(RewardOutcome.Rewarded, RewardOutcome.Rewarded), listOf(adsOff, placementOff))
+        assertEquals(
+            listOf(
+                RewardOutcome.GrantedWithoutAd("ads_disabled"),
+                RewardOutcome.GrantedWithoutAd("placement_disabled"),
+            ),
+            listOf(adsOff, placementOff),
+        )
         assertEquals(emptyList(), network.shown, "neither gate went near an ad")
         assertEquals(emptyList(), paywall.standIns)
     }

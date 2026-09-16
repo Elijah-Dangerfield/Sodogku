@@ -2246,6 +2246,59 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun bonesThatArriveWithNoAdSaySo() = runUnitTest {
+        // The player pressed a button that says "Watch an ad for 3" and no ad
+        // played. Before this the bones simply appeared, which reads as a bug or
+        // as nothing at all. Every outcome here already grants — that is the
+        // fail-open rule and this changes none of it — so the only thing under
+        // test is whether the game acknowledges what it just did.
+        listOf(
+            RewardOutcome.NoFill,
+            RewardOutcome.Offline,
+            RewardOutcome.Failed("boom"),
+            RewardOutcome.GrantedWithoutAd("new_user_grace"),
+        ).forEach { outcome ->
+            val cache = InMemoryAppCache()
+            cache.set(AppData(bones = 0))
+            val vm = viewModel(adGate = FixedAdGate(outcome), cache = cache)
+
+            vm.takeAction(GameAction.RefillBones)
+            settle()
+
+            assertEquals(ConsumableRefillTo, vm.state.livesRemaining, "$outcome withheld bones")
+            assertTrue(vm.state.freeBonesGrant, "$outcome was a free grant and went unremarked")
+        }
+    }
+
+    @Test
+    fun anAdThatActuallyPlayedIsNotAFavour() = runUnitTest {
+        val cache = InMemoryAppCache()
+        cache.set(AppData(bones = 0))
+        val vm = viewModel(adGate = FixedAdGate(RewardOutcome.Rewarded), cache = cache)
+
+        vm.takeAction(GameAction.RefillBones)
+        settle()
+
+        assertEquals(ConsumableRefillTo, vm.state.livesRemaining)
+        assertFalse(vm.state.freeBonesGrant, "the player watched the ad they were offered")
+    }
+
+    @Test
+    fun proIsNotToldItIsBeingDoneAFavour() = runUnitTest {
+        // Pro bought the absence of ads. Thanking them for it every refill turns
+        // the thing they paid for into a recurring notification.
+        val cache = InMemoryAppCache()
+        cache.set(AppData(bones = 0))
+        val vm = viewModel(entitlements = ProEntitlements(), cache = cache)
+
+        vm.takeAction(GameAction.RefillBones)
+        settle()
+
+        assertEquals(ConsumableRefillTo, vm.state.livesRemaining)
+        assertFalse(vm.state.freeBonesGrant)
+    }
+
+    @Test
     fun proSkipsTheAdEntirely() = runUnitTest {
         val gate = FixedAdGate(RewardOutcome.Dismissed)
         val vm = viewModel(adGate = gate, entitlements = ProEntitlements())

@@ -646,6 +646,8 @@ class GameViewModel(
             // nothing.
             GameAction.OpenStreak -> sendEvent(GameEvent.OpenStreak(streak = 0))
             GameAction.DismissFreezeMessage -> action.updateState { it.copy(freezeMessage = null) }
+            GameAction.DismissFreeBonesGrant ->
+                action.updateState { it.copy(freeBonesGrant = false) }
 
             GameAction.OpenPrivacy -> sendEvent(GameEvent.OpenPrivacy)
             GameAction.OpenTerms -> sendEvent(GameEvent.OpenTerms)
@@ -2330,8 +2332,17 @@ class GameViewModel(
         } else {
             AdPlacement.BoosterGrant
         }
-        val granted = entitlements.isPro.value ||
-            adGate.showRewarded(placement) != RewardOutcome.Dismissed
+        // Pro still short-circuits the gate rather than asking it, which is what
+        // keeps a paying player from ever touching the ad SDK. The outcome is
+        // spelled out instead of implied so the branch below has the same shape
+        // for both, and so `pro` stays distinguishable from the grants that are
+        // the game being generous.
+        val outcome = if (entitlements.isPro.value) {
+            RewardOutcome.GrantedWithoutAd(ProGrantReason)
+        } else {
+            adGate.showRewarded(placement)
+        }
+        val granted = outcome != RewardOutcome.Dismissed
         if (!granted) {
             // The prompt is only up when the bones pill sent us here; the
             // standing offer and the lose sheet have nothing open. Leaving it
@@ -2361,6 +2372,7 @@ class GameViewModel(
                 phase = GamePhase.Playing,
                 livesRemaining = topped,
                 boosterPrompt = null,
+                freeBonesGrant = outcome.isAFavour(),
             )
         }
         persistCounts(Consumable.Bone, topped)
@@ -3217,6 +3229,32 @@ class GameViewModel(
  */
 internal fun endsTheCampaign(levelId: Int, isDaily: Boolean): Boolean =
     !isDaily && levelId >= LevelPacks.lastCampaignLevelId
+
+/** [RewardOutcome.GrantedWithoutAd]'s reason when Pro short-circuits the gate. */
+private const val ProGrantReason = "pro"
+
+/**
+ * Whether this outcome is the game handing over bones it did not have to.
+ *
+ * True for every grant that cost the player nothing and was not something they
+ * bought: the new-user grace, ads switched off, a disabled placement, and the
+ * three unserved outcomes the gate pays out on anyway — no fill, no network, an
+ * SDK that threw. From the player's side those are all the same event. They
+ * pressed a button offering an ad, no ad arrived, and the bones did.
+ *
+ * False for Pro, who paid for the absence of ads and is not being done a favour
+ * by it, and false for [RewardOutcome.Dismissed], which grants nothing at all.
+ *
+ * It decides a toast and nothing else. Every one of these outcomes already
+ * grants, here and everywhere, and nothing in this file may make that
+ * conditional — see [AdGate].
+ */
+private fun RewardOutcome.isAFavour(): Boolean = when (this) {
+    is RewardOutcome.GrantedWithoutAd -> reason != ProGrantReason
+    RewardOutcome.NoFill, RewardOutcome.Offline -> true
+    is RewardOutcome.Failed -> true
+    RewardOutcome.Rewarded, RewardOutcome.Dismissed -> false
+}
 
 /**
  * Which offer the booster prompt is, as the `trigger` attribute of
