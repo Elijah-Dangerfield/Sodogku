@@ -156,29 +156,6 @@ an overload that takes the semantics label as a parameter and applies it in the
 right order, not a call-site conversion. Found while auditing the achievements
 screen for SD-114.
 
-## SD-120 [P1] — The Bones prompt opens on every board started with zero bones
-
-**Ask:** "I get the out of bones message at the start of every game. idk if that
-makes any sense. maybe we need to not do that. maybe just when you run out or
-make a mistake after running out idk", and four days earlier: "we show this
-dialog way too much. is it every on resume of every puzzle. it's popping up a
-lot"
-
-**Done when:** a player who starts a board with zero bones is not shown the
-dialog before they have done anything, and still finds out about bones before an
-attempt ends because of them.
-
-**Case file:** `docs/cases/SD-120/` — both screenshots, the Sep 16 session log,
-the trigger line, and why the current behavior was built that way on purpose.
-Read it before changing the condition.
-
-**Hints:** `GameViewModel.startAttempt` sets `boosterPrompt` when
-`livesRemaining <= 0`. There is no telemetry for the prompt being shown, so
-nobody can measure whether the fix worked; adding it is part of this item.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-M and
-https://elijah-dangerfield.sentry.io/issues/SODOGKU-E · session
-1ba50ef1-4f55-4832-870f-ce8b91da99c3 · 2026-09-16
-
 ## SD-121 [P1] — No streak ceremony when the streak starts or increments
 
 **Ask:** "I just came back every one day and completed a puzzle which should've
@@ -263,23 +240,6 @@ Depends on SD-121: there is no point animating a ceremony that never opens.
 Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-G · session
 bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
 
-## SD-125 [P2] — "You have 0" in the Bones dialog is too small, and maybe unneeded
-
-**Ask:** "the 'you have zero' is too small but also not needed. look for other
-usages of that font size to see if we need to increase it"
-
-**Done when:** the line is gone, or it is legible at the size the rest of the app
-uses for a line of metadata. The second half of the ask is the real work: find
-the other call sites of that size and decide whether the size itself is wrong.
-
-**Hints:** The line sits under the body copy in the Bones dialog, above WATCH AN
-AD FOR 3. The bone pills in the HUD already say the same thing, which is
-presumably why he calls it unneeded. SD-114 found the same class of problem on
-the achievements screen, where a `Caption.C200` counter at 6sp was the smallest
-text on the page; check whether this is another C200.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-F · session
-bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
-
 ## SD-126 [P2] — Review the generated daily boards for how they open
 
 **Ask:** "maybe I'm just dumb but this daily board seems way too hard to solve
@@ -328,3 +288,34 @@ can be offered here. Ship the acknowledgement, leave a seam for the offer.
 Build it with SD-121, which is the same seam from the other side: the returning
 player whose streak restarted at 1 is exactly the player whose streak just broke,
 and today they get nothing from either direction.
+
+## SD-128 [P2] — Decide whether the Caption ramp is too small, and fix the two sites that forced the question
+
+**Ask:** SD-125 asked, about the "You have 0" line: "look for other usages of that
+font size to see if we need to increase it." That line was `Caption.C300` and the
+survey answered the narrow question — C300 is the app's deliberate metadata size,
+used at fifteen call sites, and SD-114 promoted the achievement tiles *up* to it.
+What the survey turned up instead is the wider question nobody has answered.
+
+**The finding:** the Caption ramp is C400 10sp, C300 8sp, C200 6sp. All three sit
+below Material's smallest label and below iOS caption2. Body and Heading are
+ordinary. So the ramp itself is the outlier, not any one call site.
+
+**Done when:** there is a decision, written down, on whether the Caption ramp
+moves. If it does, it is three lines in one file and it moves every caption in
+the app, so it needs looking at rather than reasoning about.
+
+**The two sites that forced it**, both drawing content rather than decoration at
+6sp, and both left alone because they sit in fixed-size boxes that cannot be
+checked without running the app:
+
+- `BottomBar` line 230, the nav badge count
+- `StreakCalendar` lines 98 and 201, the weekday headers and the date in each cell
+
+**Hints:** `libraries/ui/.../system/typography/TypographyResource.kt` owns the
+ramp. `DailyCard` 190/204 was the third site and is already fixed under SD-125,
+where the freeze and restore counts sat at C200 directly under a C300 label in
+the same column and colour. Accessibility is the real argument here, not taste:
+these sizes do not scale the way a system font setting expects, and SD-114's
+review found the two worst defects in `libraries/ui` were both about what a
+screen reader hears.

@@ -102,11 +102,25 @@ interface AdGate {
  * can replace it with
  * `@ContributesBinding(AppScope::class, replaces = [AlwaysRewardingAdGate::class])`
  * without crossing the impl-module boundary.
+ *
+ * **[RewardOutcome.GrantedWithoutAd], not [RewardOutcome.Rewarded]**, because no
+ * ad plays here and that is the whole distinction between the two. Returning
+ * `Rewarded` would have a build on this binding hand over an ad's worth of bones
+ * while telling the player an ad paid for them, which is the one thing the
+ * `GrantedWithoutAd` reason exists to let a caller say out loud. Grants exactly
+ * as `Rewarded` does; callers ask `!= Dismissed`.
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
 @Inject
 class AlwaysRewardingAdGate : AdGate {
-    override suspend fun showRewarded(placement: AdPlacement): RewardOutcome = RewardOutcome.Rewarded
+    override suspend fun showRewarded(placement: AdPlacement): RewardOutcome =
+        RewardOutcome.GrantedWithoutAd(NoAdNetworkReason)
+
     override fun preload(placement: AdPlacement) = Unit
+
+    private companion object {
+        /** Named like `RealAdGate`'s reasons, which are the values a funnel joins on. */
+        const val NoAdNetworkReason = "no_ad_network"
+    }
 }
