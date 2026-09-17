@@ -20,19 +20,20 @@ import me.tatarka.inject.annotations.Inject
 /**
  * The streak page.
  *
- * [celebrating] is the whole difference between the two ways in, and it is
- * decided once, here, from the route. A page opened by tap must not animate, and
- * "must not animate" is easy to get wrong by leaving an entrance in the
- * composable and hoping nothing triggers it, so the screen has no entrance at
- * all and the one animated cell is opt-in.
+ * [celebrating] and [lost] are the whole difference between the ways in, and
+ * they are decided once, here, from the route. A page opened by tap must not
+ * animate, and "must not animate" is easy to get wrong by leaving an entrance in
+ * the composable and hoping nothing triggers it, so the screen has no entrance
+ * at all and the one animated cell is opt-in.
  */
 @Inject
 class StreakViewModel(
     private val streak: StreakRepository,
     private val appCache: AppCache,
     @Assisted private val celebrating: Int,
+    @Assisted private val lost: Int,
 ) : SEAViewModel<StreakState, StreakEvent, StreakAction>(
-    initialStateArg = StreakState(celebrating = celebrating),
+    initialStateArg = StreakState(celebrating = celebrating, lost = lost),
 ) {
 
     init {
@@ -52,6 +53,12 @@ class StreakViewModel(
             // next launch would make a reward feel like a nag.
             takeAction(StreakAction.MarkCelebrated)
         }
+        if (lost > 0) {
+            // Same rule, and it matters more here: being told twice that a run
+            // you were proud of is gone is the version of this feature nobody
+            // asked for.
+            takeAction(StreakAction.MarkLost)
+        }
     }
 
     override suspend fun handleAction(action: StreakAction) {
@@ -69,6 +76,10 @@ class StreakViewModel(
             StreakAction.MarkCelebrated -> {
                 Catching { streak.onPromptShown(StreakPrompt.Celebrate(celebrating)) }
                     .logOnFailure { "Failed to record the streak celebration" }
+            }
+            StreakAction.MarkLost -> {
+                Catching { streak.onPromptShown(StreakPrompt.Lost(lost)) }
+                    .logOnFailure { "Failed to record the lost streak" }
             }
             StreakAction.Back -> sendEvent(StreakEvent.NavigateBack)
         }
@@ -117,7 +128,7 @@ class StreakViewModel(
                 // still says the number; what it does not do is move.
                 fillingIndex = summary.days
                     .indexOfFirst { day -> day == summary.latestCompleted }
-                    .takeIf { index -> index >= 0 && celebrating > 0 && !it.reduceAnimations },
+                    .takeIf { index -> index >= 0 && it.ceremony && !it.reduceAnimations },
             )
         }
     }
@@ -142,9 +153,23 @@ data class StreakState(
     /** The run this page was opened to celebrate, or `0` for a plain visit. */
     val celebrating: Int = 0,
 
+    /** The run that broke, if this page was opened to say so, or `0`. */
+    val lost: Int = 0,
+
     /** Index into [days] of the single cell that animates, or null. */
     val fillingIndex: Int? = null,
 ) {
+
+    /**
+     * Whether the page was pushed at the player rather than opened by them.
+     *
+     * Both ceremonies perform, and a lost run performs the same way a won day
+     * does: the beats arrive, and today's square lands in a calendar that is
+     * showing the gap beside it. That square is the only good news the page has,
+     * and it is the reason this is a moment rather than a notice.
+     */
+    val ceremony: Boolean
+        get() = celebrating > 0 || lost > 0
 
     /**
      * What the big number counts up **from**, or null for a page that should not
@@ -163,6 +188,10 @@ data class StreakState(
      * Every other celebration counts from the day before, which is the run the
      * player actually held yesterday, because a ceremony fires on every day the
      * run grows.
+     *
+     * A lost run never counts, by the same argument carried further: that page
+     * is already saying a number went down, and animating the 1 climbing would
+     * be the page congratulating itself in the middle of an apology.
      */
     val countUpFrom: Int?
         get() = when {
@@ -210,5 +239,6 @@ sealed interface StreakAction {
     data class SummaryChanged(val summary: StreakSummary) : StreakAction
     data class PlaybackChanged(val settings: PlaybackSettings) : StreakAction
     data object MarkCelebrated : StreakAction
+    data object MarkLost : StreakAction
     data object Back : StreakAction
 }

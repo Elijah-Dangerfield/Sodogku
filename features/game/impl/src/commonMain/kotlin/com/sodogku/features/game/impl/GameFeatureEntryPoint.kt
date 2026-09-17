@@ -70,6 +70,7 @@ class GameFeatureEntryPoint(
                     GameEvent.OpenAchievements -> router.navigate(AchievementsRoute())
                     GameEvent.OpenStreakIntention -> router.navigate(StreakIntentionRoute())
                     is GameEvent.OpenStreak -> router.navigate(StreakRoute(celebrating = event.streak))
+                    is GameEvent.OpenLostStreak -> router.navigate(StreakRoute(lost = event.broken))
                 }
             }
 

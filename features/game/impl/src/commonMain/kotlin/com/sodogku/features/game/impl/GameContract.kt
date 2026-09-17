@@ -756,6 +756,17 @@ sealed interface GameEvent {
     /** A milestone worth a page. [streak] is the run being celebrated. */
     data class OpenStreak(val streak: Int) : GameEvent
 
+    /**
+     * The first board back after a break. [broken] is the run that ended, which
+     * is not the run the player has now and is the only number the page could
+     * not work out for itself.
+     *
+     * Its own event rather than a second field on [OpenStreak], because a
+     * celebration and a loss are two answers and one nullable `Int` shared
+     * between them is the shape that eventually gets both set.
+     */
+    data class OpenLostStreak(val broken: Int) : GameEvent
+
     /** A campaign level picked from the drawer of a board in the other pack. */
     data class OpenLevel(val levelId: Int) : GameEvent
 

@@ -38,18 +38,26 @@ import sodogku.libraries.resources.generated.resources.streak_day_label
 import sodogku.libraries.resources.generated.resources.streak_keep_it_today
 import sodogku.libraries.resources.generated.resources.streak_longest
 import sodogku.libraries.resources.generated.resources.streak_longest_none
+import sodogku.libraries.resources.generated.resources.streak_lost_body
+import sodogku.libraries.resources.generated.resources.streak_lost_title
 import sodogku.libraries.resources.generated.resources.streak_title
 
 /**
  * The run, the record, and the last five weeks.
  *
  * **Nothing on this page moves when it is opened by tap.** Every moving part is
- * behind the same question, `state.celebrating > 0`: the beats arrive only on a
+ * behind the same question, [StreakState.ceremony]: the beats arrive only on a
  * ceremony ([Beat]), the number only counts when [StreakState.countUpFrom] says
  * there is something to count ([StreakViewModel]), and the one filling day cell
  * is the one named by [StreakState.fillingIndex], which is null on a plain
  * visit. That is the difference the owner asked for, and each half of it is
  * decided outside this file so something can test it.
+ *
+ * A run that broke is the same page with one more sentence at the top and a
+ * different sign-off at the bottom. It is deliberately not a separate screen:
+ * what a player wants at that moment is the calendar with the gap in it and the
+ * record that survived, which is this page, and a dedicated one would have had
+ * to redraw both to say anything at all.
  *
  * The slide up is not here either. A page cannot rise over a board the navigator
  * has already taken away, so the entrance belongs to `StreakRoute`, which asks
@@ -88,7 +96,8 @@ fun StreakScreen(
 
 @Composable
 private fun StreakBody(state: StreakState, modifier: Modifier = Modifier) {
-    val ceremony = state.celebrating > 0
+    val ceremony = state.ceremony
+    val mourning = state.lost > 0
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         VerticalSpacerD500()
@@ -101,22 +110,43 @@ private fun StreakBody(state: StreakState, modifier: Modifier = Modifier) {
         // digits change while the whole beat is still scaling and travelling,
         // and two springs on one number read as a wobble rather than as a
         // landing.
+        //
+        // A lost run puts its headline inside this beat rather than taking one
+        // of its own, so that the sentence and the 1 it is explaining arrive
+        // together. Given its own beat it would have had to be first, which
+        // renumbers the whole script and retunes a celebration that was tuned
+        // three commits ago for a page that is not this one.
         Beat(ceremony, HeroBeat) {
-            StreakHero(
-                streak = state.current,
-                week = state.days.toWeekStrip(),
-                dayLabel = pluralStringResource(
-                    Res.plurals.streak_day_label,
-                    state.current,
-                    state.current,
-                ),
-                countUpFrom = state.countUpFrom,
-                countUpDelayMillis = if (ceremony) {
-                    beatDelayMillis(HeroBeat) + HeroSettleMillis
-                } else {
-                    0
-                },
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (mourning) {
+                    Text(
+                        text = pluralStringResource(
+                            Res.plurals.streak_lost_title,
+                            state.lost,
+                            state.lost,
+                        ),
+                        typography = AppTheme.typography.Heading.H700,
+                        textAlign = TextAlign.Center,
+                    )
+                    VerticalSpacerD500()
+                }
+
+                StreakHero(
+                    streak = state.current,
+                    week = state.days.toWeekStrip(),
+                    dayLabel = pluralStringResource(
+                        Res.plurals.streak_day_label,
+                        state.current,
+                        state.current,
+                    ),
+                    countUpFrom = state.countUpFrom,
+                    countUpDelayMillis = if (ceremony) {
+                        beatDelayMillis(HeroBeat) + HeroSettleMillis
+                    } else {
+                        0
+                    },
+                )
+            }
         }
 
         VerticalSpacerD500()
@@ -137,10 +167,22 @@ private fun StreakBody(state: StreakState, modifier: Modifier = Modifier) {
         }
 
         if (ceremony) {
+            // **The seam for an offer, and the whole of it.** The owner's
+            // instinct on a lost run was a freeze or a store; what a freeze even
+            // covers is undecided and is SD-28 in `docs/backlog.md`, so nothing
+            // is offered here yet and the moment is an acknowledgement on its
+            // own, which is what "an experience either way" asked for. When
+            // SD-28 is answered, the offer is another beat under this sentence,
+            // gated on the same `mourning`, with the run it is priced against
+            // already on state as `lost`.
             VerticalSpacerD500()
             Beat(ceremony, SignOffBeat) {
                 Text(
-                    text = stringResource(Res.string.streak_celebrate_body),
+                    text = if (mourning) {
+                        stringResource(Res.string.streak_lost_body)
+                    } else {
+                        stringResource(Res.string.streak_celebrate_body)
+                    },
                     typography = AppTheme.typography.Body.B500,
                     color = AppTheme.colors.textSecondary,
                     textAlign = TextAlign.Center,
@@ -256,6 +298,21 @@ private fun StreakScreenPreview() {
 private fun StreakScreenCelebratingPreview() {
     PreviewContent {
         StreakScreen(state = previewState().copy(celebrating = 6), onAction = {})
+    }
+}
+
+/**
+ * The run that broke. A 1 under a sentence naming the 12 it replaced, with the
+ * gap sitting in the calendar underneath and the record still on the page.
+ */
+@Preview
+@Composable
+private fun StreakScreenLostPreview() {
+    PreviewContent {
+        StreakScreen(
+            state = previewState().copy(current = 1, lost = 12),
+            onAction = {},
+        )
     }
 }
 

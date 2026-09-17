@@ -780,6 +780,21 @@
 
     <string name="streak_celebrate_body">Same time tomorrow.</string>
 
+    <!-- Above the number, on the first board after a break. It has to be the
+         first thing on the page: the number under it is a 1, and a 1 on its own
+         where a 12 used to be is the silence this moment was filed to end.
+         Plain past tense, not "oh no" and not "you failed"; the player already
+         knows, and the app telling them how to feel about it is the version that
+         gets the page dismissed. -->
+    <plurals name="streak_lost_title">
+        <item quantity="one">Your run of %1$d day ended</item>
+        <item quantity="other">Your run of %1$d days ended</item>
+    </plurals>
+    <!-- Under the number, where the celebration puts its sign-off. Names the one
+         good thing that is true: they played today, so day one of the next run
+         is already done, and a record is the one number a break cannot take. -->
+    <string name="streak_lost_body">Today starts the next one, and your record still stands.</string>
+
     <!-- The question above the number, which is the number's answer. Asked
          rather than asserted, because a page that opens by telling somebody
          they are committed has decided for them. -->

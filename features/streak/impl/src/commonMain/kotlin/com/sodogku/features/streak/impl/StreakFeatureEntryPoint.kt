@@ -29,15 +29,15 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @ContributesBinding(AppScope::class, multibinding = true)
 @Inject
 class StreakFeatureEntryPoint(
-    private val streakViewModelFactory: (celebrating: Int) -> StreakViewModel,
+    private val streakViewModelFactory: (celebrating: Int, lost: Int) -> StreakViewModel,
     private val intentionViewModelFactory: () -> StreakIntentionViewModel,
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
         screen<StreakRoute> { backStackEntry ->
             val route = backStackEntry.toRoute<StreakRoute>()
-            val viewModel: StreakViewModel = viewModel(key = StreakKey(route.celebrating)) {
-                streakViewModelFactory(route.celebrating)
+            val viewModel: StreakViewModel = viewModel(key = StreakKey(route.celebrating, route.lost)) {
+                streakViewModelFactory(route.celebrating, route.lost)
             }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
 
@@ -77,10 +77,11 @@ class StreakFeatureEntryPoint(
 }
 
 /**
- * Keyed on the argument the ViewModel is built with.
+ * Keyed on the arguments the ViewModel is built with.
  *
  * `viewModel { }` caches per backstack entry and ignores the factory on a hit,
  * so a page opened by tap and then re-opened by a celebration would otherwise
- * get the first instance back and quietly refuse to animate.
+ * get the first instance back and quietly refuse to animate. Both numbers are in
+ * the key: a lost run and a celebration of the same size are different pages.
  */
-private fun StreakKey(celebrating: Int): String = "streak-$celebrating"
+private fun StreakKey(celebrating: Int, lost: Int): String = "streak-$celebrating-$lost"

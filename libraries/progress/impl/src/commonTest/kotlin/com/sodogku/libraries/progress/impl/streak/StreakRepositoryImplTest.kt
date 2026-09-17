@@ -180,6 +180,37 @@ class StreakRepositoryImplTest : CoroutineTest() {
     }
 
     @Test
+    fun comingBackAfterABreakSaysWhatBrokeRatherThanCelebratingTheOneDayLeft() = runUnitTest {
+        // SD-127, end to end through the rows rather than through the rule. The
+        // twelve days, the missed day and today are all the repository is given;
+        // the 12 in the prompt is folded back out of them.
+        seed(completedDaysBack = listOf(0) + (2..13).toList())
+        progress.completedLevels = 40
+        prompts.value = StreakPromptState(intentionShown = true, celebratedOn = LocalDate(2026, 9, 1))
+        val repo = repository()
+
+        assertEquals(1, repo.summary().current, "the run standing is today alone")
+        assertEquals(StreakPrompt.Lost(12), repo.pendingPrompt())
+    }
+
+    @Test
+    fun aLostRunIsSaidOnceAndSpendsTheDay() = runUnitTest {
+        seed(completedDaysBack = listOf(0) + (2..13).toList())
+        progress.completedLevels = 40
+        prompts.value = StreakPromptState(intentionShown = true, celebratedOn = LocalDate(2026, 9, 1))
+        val repo = repository()
+
+        repo.onPromptShown(repo.pendingPrompt())
+
+        assertEquals(LocalDate(2026, 9, 7), prompts.value.celebratedOn)
+        assertEquals(
+            StreakPrompt.None,
+            repo.pendingPrompt(),
+            "the next board of the same day said it again",
+        )
+    }
+
+    @Test
     fun skippedLevelsAreNotClears() = runUnitTest {
         progress.completedLevels = 1
         progress.skippedLevels = 5

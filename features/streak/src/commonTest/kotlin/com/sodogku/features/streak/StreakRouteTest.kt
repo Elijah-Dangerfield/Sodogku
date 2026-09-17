@@ -3,14 +3,18 @@ package com.sodogku.features.streak
 import com.sodogku.libraries.navigation.AnimationType
 import com.sodogku.libraries.navigation.Route
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * How the streak page arrives, which is decided by the one number the route
- * carries.
+ * How the streak page arrives, which is decided by the numbers the route carries
+ * and by nothing else.
  *
  * A ceremony rises over the board and a page the player asked for is pushed. The
  * two are written as a pair on purpose: "the ceremony slides up" alone passes
@@ -59,6 +63,36 @@ class StreakRouteTest {
             route.coversParent,
             "a plain push wants the screen underneath to travel with it",
         )
+    }
+
+    @Test
+    fun aLostRunRisesTheSameWayAWonDayDoes() {
+        // Written as a claim rather than a copy of the celebration's test,
+        // because the temptation on a second number is to key the presentation
+        // off the first one and leave the new way in as a silent push over a
+        // board that is sliding out from under it.
+        val route = StreakRoute(lost = 12)
+
+        assertEquals(AnimationType.SlideUp, route.enter)
+        assertEquals(AnimationType.SlideDown, route.popExit)
+        assertTrue(route.coversParent)
+    }
+
+    @Test
+    fun aRouteSerializedBeforeTheSecondNumberStillDecodes() {
+        // The arg was added after the app shipped, so there are saved backstacks
+        // without it. A field with no default here is a crash on restore, and
+        // only for the players who happened to have the streak page open.
+        // Encoded with a value in it, because defaults are left out of the JSON
+        // and a route that never carried the field would prove nothing about
+        // whether the field is optional to decode.
+        val encoded = json.encodeToJsonElement(StreakRoute(celebrating = 3, lost = 12)).jsonObject
+        assertTrue("lost" in encoded, "the arg is not in the serialized shape, so removing it proves nothing")
+
+        val decoded = json.decodeFromJsonElement<StreakRoute>(JsonObject(encoded - "lost"))
+
+        assertEquals(3, decoded.celebrating)
+        assertEquals(0, decoded.lost)
     }
 
     @Test

@@ -13,6 +13,16 @@ import kotlin.test.assertTrue
  * whether the player had ever played a daily and whether the daily feature was
  * switched on, neither of which means anything now, and celebrated on
  * milestones rather than on every day the run grew.
+ *
+ * The four cases are not independent, and the pairs are written as pairs on
+ * purpose. `Lost` and `Celebrate(1)` are due on exactly the same day, so "a
+ * broken run is mourned" passes on its own against an implementation that
+ * mourns every run of one, and "a restart is celebrated" passes against one that
+ * never mourns anything. Neither is true of both tests at once.
+ *
+ * Deliberately not covered here: where the broken run's length comes from, which
+ * is `PlayStreakTest`, and what the page does with it, which is
+ * `StreakViewModelTest` in `:features:streak:impl`.
  */
 class StreakPromptsTest {
 
@@ -134,12 +144,118 @@ class StreakPromptsTest {
         assertEquals(StreakPrompt.Intention, promptOn(Wednesday, streak = 9, boardsCleared = 2, state = Fresh))
     }
 
+    @Test
+    fun aRunThatBrokeIsNamedRatherThanQuietlyReplacedByAOne() {
+        // SD-127. The player had twelve days, missed one, came back, and the
+        // page said "1" with nothing to explain it.
+        val returning = StreakPromptState(intentionShown = true, celebratedOn = Monday)
+
+        assertEquals(
+            StreakPrompt.Lost(12),
+            promptOn(Wednesday, streak = 1, brokenStreak = 12, boardsCleared = 40, state = returning),
+        )
+    }
+
+    @Test
+    fun theLossOutranksTheCelebrationOfTheRunThatReplacedIt() {
+        // The collision SD-121 created, and the reason the order is written
+        // down. Both are due on exactly this day: the run is one, which is what
+        // `Celebrate(1)` keys on, and it is one because the run before it ended.
+        // The loss wins because it is the same page saying strictly more.
+        val returning = StreakPromptState(intentionShown = true, celebratedOn = Monday)
+
+        val prompt = promptOn(Wednesday, streak = 1, brokenStreak = 9, boardsCleared = 40, state = returning)
+
+        assertTrue(
+            prompt !is StreakPrompt.Celebrate,
+            "a player who just lost nine days was congratulated on having one: $prompt",
+        )
+    }
+
+    @Test
+    fun aRunOfOneWithNothingBehindItIsStillCelebrated() {
+        // SD-121's rule has to survive SD-127's. A player whose only previous
+        // run was a single day has lost nothing worth a page, and the moment
+        // they get is the one they got before this item existed.
+        val returning = StreakPromptState(intentionShown = true, celebratedOn = Monday)
+
+        assertEquals(
+            StreakPrompt.Celebrate(1),
+            promptOn(Wednesday, streak = 1, brokenStreak = 0, boardsCleared = 20, state = returning),
+            "a first run was mourned, so every new player is told they lost something",
+        )
+        assertEquals(
+            StreakPrompt.Celebrate(1),
+            promptOn(Wednesday, streak = 1, brokenStreak = 1, boardsCleared = 20, state = returning),
+            "somebody who plays every other day is told they lost something on every visit",
+        )
+    }
+
+    @Test
+    fun aBreakIsOnlyNewsOnTheFirstDayBack() {
+        // The second day back is a run of two and a break that is old news. The
+        // day-scoped guard alone cannot hold this: a new day clears it, and the
+        // broken run behind them does not go anywhere.
+        val returning = StreakPromptState(intentionShown = true, celebratedOn = Monday)
+
+        for (streak in 2..30) {
+            assertEquals(
+                StreakPrompt.Celebrate(streak),
+                promptOn(Wednesday, streak = streak, brokenStreak = 12, boardsCleared = 40, state = returning),
+                "day $streak of the run back was still talking about the run before it",
+            )
+        }
+    }
+
+    @Test
+    fun aBreakIsNamedOnceADay() {
+        // The second board of the same day has nothing to add, and a page that
+        // came back after every clear would be worse than the silence it
+        // replaces.
+        val told = StreakPromptState(intentionShown = true, celebratedOn = Wednesday)
+
+        assertEquals(
+            StreakPrompt.None,
+            promptOn(Wednesday, streak = 1, brokenStreak = 12, boardsCleared = 40, state = told),
+        )
+    }
+
+    @Test
+    fun aPlayerWhoOnlyEverPlayedDailiesIsStillToldTheirRunBroke() {
+        // `boardsCleared` counts campaign clears, so a daily-only player never
+        // spends the intention and `intentionShown` stays false for the life of
+        // the install. A broken run of twelve is its own proof they are not new,
+        // which is why the loss does not borrow the celebration's gate.
+        assertEquals(
+            StreakPrompt.Lost(12),
+            promptOn(Wednesday, streak = 1, brokenStreak = 12, boardsCleared = 0, state = Fresh),
+        )
+    }
+
+    @Test
+    fun theIntentionOutranksALostRunToo() {
+        // Unreachable in practice, for the same reason the celebration's case
+        // is: nobody holds a run of two days without having cleared two boards.
+        // Stated so the order is a decision rather than a branch ordering.
+        assertEquals(
+            StreakPrompt.Intention,
+            promptOn(Wednesday, streak = 1, brokenStreak = 12, boardsCleared = 2, state = Fresh),
+        )
+    }
+
     private fun promptOn(
         today: LocalDate,
         streak: Int,
         boardsCleared: Int,
         state: StreakPromptState,
-    ) = promptFor(today = today, streak = streak, boardsCleared = boardsCleared, state = state)
+        brokenStreak: Int = 0,
+    ) = promptFor(
+        today = today,
+        streak = streak,
+        brokenStreak = brokenStreak,
+        boardsCleared = boardsCleared,
+        state = state,
+    )
 
     private companion object {
         val Fresh = StreakPromptState()

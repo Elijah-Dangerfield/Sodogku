@@ -2031,6 +2031,7 @@ class GameViewModel(
             StreakPrompt.None -> Unit
             StreakPrompt.Intention -> sendEvent(GameEvent.OpenStreakIntention)
             is StreakPrompt.Celebrate -> sendEvent(GameEvent.OpenStreak(prompt.streak))
+            is StreakPrompt.Lost -> sendEvent(GameEvent.OpenLostStreak(prompt.broken))
         }
     }
 

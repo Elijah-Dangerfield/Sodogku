@@ -42,6 +42,35 @@ internal fun playStreakOn(today: LocalDate, played: Set<LocalDate>): Int {
 }
 
 /**
+ * The run that ended before the one [today] belongs to, or `0` if there is none.
+ *
+ * What "it used to be longer" means, and the only thing SD-127 needed that was
+ * not already on disk. It is genuinely not the same question as either number
+ * the page already shows: [playStreakOn] answers what is running now, which is
+ * the 1, and [longestPlayStreak] is the all-time record, which never falls and
+ * so can never say that anything ended. A player whose best was 30 and who just
+ * lost a 4 would be told they lost 30.
+ *
+ * Nothing new is stored for this. A run that broke is still written down in the
+ * play days that made it, so the honest fix is a second fold beside the first
+ * rather than a counter to keep true; the arithmetic [playStreakOn] does is
+ * untouched, and this reuses it for the older run.
+ *
+ * The walk is over the played days rather than over the calendar, because the
+ * gap has no bound: a player who finished a board once and came back eight
+ * months later would otherwise cost two hundred iterations of stepping back
+ * through days nobody played.
+ */
+internal fun brokenPlayStreakOn(today: LocalDate, played: Set<LocalDate>): Int {
+    var start = if (today in played) today else today.previousDay()
+    if (start !in played) return 0
+    while (start.previousDay() in played) start = start.previousDay()
+
+    val endedOn = played.filter { it < start }.maxOrNull() ?: return 0
+    return playStreakOn(endedOn, played)
+}
+
+/**
  * The longest run the player has ever finished, current one included while it is
  * still the best.
  *

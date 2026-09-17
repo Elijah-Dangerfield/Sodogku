@@ -818,6 +818,27 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun aBrokenRunCarriesTheRunThatEndedRatherThanTheOneLeft() = runUnitTest {
+        // SD-127. The number the page has to print is the twelve that ended,
+        // and it is the only one the streak page could not have worked out for
+        // itself: the run it can see is the 1 standing today.
+        val vm = viewModel(streak = SilentStreak(StreakPrompt.Lost(broken = TWELVE_DAYS)))
+        val events = eventsOf(vm)
+
+        solveCurrent(vm)
+
+        assertEquals(
+            TWELVE_DAYS,
+            events.filterIsInstance<GameEvent.OpenLostStreak>().single().broken,
+            "the player was never told what broke",
+        )
+        assertTrue(
+            events.none { it is GameEvent.OpenStreak },
+            "a lost run opened the celebration as well, so the player got two pages: $events",
+        )
+    }
+
+    @Test
     fun openingTheStreakFromThePaneCarriesNothingToCelebrate() = runUnitTest {
         // The number is what the streak page animates on, so a tap that carried
         // one would make the page perform at a player who only went to look at
@@ -859,7 +880,11 @@ class GameViewModelTest : CoroutineTest() {
 
         assertTrue(events.any { it == GameEvent.Won }, "the level was never won, so this proves nothing")
         assertTrue(
-            events.none { it is GameEvent.OpenStreak || it is GameEvent.OpenStreakIntention },
+            events.none {
+                it is GameEvent.OpenStreak ||
+                    it is GameEvent.OpenStreakIntention ||
+                    it is GameEvent.OpenLostStreak
+            },
             "a streak with nothing to say still took the screen: $events",
         )
     }
@@ -6391,6 +6416,7 @@ class GameViewModelTest : CoroutineTest() {
 
         /** A milestone the streak celebrates. */
         const val SEVEN_DAYS = 7
+        const val TWELVE_DAYS = 12
 
         /** A whole-campaign schedule at one rate, as the config map holds it. */
         fun everyN(rate: Int): List<Map<String, Int>> =

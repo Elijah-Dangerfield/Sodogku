@@ -30,10 +30,17 @@ import kotlin.test.assertTrue
  * back to a run that had broken — is the one that would otherwise be decided by
  * an arithmetic accident in the screen.
  *
+ * SD-127 adds a third way in, and it is the one that needs both halves at once:
+ * a lost run performs, because today's square landing in a calendar with a gap
+ * in it is the only good news the page has, and it never counts, because a
+ * number climbing to itself in display type while the page apologises is the
+ * page congratulating itself.
+ *
  * Deliberately not covered here: that the number actually climbs, and that the
  * page holds still when it is asked to. Those are claims about a composition and
  * live in `CountUpNumberTest` and `ArrivingHoldsStillTest` in `:libraries:ui`.
- * How the page *arrives* is `StreakRouteTest` in `:features:streak`.
+ * How the page *arrives* is `StreakRouteTest` in `:features:streak`. Which of
+ * the four prompts is due at all is `StreakPromptsTest` in `:libraries:progress`.
  */
 class StreakViewModelTest : CoroutineTest() {
 
@@ -170,11 +177,55 @@ class StreakViewModelTest : CoroutineTest() {
         )
     }
 
+    @Test
+    fun aLostRunIsRecordedOnArrival() = runUnitTest {
+        val repo = FakeStreak(summary(completedThrough = 1))
+
+        viewModel(repo, celebrating = 0, lost = 12)
+
+        assertEquals(
+            listOf<StreakPrompt>(StreakPrompt.Lost(12)),
+            repo.shown,
+            "being told twice that a run you were proud of is gone is the version nobody asked for",
+        )
+    }
+
+    @Test
+    fun aLostRunPerformsButNeverCountsUp() = runUnitTest {
+        // The two halves of what a lost page does, and they pull in opposite
+        // directions. It is a ceremony, so today's square lands in a calendar
+        // showing the gap beside it; it is not a celebration, so the 1 does not
+        // climb to itself in display type while the page apologises.
+        val repo = FakeStreak(summary(completedThrough = 1))
+
+        val vm = viewModel(repo, celebrating = 0, lost = 12)
+
+        assertEquals(today, vm.state.days[requireNotNull(vm.state.fillingIndex)].date)
+        assertNull(vm.state.countUpFrom, "the number performed on a page about a run ending")
+        assertEquals(12, vm.state.lost, "and the page still says what it was pushed for")
+    }
+
+    @Test
+    fun reduceAnimations_leavesTheLostPageStillWithoutSilencingIt() = runUnitTest {
+        val repo = FakeStreak(summary(completedThrough = 1))
+
+        val vm = viewModel(
+            repo,
+            celebrating = 0,
+            lost = 12,
+            cache = InMemoryAppCache(AppData(reduceAnimations = true)),
+        )
+
+        assertNull(vm.state.fillingIndex, "the setting is honoured on this page too")
+        assertEquals(12, vm.state.lost, "but the player is still told their run ended")
+    }
+
     private fun viewModel(
         repo: StreakRepository,
         celebrating: Int,
+        lost: Int = 0,
         cache: AppCache = InMemoryAppCache(),
-    ) = StreakViewModel(streak = repo, appCache = cache, celebrating = celebrating)
+    ) = StreakViewModel(streak = repo, appCache = cache, celebrating = celebrating, lost = lost)
 
     /**
      * Five weeks ending on Sunday 13 September, with [completedThrough] days

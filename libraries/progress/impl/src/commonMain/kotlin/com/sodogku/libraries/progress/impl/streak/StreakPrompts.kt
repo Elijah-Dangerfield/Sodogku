@@ -13,14 +13,26 @@ import kotlinx.serialization.Serializable
 internal fun promptFor(
     today: LocalDate,
     streak: Int,
+    brokenStreak: Int,
     boardsCleared: Int,
     state: StreakPromptState,
 ): StreakPrompt = when {
-    // The intention moment outranks a celebration. They cannot both be due in
-    // practice, since the intention fires on the second board ever and a
-    // celebration needs a run of two days, but the order says which wins rather
-    // than leaving it to whichever branch is written first.
+    // The intention moment outranks everything below it. It cannot be due at the
+    // same time as either in practice, since it fires on the second board ever,
+    // but the order says which wins rather than leaving it to whichever branch
+    // is written first.
     intentionIsDue(boardsCleared, state) -> StreakPrompt.Intention
+
+    // **A loss outranks the celebration of the run that replaced it**, and this
+    // is the one place the two genuinely collide. SD-121 made a run of one worth
+    // a page precisely because a run that restarts at one is a run that just
+    // broke, so every day a loss is due, `Celebrate(1)` is due as well.
+    //
+    // The loss wins because it is the same page saying strictly more. Both print
+    // the 1; only this one admits it used to be a 12, which is the whole of what
+    // SD-127 was filed about. Congratulating somebody on day one without naming
+    // what day one cost them is the silence, dressed up.
+    lossIsDue(today, streak, brokenStreak, state) -> StreakPrompt.Lost(brokenStreak)
 
     celebrationIsDue(today, streak, state) -> StreakPrompt.Celebrate(streak)
 
@@ -45,6 +57,47 @@ internal fun promptFor(
  */
 private fun intentionIsDue(boardsCleared: Int, state: StreakPromptState): Boolean =
     !state.intentionShown && boardsCleared >= IntentionAfterBoards
+
+/**
+ * Once, on the first day back from a break.
+ *
+ * Three clauses, and each of them is doing work.
+ *
+ * **The run is one.** That is what "first day back" is: the player finished a
+ * board today and it is the only day standing. On the second day back the run is
+ * two and the break is old news, which is what stops this reappearing every day
+ * for the rest of the week. It is the same 1 [celebrationIsDue] keys on, for the
+ * same reason, and they are due together by design rather than by accident.
+ *
+ * **There was a run to lose.** [ShortestMournedRun] is two, because a run of one
+ * is a single day, and telling somebody who plays every other day that they lost
+ * something on every single visit turns the moment into a scold. It also keeps
+ * this away from a player's first week, where a broken run of one is just how
+ * anybody starts.
+ *
+ * **It has not been said today.** The same day-scoped guard SD-121 introduced,
+ * shared with the celebration on purpose: the player gets one page about a day,
+ * whichever page it is, and a lost-streak screen that came back on every board
+ * would be worse than the silence it replaces.
+ *
+ * Deliberately not gated on [StreakPromptState.intentionShown], unlike the
+ * celebration of one. A broken run of two days is its own proof that this is not
+ * somebody's first day, and the intention only fires off *campaign* clears, so a
+ * player who has only ever played dailies can hold a long run without it ever
+ * having been spent.
+ *
+ * There is no staleness rule either. A run that broke eight months ago is still
+ * the run this player last had, and the first board back is still the only
+ * moment anybody is listening.
+ */
+private fun lossIsDue(
+    today: LocalDate,
+    streak: Int,
+    brokenStreak: Int,
+    state: StreakPromptState,
+): Boolean = streak == FirstCelebratedRestart &&
+    brokenStreak >= ShortestMournedRun &&
+    state.celebratedOn != today
 
 /**
  * Every day the run grows, after the first.
@@ -87,6 +140,12 @@ private fun firstCelebratedStreak(state: StreakPromptState): Int =
  * play days, and the alternative, inferring it from the streak itself, re-fires
  * a celebration every time the app is reopened on the same day.
  *
+ * **SD-127 added nothing here**, which is worth saying because a lost-streak
+ * moment sounds like it wants a remembered "their streak was 12 yesterday". It
+ * does not: the run that broke is still written down in the days that made it
+ * (`brokenPlayStreakOn`), and the only thing a fold cannot know, whether the
+ * player has already been told today, is the field below.
+ *
  * Deliberately not part of `AppData`. These two fields are machinery and neither
  * means anything without the rules above beside it, which is the same argument
  * `SkipState` makes for living next door rather than in the shared blob.
@@ -98,10 +157,11 @@ data class StreakPromptState(
     /**
      * The day the streak last took the screen, or `null`.
      *
-     * The intention moment writes it too. That page prints the run the player
-     * already has, so it is that run's celebration, and leaving this unset
-     * behind it would let the next board of the same day say the same thing
-     * again.
+     * Every page writes it, including the intention and the lost-run moment.
+     * The intention prints the run the player already has, so it is that run's
+     * celebration; the lost-run page prints the day-one that replaced the run
+     * that broke. Leaving this unset behind either would let the next board of
+     * the same day say the same thing again.
      *
      * One date rather than the set of every day already celebrated, which is
      * all the rule needs: the prompt is only ever asked for on a day the player
@@ -118,3 +178,6 @@ internal const val FirstCelebratedStreak = 2
 
 /** And after it, when a run of one is a run that started over. */
 internal const val FirstCelebratedRestart = 1
+
+/** The shortest run whose ending is worth telling somebody about. */
+internal const val ShortestMournedRun = 2

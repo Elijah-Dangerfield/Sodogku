@@ -17,6 +17,10 @@ import kotlinx.datetime.plus
  * four outcomes. The rules that survived the move are here; the ones that did
  * not were about a daily being failed or frozen, which a streak measured in
  * "did you turn up" has no opinion on.
+ *
+ * Three numbers come out of the same set of dates and they are easy to confuse,
+ * so `brokenPlayStreakOn` is pinned against both of the others rather than on
+ * its own: the run standing now, the best run ever, and the run that ended.
  */
 class PlayStreakTest {
 
@@ -126,6 +130,71 @@ class PlayStreakTest {
             val days = playCalendarOn(day, emptySet(), weeks = 5)
             assertTrue(days.any { it.date == day && it.isToday }, "$day (${day.dayOfWeek}) fell outside its own calendar")
         }
+    }
+
+    @Test
+    fun theRunBeforeTheGapIsWhatBroke() {
+        // SD-127's whole question. Twelve days, a missed day, then today.
+        val played = daysBackFrom(Today, 1) + daysBackFrom(Today.minus(DatePeriod(days = 2)), 12)
+
+        assertEquals(1, playStreakOn(Today, played), "the run standing is the one day back")
+        assertEquals(12, brokenPlayStreakOn(Today, played), "and the one that ended was twelve")
+    }
+
+    @Test
+    fun theBrokenRunIsTheMostRecentOneRatherThanTheBest() {
+        // The reason this is not `longestPlayStreak`. A record never falls, so
+        // it can never say anything ended, and a player whose best was thirty
+        // and who just lost four would be told the wrong number.
+        val best = daysBackFrom(Today.minus(DatePeriod(days = 40)), 30)
+        val recent = daysBackFrom(Today.minus(DatePeriod(days = 2)), 4)
+        val played = best + recent + daysBackFrom(Today, 1)
+
+        assertEquals(4, brokenPlayStreakOn(Today, played))
+        assertEquals(30, longestPlayStreak(played), "the record is a different number, and still right")
+    }
+
+    @Test
+    fun aFirstRunHasNothingBehindIt() {
+        // Nobody's first day is a day they lost something.
+        assertEquals(0, brokenPlayStreakOn(Today, daysBackFrom(Today, 1)))
+        assertEquals(0, brokenPlayStreakOn(Today, daysBackFrom(Today, 9)))
+        assertEquals(0, brokenPlayStreakOn(Today, emptySet()))
+    }
+
+    @Test
+    fun anUnbrokenRunReportsNothingBrokenHoweverLongTheHistoryIs() {
+        // The common case, and the one that would be most expensive to get
+        // wrong: every player still on a run would be told it had ended.
+        for (length in 1..30) {
+            assertEquals(
+                0,
+                brokenPlayStreakOn(Today, daysBackFrom(Today, length)),
+                "a run of $length days reported something behind it",
+            )
+        }
+    }
+
+    @Test
+    fun aGapOfMonthsIsStillTheRunBeforeIt() {
+        // No staleness rule, deliberately. A run that broke in the spring is
+        // still the last run this player had, and the first board back is the
+        // only moment anybody is listening.
+        val old = daysBackFrom(Today.minus(DatePeriod(days = 240)), 7)
+        val played = old + setOf(Today)
+
+        assertEquals(7, brokenPlayStreakOn(Today, played))
+    }
+
+    @Test
+    fun todayNotYetPlayedReadsTheSameRunAsTheStreakDoes() {
+        // `playStreakOn` starts at yesterday when today is empty, because the
+        // day is not over. This has to agree with it or the pair could report a
+        // run of eight with the same eight days as the run that broke.
+        val played = daysBackFrom(Today.minus(DatePeriod(days = 1)), 8)
+
+        assertEquals(8, playStreakOn(Today, played))
+        assertEquals(0, brokenPlayStreakOn(Today, played), "the run that is still running is not a run that broke")
     }
 
     private fun daysBackFrom(end: LocalDate, count: Int): Set<LocalDate> =

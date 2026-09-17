@@ -72,16 +72,20 @@ class StreakRepositoryImpl(
         return promptFor(
             today = day,
             streak = playStreakOn(day, played),
+            brokenStreak = brokenPlayStreakOn(day, played),
             boardsCleared = progress.all().count { it.state == LevelState.Completed },
             state = prompts.get(),
         )
     }
 
     /**
-     * Both pages spend the day, and the intention spends it too.
+     * Every page spends the day, the intention and the lost run included.
      *
-     * It prints the run the player already has, so it is that run's celebration
-     * and the next board of the same day has nothing left to say.
+     * The intention prints the run the player already has, so it is that run's
+     * celebration and the next board of the same day has nothing left to say.
+     * The lost-run page is the same bargain from the other side: it is the one
+     * thing that day has to report, and repeating it on the next board would
+     * make it a nag rather than a moment.
      */
     override suspend fun onPromptShown(prompt: StreakPrompt) {
         when (prompt) {
@@ -90,7 +94,8 @@ class StreakRepositoryImpl(
                 it.copy(intentionShown = true, celebratedOn = today())
             }
 
-            is StreakPrompt.Celebrate -> prompts.update { it.copy(celebratedOn = today()) }
+            is StreakPrompt.Celebrate, is StreakPrompt.Lost ->
+                prompts.update { it.copy(celebratedOn = today()) }
         }
     }
 
