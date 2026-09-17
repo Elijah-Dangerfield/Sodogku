@@ -154,24 +154,29 @@ non-deprecated way to name a literal, which is the same seam from the other end.
 Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-H · session
 bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
 
-## SD-126 [P2] — Review the generated daily boards for how they open
+## SD-134 [P2] — Tell a daily player that a cross is a legitimate first move
 
-**Ask:** "maybe I'm just dumb but this daily board seems way too hard to solve
-without a starter dog or a single square color. maybe we should review our boards
-we generated?"
+**Ask:** SD-126 asked whether the generated daily boards were too hard to open.
+They were measured and they are not: every one of the 730 has a deduction
+available on the empty grid and none ever needs a guess. What is true is that
+**38% of dailies open with no forced dog**, so the first move is a cross, and the
+daily never says so. The campaign hands out a free dog for sixteen levels
+precisely so the first empty grid arrives after the rules are known. The daily
+inherits none of that.
 
-**Done when:** there is an answer, backed by the generator, to whether a daily
-can open with no starter dog and no single-cell region, and whether that is a
-board a player can reasonably start.
+**Done when:** a player meeting an empty-opening daily is pointed at the cross,
+or at the sniff, once. Not a tutorial and not on every board.
 
-**Hints:** The screenshot is a 7x7 daily, streak 2, 0/7 dogs, three bones, one X
-placed. Every colour region on it has two or more cells and no dog is pre-placed,
-so there is no forced opening move. SD-113 added a starter-dog opening run for
-the **campaign** (`progression.starterDogOpeningLevels`, default 16); the daily
-is not covered by it, which may be the whole answer. The generator is
-`tools/.../levelgen/Generator.kt` and the difficulty model is
-`libraries/puzzle/.../Difficulty.kt`. `LevelPackVerificationTest` is what tells
-you whether a change to generation broke an invariant; do not weaken it.
+**Hints:** The sniff already does this exact job — it shows where a dog cannot
+go, names the technique, and declines to charge when it has nothing to add. The
+screenshot behind SD-126 shows three bones and three sniffs unspent, so nothing
+was lost; the owner just did not reach for it. That makes "point at the sniff"
+the cheapest version of this and probably the right one.
+
+`docs/cases/SD-126/README.md` has the measurement, the worked three-step solve of
+the board he was stuck on, and the re-run recipe. `docs/decisions.md`
+(2026-09-16) records why regenerating the pool and giving the daily a starter dog
+were both rejected, so do not reopen either here.
 Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-J · session
 bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
 

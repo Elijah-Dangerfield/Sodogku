@@ -6,6 +6,58 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-16 — the daily keeps its empty openings, and the pool is not regenerated
+
+SD-126 is the owner on a daily he could not start: *"this daily board seems way
+too hard to solve without a starter dog or a single square color. maybe we
+should review our boards we generated?"* The boards were reviewed. The full
+measurement is in `docs/cases/SD-126/README.md` with the script that produced
+it. Nothing changed, and this entry is why.
+
+**The premise checks out and the conclusion does not.** 280 of the 730 shipped
+dailies (38%) have no single-cell region, so nothing forces a dog and the first
+move is a cross. His board, daily 269, is one of them. But not one of the 730 is
+unstartable: every board has a deduction available on the empty grid, 242 of
+those 280 have a *tier-2* one, and none ever needs a guess — which
+`LevelPackVerificationTest` already proves on every build, twice over. What the
+report is really about is that the first dog can be far away: 152 dailies need
+tier-3 reasoning before one can be placed and 21 need a contradiction.
+
+**The daily pool cannot be regenerated, and that is not a preference.**
+`DailyResult` stores the *pool index* a day was played at, so refiltering or
+reshuffling the 730 rewrites which board every past day was, for everyone. The
+pool is append-only in the same way and for the same reason the campaign is.
+That rules out the direct fix — "make every daily have a single-cell region" —
+before it is even priced.
+
+**The daily does not get a starter dog either.** `GameViewModel` already has the
+`isDaily` branch, so it is one line. It is rejected because the daily is one
+board shared by every player on the same day, with one shared score and a
+leaderboard reading it: a free dog moves par for everybody at once. And
+`LevelCurve`'s daily curve was deliberately rebuilt so the daily is *not* easier
+than the campaign level its player is on, because the thing that exists to bring
+someone back should not be the easy option. Changing that is a call about what
+the daily is, not a fix for a board that opens empty.
+
+**A generator filter now was considered and is worse than a note.** The obvious
+compromise is to reject candidates whose first placement needs tier 4, taking
+effect the next time anybody regenerates. It was not added: `LevelPacks`
+promises the generator reproduces the shipped pack byte for byte for a given
+seed, and a filter that is a no-op today would make the next
+`:tools:level-generator:run` silently emit a different pack to somebody
+expecting an empty diff. The constraint is written down in the case file for
+whoever grows the pool past two years, which is when it can be applied for free.
+
+**What is actually missing is not a board property.** The campaign hands out a
+free dog for sixteen levels so that the first empty grid arrives after the rules
+are known; the daily inherits none of that scaffolding and never says that a
+cross is a legitimate first move. The sniff does exactly this and declines to
+charge when it has nothing to add, and the screenshot shows three bones unspent.
+That is a teaching gap in the daily's first session, and it is filed as its own
+item rather than answered by regenerating a pack.
+
+---
+
 ## 2026-09-14 — a day that was given up on is a day that was never played
 
 SD-49 removed Give up on today. It did not remove the rows Give up had already

@@ -505,6 +505,18 @@ tier 3 and about a fifth at the ceiling. It is a three-to-five-minute habit rath
 wall, and it is deliberately not *easier* than the campaign level its player is on, which
 is the wrong signal from the thing that exists to bring them back.
 
+**38% of dailies open with no forced move, and the daily gets no starter dog.** 280 of
+the 730 have no single-cell region, so nothing places a dog for free and the first move is
+a *cross* rather than a dog. None is unstartable — every board has a deduction available
+on the empty grid, 242 of those 280 have a tier-2 one, and no board ever needs a guess —
+but the first dog can be a long way off: 152 need tier-3 reasoning before one can be
+placed and 21 need a contradiction. The starter dog
+(`progression.starterDogOpeningLevels`) is campaign-only and stays that way, because the
+daily is one board shared by everybody on the day and a free dog moves par for all of
+them at once. SD-126 is the owner meeting this; `docs/cases/SD-126/README.md` has the
+measurement, the worked solve of the board he was stuck on, and the reason the pool
+cannot be regenerated to fix it.
+
 **One attempt per day, enforced by the primary key.** `daily_result` takes one row per
 date, the insert is ignore-on-conflict, and there is deliberately no update path on the
 table at all. The lock therefore holds whatever the clock is set to.
