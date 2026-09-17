@@ -1,5 +1,6 @@
 package com.sodogku.features.game.impl
 
+import com.sodogku.libraries.ui.components.celebration.beatDelayMillis
 import com.sodogku.libraries.scoring.NearMiss
 import com.sodogku.libraries.scoring.Standing
 import kotlin.test.Test

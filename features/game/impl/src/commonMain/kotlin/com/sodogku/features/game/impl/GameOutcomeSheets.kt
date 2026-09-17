@@ -24,8 +24,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.style.TextAlign
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
-import com.sodogku.system.Motion
-import kotlinx.coroutines.delay
+import com.sodogku.libraries.ui.components.celebration.Arriving
+import com.sodogku.libraries.ui.components.celebration.beatDelayMillis
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.Surface
 import com.sodogku.libraries.ui.components.button.ButtonGhost
@@ -194,9 +194,6 @@ internal fun winBeats(state: GameState): List<WinBeat> = buildList {
     if (state.isDaily && state.dailyStreak > 0) add(WinBeat.Streak)
 }
 
-/** When the beat at [order] lands, counted from the moment the panel starts rising. */
-internal fun beatDelayMillis(order: Int): Int = PanelLeadMillis + order * BeatStaggerMillis
-
 /**
  * A clear, as a page that arrives rather than a card that is already there.
  *
@@ -208,7 +205,7 @@ internal fun beatDelayMillis(order: Int): Int = PanelLeadMillis + order * BeatSt
  * the board is still the subject.
  *
  * **The panel eases and the contents spring.** Everything else in this app uses
- * [Motion.Pop], which overshoots; a full-display panel that overshoots slides
+ * `Motion.Pop`, which overshoots; a full-display panel that overshoots slides
  * clear off the top of the screen and shows the board underneath it for a few
  * frames. So the bounce lives in each piece as it lands, which is where it can
  * be seen anyway.
@@ -400,47 +397,6 @@ private fun OnwardButton(state: GameState, onAction: (GameAction) -> Unit) {
             // decided not to do.
             Text(stringResource(Res.string.game_next_level))
         }
-    }
-}
-
-/**
- * One beat of the celebration, landing.
- *
- * Fades, rises and springs to its place. Every value is read inside
- * [graphicsLayer] and none of it in composition, which is what keeps a rolling
- * counter and a row of stats off the recomposition path of their own entrance.
- *
- * Still under [LocalReduceAnimations] and under [LocalInspectionMode], so the
- * page a player asked to calm down is the finished page, and so a preview or a
- * screenshot captures it rather than whichever frame it was on.
- */
-@Composable
-private fun Arriving(order: Int, content: @Composable () -> Unit) {
-    val still = LocalReduceAnimations.current || LocalInspectionMode.current
-    val landed = remember { Animatable(if (still) 1f else 0f) }
-    LaunchedEffect(order, still) {
-        if (still) {
-            landed.snapTo(1f)
-            return@LaunchedEffect
-        }
-        landed.snapTo(0f)
-        delay(beatDelayMillis(order).toLong())
-        landed.animateTo(1f, Motion.Pop)
-    }
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.graphicsLayer {
-            val progress = landed.value
-            // Coerced because [Motion.Pop] overshoots past one, which is what
-            // the scale wants and what alpha cannot have.
-            alpha = progress.coerceIn(0f, 1f)
-            val scale = ArrivalStartScale + (1f - ArrivalStartScale) * progress
-            scaleX = scale
-            scaleY = scale
-            translationY = (1f - progress) * ArrivalRise.toPx()
-        },
-    ) {
-        content()
     }
 }
 
@@ -1135,26 +1091,8 @@ private val PreviewDailyResetsIn = 6.hours
  */
 private const val PanelRiseMillis = 340
 
-/**
- * How long the first beat waits for the panel.
- *
- * Short of the full rise on purpose. The dog starting to arrive while the page
- * is still travelling is what makes the two read as one movement rather than as
- * a page that lands and then remembers it has contents.
- */
-private const val PanelLeadMillis = 220
-
-/** The gap between one beat landing and the next starting. */
-private const val BeatStaggerMillis = 70
-
 /** The same gap inside the paw rating, a touch longer because there are only three. */
 private const val PawStaggerMillis = 110
-
-/** How small a beat starts. Small enough to read as arriving, not as a glitch. */
-private const val ArrivalStartScale = 0.82f
-
-/** How far below its place a beat starts. */
-private val ArrivalRise = Dimension.D700
 
 /** The script takes the slack; the button keeps the bottom of the page. */
 private const val ScriptWeight = 1f

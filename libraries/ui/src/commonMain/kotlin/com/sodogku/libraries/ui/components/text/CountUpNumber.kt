@@ -33,6 +33,12 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * A page the player went looking for should not perform at them, so the caller
  * decides, and "was there anything new" is the only thing it has to answer.
  *
+ * **Passing [value] itself is the third answer, and it is a real one.** There is
+ * something to celebrate but nothing to count from — a run that has just started
+ * over has no previous run, and climbing to it from zero says "you were on
+ * nothing" in the biggest type on the screen. The digits stay put and the thump
+ * still lands, which is the celebration without the accusation.
+ *
  * **Count first, land second.** The number reaching its new value and *then*
  * being hit is the order that reads as an impact. Scaling while the digits are
  * still changing reads as a glitch, which is why the thump is after the loop
@@ -52,6 +58,15 @@ fun CountUpNumber(
     countUpFrom: Int? = null,
     typography: TypographyResource = AppTheme.typography.Display.D1500,
     color: ColorResource = AppTheme.colors.accentBrand,
+    /**
+     * How long the climb waits before it starts.
+     *
+     * Zero wherever the number is on screen from the first frame. A ceremony
+     * that arrives a piece at a time passes the moment this number lands, or the
+     * count happens behind an alpha of zero and the number fades in already
+     * holding a total the player watched nothing happen to.
+     */
+    startDelayMillis: Int = 0,
 ) {
     val still = LocalReduceAnimations.current || LocalInspectionMode.current
     val haptics = LocalHaptics.current
@@ -59,12 +74,13 @@ fun CountUpNumber(
     var shown by remember { mutableIntStateOf(countUpFrom ?: value) }
     val thump = remember { Animatable(if (countUpFrom == null || still) 1f else SlamFrom) }
 
-    LaunchedEffect(value, countUpFrom, still) {
+    LaunchedEffect(value, countUpFrom, still, startDelayMillis) {
         if (countUpFrom == null || still) {
             shown = value
             thump.snapTo(1f)
             return@LaunchedEffect
         }
+        delay(startDelayMillis.toLong())
         for (next in (countUpFrom + 1)..value) {
             shown = next
             delay(TickMillis)

@@ -1,10 +1,8 @@
 package com.sodogku.features.streak.impl
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -16,15 +14,15 @@ import com.sodogku.libraries.progress.streak.StreakDayState
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.FullScreenLoader
 import com.sodogku.libraries.ui.components.Screen
-import com.sodogku.libraries.ui.components.dog.Dog
-import com.sodogku.libraries.ui.components.dog.DogPose
+import com.sodogku.libraries.ui.components.celebration.Arrived
+import com.sodogku.libraries.ui.components.celebration.Arriving
+import com.sodogku.libraries.ui.components.celebration.beatDelayMillis
 import com.sodogku.libraries.ui.components.header.TopBar
 import com.sodogku.libraries.ui.components.streak.StreakCalendar
 import com.sodogku.libraries.ui.components.streak.StreakHero
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.screenContentPadding
 import com.sodogku.system.AppTheme
-import com.sodogku.system.Dimension
 import com.sodogku.system.VerticalSpacerD300
 import com.sodogku.system.VerticalSpacerD500
 import com.sodogku.system.VerticalSpacerD800
@@ -45,12 +43,17 @@ import sodogku.libraries.resources.generated.resources.streak_title
 /**
  * The run, the record, and the last five weeks.
  *
- * **Nothing on this page moves when it is opened by tap.** There is no entrance
- * animation to suppress, because there is none to begin with: the only animated
- * thing is the single cell named by [StreakState.fillingIndex], and that is null
- * unless the page was pushed to celebrate a milestone. That is the difference
- * the owner asked for, expressed as an absence rather than as a flag somebody
- * has to remember to check.
+ * **Nothing on this page moves when it is opened by tap.** Every moving part is
+ * behind the same question, `state.celebrating > 0`: the beats arrive only on a
+ * ceremony ([Beat]), the number only counts when [StreakState.countUpFrom] says
+ * there is something to count ([StreakViewModel]), and the one filling day cell
+ * is the one named by [StreakState.fillingIndex], which is null on a plain
+ * visit. That is the difference the owner asked for, and each half of it is
+ * decided outside this file so something can test it.
+ *
+ * The slide up is not here either. A page cannot rise over a board the navigator
+ * has already taken away, so the entrance belongs to `StreakRoute`, which asks
+ * for a slide up and for the board underneath to hold still while it travels.
  */
 @Composable
 fun StreakScreen(
@@ -85,46 +88,64 @@ fun StreakScreen(
 
 @Composable
 private fun StreakBody(state: StreakState, modifier: Modifier = Modifier) {
+    val ceremony = state.celebrating > 0
+
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         VerticalSpacerD500()
 
         // The same picture the commitment moment shows, and on a celebration the
-        // same performance: the number counts up from yesterday's run and lands
-        // with a thump.
+        // same performance: the number flips to the run the player has just
+        // earned and lands with a thump.
         //
-        // `countUpFrom` is null when the page was *opened* rather than triggered,
-        // which is the whole difference between the two ways in. A page you went
-        // looking for should not perform at you.
-        StreakHero(
-            streak = state.current,
-            week = state.days.toWeekStrip(),
-            dayLabel = pluralStringResource(Res.plurals.streak_day_label, state.current, state.current),
-            countUpFrom = (state.celebrating - 1).takeIf { state.celebrating > 0 },
-        )
+        // The count waits for the hero to finish arriving. Started with it, the
+        // digits change while the whole beat is still scaling and travelling,
+        // and two springs on one number read as a wobble rather than as a
+        // landing.
+        Beat(ceremony, HeroBeat) {
+            StreakHero(
+                streak = state.current,
+                week = state.days.toWeekStrip(),
+                dayLabel = pluralStringResource(
+                    Res.plurals.streak_day_label,
+                    state.current,
+                    state.current,
+                ),
+                countUpFrom = state.countUpFrom,
+                countUpDelayMillis = if (ceremony) {
+                    beatDelayMillis(HeroBeat) + HeroSettleMillis
+                } else {
+                    0
+                },
+            )
+        }
 
         VerticalSpacerD500()
 
         // The record is quieter than the run. It is the thing to beat, not the
         // thing the page is about, and a run of 3 under a record of 90 read at
         // the same weight is a page that opens by saying you used to be better.
-        Text(
-            text = if (state.longest > 0) {
-                pluralStringResource(Res.plurals.streak_longest, state.longest, state.longest)
-            } else {
-                stringResource(Res.string.streak_longest_none)
-            },
-            typography = AppTheme.typography.Body.B500,
-            color = AppTheme.colors.textSecondary,
-        )
-
-        if (state.celebrating > 0) {
-            VerticalSpacerD500()
+        Beat(ceremony, RecordBeat) {
             Text(
-                text = stringResource(Res.string.streak_celebrate_body),
+                text = if (state.longest > 0) {
+                    pluralStringResource(Res.plurals.streak_longest, state.longest, state.longest)
+                } else {
+                    stringResource(Res.string.streak_longest_none)
+                },
                 typography = AppTheme.typography.Body.B500,
                 color = AppTheme.colors.textSecondary,
-                textAlign = TextAlign.Center,
             )
+        }
+
+        if (ceremony) {
+            VerticalSpacerD500()
+            Beat(ceremony, SignOffBeat) {
+                Text(
+                    text = stringResource(Res.string.streak_celebrate_body),
+                    typography = AppTheme.typography.Body.B500,
+                    color = AppTheme.colors.textSecondary,
+                    textAlign = TextAlign.Center,
+                )
+            }
         } else if (!state.playedToday && state.current > 0) {
             // The one thing a status page can say that the calendar cannot: how
             // long is left. Only when there is a run to lose and it has not been
@@ -140,20 +161,27 @@ private fun StreakBody(state: StreakState, modifier: Modifier = Modifier) {
 
         VerticalSpacerD800()
 
-        Text(
-            text = stringResource(Res.string.streak_calendar_title),
-            typography = AppTheme.typography.Heading.H600,
-            textAlign = TextAlign.Start,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        VerticalSpacerD300()
+        // The heading and the grid are one beat. They are one thing, and a
+        // heading that arrives ahead of the squares it names spends its own
+        // turn on screen labelling nothing.
+        Beat(ceremony, CalendarBeat, Modifier.fillMaxWidth()) {
+            Column {
+                Text(
+                    text = stringResource(Res.string.streak_calendar_title),
+                    typography = AppTheme.typography.Heading.H600,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                VerticalSpacerD300()
 
-        StreakCalendar(
-            days = state.days.map { it.toCell() },
-            weekdayLabels = WeekdayInitials.map { stringResource(it) },
-            fillingIndex = state.fillingIndex,
-            modifier = Modifier.fillMaxWidth(),
-        )
+                StreakCalendar(
+                    days = state.days.map { it.toCell() },
+                    weekdayLabels = WeekdayInitials.map { stringResource(it) },
+                    fillingIndex = state.fillingIndex,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
 
         // Only on a genuinely empty page. Explaining where the squares come from
         // to somebody who has already filled some in is noise.
@@ -171,11 +199,63 @@ private fun StreakBody(state: StreakState, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * A piece of the page, arriving on a ceremony and simply present otherwise.
+ *
+ * Both branches lay the content out the same way, so the page a player opened by
+ * tap is the page a ceremony finishes as. Omitting the wrapper on a plain visit
+ * would have changed the measurement as well as the motion.
+ */
+@Composable
+private fun Beat(
+    ceremony: Boolean,
+    order: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    if (ceremony) {
+        Arriving(order = order, modifier = modifier, content = content)
+    } else {
+        Arrived(modifier = modifier, content = content)
+    }
+}
+
+/**
+ * The script, in the order it is read. The number first, because it is what the
+ * page was pushed to say.
+ */
+private const val HeroBeat = 0
+private const val RecordBeat = 1
+private const val SignOffBeat = 2
+private const val CalendarBeat = 3
+
+/**
+ * How long the number waits after its own beat has started before it climbs.
+ *
+ * Past the arrival spring rather than inside it. `Motion.Pop` is still settling
+ * for a while after the beat is legible, and the whole point of the flip is that
+ * it is watched.
+ */
+private const val HeroSettleMillis = 260
+
 @Preview
 @Composable
 private fun StreakScreenPreview() {
     PreviewContent {
         StreakScreen(state = previewState(), onAction = {})
+    }
+}
+
+/**
+ * The ceremony. Under `LocalInspectionMode` every beat has already landed and
+ * the number is already at its new value, which is both the point of that rule
+ * and what makes this worth looking at.
+ */
+@Preview
+@Composable
+private fun StreakScreenCelebratingPreview() {
+    PreviewContent {
+        StreakScreen(state = previewState().copy(celebrating = 6), onAction = {})
     }
 }
 

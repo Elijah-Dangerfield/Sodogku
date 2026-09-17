@@ -147,6 +147,31 @@ data class StreakState(
 ) {
 
     /**
+     * What the big number counts up **from**, or null for a page that should not
+     * count at all.
+     *
+     * Three answers, not two, and the third is the one SD-121 created. A
+     * ceremony can now fire on a run of **one** — the day a player comes back to
+     * a run that had broken, which is the day they are most likely to break it
+     * again. The run before that day was zero, so "the old run" is honestly
+     * zero; but `0 → 1` in display type is the page opening by telling them they
+     * had nothing, and this app has already decided once (see `lossFacts`) that
+     * the honest number is the wrong one when its only content is that things
+     * went badly. So a run of one starts where it ends: nothing flips, and the
+     * thump still lands.
+     *
+     * Every other celebration counts from the day before, which is the run the
+     * player actually held yesterday, because a ceremony fires on every day the
+     * run grows.
+     */
+    val countUpFrom: Int?
+        get() = when {
+            celebrating <= 0 -> null
+            celebrating == RestartedRun -> RestartedRun
+            else -> celebrating - 1
+        }
+
+    /**
      * The countdown, rounded to whole hours, or minutes in the last one.
      *
      * Rounded *up* deliberately: "1 hour left" with fifty-nine minutes on the
@@ -167,6 +192,9 @@ data class StreakState(
 
     private companion object {
         const val MinutesInHour = 60L
+
+        /** A run with no run behind it: the first day, or the first day back. */
+        const val RestartedRun = 1
     }
 }
 

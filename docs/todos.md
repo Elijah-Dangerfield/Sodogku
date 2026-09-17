@@ -154,23 +154,6 @@ non-deprecated way to name a literal, which is the same seam from the other end.
 Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-H · session
 bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
 
-## SD-124 [P2] — Give the streak celebration the number flip it was asked for
-
-**Ask:** "this isn't really much like duo lingo in the way I want. I want a slide
-up and a smooth animation of a streak flipping from 1 to 2 with a bouncy
-celebration"
-
-**Done when:** the streak ceremony slides up, the number animates from the old
-run to the new one, and it lands with a bounce.
-
-**Hints:** `StreakScreen.kt` and `StreakViewModel.kt` in `features/streak/impl`.
-`StreakRoute(celebrating = n)` already carries the number being celebrated, and
-`GameAction.OpenStreak` deliberately passes 0 so a page the player asked for
-animates nothing. That distinction is what makes the flip possible, so keep it.
-Depends on SD-121: there is no point animating a ceremony that never opens.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-G · session
-bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
-
 ## SD-126 [P2] — Review the generated daily boards for how they open
 
 **Ask:** "maybe I'm just dumb but this daily board seems way too hard to solve
@@ -274,6 +257,15 @@ short display, the system-bar inset at the top, whether the stagger reads as
 celebratory or as slow, and the script at its longest — a daily clear with a near
 miss, a new best time, a treat and a streak is nine beats, which is when the new
 `verticalScroll` starts mattering.
+
+**The streak ceremony, from SD-124.** Clear a board on a day that grows the run.
+The page should rise over a board that holds still, and the number should count
+to the new run and thump. Two specific things: a run of **one** deliberately does
+not flip (it starts where it ends, so only the thump lands), and
+`StreakIntentionScreen` still counts `0 → 1` on the first-ever run — the two
+pages now disagree about what a run of one does, which is defensible since they
+are different moments, but somebody should look at them back to back and confirm
+that.
 
 **Hints:** `Surface.kt`, the `Box` modifier chain, and the KDoc section "Why the
 press is applied before the fill". `bounceClick` is `graphicsLayer` then

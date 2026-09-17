@@ -818,6 +818,37 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun openingTheStreakFromThePaneCarriesNothingToCelebrate() = runUnitTest {
+        // The number is what the streak page animates on, so a tap that carried
+        // one would make the page perform at a player who only went to look at
+        // it. The tap happens *after* a clear on purpose: that is when the run
+        // is sitting on state, ready to be picked up by a plausible-looking
+        // `streak = state.dailyStreak`, and it is the only moment the mistake is
+        // reachable at all.
+        val vm = viewModel(
+            isDaily = true,
+            daily = FakeDaily(levelId = DailyLevel, streak = SEVEN_DAYS),
+            streak = SilentStreak(StreakPrompt.Celebrate(streak = SEVEN_DAYS)),
+        )
+        val events = eventsOf(vm)
+
+        solveCurrent(vm)
+        vm.takeAction(GameAction.OpenStreak)
+
+        val opened = events.filterIsInstance<GameEvent.OpenStreak>()
+        assertEquals(
+            SEVEN_DAYS,
+            opened.first().streak,
+            "the clear opened no ceremony, so the tap below proves nothing",
+        )
+        assertEquals(
+            0,
+            opened.last().streak,
+            "the level pane opened the streak page as a ceremony",
+        )
+    }
+
+    @Test
     fun aQuietStreakNeverInterruptsAWin() = runUnitTest {
         // The overwhelmingly common case, and the one that would be most
         // annoying to get wrong: a full-screen page after every clear.

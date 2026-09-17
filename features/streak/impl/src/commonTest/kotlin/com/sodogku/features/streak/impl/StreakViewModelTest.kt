@@ -24,6 +24,16 @@ import kotlin.test.assertTrue
  * Both assertions name the exact cell. "Nothing is animating" would pass against
  * a screen that had lost its animation entirely, so the two tests are written as
  * a pair and neither is true of a broken implementation.
+ *
+ * The same pairing covers the number. [StreakState.countUpFrom] has three
+ * answers, and the third — a run of one, which after SD-121 is a player coming
+ * back to a run that had broken — is the one that would otherwise be decided by
+ * an arithmetic accident in the screen.
+ *
+ * Deliberately not covered here: that the number actually climbs, and that the
+ * page holds still when it is asked to. Those are claims about a composition and
+ * live in `CountUpNumberTest` and `ArrivingHoldsStillTest` in `:libraries:ui`.
+ * How the page *arrives* is `StreakRouteTest` in `:features:streak`.
  */
 class StreakViewModelTest : CoroutineTest() {
 
@@ -103,6 +113,47 @@ class StreakViewModelTest : CoroutineTest() {
         assertNull(vm.state.fillingIndex, "the setting is honoured even on a celebration")
         assertEquals(7, vm.state.celebrating, "and the page still says what it is for")
         assertEquals(7, vm.state.current)
+    }
+
+    @Test
+    fun aGrowingRunCountsUpFromTheDayBefore() = runUnitTest {
+        val repo = FakeStreak(summary(completedThrough = 4))
+
+        val vm = viewModel(repo, celebrating = 4)
+
+        assertEquals(
+            3,
+            vm.state.countUpFrom,
+            "the flip is supposed to be from the run the player held yesterday to the one " +
+                "they hold now",
+        )
+    }
+
+    @Test
+    fun aRunThatStartedOverLandsWithoutCountingUpFromNothing() = runUnitTest {
+        // SD-121 made this reachable: a run of one is celebrated once the
+        // intention moment has been spent, and that is a player coming back to a
+        // run that had broken rather than a player starting out.
+        val repo = FakeStreak(summary(completedThrough = 1))
+
+        val vm = viewModel(repo, celebrating = 1)
+
+        assertEquals(
+            1,
+            vm.state.countUpFrom,
+            "a restart counted up from zero, so the page opens by saying in display type " +
+                "that the player had nothing",
+        )
+    }
+
+    @Test
+    fun aPageOpenedByTapCountsNothing() = runUnitTest {
+        val repo = FakeStreak(summary(completedThrough = 4))
+
+        assertNull(
+            viewModel(repo, celebrating = 0).state.countUpFrom,
+            "the number performed on a page the player went looking for",
+        )
     }
 
     @Test

@@ -64,6 +64,8 @@ fun StreakHero(
     dayLabel: String,
     modifier: Modifier = Modifier,
     countUpFrom: Int? = null,
+    /** When the count starts, for a ceremony whose pieces arrive in sequence. */
+    countUpDelayMillis: Int = 0,
 ) {
     Column(
         modifier = modifier,
@@ -73,7 +75,11 @@ fun StreakHero(
 
         VerticalSpacerD300()
 
-        CountUpNumber(value = streak, countUpFrom = countUpFrom)
+        CountUpNumber(
+            value = streak,
+            countUpFrom = countUpFrom,
+            startDelayMillis = countUpDelayMillis,
+        )
 
         Text(
             text = dayLabel,
