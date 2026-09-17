@@ -56,6 +56,18 @@ class StreakRepositoryImpl(
     private val timeZone: DeviceTimeZone,
 ) : StreakRepository {
 
+    /**
+     * The day the last prompt was decided for, so that showing it spends that
+     * day rather than whatever day it is by the time the page is on screen.
+     *
+     * In memory rather than on disk on purpose: it is only meaningful between a
+     * [pendingPrompt] and the [onPromptShown] that answers it, and a process
+     * that dies in that gap showed the player nothing, so there is nothing to
+     * record. Null falls back to the clock, which is what the first call after a
+     * cold start would have done anyway.
+     */
+    private var promptedFor: LocalDate? = null
+
     override fun observe(): Flow<StreakSummary> = dayChanges()
         .flatMapLatest { day -> dao.observeAll().map { rows -> summaryOn(day, rows.toDates()) } }
         .distinctUntilChanged()
@@ -69,6 +81,7 @@ class StreakRepositoryImpl(
     override suspend fun pendingPrompt(): StreakPrompt {
         val played = dao.all().toDates()
         val day = today()
+        promptedFor = day
         return promptFor(
             today = day,
             streak = playStreakOn(day, played),
@@ -86,16 +99,26 @@ class StreakRepositoryImpl(
      * The lost-run page is the same bargain from the other side: it is the one
      * thing that day has to report, and repeating it on the next board would
      * make it a nag rather than a moment.
+     *
+     * **The day it spends is the day the page was decided for, not the clock
+     * now.** Between the two there is a screen being built and a navigation, and
+     * a player finishing a board at 23:59:59 crosses midnight inside that gap.
+     * Reading the clock again there recorded the page against tomorrow, which
+     * then blocked tomorrow's own page — the run reached six and said nothing,
+     * because a page about day five had already claimed day six. Narrow, and
+     * exactly the shape the class docblock above says every date bug in this app
+     * has had.
      */
     override suspend fun onPromptShown(prompt: StreakPrompt) {
+        val day = promptedFor ?: today()
         when (prompt) {
             StreakPrompt.None -> Unit
             StreakPrompt.Intention -> prompts.update {
-                it.copy(intentionShown = true, celebratedOn = today())
+                it.copy(intentionShown = true, celebratedOn = day)
             }
 
             is StreakPrompt.Celebrate, is StreakPrompt.Lost ->
-                prompts.update { it.copy(celebratedOn = today()) }
+                prompts.update { it.copy(celebratedOn = day) }
         }
     }
 

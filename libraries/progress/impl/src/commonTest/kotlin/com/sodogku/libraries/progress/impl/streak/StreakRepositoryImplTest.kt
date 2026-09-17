@@ -11,6 +11,7 @@ import com.sodogku.libraries.progress.streak.StreakDayState
 import com.sodogku.libraries.progress.streak.StreakPrompt
 import com.sodogku.libraries.progress.streak.StreakSummary
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.LocalDate
@@ -19,6 +20,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -277,6 +281,67 @@ class StreakRepositoryImplTest : CoroutineTest() {
         )
     }
 
+    @Test
+    fun aPageIsRecordedAgainstTheDayItWasDecidedForRatherThanTheClockAtArrival() = runUnitTest {
+        // There is a screen being built and a navigation between deciding a
+        // prompt and showing it, and a player finishing a board at 23:59:59
+        // crosses midnight inside that gap. Reading the clock again on the far
+        // side recorded the page about day five against day six, and the
+        // day-scoped guard then swallowed day six's own page: the run reached
+        // six and said nothing.
+        seed(completedDaysBack = (0..4).toList())
+        prompts.value = StreakPromptState(intentionShown = true)
+        clock.set(Instant.parse("2026-09-07T23:59:59Z"))
+        val repo = repository()
+
+        val offered = repo.pendingPrompt()
+        assertEquals(StreakPrompt.Celebrate(5), offered)
+
+        clock.set(Instant.parse("2026-09-08T00:00:01Z"))
+        repo.onPromptShown(offered)
+
+        assertEquals(LocalDate(2026, 9, 7), prompts.value.celebratedOn, "the day the page was about")
+
+        clock.set(Instant.parse("2026-09-08T12:00:00Z"))
+        repo.onBoardCompleted()
+
+        assertEquals(6, repo.summary().current, "day six really was played")
+        assertEquals(StreakPrompt.Celebrate(6), repo.pendingPrompt(), "and day six gets its own page")
+    }
+
+    @Test
+    fun observe_reEmitsWhenTheDayIsPlayed() = runUnitTest {
+        // The interface promises this and the view model leans on it. Two
+        // mutations survived the whole class without it: replacing the
+        // dao-observing flow with a one-shot read, and dropping
+        // `distinctUntilChanged`.
+        val repo = repository()
+        val seen = mutableListOf<Int>()
+        backgroundScope.launch { repo.observe().collect { seen += it.current } }
+
+        repo.onBoardCompleted()
+
+        assertEquals(listOf(0, 1), seen, "the run was folded again when the row landed")
+    }
+
+    @Test
+    fun observe_reEmitsWhenTheDateRollsOver() = runUnitTest {
+        clock.followVirtualTime { testScheduler.currentTime.milliseconds }
+        clock.set(Instant.parse("2026-09-07T20:00:00Z"))
+        seed(completedDaysBack = listOf(0))
+        val repo = repository()
+        val seen = mutableListOf<LocalDate>()
+        backgroundScope.launch { repo.observe().collect { seen += it.today } }
+
+        testScheduler.advanceTimeBy(4.hours + 1.milliseconds)
+
+        assertEquals(
+            listOf(LocalDate(2026, 9, 7), LocalDate(2026, 9, 8)),
+            seen,
+            "one for today, one for the day that arrived while the page was open",
+        )
+    }
+
     private fun StreakSummary.dayOn(date: LocalDate) =
         days.first { it.date == date }.state
 
@@ -307,10 +372,23 @@ class StreakRepositoryImplTest : CoroutineTest() {
 
 @OptIn(ExperimentalTime::class)
 private class MutableClock(private var current: Instant) : Clock {
-    override fun now(): Instant = current
+
+    private var virtualTime: () -> Duration = { Duration.ZERO }
+
+    override fun now(): Instant = current + virtualTime()
 
     fun set(instant: Instant) {
         current = instant
+    }
+
+    /**
+     * Ties the clock to the test scheduler, so a `delay` inside the repository
+     * moves the wall clock the way it would in life. Without it the rollover
+     * flow wakes at midnight and finds it is still yesterday. Copied from
+     * `DailyRepositoryImplTest`, which needed it first and for the same flow.
+     */
+    fun followVirtualTime(elapsed: () -> Duration) {
+        virtualTime = elapsed
     }
 }
 

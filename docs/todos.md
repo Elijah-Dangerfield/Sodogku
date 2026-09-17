@@ -62,6 +62,19 @@ close; re-run it and update which slices have been covered.
 
 **Slices covered so far:**
 
+- **`libraries/progress`, the streak and daily folds**, 2026-09-16, against
+  `ae0c56b`, deliberately pointed at code that had changed the same day. Eleven
+  findings. 37 mutations, 33 killed, every survivor explained. Verdict: the
+  prompt rules are the best-covered code in the slice — eleven mutations against
+  `StreakPrompts.kt`, all killed — and the defects are at the repository's seams
+  and in what nobody observes. Two were fixed on the spot: a midnight crossing
+  between deciding a prompt and recording it, which swallowed the next day's
+  page (a real bug introduced by SD-121 hours earlier, reproduced before it was
+  fixed), and `observe()` having no test at all, which two separate mutations
+  proved by surviving the whole class. The rest are SD-137 through SD-140. The
+  `celebratedOn` migration was checked against a real legacy blob through the
+  actual serializer and is fine: existing players get one duplicate page on the
+  day they update, and nothing after.
 - **The `libraries/ui` board and dog components**, 2026-09-11. Eleven findings,
   now SD-99 through SD-109, two of them P1 and both about what a screen reader
   hears. Verdict: the board cell and the drag are right about the two things the
@@ -93,8 +106,13 @@ close; re-run it and update which slices have been covered.
 
 **Every slice originally listed is now covered.** Pick new ones or decide this
 runs on a schedule rather than on request. Candidates nobody has looked at:
-`libraries/progress` and the streak folds, `libraries/navigation` and the
-floating-window host, the iOS Swift layer, and `:apps:server`.
+`libraries/navigation` and the floating-window host, the iOS Swift layer, and
+`:apps:server`.
+
+**One thing the `libraries/progress` pass established that is worth repeating:**
+pointing a review at code that changed the same day found a real bug in it within
+the hour. Consider running this against a slice the last batch of work touched
+rather than against the oldest untouched one.
 
 **Hints:** Run it as a **Fable** subagent, and give it a *slice*, not the whole
 repo. A review with no boundary returns a list of generalities. Slices worth
@@ -363,3 +381,107 @@ badge into its own bounds would fix the semantics and the overflow together.
 
 Found while measuring the badge for SD-128. The overflow half is fixed and
 tested; this half is not.
+
+## SD-137 [P1] — A board finished after midnight counts for a different day than its daily does
+
+**Ask:** `StreakRepositoryImpl.onBoardCompleted()` takes no date and writes
+`today()` at the moment the board is finished. `DailyRepositoryImpl` deliberately
+records against the *board's* date and has a test saying so
+(`theResultIsRecordedAgainstTheBoardThatWasPlayed_notTheClockAtTheEnd`). So the
+two disagree for any board started before midnight and finished after it.
+
+**Done when:** a board started on day N and finished on day N+1 counts for the
+same day in both, or the difference is written down as intended.
+
+**Failure scenario, worked:** play day 0. Start day 1's daily at 23:55, finish at
+00:05. `daily_result` has day 1, `play_day` has days 0 and 2. The streak calendar
+marks day 1 Missed while the daily history says it was completed, the run reads 1
+where the player has done three days in a row, and they get `Celebrate(1)` — or,
+after SD-127, a page telling them the run they are still holding has ended.
+
+**Hints:** `StreakRepositoryImpl.kt:77-79` against `DailyRepositoryImpl.kt:80`
+and `GameViewModel.kt:2099`, which already passes the board's date to the daily.
+Passing the same date to `onBoardCompleted` is the obvious shape; the campaign
+has no equivalent date to pass, which is the part that needs deciding. Nothing in
+the slice tests this shape.
+
+Found by the SD-6 review of `libraries/progress`, 2026-09-16. Verified by
+reading, not by running; the frequency is a guess.
+
+## SD-138 [P2] — A bridged daily does not bridge the play streak, and SD-127 now says so out loud
+
+**Ask:** A player with a 12-day run misses a day, watches the rewarded ad, and
+the daily card says the run is bridged and continuing. The play-day fold knows
+nothing about it: `playCalendarOn` only ever produces Future, Completed and
+Missed, and `StreakDayState.Bridged` is a state nothing produces.
+
+**Done when:** a freeze or a restore either bridges the play streak too, or the
+daily stops claiming it bridged anything.
+
+**Why it is worse now than it was:** before SD-127 the streak page quietly showed
+a 1 and the disagreement was silent. Now `brokenPlayStreakOn` returns 12 and the
+page says "Your run of 12 days ended" — the day after the app sold an ad on the
+promise that it had not.
+
+**Hints:** `PlayStreak.kt:99-121`, `StreakSummary.kt:19-20` (which already says
+`Bridged` is never spent, "see SD-28"), and `DailyRepositoryImpl.useFreeze()` /
+`restoreStreak()`, both live behind `GameAction.UseFreeze` and `RestoreStreak`.
+This is a product decision rather than a code slip and it overlaps SD-28 in
+`docs/backlog.md`, which has to answer what a freeze covers first.
+
+Found by the SD-6 review of `libraries/progress`, 2026-09-16.
+
+## SD-139 [P2] — A daily-only player is unreachable by two of the three streak rules
+
+**Ask:** `boardsCleared` counts `LevelState.Completed` in `ProgressRepository`,
+and dailies never write there. So a player who only ever plays the daily never
+spends the intention moment, which means `intentionShown` stays false forever,
+which means the Celebrate floor stays at 2 and the "a run of one is somebody who
+came back" rule never applies to them at all.
+
+**Done when:** either the intention can be spent by a daily, or the two rules
+that read `intentionShown` use something a daily-only player can reach.
+
+**Two consequences, both reachable:**
+
+- A daily-only player who plays every other day sees no page, ever.
+- A daily-only player whose 12-day run broke yesterday clears their first two
+  campaign boards today. `promptFor` returns `Intention`, that spends the day,
+  tomorrow the run is 2, and `Lost(12)` is never shown. This is pinned today by
+  `theIntentionOutranksALostRunToo`, so changing it means changing that test
+  deliberately.
+
+**Hints:** `StreakPrompts.kt:126-133` and `intentionIsDue`. Two comments in
+`StreakPromptsTest` (around lines 141 and 237) assert these collisions are
+unreachable because "nobody holds a run of two days without having cleared two
+boards" — a test in the same file, at 224-233, is built on exactly that player.
+Those comments are wrong and should go with the fix either way.
+
+Found by the SD-6 review of `libraries/progress`, 2026-09-16. The reachability is
+verified; whether the outcome is wrong is a judgement call.
+
+## SD-140 [P2] — Three small ones from the `libraries/progress` review
+
+**Ask:** Three findings too small for their own items, all verified.
+
+**Done when:** each is fixed or dismissed in writing.
+
+- **A test that cannot fail.** `DailyCalendarTest.untilNextDay_isAlwaysPositive`
+  (lines 67-75) is named for the `.coerceAtLeast(1.seconds)` floor in
+  `DailyCalendar.kt:36-37` and cannot observe it: the fixture is 23:59:59Z, which
+  yields exactly one second with or without the floor. Removing the floor leaves
+  the test green. The floor may be unreachable in any case, since the next day's
+  start is after every instant of today — in which case say so in the docblock
+  rather than leaving a guard nobody can test.
+- **`summaryOn` reads the clock twice.** `StreakRepositoryImpl.kt:129-136` builds
+  `untilTomorrow` from a fresh `clock.now()` while `today` came from
+  `dayChanges()`, so a DAO emission between real midnight and the flow waking
+  gives tomorrow's date with a 24-hour countdown. Self-heals on the next
+  emission, and the same shape is in `DailyRepositoryImpl.statusOn:167`. What is
+  actually wrong is `StreakSummary`'s docblock (lines 77-84), which claims every
+  field comes from one snapshot.
+- **Stale docblocks in `StreakSummary.kt`.** Lines 41-44 say current and longest
+  fold from `daily_result`, and line 47 says "as `DailyStatus.streak` reports
+  it". Both predate the `play_day` split.
+
+Found by the SD-6 review of `libraries/progress`, 2026-09-16.
