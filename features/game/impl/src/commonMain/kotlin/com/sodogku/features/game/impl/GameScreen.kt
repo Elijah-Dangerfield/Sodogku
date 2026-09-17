@@ -209,20 +209,11 @@ fun GameScreen(
             Spacer(modifier = Modifier.height(Dimension.D700))
         }
 
-            // The outcome covers the board rather than replacing it: the player
-            // should still see the grid they just finished (or ran out of bones
-            // on) behind the sheet. A daily recap covers it too — the day is
-            // over, so the board underneath is a backdrop and not a puzzle.
-            if (state.phase != GamePhase.Playing && state.phase != GamePhase.Loading) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(AppTheme.colors.backgroundOverlay.color),
-                ) {
-                    GameOutcomeSheet(state = state, onAction = onAction)
-                }
-            }
+            // How an ending covers the board is the ending's own business: a
+            // clear takes the whole screen, a loss and a recap dim it and leave
+            // it visible. Both draw nothing at all while a board is in play, so
+            // the phase test lives in there with the rest of that decision.
+            GameOutcomeSheet(state = state, onAction = onAction)
 
             // Over the sheet, not inside it. Several badges can land at once — a
             // first clear can earn First Steps, Perfect Form and Speed Demon in

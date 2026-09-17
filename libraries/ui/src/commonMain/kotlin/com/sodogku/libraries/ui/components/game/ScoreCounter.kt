@@ -75,6 +75,15 @@ fun ScoreCounter(
      * digits and is the number the sheet is *about*, so it stays exact.
      */
     abbreviated: Boolean = false,
+    /**
+     * How long the roll waits before it starts.
+     *
+     * Zero everywhere the counter is already on screen. The win celebration
+     * passes the moment its own number arrives, because a counter that rolls
+     * while it is still faded out has done its earning off screen and fades in
+     * holding a number the player watched nothing happen to.
+     */
+    startDelayMillis: Int = 0,
 ) {
     // Read here rather than taken as a parameter, so a new screen honours the
     // setting without its author knowing the setting exists. A number that rolls
@@ -83,13 +92,14 @@ fun ScoreCounter(
     val still = LocalReduceAnimations.current || LocalInspectionMode.current
     var displayed by remember { mutableIntStateOf(if (still) score else countFrom) }
 
-    LaunchedEffect(score, still) {
+    LaunchedEffect(score, still, startDelayMillis) {
         val start = displayed
         if (still) {
             displayed = score
             return@LaunchedEffect
         }
         if (start == score) return@LaunchedEffect
+        delay(startDelayMillis.toLong())
         val progress = Animatable(0f)
         progress.animateTo(1f, tween(durationMillis = countUpMillis(score - start))) {
             displayed = (start + (score - start) * value).roundToInt()
@@ -153,14 +163,18 @@ private fun oneDecimal(value: Double): String {
  * the button under it is live the whole time.
  */
 @Composable
-fun ScorePawBurst(modifier: Modifier = Modifier) {
+fun ScorePawBurst(
+    modifier: Modifier = Modifier,
+    /** When the number they are flying into arrives, matching [ScoreCounter]'s own wait. */
+    startDelayMillis: Int = 0,
+) {
     if (LocalReduceAnimations.current || LocalInspectionMode.current) return
 
     Box(contentAlignment = Alignment.Center, modifier = modifier) {
         repeat(PawsInBurst) { index ->
             val progress = remember(index) { Animatable(0f) }
-            LaunchedEffect(index) {
-                delay(index * PawStaggerMillis.toLong())
+            LaunchedEffect(index, startDelayMillis) {
+                delay(startDelayMillis + index * PawStaggerMillis.toLong())
                 progress.animateTo(
                     1f,
                     tween(durationMillis = PawFlightMillis, easing = FastOutSlowInEasing),

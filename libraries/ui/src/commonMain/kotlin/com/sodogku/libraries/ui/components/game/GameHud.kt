@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalInspectionMode
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
+import kotlinx.coroutines.delay
 
 /**
  * The lives left in this attempt, as bones.
@@ -109,24 +110,48 @@ fun PawRating(
      * twitch.
      */
     animated: Boolean = true,
+    /**
+     * How long each paw waits behind the one to its left.
+     *
+     * Zero everywhere the rating is a fact on a row — it is a fact all at once,
+     * and three paws landing in sequence in a level list would read as the list
+     * loading. The win celebration passes a stagger because there the rating is
+     * the thing being awarded, and awarding three of something one at a time is
+     * what makes it feel like three.
+     */
+    staggerMillis: Int = 0,
 ) {
+    // Read here rather than taken as a parameter, the same way [ScoreCounter]
+    // and [Dog] read it: a caller honours the setting without knowing it exists.
+    // Under inspection it also stops a preview or a screenshot capturing
+    // whichever frame of the pop it happened to land on — and with a stagger,
+    // capturing a rating whose later paws have not arrived at all.
+    val still = !animated || LocalReduceAnimations.current || LocalInspectionMode.current
     Row(
         horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
         modifier = modifier,
     ) {
         repeat(MaxPaws) { index ->
             val earned = index < paws
-            val pop = remember { Animatable(if (animated) 0f else 1f) }
-            LaunchedEffect(earned, animated) {
-                if (earned && animated) {
-                    pop.snapTo(0f)
-                    pop.animateTo(Motion.PopOvershoot, Motion.Pop)
-                    pop.animateTo(1f, Motion.Tap)
+            val pop = remember { Animatable(if (still) 1f else 0f) }
+            LaunchedEffect(earned, still, staggerMillis) {
+                if (still) {
+                    pop.snapTo(1f)
+                    return@LaunchedEffect
                 }
+                if (!earned) return@LaunchedEffect
+                pop.snapTo(0f)
+                delay(index.toLong() * staggerMillis)
+                pop.animateTo(Motion.PopOvershoot, Motion.Pop)
+                pop.animateTo(1f, Motion.Tap)
             }
             Box(
                 modifier = Modifier
                     .size(size)
+                    // Read in the layer and never in composition. The rating
+                    // shares a celebration with a rolling score and a row of
+                    // stats, and subscribing that subtree to every frame of
+                    // three pops is how a flourish starts costing frames.
                     .graphicsLayer {
                         val scale = if (earned) pop.value else 1f
                         scaleX = scale

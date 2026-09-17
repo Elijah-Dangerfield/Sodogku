@@ -137,26 +137,20 @@ ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
 
-## SD-123 [P2] — Make the win sheet a full-screen celebration, not a dialog
+## SD-133 [P2] — Dark mode, defaulting to the device setting
 
-**Ask:** "I'd prefer this not be a dialog and instead be a slide up page or a
-bottom sheet that's full screen to achieve the same result. bouncy animations
-still wanted, duo lingo style." Said again four days later: "I'd like this to be
-full screen. like the Duolingo lesson celebration. but just a dialog."
+**Ask:** The same report that asked for a full-screen win celebration (SD-123)
+also asked for dark mode, defaulting to whatever the device is set to. It was
+deliberately kept out of that item and is not started.
 
-**Done when:** finishing a level presents a full-screen slide-up rather than a
-centred dialog, and the paws and score arrive with movement rather than already
-drawn.
+**Done when:** the app follows the system light/dark setting, and every screen
+has been looked at in both.
 
-**Hints:** The sheet today is the "Flawless / five paws / Score, Time, Mistakes /
-NEXT LEVEL" card in `GameOutcomeSheets.kt`. Use `bottomSheet<>` rather than a
-full `screen<>`; AGENTS.md argues for it and the backstack stays one deep.
-Anything that animates forever needs a fixed value under `LocalInspectionMode`,
-and never read an animated value during composition.
-
-**The same report also asks for dark mode**, defaulting to the device setting,
-which is a separate piece of work and is not in this item. Promote it to its own
-if you want it.
+**Hints:** `AppTheme` and `libraries/ui/.../system/color/` own the palette. This
+is a sweep rather than a feature: the value is in finding the call sites that
+name a literal colour instead of a `ColorResource`, and there are some — SD-130
+records that `ColorResource` is `@Deprecated` at class level with no
+non-deprecated way to name a literal, which is the same seam from the other end.
 Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-H · session
 bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
 
@@ -257,16 +251,29 @@ these sizes do not scale the way a system font setting expects, and SD-114's
 review found the two worst defects in `libraries/ui` were both about what a
 screen reader hears.
 
-## SD-129 [P2] — Confirm on a device that the whole card presses, not just its text
+## SD-129 [P2] — Look at the two things this batch changed that only a device can judge
 
-**Ask:** SD-119 moved `bounceClick` above the fill inside `Surface`. Every
-clickable `Surface` in the app now scales its border, shadow and fill along with
+**Ask:** Two changes landed whose acceptance criterion is "does it look right",
+and neither has been looked at. Both are reasoned about and tested structurally;
+neither has been run.
+
+**Done when:** somebody has opened the app and said yes or no to each.
+
+**The press, from SD-119.** `bounceClick` moved above the fill inside `Surface`,
+so every clickable `Surface` now scales its border, shadow and fill along with
 its content, where before the content shrank away from a border that held still.
+Press `Card`, `CardSecondary`, `NoticeBanner`, `StreakButton` and `IconButton`.
+If the new press is wrong, the fix is a parameter, not a revert: the four SD-119
+call sites need the new order to keep the press they already had.
 
-**Done when:** somebody has pressed `Card`, `CardSecondary`, `NoticeBanner`,
-`StreakButton` and `IconButton` on a device and said whether the new press is
-right. If it is not, the fix is a parameter, not a revert: the four SD-119 call
-sites need the new order to keep the press they already had.
+**The win celebration, from SD-123.** Finish a level. The panel should rise from
+the bottom over 340ms and the beats should land one at a time behind it, paws
+staggered, score rolling up from zero. Things to look at specifically, because
+they are the ones that were reasoned about rather than seen: the proportions on a
+short display, the system-bar inset at the top, whether the stagger reads as
+celebratory or as slow, and the script at its longest — a daily clear with a near
+miss, a new best time, a treat and a streak is nine beats, which is when the new
+`verticalScroll` starts mattering.
 
 **Hints:** `Surface.kt`, the `Box` modifier chain, and the KDoc section "Why the
 press is applied before the fill". `bounceClick` is `graphicsLayer` then
