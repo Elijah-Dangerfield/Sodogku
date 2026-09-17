@@ -160,7 +160,7 @@ internal fun ColorRow(
                 Text(text = role, typography = AppTheme.typography.Label.L600)
                 Text(
                     text = "${resource.designSystemName} · ${resource.toHexString()}",
-                    typography = AppTheme.typography.Caption.C200,
+                    typography = AppTheme.typography.Caption.C300,
                     color = AppTheme.colors.textSecondary,
                 )
             }
@@ -228,7 +228,7 @@ internal fun ColorSwatch(
         )
         Text(
             text = resource.toHexString(),
-            typography = AppTheme.typography.Caption.C200,
+            typography = AppTheme.typography.Caption.C300,
             color = AppTheme.colors.textSecondary,
         )
     }

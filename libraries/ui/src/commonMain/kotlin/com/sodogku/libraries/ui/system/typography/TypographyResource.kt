@@ -62,7 +62,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * - Tighter line-height (1.2x) for compact UI elements
  * - Use for interactive and metadata text
  *
- * **Caption (C200-C400)** - Timestamps, legal text, footnotes, helper text
+ * **Caption (C300-C400)** - Timestamps, legal text, footnotes, helper text
  * - Normal weight for unobtrusiveness
  * - Standard line-height (1.4x) for small text legibility
  * - Smallest text in the system
@@ -261,10 +261,21 @@ interface BodyTypography {
     val B400: TypographyResource
 }
 
+/**
+ * The bottom of the scale, and the only ramp in the system that is entirely
+ * below what either platform calls its smallest size — Material's `labelSmall`
+ * is 11sp and UIKit's `caption2` is 11pt, against C400's 10sp and C300's 8sp.
+ *
+ * There used to be a C200 at 6sp. It is gone rather than resized: at 6sp
+ * Poppins draws an x-height of 3.3sp, a shade over half of Material's floor,
+ * and a size that small does not become readable by being multiplied — at the
+ * largest text setting iOS offers, Compose scales it to 10.8sp, still under the
+ * 11pt iOS gives a caption by default. Every caller it had was drawing content:
+ * a notification count, a weekday, a date. See `docs/decisions.md`, 2026-09-16.
+ */
 interface CaptionTypography {
     val C400: TypographyResource
     val C300: TypographyResource
-    val C200: TypographyResource
 }
 
 @Composable
@@ -670,15 +681,6 @@ class CaptionTypographyImpl(
         lineHeight = Dimension.D300.lineHeight(LineHeightRatio.STANDARD),
         lineBreak = LineBreak.Simple,
         identifier = "caption-300"
-    )
-
-    override val C200 = TypographyResource(
-        fontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = Dimension.D200.sp(),
-        lineHeight = Dimension.D200.lineHeight(LineHeightRatio.STANDARD),
-        lineBreak = LineBreak.Simple,
-        identifier = "caption-200"
     )
 }
 
@@ -1207,14 +1209,6 @@ private fun PreviewCaptionTypography() {
                     name = "Caption 300",
                     typographyResource = AppTheme.typography.Caption.C300,
                     exampleText = "Updated yesterday at 3:45 PM"
-                )
-            }
-
-            item {
-                TypographySpecItem(
-                    name = "Caption 200",
-                    typographyResource = AppTheme.typography.Caption.C200,
-                    exampleText = "© 2025 All rights reserved. Terms & Conditions apply."
                 )
             }
         }

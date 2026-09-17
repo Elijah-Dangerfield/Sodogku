@@ -34,6 +34,7 @@ import com.sodogku.system.Motion
 import com.sodogku.system.Radii
 import com.sodogku.system.clip
 import com.sodogku.system.cornerRadius
+import com.sodogku.system.typography.TypographyResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /** How one square on the streak calendar is drawn. */
@@ -95,7 +96,7 @@ fun StreakCalendar(
             weekdayLabels.forEach { day ->
                 Text(
                     text = day,
-                    typography = AppTheme.typography.Caption.C200,
+                    typography = StreakCalendarTypography,
                     color = AppTheme.colors.textSecondary,
                     textAlign = TextAlign.Center,
                     // The headings repeat what every cell already says out loud,
@@ -198,7 +199,11 @@ private fun StreakDayCell(cell: StreakCell, filling: Boolean, modifier: Modifier
     ) {
         Text(
             text = cell.label,
-            typography = AppTheme.typography.Caption.C200,
+            // C300, not the 6sp this used to be. The square is sized by the
+            // screen and not by the type, so the date has to fit it at the
+            // largest system font as well as at the default;
+            // `StreakCalendarFitsTest` measures both rather than assuming.
+            typography = StreakCalendarTypography,
             // Every filled square names the colour it is filled with. A bridged
             // day fell through to the same brown a *cream* square uses, which put
             // Brown700 on Purple600 at 1.7:1 — the date on the one square the
@@ -253,6 +258,18 @@ internal fun todayRing(
         cornerRadius = (clipCornerRadius - inset).coerceAtLeast(0f),
     )
 }
+
+/**
+ * The size the weekday headings and the dates are both drawn at.
+ *
+ * Named rather than written twice, and named so that something can measure it.
+ * A square here is sized by the screen and never by the type in it, so "the date
+ * fits" is a claim about a font size against a width — `StreakCalendarFitsTest`
+ * holds it, and it can only hold it against the size the grid actually uses if
+ * there is exactly one of it.
+ */
+internal val StreakCalendarTypography: TypographyResource
+    @Composable get() = AppTheme.typography.Caption.C300
 
 private const val DaysPerWeek = 7
 

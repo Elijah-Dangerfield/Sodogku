@@ -133,6 +133,18 @@ fun Surface(
     border: Border? = null,
     alpha: Float = 1f,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    /**
+     * Whether content is cut off at the surface's edge. On by default, because
+     * a rounded card whose contents square off its own corners is the reason
+     * this clips at all.
+     *
+     * Pass `false` for a surface whose job is to be a background and whose
+     * content is *meant* to hang over an edge — a bar with a badge above it,
+     * a chip with a marker outside it. The shape has to be square for that to
+     * be safe, and a clip is not free either, so it stays on unless a caller
+     * says otherwise.
+     */
+    clip: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Box(
@@ -141,7 +153,7 @@ fun Surface(
                 color = color,
                 shape = radius.shape,
                 elevation = elevation,
-                clip = true,
+                clip = clip,
                 alpha = alpha,
                 border = border
             )

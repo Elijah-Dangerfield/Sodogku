@@ -105,6 +105,14 @@ fun AppBottomBar(
         contentColor = AppTheme.colors.onBackground,
         border = null,
         radius = Radii.None,
+        // A badge is drawn *above* the icon it belongs to, and it grows with
+        // the system font size while this bar does not. Clipping, the bar was
+        // shaving the top off its own notification count from the first step
+        // above the default text size — worst on the selected tab, which is
+        // magnified 1.2x about its centre and so throws the badge higher
+        // still. The bar has no corners to protect, so it stops clipping
+        // instead of getting taller for everybody. `BottomBarBadgeFitsTest`.
+        clip = false,
     ) {
         Row(
             modifier = Modifier
@@ -211,6 +219,18 @@ private fun MagnifyingBottomBarItem(
 }
 
 
+/**
+ * The count on a tab, at the smallest size the system still has.
+ *
+ * It was C200, 6sp, the size this app used to keep for things nobody reads. A
+ * number that exists to be read at a glance is not one of them.
+ *
+ * Material hangs a badge *above* its anchor, at `-height + 14dp`, and the
+ * badge's height follows the system font size while the bar's does not — so
+ * how much of the count is on screen was a question about the bar, not about
+ * this. `AppBottomBar` stopped clipping rather than reserving room, and
+ * `BottomBarBadgeFitsTest` holds the pair together.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomBarBadge(count: Int) {
@@ -227,7 +247,7 @@ fun BottomBarBadge(count: Int) {
         ) {
             Text(
                 text = if (count > 99) "99+" else count.toString(),
-                typography = AppTheme.typography.Caption.C200.SemiBold,
+                typography = AppTheme.typography.Caption.C300.SemiBold,
             )
         }
     }

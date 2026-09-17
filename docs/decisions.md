@@ -6,6 +6,90 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-16: the Caption ramp keeps its two sizes and loses its third
+
+SD-125 asked whether the app's metadata size needed raising and SD-128 turned
+that into the wider question: the Caption ramp is C400 10sp, C300 8sp, C200 6sp,
+and all three are under what either platform calls its smallest text. The ramp
+does not move. C200 is deleted.
+
+**The numbers, measured rather than remembered.** Material 3's smallest type
+token is `labelSmall` at **11sp** (`bodySmall` is 12sp), read out of
+`androidx.compose.material3.tokens.TypeScaleTokens` in the version this app
+builds against. UIKit's smallest text style is `caption2` at **11pt**, with
+`caption1` at 12 and `footnote` at 13, printed off a booted iOS 26.1 simulator
+rather than quoted. Caption is set in Poppins, whose x-height is 0.548 em
+against Roboto's 0.5283 (both read from the shipped `OS/2` tables), so the app's
+10sp reads about as tall as Roboto at 10.4sp. That closes some of the gap to 11
+and none of the gap at 8 or 6.
+
+**Where the ramp is actually used.** Forty-eight call sites, thirty-five of them
+outside the design-system catalog and the typography previews. C400 has seven,
+five of them real, all chart furniture and card helper text. C300 has
+thirty-four, twenty-seven real: it is the app's metadata size and what SD-114
+promoted the achievement tiles *up* to. C200 had seven, three real, and every
+one of those three was content rather than decoration: the notification count
+on a tab, and the weekday headings and the dates on the streak calendar. A
+fourth, the freeze and restore counts on `DailyCard`, had already been moved to
+C300 by SD-125.
+
+**The font-scale argument is half true, and the half that is true is the one
+that matters.** `sp` is honoured on both platforms here. On Android
+`Configuration.fontScale` reaches Compose through `AndroidDensity`, including
+the API-34 non-linear curve, whose lookup table starts at 8sp and interpolates
+from zero below that, so 6sp scales exactly linearly. On iOS, Compose
+Multiplatform reads `preferredContentSizeCategory` in `UIView.density` and maps
+it to a `fontScale` between 0.8 and 1.8. So these sizes do scale. What they do
+not do is arrive anywhere: at the largest text size iOS offers, the 1.8 cap puts
+C200's 6sp at **10.8sp, under the 11pt iOS gives a caption at its default**,
+against the 40pt iOS itself would draw. A size that starts low enough cannot be
+rescued by a multiplier, and 6sp starts that low.
+
+**Why C400 and C300 stay where they are.** Three reasons, and the weakest of
+them is that nobody can look at the result right now. Raising the ramp one step
+to 12/10 would change how thirty-two shipped call sites across thirteen files
+look, and none of that is checkable from a test. It would also put Caption
+within 2sp of Body's default 14sp and exactly on top of `Body.B500`, erasing the
+distinction the ramp exists to draw. A caption that is nearly body text is not a
+caption. And the case for it is weaker than it sounds: 10sp Poppins is within
+about 0.6sp of Material's floor once x-height is accounted for, which is a
+different claim from 6sp being at half of it. The 12/10 question is left open
+deliberately, with these numbers in it, for whoever can put the app in front of
+their eyes.
+
+**Deleting C200 rather than resizing it.** The docblock says Caption is for
+"timestamps, legal text, footnotes". A step one size below the app's own
+metadata size, with no use on that list, is not a step. It is a trap. Resizing it
+to 8sp would have left a duplicate of C300 with a name inviting somebody to use
+it for something even smaller. Gone, it is a compile error, which is a stronger
+guarantee than any test could give.
+
+**The bottom bar stopped clipping, and that is the part that was a real bug.**
+Material hangs a badge above its anchor at `-badgeHeight + 14dp`, and the badge
+grows with the system font size while the bar does not. `AppBottomBar` draws on
+a `Surface` that clips, so past some text size the bar was shaving the top off
+its own notification count. Measured, that was already happening at 6sp, from
+around a 1.5x text setting on the *selected* tab, which is magnified 1.2x about
+its centre and so throws the badge higher still. The alternatives were to reserve 8dp of headroom,
+which makes the bar 17% taller and pushes the icons down for every player to
+serve the few at the largest font size, and to cap the badge's height, which is
+the accessibility defect restated as a feature. The bar is a square with no
+corners to protect, so `Surface` gained a `clip` parameter and the bar passes
+`false`. `BottomBarBadgeFitsTest` holds it, including the case that says the
+badge genuinely does reach past the edge. Without that one, "nothing was
+clipped" is also what a bar with no badge at all reports.
+
+**Two composition tests, and a trap in the tier worth writing down.**
+`StreakCalendarFitsTest` and `BottomBarBadgeFitsTest` both measure real layout at
+font scales 1, 2 and 4. The first draft of both was green and worthless:
+**Robolectric's default legacy graphics measures every string to the same box
+whatever size it is set in**, so a date reported 35dp tall at 8sp and at 32sp
+alike and every font scale passed. `@GraphicsMode(GraphicsMode.Mode.NATIVE)` is
+what makes text measurement real, and it is the first thing to check when a
+layout assertion in this tier looks too easy.
+
+---
+
 ## 2026-09-16 — the daily keeps its empty openings, and the pool is not regenerated
 
 SD-126 is the owner on a daily he could not start: *"this daily board seems way

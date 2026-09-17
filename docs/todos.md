@@ -137,80 +137,6 @@ ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
 
-## SD-133 [P2] — Dark mode, defaulting to the device setting
-
-**Ask:** The same report that asked for a full-screen win celebration (SD-123)
-also asked for dark mode, defaulting to whatever the device is set to. It was
-deliberately kept out of that item and is not started.
-
-**Done when:** the app follows the system light/dark setting, and every screen
-has been looked at in both.
-
-**Hints:** `AppTheme` and `libraries/ui/.../system/color/` own the palette. This
-is a sweep rather than a feature: the value is in finding the call sites that
-name a literal colour instead of a `ColorResource`, and there are some — SD-130
-records that `ColorResource` is `@Deprecated` at class level with no
-non-deprecated way to name a literal, which is the same seam from the other end.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-H · session
-bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
-
-## SD-134 [P2] — Tell a daily player that a cross is a legitimate first move
-
-**Ask:** SD-126 asked whether the generated daily boards were too hard to open.
-They were measured and they are not: every one of the 730 has a deduction
-available on the empty grid and none ever needs a guess. What is true is that
-**38% of dailies open with no forced dog**, so the first move is a cross, and the
-daily never says so. The campaign hands out a free dog for sixteen levels
-precisely so the first empty grid arrives after the rules are known. The daily
-inherits none of that.
-
-**Done when:** a player meeting an empty-opening daily is pointed at the cross,
-or at the sniff, once. Not a tutorial and not on every board.
-
-**Hints:** The sniff already does this exact job — it shows where a dog cannot
-go, names the technique, and declines to charge when it has nothing to add. The
-screenshot behind SD-126 shows three bones and three sniffs unspent, so nothing
-was lost; the owner just did not reach for it. That makes "point at the sniff"
-the cheapest version of this and probably the right one.
-
-`docs/cases/SD-126/README.md` has the measurement, the worked three-step solve of
-the board he was stuck on, and the re-run recipe. `docs/decisions.md`
-(2026-09-16) records why regenerating the pool and giving the daily a starter dog
-were both rejected, so do not reopen either here.
-Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-J · session
-bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
-
-## SD-128 [P2] — Decide whether the Caption ramp is too small, and fix the two sites that forced the question
-
-**Ask:** SD-125 asked, about the "You have 0" line: "look for other usages of that
-font size to see if we need to increase it." That line was `Caption.C300` and the
-survey answered the narrow question — C300 is the app's deliberate metadata size,
-used at fifteen call sites, and SD-114 promoted the achievement tiles *up* to it.
-What the survey turned up instead is the wider question nobody has answered.
-
-**The finding:** the Caption ramp is C400 10sp, C300 8sp, C200 6sp. All three sit
-below Material's smallest label and below iOS caption2. Body and Heading are
-ordinary. So the ramp itself is the outlier, not any one call site.
-
-**Done when:** there is a decision, written down, on whether the Caption ramp
-moves. If it does, it is three lines in one file and it moves every caption in
-the app, so it needs looking at rather than reasoning about.
-
-**The two sites that forced it**, both drawing content rather than decoration at
-6sp, and both left alone because they sit in fixed-size boxes that cannot be
-checked without running the app:
-
-- `BottomBar` line 230, the nav badge count
-- `StreakCalendar` lines 98 and 201, the weekday headers and the date in each cell
-
-**Hints:** `libraries/ui/.../system/typography/TypographyResource.kt` owns the
-ramp. `DailyCard` 190/204 was the third site and is already fixed under SD-125,
-where the freeze and restore counts sat at C200 directly under a C300 label in
-the same column and colour. Accessibility is the real argument here, not taste:
-these sizes do not scale the way a system font setting expects, and SD-114's
-review found the two worst defects in `libraries/ui` were both about what a
-screen reader hears.
-
 ## SD-129 [P2] — Look at the two things this batch changed that only a device can judge
 
 **Ask:** Two changes landed whose acceptance criterion is "does it look right",
@@ -343,3 +269,97 @@ here is the owner's call and is part of the same decision.
 `fivePawFraction` KDoc states this limitation in the place somebody tuning the
 number will read it. `PawLadderReachabilityTest` and `ScoringTest` sweep the
 ladder and are where a new speed term would have to prove itself.
+
+## SD-133 [P2] — Dark mode, defaulting to the device setting
+
+**Ask:** The same report that asked for a full-screen win celebration (SD-123)
+also asked for dark mode, defaulting to whatever the device is set to. It was
+deliberately kept out of that item and is not started.
+
+**Done when:** the app follows the system light/dark setting, and every screen
+has been looked at in both.
+
+**Hints:** `AppTheme` and `libraries/ui/.../system/color/` own the palette. This
+is a sweep rather than a feature: the value is in finding the call sites that
+name a literal colour instead of a `ColorResource`, and there are some — SD-130
+records that `ColorResource` is `@Deprecated` at class level with no
+non-deprecated way to name a literal, which is the same seam from the other end.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-H · session
+bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
+
+## SD-134 [P2] — Tell a daily player that a cross is a legitimate first move
+
+**Ask:** SD-126 asked whether the generated daily boards were too hard to open.
+They were measured and they are not: every one of the 730 has a deduction
+available on the empty grid and none ever needs a guess. What is true is that
+**38% of dailies open with no forced dog**, so the first move is a cross, and the
+daily never says so. The campaign hands out a free dog for sixteen levels
+precisely so the first empty grid arrives after the rules are known. The daily
+inherits none of that.
+
+**Done when:** a player meeting an empty-opening daily is pointed at the cross,
+or at the sniff, once. Not a tutorial and not on every board.
+
+**Hints:** The sniff already does this exact job — it shows where a dog cannot
+go, names the technique, and declines to charge when it has nothing to add. The
+screenshot behind SD-126 shows three bones and three sniffs unspent, so nothing
+was lost; the owner just did not reach for it. That makes "point at the sniff"
+the cheapest version of this and probably the right one.
+
+`docs/cases/SD-126/README.md` has the measurement, the worked three-step solve of
+the board he was stuck on, and the re-run recipe. `docs/decisions.md`
+(2026-09-16) records why regenerating the pool and giving the daily a starter dog
+were both rejected, so do not reopen either here.
+Sentry https://elijah-dangerfield.sentry.io/issues/SODOGKU-J · session
+bec35582-715e-4374-98b3-19ad3ac2e472 · 2026-09-12
+
+## SD-135 [P2] — Look at the app and decide whether Caption moves to 12/10
+
+**Ask:** SD-128 answered the half of the type-scale question that could be
+answered from a test bench: C200 at 6sp was indefensible and is deleted. It
+deliberately left the other half open, because it needs somebody's eyes.
+
+**Done when:** there is a yes or no, written into `docs/decisions.md` beside the
+2026-09-16 entry, on whether Caption C400 and C300 move from 10sp and 8sp to
+12sp and 10sp.
+
+**The numbers are already gathered**, in that entry. The short version: Material's
+smallest token is `labelSmall` 11sp, UIKit's is `caption2` 11pt, and the app's
+Poppins has a taller x-height than Roboto, so 10sp here reads like about 10.4sp
+of Roboto. That leaves C400 roughly 0.6sp under the platform floor, which is a
+much weaker case than C200's was. Against moving: 12/10 changes 32 shipped call
+sites in 13 files, puts Caption within 2sp of Body's 14sp default and exactly on
+`Body.B500`, and a caption that is nearly body text has stopped being a caption.
+
+**While you have the app open, check the other three ramps' bottom steps**,
+which SD-128 noticed and did not survey: `Heading.H400` is 10sp, `Body.B400` is
+10sp, and `Label.L300` is 8sp. All three are under Material's floor too, and the
+Caption decision says nothing about them.
+
+**Hints:** `libraries/ui/.../system/typography/TypographyResource.kt` owns every
+ramp. It is three lines per ramp. `StreakCalendarFitsTest` and
+`BottomBarBadgeFitsTest` in `:libraries:ui` are the pattern for pinning "this
+text fits its box at font scale 2" if a size does move — and note the trap
+recorded in both: without `@GraphicsMode(GraphicsMode.Mode.NATIVE)`, Robolectric
+measures every string to the same box whatever size it is set in, and the test
+is worthless while staying green.
+
+## SD-136 [P2] — The notification badge on a tab says a bare number
+
+**Ask:** A screen reader on the bottom bar hears the tab's name and then a bare
+digit, with nothing saying what the digit counts.
+
+**Done when:** the badge names what it is counting, and `99+` reads as something
+a person would say.
+
+**Hints:** `BottomBarBadge` in `libraries/ui/.../components/BottomBar.kt`. It
+goes through Material's `BadgedBox` under `@OptIn(ExperimentalMaterial3Api::class)`,
+against AGENTS.md's "avoid Material directly" guideline, and that is the same
+knot: `BadgedBox` hangs the badge outside its anchor's bounds, which is why
+`AppBottomBar` had to stop clipping under SD-128. A DS layout that measures the
+badge into its own bounds would fix the semantics and the overflow together.
+`Surface` gained a `clip` parameter for that fix and only the bottom bar passes
+`false`; if the badge stops overhanging, the parameter may have no callers left.
+
+Found while measuring the badge for SD-128. The overflow half is fixed and
+tested; this half is not.

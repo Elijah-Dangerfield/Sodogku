@@ -99,7 +99,6 @@ internal fun TypographyCatalogBodyText() {
     ) {
         TypeRow("Caption.C400", t.Caption.C400, "42m remaining")
         TypeRow("Caption.C300", t.Caption.C300, "42m remaining")
-        TypeRow("Caption.C200", t.Caption.C200, "42m remaining")
     }
 }
 
