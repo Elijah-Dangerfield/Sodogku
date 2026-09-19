@@ -13,8 +13,30 @@ This is **Kotlin Multiplatform**—most code is shared, but some platform featur
 ```shell
 ./gradlew :apps:compose:assembleDebug          # Android
 ./gradlew :apps:compose:compileKotlinIosSimulatorArm64  # iOS Kotlin
-xcodebuild -project apps/ios/iosApp.xcodeproj -scheme iOS -sdk iphonesimulator  # iOS full
+xcodebuild -project apps/ios/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator  # iOS full
 ```
+
+The scheme is `iosApp`, the target's own name. There is no `iOS` scheme and there
+never was; `xcodebuild -list` is the check.
+
+To put a build on a physical iPhone, the destination is the **hardware UDID**,
+which is not the identifier `devicectl list devices` prints — that one is a
+CoreDevice UUID and `xcodebuild` rejects it. Take the id from `xcodebuild`'s own
+"Available destinations" list, or from `xcrun xctrace list devices`.
+
+```shell
+xcrun devicectl list devices                       # is it paired?
+xcodebuild -project apps/ios/iosApp.xcodeproj -scheme iosApp -configuration Debug \
+  -destination 'id=<hardware-udid>' -derivedDataPath /tmp/ios-dd \
+  -allowProvisioningUpdates build
+xcrun devicectl device install app --device <hardware-udid> \
+  /tmp/ios-dd/Build/Products/Debug-iphoneos/Sodogku.app
+xcrun devicectl device process launch --device <hardware-udid> com.sodogku.Sodogku
+```
+
+Signing needs nothing set up: the project is on automatic signing with
+`DEVELOPMENT_TEAM` already committed, and `-allowProvisioningUpdates` lets
+Xcode mint the profile.
 
 ## Module Structure
 
