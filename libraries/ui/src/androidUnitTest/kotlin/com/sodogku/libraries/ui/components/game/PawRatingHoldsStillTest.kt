@@ -5,10 +5,13 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
+import com.sodogku.system.AppThemeProvider
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -48,6 +51,21 @@ class PawRatingHoldsStillTest {
 
     @get:Rule
     val compose = createComposeRule()
+
+    /**
+     * The rating reads its gold from the theme (an earned paw is `accentBrand`
+     * since the 2026-09 palette retune), and the theme loads its faces through
+     * Compose Multiplatform's resource reader, which takes its `Context` from a
+     * `ContentProvider` the manifest merger installs. A unit test starts no
+     * providers. Same reflection, and the same reason, as `CountUpNumberTest`.
+     */
+    @Before
+    fun installResourceContext() {
+        Class.forName("org.jetbrains.compose.resources.AndroidContextProvider")
+            .getDeclaredField("ANDROID_CONTEXT")
+            .apply { isAccessible = true }
+            .set(null, RuntimeEnvironment.getApplication())
+    }
 
     /**
      * The guard against the guard, and it has to come first: every assertion
@@ -135,11 +153,13 @@ class PawRatingHoldsStillTest {
                 LocalInspectionMode provides inspecting,
                 LocalReduceAnimations provides reduceAnimations,
             ) {
-                PawRating(
-                    paws = EVERY_PAW,
-                    animated = animated,
-                    staggerMillis = STAGGER_MILLIS,
-                )
+                AppThemeProvider {
+                    PawRating(
+                        paws = EVERY_PAW,
+                        animated = animated,
+                        staggerMillis = STAGGER_MILLIS,
+                    )
+                }
             }
         }
         compose.waitForIdle()

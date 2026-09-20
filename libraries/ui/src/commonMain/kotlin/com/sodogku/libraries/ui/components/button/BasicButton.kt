@@ -29,10 +29,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Radii
+import com.sodogku.system.Radius
 import com.sodogku.system.thenIf
 import com.sodogku.libraries.ui.Border
 import com.sodogku.libraries.ui.Elevation
@@ -67,16 +69,17 @@ internal fun BasicButton(
     CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
         val effectiveOnClick = if (enabled) onClick else onDisabledTap
 
+        val radius = size.radius()
         val face: @Composable () -> Unit = {
             Surface(
                 modifier = Modifier.semantics { role = Role.Button },
-                radius = Radii.Button,
+                radius = radius,
                 // When a deepColor is present the 3D lip replaces the drop
                 // shadow entirely, so no elevation there.
                 elevation = if (deepColor == null && backgroundColor != null) Elevation.Button else Elevation.None,
                 color = backgroundColor,
                 contentColor = contentColor,
-                border = borderColor?.let { Border(it, OutlinedButtonBorderWidth) },
+                border = borderColor?.let { Border(it, size.borderWidth()) },
                 contentPadding = contentPadding,
             ) {
                 Row(
@@ -132,7 +135,7 @@ internal fun BasicButton(
                 ),
             ) {
                 // deep band fills the whole box (face + the reserved lip strip)
-                Box(Modifier.matchParentSize().clip(Radii.Button.shape).background(deepColor.color))
+                Box(Modifier.matchParentSize().clip(radius.shape).background(deepColor.color))
                 // face sized normally + a constant bottom reserve (stable height); drops on press.
                 // propagateMinConstraints carries the outer Box's min width (set by a caller's
                 // fillMaxWidth) down to the face Surface, so a full-width button's face stretches to
@@ -163,12 +166,31 @@ internal fun BasicButton(
  * you see without being able to say what is wrong.
  */
 private fun ButtonSize.pressDepth(): Dp = when (this) {
+    // Shallower than Large, not deeper: the hero button is wider and taller,
+    // and the same 8dp under it read as a slab rather than a lip. 6 is what
+    // the 2026-09 handoff draws under every one of its buttons.
+    ButtonSize.Hero -> 6.dp
     ButtonSize.Large -> 8.dp
     ButtonSize.Medium -> 7.dp
     ButtonSize.Small -> 5.dp
     ButtonSize.ExtraSmall -> 4.dp
 }
 
+/**
+ * Hero takes a fixed 18dp corner where the rest of the ramp takes a quarter
+ * of the height: it sits in a column with chips and a week strip drawn at the
+ * same 18dp, and a percentage on the tallest thing in that column was the one
+ * corner that visibly did not match.
+ */
+private fun ButtonSize.radius(): Radius = when (this) {
+    ButtonSize.Hero -> Radii.Chip
+    else -> Radii.Button
+}
+
+private fun ButtonSize.borderWidth(): Dp = when (this) {
+    ButtonSize.Hero -> HeroOutlinedButtonBorderWidth
+    else -> OutlinedButtonBorderWidth
+}
 
 @Composable
 private fun ButtonSize.textConfig(): TextConfig = when (this) {
@@ -179,6 +201,8 @@ private fun ButtonSize.textConfig(): TextConfig = when (this) {
     ButtonSize.Medium -> MediumButtonTextConfig
 
     ButtonSize.Large -> LargeButtonTextConfig
+
+    ButtonSize.Hero -> HeroButtonTextConfig
 }
 
 internal fun ButtonSize.padding(hasIcon: Boolean): PaddingValues =
@@ -187,6 +211,7 @@ internal fun ButtonSize.padding(hasIcon: Boolean): PaddingValues =
         ButtonSize.Small -> if (hasIcon) SmallButtonWithIconPadding else SmallButtonPadding
         ButtonSize.Medium -> if (hasIcon) MediumButtonWithIconPadding else MediumButtonPadding
         ButtonSize.Large -> if (hasIcon) LargeButtonWithIconPadding else LargeButtonPadding
+        ButtonSize.Hero -> HeroButtonPadding
     }
 
 // Typography scale for buttons - uses Label typography (1.2x line height)
@@ -198,6 +223,15 @@ internal fun ButtonSize.padding(hasIcon: Boolean): PaddingValues =
 // - Small: L500 (12sp) - Compact buttons in toolbars
 // - Medium: L600 (14sp) - Most common button size
 // - Large: L600.SemiBold (14sp, heavier weight) - Primary CTAs
+// - Hero: L750.Bold, tracked (18sp) - The one button on a full-screen moment
+
+private val HeroButtonTextConfig: TextConfig
+    @Composable get() = TextConfig(
+        typography = AppTheme.typography.Label.L750.Bold.tracked(HeroLabelTracking),
+        overflow = TextOverflow.Ellipsis,
+        maxLines = 1,
+        allCaps = true
+    )
 
 private val ExtraSmallButtonTextConfig: TextConfig
     @Composable get() = TextConfig(
@@ -285,8 +319,19 @@ private val LargeButtonWithIconPadding = PaddingValues(
     bottom = Dimension.D900
 )
 
+// One padding whether or not there is an icon: a hero button fills its row,
+// so there is no start edge for an icon to crowd.
+private val HeroButtonPadding = PaddingValues(
+    horizontal = Dimension.D800,
+    vertical = Dimension.D800
+)
+
+/** Enough to keep 18sp bold capitals from closing up; too little to read as spaced. */
+private val HeroLabelTracking = 0.6.sp
+
 private val ButtonIconSpacing = Dimension.D200
 private val OutlinedButtonBorderWidth = StandardBorderWidth
+private val HeroOutlinedButtonBorderWidth = Dimension.D50
 
 @Preview
 @Composable

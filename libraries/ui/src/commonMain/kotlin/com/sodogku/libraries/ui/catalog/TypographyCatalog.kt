@@ -35,6 +35,7 @@ internal fun TypographyCatalogBodyHeadlines() {
         "Display · serif",
         "Hero headlines only. The italic is the dialog & bottom-sheet title signature.",
     ) {
+        TypeRow("Display.D1600", t.Display.D1600, "12")
         TypeRow("Display.D1500", t.Display.D1500, "Welcome back")
         TypeRow("Display.D1300", t.Display.D1300, "Welcome back")
         TypeRow("Display.D1100", t.Display.D1100, "Welcome back")
@@ -86,11 +87,13 @@ internal fun TypographyCatalogBodyText() {
         "Label · sans (UI elements)",
         "Buttons, chips, tabs — tight line height tuned for single-line UI, not paragraphs.",
     ) {
+        TypeRow("Label.L750", t.Label.L750, "Continue")
         TypeRow("Label.L700", t.Label.L700, "Continue")
         TypeRow("Label.L600", t.Label.L600, "Continue")
         TypeRow("Label.L500", t.Label.L500, "Continue")
         TypeRow("Label.L400", t.Label.L400, "Continue")
         TypeRow("Label.L300", t.Label.L300, "Continue")
+        TypeRow("Label.Kicker", t.Label.Kicker, "STREAK UPDATE")
     }
 
     CatalogSection(

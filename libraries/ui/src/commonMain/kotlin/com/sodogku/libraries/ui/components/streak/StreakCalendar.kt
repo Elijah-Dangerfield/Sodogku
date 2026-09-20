@@ -28,6 +28,7 @@ import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.system.Feel
 import com.sodogku.libraries.ui.system.LocalHaptics
+import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Motion
@@ -143,7 +144,10 @@ private fun StreakDayCell(cell: StreakCell, filling: Boolean, modifier: Modifier
 
     // Held at 1 in a preview or a screenshot test: an animation that starts at 0
     // and is never driven leaves the day the page is celebrating drawn empty.
-    val still = LocalInspectionMode.current
+    // And under reduce-animations, read here rather than left to the caller.
+    // A view model withholding `fillingIndex` on the setting's behalf is a
+    // courtesy the second caller forgets; the cell honouring it is not.
+    val still = LocalInspectionMode.current || LocalReduceAnimations.current
     val fill = remember { Animatable(if (filling && !still) 0f else 1f) }
 
     LaunchedEffect(filling) {

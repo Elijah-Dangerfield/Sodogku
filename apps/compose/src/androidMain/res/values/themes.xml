@@ -19,10 +19,10 @@
       of the page rather than appearing on a different one.
 
       It deliberately does *not* match the app background, which is
-      `ColorResource.Cream50` (#F8F2ED) — the same value iOS paints in its
+      `ColorResource.Cream50` (#F5EFE7) — the same value iOS paints in its
       `LaunchBackground` colorset. The two cannot both be matched, and the icon
       wins because that is what the platform animates. The residual step to the
-      app background is two or three units per channel.
+      app background is four to six units per channel.
 
       A comment here used to claim this matched the app background and named
       `ColorResource.Gray50` (#FAFAFA), which is neither this value nor the app's.

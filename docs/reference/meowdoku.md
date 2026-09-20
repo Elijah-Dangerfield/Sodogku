@@ -74,9 +74,10 @@ side by side rather than reading the list below.
 
 **Matched.**
 
-- **Temperature.** The page is `#F8F2ED` and every text colour is a warm brown. Body
-  text sits at 10.6:1 against it and secondary text at 7.0:1, so nothing was traded for
-  the warmth.
+- **Temperature.** The page is `#F5EFE7` and every text colour is a warm brown. Body
+  text sits at 11.8:1 against it and secondary text at 6.0:1, so nothing was traded for
+  the warmth. (Retuned 2026-09-20 with the streak-and-rewards handoff; the page was
+  `#F8F2ED` before, at 10.6:1 and 7.0:1.)
 - **The board card.** White, 24dp corners, a soft shadow, and 10dp of white showing
   around the outermost cells. The gutter between cells went from 4dp to 6dp so the card
   shows through, which is what makes it read as a board rather than a table.

@@ -170,6 +170,7 @@ fun ScorePawBurst(
 ) {
     if (LocalReduceAnimations.current || LocalInspectionMode.current) return
 
+    val pawGold = AppTheme.colors.accentBrand.color
     Box(contentAlignment = Alignment.Center, modifier = modifier) {
         repeat(PawsInBurst) { index ->
             val progress = remember(index) { Animatable(0f) }
@@ -207,7 +208,7 @@ fun ScorePawBurst(
                             else -> 1f
                         }.coerceIn(0f, 1f)
                     }
-                    .drawBehind { drawPaw(PawGold, filled = true) },
+                    .drawBehind { drawPaw(pawGold, filled = true) },
             )
         }
     }
@@ -343,13 +344,6 @@ private const val PawLandScale = 0.45f
 
 private const val PawFadeIn = 0.15f
 private const val PawFadeOut = 0.85f
-
-/**
- * The gold of an earned paw. A second copy of `GameHud`'s `EarnedPaw`, which is
- * file-private there. The two are the same colour on purpose, and want to be one
- * token the next time that file is open.
- */
-private val PawGold = Color(0xFFF5B93D)
 
 @Preview
 @Composable

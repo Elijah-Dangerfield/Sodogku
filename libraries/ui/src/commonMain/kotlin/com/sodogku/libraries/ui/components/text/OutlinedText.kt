@@ -127,6 +127,17 @@ fun OutlinedText(
  */
 private val DefaultStrokeWidth = Dimension.D100
 
+/**
+ * The stroke behind a display numeral, in `textOutline`.
+ *
+ * Two widths, because the 2026-09 handoff draws two: 7 behind the streak count
+ * at `Display.D1600`, and 6 behind everything a step down, the "Sharp work"
+ * headline and the achievements count. Named here so the three screens that
+ * draw one cannot each pick a number.
+ */
+val HeroNumeralStrokeWidth: Dp = 7.dp
+val DisplayNumeralStrokeWidth: Dp = Dimension.D200
+
 @Preview
 @Composable
 private fun OutlinedTextPreview() {
@@ -135,6 +146,20 @@ private fun OutlinedTextPreview() {
             text = "+56",
             typography = AppTheme.typography.Heading.H500,
             color = AppTheme.colors.accentPrimary,
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun DisplayNumeralPreview() {
+    PreviewContent {
+        OutlinedText(
+            text = "12",
+            typography = AppTheme.typography.Display.D1600,
+            color = AppTheme.colors.accentBrand,
+            strokeColor = AppTheme.colors.textOutline,
+            strokeWidth = HeroNumeralStrokeWidth,
         )
     }
 }

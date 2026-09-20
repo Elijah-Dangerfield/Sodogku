@@ -350,7 +350,7 @@ private fun ProSlab(onClose: (() -> Unit)?, modifier: Modifier = Modifier) {
  * the same shape as every other paw in the app and picks up the icon system's
  * sizing. It is [com.sodogku.system.color.Colors.textSecondary] and not the
  * amber: the amber the slab and the button are made of measures **1.6:1** on the
- * sheet's cream, which is a bullet you cannot see. Brown-700 measures 7.0:1 on
+ * sheet's cream, which is a bullet you cannot see. Brown-700 measures 6.0:1 on
  * the same cream and still sits a step behind the sentence it marks.
  */
 @Composable

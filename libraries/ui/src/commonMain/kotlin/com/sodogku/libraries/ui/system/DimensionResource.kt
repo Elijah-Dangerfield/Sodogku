@@ -16,6 +16,7 @@ sealed class DimensionResource(val dp: Dp) {
     data object D500 : DimensionResource(12.dp)
     data object D600 : DimensionResource(14.dp)
     data object D700 : DimensionResource(16.dp)
+    data object D750 : DimensionResource(18.dp)
     data object D800 : DimensionResource(20.dp)
     data object D850 : DimensionResource(22.dp)
     data object D900 : DimensionResource(24.dp)
@@ -43,6 +44,7 @@ object Dimension {
     val D500 = DimensionResource.D500.dp  // 12 dp
     val D600 = DimensionResource.D600.dp  // 14 dp
     val D700 = DimensionResource.D700.dp  // 16 dp
+    val D750 = DimensionResource.D750.dp  // 18 dp
     val D800 = DimensionResource.D800.dp  // 20 dp
     val D850 = DimensionResource.D850.dp  // 22 dp
 

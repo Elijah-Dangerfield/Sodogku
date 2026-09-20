@@ -52,40 +52,66 @@ sealed class ColorResource(val color: Color, val designSystemName: String) {
     object Gray800 : ColorResource(Color(0xFF424242), "gray-800")
     object Gray900 : ColorResource(Color(0xFF212121), "gray-900")
 
-    // Blue - Primary accent
+    // Blue - Primary accent.
+    //
+    // The 600 and 700 rungs are the app's, not Material's. The 2026-09 handoff
+    // tuned the primary blue and gave it a solid dark tone for the slab under a
+    // button, and both replaced the Material values in place rather than being
+    // added beside them: nothing read either rung directly, and a ladder with
+    // two sixes on it is worse than one whose middle has moved.
     object Blue50 : ColorResource(Color(0xFFE3F2FD), "blue-50")
     object Blue100 : ColorResource(Color(0xFFBBDEFB), "blue-100")
     object Blue200 : ColorResource(Color(0xFF90CAF9), "blue-200")
     object Blue300 : ColorResource(Color(0xFF64B5F6), "blue-300")
     object Blue400 : ColorResource(Color(0xFF42A5F5), "blue-400")
     object Blue500 : ColorResource(Color(0xFF2196F3), "blue-500")
-    object Blue600 : ColorResource(Color(0xFF1E88E5), "blue-600")
-    object Blue700 : ColorResource(Color(0xFF1976D2), "blue-700")
+    object Blue600 : ColorResource(Color(0xFF2F8EF4), "blue-600")
+    object Blue700 : ColorResource(Color(0xFF1A6CC4), "blue-700")
     object Blue800 : ColorResource(Color(0xFF1565C0), "blue-800")
     object Blue900 : ColorResource(Color(0xFF0D47A1), "blue-900")
 
-    // Green - Success states
+    // Green - Success states. 600 is the handoff's green; 800 is the same green
+    // as ink on a light surface, where the fill itself is too pale to read.
     object Green50 : ColorResource(Color(0xFFE8F5E9), "green-50")
     object Green100 : ColorResource(Color(0xFFC8E6C9), "green-100")
     object Green400 : ColorResource(Color(0xFF66BB6A), "green-400")
     object Green500 : ColorResource(Color(0xFF4CAF50), "green-500")
-    object Green600 : ColorResource(Color(0xFF43A047), "green-600")
+    object Green600 : ColorResource(Color(0xFF3D8B40), "green-600")
     object Green700 : ColorResource(Color(0xFF388E3C), "green-700")
+    object Green800 : ColorResource(Color(0xFF2F7A33), "green-800")
 
-    // Red - Error/danger states
+    // Red - Error/danger states. 600 is the handoff's red.
     object Red50 : ColorResource(Color(0xFFFFEBEE), "red-50")
     object Red100 : ColorResource(Color(0xFFFFCDD2), "red-100")
     object Red400 : ColorResource(Color(0xFFEF5350), "red-400")
     object Red500 : ColorResource(Color(0xFFF44336), "red-500")
-    object Red600 : ColorResource(Color(0xFFE53935), "red-600")
+    object Red600 : ColorResource(Color(0xFFE63329), "red-600")
     object Red700 : ColorResource(Color(0xFFD32F2F), "red-700")
 
-    // Orange/Amber - Warning states
+    // Orange/Amber - Warning states, and the brand.
+    //
+    // Amber600 is the app's own colour. The rungs above it are not lighter
+    // ambers: they are the same amber as it has to be drawn when it cannot be
+    // drawn as itself. 700 is the slab under an amber button, 800 is amber as
+    // text on a light ground (the fill fails contrast there), 900 is the same
+    // for text under 14sp. 200 is a pale wash for decoration behind a hero.
     object Orange400 : ColorResource(Color(0xFFFFA726), "orange-400")
     object Orange500 : ColorResource(Color(0xFFFF9800), "orange-500")
     object Orange600 : ColorResource(Color(0xFFFB8C00), "orange-600")
+    object Amber200 : ColorResource(Color(0xFFFFD98A), "amber-200")
     object Amber500 : ColorResource(Color(0xFFFFC107), "amber-500")
     object Amber600 : ColorResource(Color(0xFFFFB300), "amber-600")
+    object Amber700 : ColorResource(Color(0xFFC88C00), "amber-700")
+    object Amber800 : ColorResource(Color(0xFFB9761D), "amber-800")
+    object Amber900 : ColorResource(Color(0xFF8A5510), "amber-900")
+
+    // Gold - a bone. Duller than the amber on purpose, so a bone and a paw
+    // beside each other read as two materials rather than one colour twice.
+    object Gold500 : ColorResource(Color(0xFFF5B81E), "gold-500")
+
+    // Rose - a missed day. The fill and the mark drawn on it.
+    object Rose100 : ColorResource(Color(0xFFE8CFC4), "rose-100")
+    object Rose400 : ColorResource(Color(0xFFC98D7A), "rose-400")
 
     // Purple - Secondary accent
     object Purple50 : ColorResource(Color(0xFFF3E5F5), "purple-50")
@@ -98,17 +124,37 @@ sealed class ColorResource(val color: Color, val designSystemName: String) {
     // Cream - the page. A cold grey background reads as a utility; a warm cream
     // one reads as a toy, and that single substitution is most of the distance
     // between this app and the games it is being compared against.
-    object Cream50 : ColorResource(Color(0xFFF8F2ED), "cream-50")
-    object Cream100 : ColorResource(Color(0xFFF2E9E1), "cream-100")
-    object Cream200 : ColorResource(Color(0xFFE8DCD1), "cream-200")
+    //
+    // The ladder is denser than it looks. The 2026-09 handoff draws its tracks,
+    // rules, empty days and ghost borders in creams one or two units apart, and
+    // they are kept as separate rungs at their exact values rather than snapped
+    // to a neighbour: the differences are below what anyone can see in
+    // isolation, and above what a designer will accept when a screen is held
+    // against the board it was matched to. Ivory is the card surface, a warm
+    // off-white rather than pure white so cards sit *on* the cream instead of
+    // punching a hole in it.
+    object Ivory : ColorResource(Color(0xFFFFFDFA), "ivory")
+    object Cream10 : ColorResource(Color(0xFFFDF8F2), "cream-10")
+    object Cream20 : ColorResource(Color(0xFFFDF6EC), "cream-20")
+    object Cream50 : ColorResource(Color(0xFFF5EFE7), "cream-50")
+    object Cream100 : ColorResource(Color(0xFFECE2D6), "cream-100")
+    object Cream200 : ColorResource(Color(0xFFE8DBCC), "cream-200")
+    object Cream225 : ColorResource(Color(0xFFE4D8CA), "cream-225")
+    object Cream250 : ColorResource(Color(0xFFE3D7C8), "cream-250")
+    object Cream275 : ColorResource(Color(0xFFE2D3C3), "cream-275")
     object Cream300 : ColorResource(Color(0xFFDCCCBE), "cream-300")
 
     // Brown - every text colour. Pure black on cream reads as newsprint printed
     // on the wrong paper; the ink has to be warm too or the cream looks like a
     // mistake.
-    object Brown900 : ColorResource(Color(0xFF4A322F), "brown-900")
-    object Brown700 : ColorResource(Color(0xFF6D4A47), "brown-700")
-    object Brown500 : ColorResource(Color(0xFF9A7A75), "brown-500")
+    //
+    // 600 is not ink. It is the band behind a lost streak, a brown that is
+    // deliberately a shade off the muted text beside it so the two never get
+    // confused for one token.
+    object Brown900 : ColorResource(Color(0xFF3F2A1E), "brown-900")
+    object Brown700 : ColorResource(Color(0xFF6B5648), "brown-700")
+    object Brown600 : ColorResource(Color(0xFF8A6A58), "brown-600")
+    object Brown500 : ColorResource(Color(0xFF8A6E5C), "brown-500")
     object Brown300 : ColorResource(Color(0xFFC2ABA6), "brown-300")
 
     // Utility colors
@@ -189,6 +235,7 @@ private val colors = listOf(
     ColorResource.Green500,
     ColorResource.Green600,
     ColorResource.Green700,
+    ColorResource.Green800,
     // Red
     ColorResource.Red50,
     ColorResource.Red100,
@@ -200,8 +247,15 @@ private val colors = listOf(
     ColorResource.Orange400,
     ColorResource.Orange500,
     ColorResource.Orange600,
+    ColorResource.Amber200,
     ColorResource.Amber500,
     ColorResource.Amber600,
+    ColorResource.Amber700,
+    ColorResource.Amber800,
+    ColorResource.Amber900,
+    ColorResource.Gold500,
+    ColorResource.Rose100,
+    ColorResource.Rose400,
     // Purple
     ColorResource.Purple50,
     ColorResource.Purple100,
@@ -210,12 +264,19 @@ private val colors = listOf(
     ColorResource.Purple600,
     ColorResource.Purple700,
     // Cream / brown
+    ColorResource.Ivory,
+    ColorResource.Cream10,
+    ColorResource.Cream20,
     ColorResource.Cream50,
     ColorResource.Cream100,
     ColorResource.Cream200,
+    ColorResource.Cream225,
+    ColorResource.Cream250,
+    ColorResource.Cream275,
     ColorResource.Cream300,
     ColorResource.Brown900,
     ColorResource.Brown700,
+    ColorResource.Brown600,
     ColorResource.Brown500,
     ColorResource.Brown300,
     // Utilities

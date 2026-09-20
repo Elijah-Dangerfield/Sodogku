@@ -93,7 +93,13 @@ data class TypographyResource internal constructor(
     internal val lineHeight: TextUnit,
     internal val lineBreak: LineBreak,
     internal val fontStyle: FontStyle = FontStyle.Normal,
-    internal val identifier: String
+    internal val identifier: String,
+    /**
+     * Tracking. Unspecified everywhere on the ramp except the kicker: a
+     * spaced-out line of capitals is a style, not a size, and it is applied by
+     * [tracked] at the few sites that want it rather than carried by a rung.
+     */
+    internal val letterSpacing: TextUnit = TextUnit.Unspecified,
 ) {
 
     val style: TextStyle = TextStyle(
@@ -103,6 +109,7 @@ data class TypographyResource internal constructor(
         lineHeight = lineHeight,
         fontStyle = fontStyle,
         lineBreak = lineBreak,
+        letterSpacing = letterSpacing,
     )
 
     fun style(color: Color) = TextStyle(
@@ -112,52 +119,21 @@ data class TypographyResource internal constructor(
         lineHeight = lineHeight,
         fontStyle = fontStyle,
         lineBreak = lineBreak,
+        letterSpacing = letterSpacing,
         color = color
     )
 
     val Italic: TypographyResource
-        get() = TypographyResource(
-            fontFamily = fontFamily,
-            fontWeight = fontWeight,
-            fontSize = fontSize,
-            lineHeight = lineHeight,
-            lineBreak = lineBreak,
-            fontStyle = FontStyle.Italic,
-            identifier = "${identifier}-italic"
-        )
+        get() = copy(fontStyle = FontStyle.Italic, identifier = "${identifier}-italic")
 
     val Bold: TypographyResource
-        get() = TypographyResource(
-            fontFamily = fontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = fontSize,
-            lineHeight = lineHeight,
-            lineBreak = lineBreak,
-            fontStyle = fontStyle,
-            identifier = "${identifier}-bold"
-        )
+        get() = copy(fontWeight = FontWeight.Bold, identifier = "${identifier}-bold")
 
     val ExtraBold: TypographyResource
-        get() = TypographyResource(
-            fontFamily = fontFamily,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = fontSize,
-            lineHeight = lineHeight,
-            lineBreak = lineBreak,
-            fontStyle = fontStyle,
-            identifier = "${identifier}-extrabold"
-        )
+        get() = copy(fontWeight = FontWeight.ExtraBold, identifier = "${identifier}-extrabold")
 
     val SemiBold: TypographyResource
-        get() = TypographyResource(
-            fontFamily = fontFamily,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = fontSize,
-            lineHeight = lineHeight,
-            lineBreak = lineBreak,
-            fontStyle = fontStyle,
-            identifier = "${identifier}-semibold"
-        )
+        get() = copy(fontWeight = FontWeight.SemiBold, identifier = "${identifier}-semibold")
 
     /**
      * One step up from [Normal], well short of [SemiBold].
@@ -167,37 +143,21 @@ data class TypographyResource internal constructor(
      * jump it two steps into a weight that reads as a heading.
      */
     val Medium: TypographyResource
-        get() = TypographyResource(
-            fontFamily = fontFamily,
-            fontWeight = FontWeight.Medium,
-            fontSize = fontSize,
-            lineHeight = lineHeight,
-            lineBreak = lineBreak,
-            fontStyle = fontStyle,
-            identifier = "${identifier}-medium"
-        )
+        get() = copy(fontWeight = FontWeight.Medium, identifier = "${identifier}-medium")
 
     val Normal: TypographyResource
-        get() = TypographyResource(
-            fontFamily = fontFamily,
-            fontWeight = FontWeight.Normal,
-            fontSize = fontSize,
-            lineHeight = lineHeight,
-            lineBreak = lineBreak,
-            fontStyle = fontStyle,
-            identifier = "${identifier}-normal"
-        )
+        get() = copy(fontWeight = FontWeight.Normal, identifier = "${identifier}-normal")
 
     val Light: TypographyResource
-        get() = TypographyResource(
-            fontFamily = fontFamily,
-            fontWeight = FontWeight.Light,
-            fontSize = fontSize,
-            lineHeight = lineHeight,
-            lineBreak = lineBreak,
-            fontStyle = fontStyle,
-            identifier = "${identifier}-light"
-        )
+        get() = copy(fontWeight = FontWeight.Light, identifier = "${identifier}-light")
+
+    /**
+     * The same rung with its letters spaced. For a short run of capitals, a
+     * button label or a chip caption, where a little air between the glyphs is
+     * what keeps bold uppercase from reading as a block.
+     */
+    fun tracked(letterSpacing: TextUnit): TypographyResource =
+        copy(letterSpacing = letterSpacing, identifier = "${identifier}-tracked")
 }
 
 interface Typography {
@@ -222,6 +182,12 @@ interface BrandTypography {
 }
 
 interface DisplayTypography {
+    /**
+     * The streak count. Added with the 2026-09 handoff, which sets that one
+     * number at 86 while the ramp stopped at 70; 84 is the nearest step the
+     * dimension scale already had. Nothing else belongs up here.
+     */
+    val D1600: TypographyResource
     val D1500: TypographyResource
     val D1400: TypographyResource
     val D1300: TypographyResource
@@ -247,11 +213,20 @@ interface HeadingTypography {
 
 interface LabelTypography {
 
+    /** The label on a hero button. The one rung between 16 and 20, and the handoff's 18. */
+    val L750: TypographyResource
     val L700: TypographyResource
     val L600: TypographyResource
     val L500: TypographyResource
     val L400: TypographyResource
     val L300: TypographyResource
+
+    /**
+     * A kicker: the short line of spaced capitals above a hero. "STREAK UPDATE",
+     * "DAY ONE", "BADGE UNLOCKED". The tracking is the style, so it lives on the
+     * token; the capitals are the text config's `allCaps`, never the string.
+     */
+    val Kicker: TypographyResource
 }
 
 interface BodyTypography {
@@ -339,6 +314,15 @@ class DisplayTypographyImpl(
     // Display uses tight line-height (1.1x) for visual impact, and Bold rather
     // than SemiBold: Poppins is near-circular, and the extra weight is what
     // turns a large number from "set in a heavy font" into something rounded.
+    override val D1600 = TypographyResource(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = Dimension.D1600.sp(),
+        lineHeight = Dimension.D1600.lineHeight(com.sodogku.system.LineHeightRatio.TIGHT),
+        lineBreak = LineBreak.Heading,
+        identifier = "display-1600"
+    )
+
     override val D1500 = TypographyResource(
         fontFamily = fontFamily,
         fontWeight = FontWeight.Bold,
@@ -572,6 +556,15 @@ class LabelTypographyImpl(
 
     // Labels use compact line-height (1.2x) for tight UI elements
 
+    override val L750 = TypographyResource(
+        fontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = Dimension.D750.sp(),
+        lineHeight = Dimension.D750.lineHeight(LineHeightRatio.COMPACT),
+        lineBreak = LineBreak.Simple,
+        identifier = "label-750"
+    )
+
     override val L700 = TypographyResource(
         fontFamily,
         fontWeight = FontWeight.SemiBold,
@@ -616,7 +609,24 @@ class LabelTypographyImpl(
         lineBreak = LineBreak.Simple,
         identifier = "label-300"
     )
+
+    override val Kicker = TypographyResource(
+        fontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = Dimension.D600.sp(),
+        lineHeight = Dimension.D600.lineHeight(LineHeightRatio.COMPACT),
+        lineBreak = LineBreak.Simple,
+        identifier = "label-kicker",
+        letterSpacing = KickerTracking,
+    )
 }
+
+/**
+ * Wide. A kicker is four or five glyphs read as a shape rather than a word,
+ * and at 14sp the handoff's 2.4 is what stops bold capitals closing up into a
+ * bar.
+ */
+private val KickerTracking = 2.4.sp
 
 class BodyTypographyImpl(
     private val fontFamily: FontFamily

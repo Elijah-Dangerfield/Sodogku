@@ -58,6 +58,33 @@ interface Colors {
     val accentBrand: ColorResource
     val onAccentBrand: ColorResource
 
+    /**
+     * The solid slab under a button in the accent's own colour.
+     *
+     * Buttons in this app are a face on a darker lip, not a face over a blur.
+     * The lip used to be derived by darkening the face, which lands near but
+     * never on the tone a designer picks by eye; these are the picked tones, so
+     * a blue button's slab is the same blue-dark on every screen that draws
+     * one. Only the two accents that carry a primary action have a slab.
+     */
+    val accentPrimaryDeep: ColorResource
+    val accentBrandDeep: ColorResource
+
+    /**
+     * The amber as text on a light surface. The fill itself is 1.8:1 against
+     * white and is not a colour anything readable can be set in; these two are
+     * the same amber pulled dark enough to be, the second for text under 14sp
+     * where the first is still short.
+     */
+    val accentBrandInk: ColorResource
+    val accentBrandInkSmall: ColorResource
+
+    /** A pale amber wash for decoration behind a hero: the rays on a clear. */
+    val accentBrandSoft: ColorResource
+
+    /** The gold of a bone. Deliberately not the amber, so a bone and a paw stay two things. */
+    val bone: ColorResource
+
     /* Backgrounds */
     val shadow: ColorResource
     val background: ColorResource
@@ -68,11 +95,41 @@ interface Colors {
     val borderSecondary: ColorResource
     val borderDisabled: ColorResource
 
+    /**
+     * A border that has to read as an edge on its own, with nothing filled
+     * inside it: the ghost button under a primary. [border] is a step off the
+     * cream it usually sits on and is meant to be found rather than seen.
+     */
+    val borderStrong: ColorResource
+
+    /** The 2dp line that fills the gap in a section header. */
+    val rule: ColorResource
+
     /* Texts */
     val text: ColorResource
     val textSecondary: ColorResource
+
+    /** Below [textSecondary]: counts, fractions, the line under a badge name. */
+    val textMuted: ColorResource
     val textDisabled: ColorResource
     val danger: ColorResource
+
+    /**
+     * The stroke behind a display numeral, so the biggest number on a screen
+     * keeps its edge over whatever it lands on. A cream rather than white,
+     * because the surfaces it sits on are cream and a white stroke reads as a
+     * halo.
+     */
+    val textOutline: ColorResource
+
+    /**
+     * Text on a coloured band: the kicker and the status bar on the streak
+     * screens. Cream rather than white for the same reason as [textOutline].
+     */
+    val onBand: ColorResource
+
+    /** The band behind a lost streak. A brown, the one thing in the app that is not amber or blue. */
+    val bandLoss: ColorResource
 
     val status: StatusColor
 
@@ -87,12 +144,28 @@ interface Colors {
     val surfaceDisabled: ColorResource
     val onSurfaceDisabled: ColorResource
 
+    /**
+     * A thing that is not yet: an empty day on the week strip, the disc behind
+     * a locked badge. Sits on [surfaceSecondary] and has to be found there,
+     * which [surfaceDisabled] is one step too light for.
+     */
+    val surfaceMuted: ColorResource
+
+    /** The unfilled length of a progress bar. */
+    val track: ColorResource
+
+    /** A missed day on the week strip: the fill, and the cross drawn on it. */
+    val missFill: ColorResource
+    val missMark: ColorResource
 }
 
 interface StatusColor {
     val okay: ColorResource
     val warning: ColorResource
     val bad: ColorResource
+
+    /** [okay] as text on a light surface, where the fill is a shade too pale to read. */
+    val okayInk: ColorResource
 }
 
 /**
@@ -104,10 +177,16 @@ interface StatusColor {
  * read as a tool; the same layout on cream with brown type reads as a toy,
  * before a single component changes.
  *
- * Contrast was checked rather than eyeballed. [text] on [background] is 10.6:1
- * and [textSecondary] on it is 7.0:1, both comfortably past WCAG AA for body
+ * Contrast was checked rather than eyeballed. [text] on [background] is 11.8:1
+ * and [textSecondary] on it is 6.0:1, both comfortably past WCAG AA for body
  * text, which is what makes the warmth affordable — a cream that had to be
  * paired with near-black to stay legible would not have been worth having.
+ * [textMuted] is 4.1:1, which is why it is for counts and captions and not for
+ * anything a player has to read.
+ *
+ * Retuned 2026-09-20 to the streak-and-rewards handoff: every value here moved
+ * a shade warmer and deeper, and the whole app followed, because a palette
+ * scoped to four screens is two palettes.
  */
 val defaultColors = object : Colors {
     // Blue as primary accent - like a clear sky
@@ -120,14 +199,21 @@ val defaultColors = object : Colors {
     // not the same idea: see the doc on the interface.
     override val accentBrand = ColorResource.Amber600
     override val onAccentBrand = ColorResource.Brown900
+    override val accentPrimaryDeep = ColorResource.Blue700
+    override val accentBrandDeep = ColorResource.Amber700
+    override val accentBrandInk = ColorResource.Amber800
+    override val accentBrandInkSmall = ColorResource.Amber900
+    override val accentBrandSoft = ColorResource.Amber200
+    override val bone = ColorResource.Gold500
 
     override val shadow = ColorResource.Black_A30
     override val textDisabled = ColorResource.Brown300
     override val danger = ColorResource.Red600
-    // Cards and pills are white so they lift off the cream. Everything below
-    // primary is a tint of the page rather than a grey, or the ladder goes cold
-    // one step down from the surface the player is actually looking at.
-    override val surfacePrimary = ColorResource.White
+    // Cards and pills are an off-white so they lift off the cream without
+    // punching a hole in it. Everything below primary is a tint of the page
+    // rather than a grey, or the ladder goes cold one step down from the
+    // surface the player is actually looking at.
+    override val surfacePrimary = ColorResource.Ivory
     override val surfaceDisabled = ColorResource.Cream200
     override val onSurfacePrimary = ColorResource.Brown900
     override val surfaceSecondary = ColorResource.Cream100
@@ -135,19 +221,30 @@ val defaultColors = object : Colors {
     override val surfaceTertiary = ColorResource.Cream200
     override val onSurfaceTertiary = ColorResource.Brown700
     override val onSurfaceDisabled = ColorResource.Brown300
+    override val surfaceMuted = ColorResource.Cream250
+    override val track = ColorResource.Cream200
+    override val missFill = ColorResource.Rose100
+    override val missMark = ColorResource.Rose400
     override val background = ColorResource.Cream50
     override val onBackground = ColorResource.Brown900
     override val border = ColorResource.Cream200
     override val borderSecondary = ColorResource.Cream300
     override val borderDisabled = ColorResource.Cream100
+    override val borderStrong = ColorResource.Cream275
+    override val rule = ColorResource.Cream225
     override val text = ColorResource.Brown900
     override val backgroundOverlay = ColorResource.Black_A70
     override val textSecondary = ColorResource.Brown700
+    override val textMuted = ColorResource.Brown500
+    override val textOutline = ColorResource.Cream10
+    override val onBand = ColorResource.Cream20
+    override val bandLoss = ColorResource.Brown600
 
     override val status = object : StatusColor {
         override val okay = ColorResource.Green600
         override val warning = ColorResource.Amber600
         override val bad = ColorResource.Red600
+        override val okayInk = ColorResource.Green800
     }
 }
 
@@ -518,12 +615,29 @@ private fun PaletteGridSection(colors: Colors) {
         colors.onAccentPrimary,
         colors.accentSecondary,
         colors.onAccentSecondary,
+        colors.accentBrand,
+        colors.accentBrandDeep,
+        colors.accentBrandInk,
+        colors.accentBrandInkSmall,
+        colors.accentBrandSoft,
+        colors.accentPrimaryDeep,
+        colors.bone,
         colors.text,
         colors.textSecondary,
+        colors.textMuted,
         colors.textDisabled,
+        colors.textOutline,
+        colors.onBand,
+        colors.bandLoss,
         colors.danger,
         colors.border,
+        colors.borderStrong,
         colors.borderDisabled,
+        colors.rule,
+        colors.track,
+        colors.surfaceMuted,
+        colors.missFill,
+        colors.missMark,
         colors.shadow
     ).distinctBy { it.designSystemName }
 

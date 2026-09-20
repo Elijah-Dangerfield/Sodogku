@@ -165,6 +165,15 @@ enum class ButtonAccent {
 }
 
 enum class ButtonSize {
+    /**
+     * The one button on a full-screen moment: the streak screens, board
+     * cleared, the achievements page. Bigger than [Large] in every dimension
+     * the 2026-09 handoff names — an 18dp corner, 20dp of vertical padding, a
+     * 6dp slab, an 18sp tracked label — and a 2dp border when outlined, so the
+     * ghost action under it reads as an edge on its own. Opt in per screen;
+     * nothing defaults to it.
+     */
+    Hero,
     Large,
     Medium,
     Small,
@@ -369,9 +378,10 @@ private fun onAccent(a: ButtonAccent) = when (a) {
 }
 
 /**
- * The hard band under a `deep` filled button. Derived from the face color
- * rather than a dedicated token so the lip tracks any palette repoint —
- * the template's color system has no `*Deep` tokens on purpose.
+ * The hard band under a `deep` filled button, for the accents that have no
+ * slab token of their own. The two that carry a primary action read theirs
+ * from the palette (see [deepSolid]); purple and the danger red are darkened
+ * from the face so a repoint of either still lands on a plausible lip.
  */
 private const val DeepDarkenFraction = 0.3f
 
@@ -379,6 +389,20 @@ private fun ColorResource.deepened(): ColorResource = ColorResource.FromColor(
     color = lerp(color, Color.Black, DeepDarkenFraction),
     name = "$designSystemName-deep",
 )
+
+/**
+ * The slab under a filled Primary, by accent. Blue and amber have a picked
+ * tone in the palette; the derived one landed near it and never on it, and a
+ * button whose lip is a shade off the design is the kind of thing a designer
+ * sees and cannot name.
+ */
+@Composable
+@ReadOnlyComposable
+private fun deepSolid(a: ButtonAccent) = when (a) {
+    ButtonAccent.Primary -> AppTheme.colors.accentPrimaryDeep
+    ButtonAccent.Secondary -> AppTheme.colors.accentSecondary.deepened()
+    ButtonAccent.Brand -> AppTheme.colors.accentBrandDeep
+}
 
 @Composable
 @ReadOnlyComposable
@@ -422,7 +446,7 @@ private fun deepColor(
     // only filled, enabled buttons that opt in get the lip
     !deep || !enabled || style != ButtonStyle.Filled -> null
     else -> when (type) {
-        ButtonType.Primary -> accentSolid(accent).deepened()
+        ButtonType.Primary -> deepSolid(accent)
         ButtonType.Secondary -> AppTheme.colors.border
         ButtonType.Ghost -> null
         ButtonType.Danger -> AppTheme.colors.danger.deepened()
@@ -441,7 +465,10 @@ private fun borderColor(
     !enabled -> AppTheme.colors.borderDisabled
     else -> when (type) {
         ButtonType.Primary -> accentSolid(accent)
-        ButtonType.Secondary -> AppTheme.colors.border
+        // `borderStrong`, not `border`: an outlined button has nothing filled
+        // inside its edge, and the cream `border` is tuned to be found on a
+        // card rather than to hold a shape on its own.
+        ButtonType.Secondary -> AppTheme.colors.borderStrong
         ButtonType.Ghost -> null
         ButtonType.Danger -> AppTheme.colors.danger
     }

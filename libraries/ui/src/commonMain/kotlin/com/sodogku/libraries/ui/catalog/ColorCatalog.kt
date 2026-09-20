@@ -24,6 +24,9 @@ internal fun ColorSurfacesContent() {
             ColorRow("surfaceSecondary", c.surfaceSecondary, c.onSurfaceSecondary, "A thing ON a surface — text inputs, nested containers, selected rows.")
             ColorRow("surfaceTertiary", c.surfaceTertiary, c.onSurfaceTertiary, "The highest layer — pressed states, floating menus, tooltips.")
             ColorRow("surfaceDisabled", c.surfaceDisabled, c.onSurfaceDisabled, "Fill for a disabled control (e.g. a disabled filled button).")
+            ColorRow("surfaceMuted", c.surfaceMuted, null, "A thing not yet: an empty day, the disc behind a locked badge.")
+            ColorRow("track", c.track, null, "The unfilled length of a progress bar.")
+            ColorRow("bandLoss", c.bandLoss, c.onBand, "The band behind a lost streak.")
             ColorRow("backgroundOverlay", c.backgroundOverlay, null, "Dims the screen behind a modal or bottom sheet.")
             ColorRow("shadow", c.shadow, null, "Drop-shadow color cast by elevated surfaces.")
         }
@@ -36,7 +39,10 @@ internal fun ColorSurfacesContent() {
         SwatchFlow {
             ColorRow("text", c.text, c.background, "Primary text and active icons.")
             ColorRow("textSecondary", c.textSecondary, c.background, "Supporting text, captions, inactive icons, metadata.")
+            ColorRow("textMuted", c.textMuted, c.background, "Counts, fractions, the line under a badge name. 4.1:1, so never body copy.")
             ColorRow("textDisabled", c.textDisabled, c.background, "Disabled text and icons.")
+            ColorRow("textOutline", c.textOutline, c.accentBrand, "The stroke behind a display numeral.")
+            ColorRow("onBand", c.onBand, c.accentPrimary, "Kicker and status text on a coloured band.")
         }
     }
 }
@@ -66,6 +72,20 @@ internal fun ColorAccents() {
             ColorRow("onAccentBrand", c.onAccentBrand, c.accentBrand, "Dark ink, not white — white on this amber is 1.8:1.")
         }
     }
+
+    CatalogSection(
+        "Accent · slabs and inks",
+        "The two primary accents as the solid lip under a button, and the amber as something readable on a light surface.",
+    ) {
+        SwatchFlow {
+            ColorRow("accentPrimaryDeep", c.accentPrimaryDeep, c.onAccentPrimary, "The slab under a blue button.")
+            ColorRow("accentBrandDeep", c.accentBrandDeep, c.onAccentBrand, "The slab under an amber button.")
+            ColorRow("accentBrandInk", c.accentBrandInk, c.surfacePrimary, "Amber as text on a light surface, 14sp and up.")
+            ColorRow("accentBrandInkSmall", c.accentBrandInkSmall, c.surfacePrimary, "Amber as text under 14sp.")
+            ColorRow("accentBrandSoft", c.accentBrandSoft, c.text, "A pale wash for decoration behind a hero: the rays on a clear.")
+            ColorRow("bone", c.bone, c.text, "The gold of a bone. Not the amber, so a bone and a paw stay two things.")
+        }
+    }
 }
 
 /** Status states + borders. */
@@ -80,7 +100,10 @@ internal fun ColorStatusBorders() {
             ColorRow("status.okay", c.status.okay, null, "Positive confirmation — saved, completed, synced.")
             ColorRow("status.warning", c.status.warning, null, "Caution — expiring soon, degraded, risky action.")
             ColorRow("status.bad", c.status.bad, null, "A failing state — sync broken, service down.")
+            ColorRow("status.okayInk", c.status.okayInk, c.surfacePrimary, "okay as text on a light surface, where the fill is too pale.")
             ColorRow("danger", c.danger, c.danger.onColor, "Errors and destructive actions (delete, sign out).")
+            ColorRow("missFill", c.missFill, c.missMark, "A missed day on the week strip.")
+            ColorRow("missMark", c.missMark, null, "The cross drawn on a missed day.")
         }
     }
 
@@ -91,7 +114,9 @@ internal fun ColorStatusBorders() {
         SwatchFlow {
             ColorRow("border", c.border, null, "Default edges, dividers, input rest state.")
             ColorRow("borderSecondary", c.borderSecondary, null, "Focused / selected edges, and quiet rest rings (radio, switch).")
+            ColorRow("borderStrong", c.borderStrong, null, "An edge with nothing filled inside it: the ghost button.")
             ColorRow("borderDisabled", c.borderDisabled, null, "Edges of disabled controls.")
+            ColorRow("rule", c.rule, null, "The 2dp line across a section header.")
         }
     }
 }

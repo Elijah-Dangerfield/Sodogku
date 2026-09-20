@@ -55,8 +55,8 @@ fun BoneLoader(
 
     val empty = AppTheme.colors.surfaceDisabled.color
     val emptyEdge = AppTheme.colors.borderSecondary.color
-    val full = BoneGold
-    val fullEdge = BoneGoldEdge
+    val full = AppTheme.colors.bone.color
+    val fullEdge = BoneEdge
 
     val sweep = remember { Animatable(0f) }
     LaunchedEffect(still) {
@@ -103,12 +103,11 @@ private val DefaultHeight: Dp = Dimension.D1300
 private const val SweepMillis = 1_400
 
 /**
- * The same gold the life counter and the refill button use. Copied rather than
- * shared for now, exactly as `BoardControl` and `GameHud` already copy it; when
- * somebody consolidates those two this is the third.
+ * The rim around the fill. The fill itself is the `bone` token; the rim has no
+ * token because the handoff's loading bone has no rim at all, and this goes
+ * with the outline when that lands rather than earning a name first.
  */
-private val BoneGold = Color(0xFFF5C043)
-private val BoneGoldEdge = Color(0xFFC8871B)
+private val BoneEdge = Color(0xFFC8871B)
 
 @Preview
 @Composable

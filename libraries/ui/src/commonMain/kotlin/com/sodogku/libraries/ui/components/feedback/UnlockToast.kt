@@ -1,6 +1,8 @@
 package com.sodogku.libraries.ui.components.feedback
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -28,6 +30,7 @@ import com.sodogku.libraries.ui.components.icon.IconSize
 import com.sodogku.libraries.ui.components.icon.Icons
 import com.sodogku.libraries.ui.components.text.Text
 import com.sodogku.libraries.ui.elevation
+import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Radii
@@ -69,24 +72,29 @@ fun UnlockToasts(
 ) {
     var shown by remember(items) { mutableStateOf(items.isNotEmpty()) }
     val inPreview = LocalInspectionMode.current
+    // The slide is decoration and goes with the setting. The timer is not: a
+    // toast that never left would be the one thing on the board the player
+    // could not get past, so reduce-animations keeps the dismiss and drops
+    // the travel.
+    val still = LocalReduceAnimations.current
 
     // Skipped under inspection: a screenshot test waits for an idle
     // composition, and a pending `delay` is not idle.
-    LaunchedEffect(items, inPreview) {
+    LaunchedEffect(items, inPreview, still) {
         if (items.isEmpty() || inPreview) return@LaunchedEffect
         delay(DwellMillis)
         shown = false
         // Long enough for the exit to finish. Clearing the list under the
         // animation makes the toast vanish rather than leave.
-        delay(ExitMillis.toLong())
+        if (!still) delay(ExitMillis.toLong())
         onDismiss()
     }
 
     AnimatedVisibility(
         visible = shown,
         modifier = modifier,
-        enter = slideInVertically { -it } + fadeIn(),
-        exit = slideOutVertically { -it } + fadeOut(),
+        enter = if (still) EnterTransition.None else slideInVertically { -it } + fadeIn(),
+        exit = if (still) ExitTransition.None else slideOutVertically { -it } + fadeOut(),
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

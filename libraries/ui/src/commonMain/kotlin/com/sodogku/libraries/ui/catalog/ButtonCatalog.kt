@@ -25,10 +25,14 @@ private const val GHOST = "Ghost"
 private const val DANGER = "Danger"
 private const val OUTLINED = "Outlined"
 private const val TEXT = "Text"
+private const val HERO = "Hero"
 private const val LARGE = "Large"
 private const val MEDIUM = "Medium"
 private const val SMALL = "Small"
 private const val EXTRA_SMALL = "ExtraSmall"
+private const val NEXT_LEVEL = "Next level"
+private const val KEEP_GOING = "Keep it going"
+private const val START_OVER = "Start from one"
 
 /** The button page body. Reused by [DesignSystemPreview]. */
 @Composable
@@ -103,13 +107,25 @@ internal fun ButtonCatalogBody() {
 
     CatalogSection(
         "Size ramp",
-        "Large for primary CTAs and dialogs; Medium is the workhorse; Small / ExtraSmall for dense rows, chips, and inline actions.",
+        "Hero for the one button on a full-screen moment; Large for primary CTAs and dialogs; Medium is the workhorse; Small / ExtraSmall for dense rows, chips, and inline actions.",
     ) {
         ButtonRow {
+            Button(size = ButtonSize.Hero, onClick = {}) { Text(HERO) }
             Button(size = ButtonSize.Large, onClick = {}) { Text(LARGE) }
             Button(size = ButtonSize.Medium, onClick = {}) { Text(MEDIUM) }
             Button(size = ButtonSize.Small, onClick = {}) { Text(SMALL) }
             Button(size = ButtonSize.ExtraSmall, onClick = {}) { Text(EXTRA_SMALL) }
+        }
+    }
+
+    CatalogSection(
+        "Hero — the three pairings",
+        "Blue over its dark slab, amber over its, and the ghost with a 2dp edge and ink text. The streak and board-cleared screens use nothing else.",
+    ) {
+        ButtonRow {
+            Button(size = ButtonSize.Hero, accent = ButtonAccent.Primary, onClick = {}) { Text(NEXT_LEVEL) }
+            Button(size = ButtonSize.Hero, accent = ButtonAccent.Brand, onClick = {}) { Text(KEEP_GOING) }
+            Button(size = ButtonSize.Hero, type = ButtonType.Secondary, style = ButtonStyle.Outlined, onClick = {}) { Text(START_OVER) }
         }
     }
 }

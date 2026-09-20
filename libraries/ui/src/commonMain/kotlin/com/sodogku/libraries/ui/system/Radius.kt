@@ -42,11 +42,21 @@ object Radii {
     val R300 = Radius(CornerSize(DimensionResource.D300.dp))
     val R400 = Radius(CornerSize(DimensionResource.D400.dp))
     val R600 = Radius(CornerSize(DimensionResource.D600.dp))
+    val R750 = Radius(CornerSize(DimensionResource.D750.dp))
     val R900 = Radius(CornerSize(DimensionResource.D900.dp))
     val None = Radius(SquareCornerSize)
 
     val Default get() = None
     val Button get() = Radius(CornerSize(percent = 25))
+
+    /**
+     * A chip, a week strip, or a hero button: the 18dp corner the 2026-09
+     * handoff draws everything button-sized in. A fixed corner rather than
+     * [Button]'s 25%, because a chip and the button under it are different
+     * heights and were visibly drawn with different corners when both took a
+     * percentage.
+     */
+    val Chip get() = R750
     val IconButton get() = Round
     val Banner get() = R400
     val Header get() = None

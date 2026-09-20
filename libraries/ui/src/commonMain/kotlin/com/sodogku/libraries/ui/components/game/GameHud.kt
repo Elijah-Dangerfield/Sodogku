@@ -92,8 +92,8 @@ fun LifeRow(
 }
 
 /**
- * Paws earned, 0 to 3. Unearned paws stay visible in outline so the player can
- * see what they missed rather than just what they got.
+ * Paws earned, 0 to [MaxPaws]. Unearned paws stay visible in outline so the
+ * player can see what they missed rather than just what they got.
  */
 @Composable
 fun PawRating(
@@ -127,6 +127,7 @@ fun PawRating(
     // whichever frame of the pop it happened to land on — and with a stagger,
     // capturing a rating whose later paws have not arrived at all.
     val still = !animated || LocalReduceAnimations.current || LocalInspectionMode.current
+    val earnedPaw = AppTheme.colors.accentBrand.color
     Row(
         horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
         modifier = modifier,
@@ -158,7 +159,7 @@ fun PawRating(
                         scaleY = scale
                     }
                     .drawBehind {
-                        drawPaw(if (earned) EarnedPaw else UnearnedPaw, filled = earned)
+                        drawPaw(if (earned) earnedPaw else UnearnedPaw, filled = earned)
                     },
             )
         }
@@ -454,7 +455,8 @@ private val LiveBoneEdge = Color(0xFFC8871B)
 /** Spent bones stay bone-shaped but go colourless, so the loss is legible at a glance. */
 private val SpentBone = Color(0xFFDEDAD6)
 private val SpentBoneEdge = Color(0xFFB4AEA8)
-private val EarnedPaw = Color(0xFFF5B93D)
+
+/** An earned paw is `accentBrand`, read in [PawRating]; only the hollow one has no token. */
 private val UnearnedPaw = Color(0x33000000)
 
 @Preview

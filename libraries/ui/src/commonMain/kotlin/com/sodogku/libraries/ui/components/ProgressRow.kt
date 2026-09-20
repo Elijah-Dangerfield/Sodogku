@@ -24,8 +24,11 @@ import com.sodogku.system.AppTheme
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.system.Dimension
 import com.sodogku.system.VerticalSpacerD100
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.platform.LocalInspectionMode
+import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.system.Radii
 import kotlin.math.roundToInt
@@ -143,6 +146,38 @@ fun ProgressRow(
     }
 }
 
+/**
+ * A thin pill of progress: the bar under a badge that is still being earned.
+ *
+ * [ProgressRow] with the handoff's numbers filled in and nothing else, so the
+ * three places a bar appears on the achievements page cannot each pick a
+ * height. The track is the `track` token; the fill is the set's colour and is
+ * the caller's to name.
+ *
+ * Held still under reduce-animations and inspection, like everything else that
+ * moves in this library: a bar that was still sliding toward its value when the
+ * page was captured is a bar at the wrong value.
+ */
+@Composable
+fun ProgressBar(
+    progress: Float,
+    fill: ColorResource,
+    modifier: Modifier = Modifier,
+    track: ColorResource = AppTheme.colors.track,
+) {
+    val still = LocalReduceAnimations.current || LocalInspectionMode.current
+    ProgressRow(
+        progressPercent = progress,
+        animateChanges = !still,
+        modifier = modifier.height(ProgressBarHeight),
+        shape = Radii.Progress.shape,
+        backgroundColor = track,
+        progressColor = fill,
+    )
+}
+
+private val ProgressBarHeight = Dimension.D400
+
 @Composable
 fun RoundedIndicator(modifier: Modifier = Modifier) {
     Box(
@@ -224,6 +259,18 @@ fun ProgressRowPreview() {
             ) {
                 Text("90% Progress")
             }
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun ProgressBarPreview() {
+    PreviewContent {
+        Column {
+            ProgressBar(progress = 0.88f, fill = AppTheme.colors.status.okay)
+            VerticalSpacerD100()
+            ProgressBar(progress = 0.09f, fill = AppTheme.colors.accentPrimary)
         }
     }
 }
