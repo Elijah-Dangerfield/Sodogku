@@ -595,3 +595,31 @@ decide whether to do both at once.
 flies east across the dateline can lose a local calendar day they never had a
 chance to play. That is a freeze's job (SD-28 in `docs/backlog.md`), not a grace
 window's.
+
+## SD-142 [P1] — Two different streak numbers on one screen, under the same string
+
+**Ask:** The level pane shows the streak twice, with two different numbers, using
+the same string resource for both. A player reads one screen that disagrees with
+itself.
+
+**Done when:** the pane shows one streak number, or the two are visibly different
+things with different labels.
+
+**Where:** `LevelDrawer.kt` line ~178 passes `state.playStreak` to `StreakButton`
+with `Res.string.daily_streak`. Line ~256 passes `status.streak`, the
+daily-only fold from `daily_result`, into `DailyCard`, which renders it at
+display size through the **same** `Res.string.daily_streak`. So a player who
+cleared six campaign boards this week and no dailies sees a run of 6 on the
+button and 0 on the card, both captioned the same way.
+
+**Hints:** This is the visible half of the split recorded in SD-138 and worked
+through in `docs/design/streak-freeze.md`, which recommends the daily card stop
+printing its own streak entirely. Read that before picking a fix, because
+"relabel both" and "delete one" lead to different work and the design doc argues
+for the second.
+
+The string name is itself a leftover: `daily_streak` predates the streak moving
+off the daily. Whatever the fix, the resource wants renaming with it.
+
+Found while planning the streak freeze, 2026-09-20. Verified by reading both call
+sites; not yet seen on a device.

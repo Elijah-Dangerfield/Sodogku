@@ -362,7 +362,7 @@ platform owns the identity, the scores, the UI and the display-name moderation.
 | Board | What is submitted |
 |---|---|
 | Lifetime score | The banked lifetime total, on every clear |
-| Longest daily streak | The longest run, on every clear |
+| Longest streak | The longest run of days with any board finished, on every clear |
 | Weekly score | Points banked since the start of the current window |
 
 Three rather than more, because a leaderboard is a shared room and splitting a small

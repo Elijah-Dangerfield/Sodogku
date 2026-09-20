@@ -89,6 +89,7 @@ Architecture rules (enforced at Gradle configuration time), the ViewModel/DI/nav
 | [AGENTS.md](AGENTS.md) | Architecture, conventions, module rules, testing, the iOS landmines |
 | [docs/reference/features.md](docs/reference/features.md) | The product spec. Every player-facing capability at a high level, what is tunable without a release, and what the game deliberately does not do |
 | [docs/decisions.md](docs/decisions.md) | Why anything non-obvious is the way it is. Newest first |
+| [docs/design/](docs/design/) | Design docs for work that is proposed but not built |
 | [docs/todos.md](docs/todos.md) | The work queue. `docs/backlog.md` is the same for things nobody has committed to |
 | [docs/store/](docs/store/) | Listing copy, data safety, icons, screenshots |
 | [docs/practices/testing.md](docs/practices/testing.md) | Which layer catches which bug; mutation checking and its traps; fakes; the source-scanning guards; the integration harness |

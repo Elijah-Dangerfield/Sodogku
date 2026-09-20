@@ -85,7 +85,14 @@ enum class Leaderboard(val appleId: String, val playId: String) {
         playId = "",
     ),
 
-    /** The longest run of consecutive dailies the player has ever finished. */
+    /**
+     * The longest run of days the player has ever finished a board on, of any
+     * kind. Fed by `StreakSummary.longest`, which folds `play_day`.
+     *
+     * It said "consecutive dailies" until 2026-09-20, which stopped being true
+     * when the streak moved off `daily_result`: a player who only ever clears
+     * campaign levels has been ranked on this board the whole time.
+     */
     LongestStreak(
         appleId = "com.sodogku.leaderboard.longest_streak",
         playId = "",
