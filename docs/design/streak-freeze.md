@@ -1,7 +1,14 @@
 # Streak freeze and streak restore
 
-A proposal. Nothing here is built. Written 2026-09-20 against `main`, and it
+A design doc. Nothing here is built. Written 2026-09-20 against `main`, and it
 answers SD-28 in `docs/backlog.md` and SD-138 in `docs/todos.md`.
+
+**The owner took the load-bearing decision on 2026-09-20: one freeze economy, on
+the play streak, and the daily's freeze and restore retire.** So everything below
+that was conditional on that answer is now the plan rather than a recommendation,
+and option B in the options table is off the table. `docs/decisions.md` carries
+the call. Three smaller questions are still open and are listed under "What the
+owner decides".
 
 ## Recommendation, in four sentences
 
@@ -234,9 +241,8 @@ route is carrying the feature.
 
 ## What the owner decides
 
-1. Does the daily keep a player-facing freeze and restore, or do they retire in favour of
-   one play-streak freeze? Everything here assumes they retire. If they stay, option C
-   becomes two economies and option B is the better ship.
+1. ~~Does the daily keep a player-facing freeze and restore?~~ **Answered 2026-09-20:
+   they retire. One economy, on the play streak.**
 2. Does the daily card stop showing its own streak number? The same decision wearing a
    smaller hat, and it is the bug a player would actually report.
 3. Is a cash purchase wanted at all, given Pro already grants ad-free freezes and is built,

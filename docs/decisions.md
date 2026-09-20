@@ -6,6 +6,54 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-20: one freeze economy, on the play streak, and the daily's retires
+
+SD-28 has been open since 2026-09-09 on what a streak freeze even covers, now that
+the streak is not the daily's. The owner answered it: one economy, and the daily's
+existing freeze and restore retire as player-facing offers. The full plan is in
+[`design/streak-freeze.md`](design/streak-freeze.md); this entry is the call and
+why it is the right one. **Nothing is built yet.**
+
+**Freeze and restore are one item, not two.** They look like two products and they
+are not. A freeze that spends itself when the player comes back leaves nothing for
+a restore to do for anybody who held one, so the restore path exists only for a
+player who held zero when the day went by. The difference is not the item, it is
+whether the balance was empty at the time. Two products would mean two
+inventories, two budgets, two sets of copy and two chances for them to disagree,
+bought for one real behavioural difference: whether the player is told before or
+after.
+
+**It applies to the play streak.** That is the streak the drawer button, the
+streak page, the celebration, the lost-run page and the Game Center board all
+read. The daily's own fold survives on one surface, the daily card, where it is a
+second number wearing the first one's label. It is also the cheaper one: the play
+fold is a pure function of a set of dates, so covering a day is a second set
+walked alongside the first, where the daily's fold would need a fifth outcome.
+
+**Two economies was the thing to avoid.** The daily's freeze is budgeted per
+month; the owner's chosen source for the new one is the campaign first-clear
+reward, which is budgeted by progress. Those are different shapes and SD-28 said
+outright they cannot coexist unchanged. Keeping both would have meant a player
+holding two kinds of freeze that cover different absences, which is the version
+nobody could explain on a card.
+
+**What is kept for compatibility.** `DailyOutcome.Frozen` and `Restored` stay
+parseable forever, the way `Failed` already is, because existing installs have
+those rows and a value that stops parsing silently drops a day from somebody's
+history. It is the *offers* that retire, not the vocabulary.
+
+**No backend, and no Supabase.** The only thing a server buys is receipt
+validation on a consumable purchase, and both stores already verify locally. A
+server-held balance would not survive a reinstall either, since the install id
+dies with the install, and it would create the outbox this app has deliberately
+never had.
+
+**The purchase the owner asked about is deferred.** The paid route that already
+exists is Pro, which grants ad-free freezes and, unlike a consumable, can be
+restored after a reinstall. If freezes are ever sold, the plan is a five-pack sold
+as convenience rather than a single sold against our own rewarded ad, because a
+player can compute that exchange rate and will.
+
 ## 2026-09-16: the Caption ramp keeps its two sizes and loses its third
 
 SD-125 asked whether the app's metadata size needed raising and SD-128 turned
@@ -87,8 +135,6 @@ whatever size it is set in**, so a date reported 35dp tall at 8sp and at 32sp
 alike and every font scale passed. `@GraphicsMode(GraphicsMode.Mode.NATIVE)` is
 what makes text measurement real, and it is the first thing to check when a
 layout assertion in this tier looks too easy.
-
----
 
 ## 2026-09-16 — the daily keeps its empty openings, and the pool is not regenerated
 

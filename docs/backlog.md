@@ -105,6 +105,17 @@ So there are two half-systems: a freeze that covers a missed *daily puzzle*, and
 a streak that does not care about the daily. Neither is wrong; they are just no
 longer the same feature.
 
+**Decided 2026-09-20, by the owner: one freeze economy, on the play streak, and
+the daily's own freeze and restore retire.** The reasoning and the phased plan are
+in [`design/streak-freeze.md`](design/streak-freeze.md), and the short version is
+that a freeze which auto-spends leaves nothing for a "restore" to do for anyone
+who held one, so the two are one item with two spend moments. The three questions
+below are kept because the document answers each of them and a reader arriving
+here should see what was asked before seeing what was picked.
+
+This item stays in the backlog until phase 1 ships. What is settled is the shape,
+not the code.
+
 **The decision to make first**, before any code:
 
 - **What does a freeze cover?** Missing a day entirely is the only way to break a

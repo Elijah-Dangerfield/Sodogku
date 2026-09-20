@@ -418,6 +418,13 @@ Missed, and `StreakDayState.Bridged` is a state nothing produces.
 **Done when:** a freeze or a restore either bridges the play streak too, or the
 daily stops claiming it bridged anything.
 
+**Decided 2026-09-20:** the second one. The daily's freeze and restore retire and
+a single freeze economy lands on the play streak, which closes this item as a side
+effect rather than on its own. Do not fix this in isolation; the plan is
+`docs/design/streak-freeze.md` phase 1 and the reasoning is in `docs/decisions.md`.
+Note the design doc says to land SD-141 first, because the grace window changes
+what counts as a missed day and that is the input to every rule here.
+
 **Why it is worse now than it was:** before SD-127 the streak page quietly showed
 a 1 and the disagreement was silent. Now `brokenPlayStreakOn` returns 12 and the
 page says "Your run of 12 days ended" — the day after the app sold an ad on the
