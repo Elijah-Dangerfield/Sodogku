@@ -87,6 +87,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 val LivesFocusKey = FocusTargetKey("game.lives")
 
 /**
+ * The stat chips on the board-cleared screen. Registered only while that
+ * screen is up, which is what lets the unlock toast prefer it over the lives
+ * pill without asking what phase the game is in.
+ */
+val WinChipsFocusKey = FocusTargetKey("game.win.chips")
+
+/**
  * The grid as one rectangle, for a warning about the board rather than about a
  * square on it.
  *

@@ -128,7 +128,8 @@ class FocusRegistry {
      * Where [key] last settled, in root coordinates, or null while nothing is
      * marked with it. For hanging something off a control the scrim is not
      * lighting: the unlock toast uses the lives pill's rectangle so it lands
-     * where the last-bone bubble does.
+     * where the last-bone bubble does, and the cleared screen's chip row once
+     * that is up.
      */
     fun boundsOf(key: FocusTargetKey): Rect? = bounds[key]
 }

@@ -344,10 +344,17 @@ fun GameScreen(
  * place on every phone, including one where the header is taller than the
  * design's. With no pill on screen yet the anchor is the origin and the card's
  * own floor keeps it under the status bar.
+ *
+ * Badges mostly land on the cleared screen, though, and that covers the pill
+ * with the dog: hung off the pill the toast sat on the hero. So the stat chips
+ * come first when they are on screen, and the toast sits in the slack under
+ * them. The chips' key is registered only while the celebration is composed,
+ * which is the whole of the phase logic.
  */
 @Composable
 private fun BoardToast(items: List<UnlockToastItem>, onDismiss: () -> Unit) {
-    val anchor = LocalFocusRegistry.current.boundsOf(LivesFocusKey) ?: Rect.Zero
+    val registry = LocalFocusRegistry.current
+    val anchor = registry.boundsOf(WinChipsFocusKey) ?: registry.boundsOf(LivesFocusKey) ?: Rect.Zero
     AnchoredCard(anchor = anchor) {
         UnlockToasts(items = items, onDismiss = onDismiss, modifier = Modifier.fillMaxWidth())
     }

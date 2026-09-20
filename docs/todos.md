@@ -192,9 +192,14 @@ when the longest badge name cannot fit at the system font size; the locked
 glyphs are desaturated through a `graphicsLayer` colour filter; See all should
 scroll, not navigate. Set the font scale to 2 and look at the grid.
 
-**The toast.** It hangs off the lives pill. On a phone whose header is taller
-than the design's, check it clears the buttons. Three badges at once now cost
-twelve seconds unless tapped.
+**The toast.** On a board in play it hangs off the lives pill; on the cleared
+screen it hangs under the stat chips, because under the pill it sat on the dog.
+On a phone whose header is taller than the design's, check it clears the
+buttons; on a short phone, check the cleared-screen toast sits between the chips
+and Next level rather than on either, and that a daily with a footnote under the
+chips is readable once the toast has gone. Level 1 now hands out one badge
+(First Steps); a first clear between 1am and 8am adds a hidden one, eight
+seconds of toast unless tapped.
 
 **The loading bone.** No outline now. Check it on the iOS splash overlay too.
 

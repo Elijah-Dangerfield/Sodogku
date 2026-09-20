@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.style.TextAlign
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
+import com.sodogku.libraries.ui.system.focusTarget
 import com.sodogku.libraries.ui.components.celebration.Arriving
 import com.sodogku.libraries.ui.components.celebration.RayBurst
 import com.sodogku.libraries.ui.components.celebration.beatDelayMillis
@@ -421,9 +422,15 @@ private fun WinBeatContent(beat: WinBeat, state: GameState, order: Int) {
         // decision worth stating. The header's counter holds the lifetime total
         // and it does roll when this clear lands, but the header is behind this
         // panel. This number is the one the page is about.
+        //
+        // Marked for the unlock toast, which hangs under this row while the
+        // celebration is up. Under the lives pill, where it hangs on a board
+        // in play, it landed on the dog.
         WinBeat.Chips -> StatChipRow(
             chips = winChips(state, scoreDelayMillis = beatDelayMillis(order)),
-            modifier = Modifier.padding(top = ChipsTop, start = ScreenGutter, end = ScreenGutter),
+            modifier = Modifier
+                .padding(top = ChipsTop, start = ScreenGutter, end = ScreenGutter)
+                .focusTarget(WinChipsFocusKey),
         )
         // The streak is the reward for a daily, so it is shown under the score
         // rather than left for the player to find back in the drawer.
