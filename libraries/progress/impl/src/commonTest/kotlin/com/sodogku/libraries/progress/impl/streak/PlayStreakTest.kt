@@ -132,6 +132,30 @@ class PlayStreakTest {
         }
     }
 
+    /**
+     * What the streak screens' week strip depends on: the last seven cells are
+     * the week today falls in, Monday to Sunday, whatever day today is. The
+     * strip slices the tail of this calendar rather than asking for a second
+     * window, so if this stopped being true the strip would show the wrong
+     * week and nothing in the feature would notice.
+     */
+    @Test
+    fun theLastSevenDaysAreTheWeekTodayFallsIn() {
+        for (offset in 0..6) {
+            val day = Today.plus(DatePeriod(days = offset))
+            val week = playCalendarOn(day, emptySet(), weeks = 5).takeLast(7)
+
+            assertEquals(DayOfWeek.MONDAY, week.first().date.dayOfWeek, "on $day the strip did not start on Monday")
+            assertEquals(DayOfWeek.SUNDAY, week.last().date.dayOfWeek, "on $day the strip did not end on Sunday")
+            assertTrue(week.any { it.isToday }, "on $day today was not in the last seven cells")
+            assertEquals(
+                day.minus(DatePeriod(days = day.dayOfWeek.ordinal)),
+                week.first().date,
+                "on $day the strip's Monday is a different Monday from today's",
+            )
+        }
+    }
+
     @Test
     fun theRunBeforeTheGapIsWhatBroke() {
         // SD-127's whole question. Twelve days, a missed day, then today.

@@ -778,36 +778,40 @@
     <string name="streak_weekday_sat">S</string>
     <string name="streak_weekday_sun">S</string>
 
-    <string name="streak_celebrate_body">Same time tomorrow.</string>
+    <!-- The three ceremonies share one layout: a coloured band with a kicker in
+         it, the number, a line under the number, a paragraph, the week, a
+         button. Kickers are sentence case here and drawn in capitals; the
+         screen does the shouting, not the translation. -->
 
-    <!-- Above the number, on the first board after a break. It has to be the
-         first thing on the page: the number under it is a 1, and a 1 on its own
-         where a 12 used to be is the silence this moment was filed to end.
-         Plain past tense, not "oh no" and not "you failed"; the player already
-         knows, and the app telling them how to feel about it is the version that
-         gets the page dismissed. -->
-    <plurals name="streak_lost_title">
-        <item quantity="one">Your run of %1$d day ended</item>
-        <item quantity="other">Your run of %1$d days ended</item>
+    <!-- The day a finished board pushes the run up. -->
+    <string name="streak_update_kicker">Streak update</string>
+    <!-- The paragraph takes the run and the run it becomes tomorrow, because
+         the number above it is live. The one-day form is a restart or a first
+         day and has no "in a row" to speak of yet. -->
+    <plurals name="streak_update_body">
+        <item quantity="one">Day one is in. Come back tomorrow and it turns into %2$d.</item>
+        <item quantity="other">%1$d in a row. Come back tomorrow and it turns into %2$d.</item>
     </plurals>
-    <!-- Under the number, where the celebration puts its sign-off. Names the one
-         good thing that is true: they played today, so day one of the next run
-         is already done, and a record is the one number a break cannot take. -->
-    <string name="streak_lost_body">Today starts the next one, and your record still stands.</string>
+    <string name="streak_update_cta">Keep it going</string>
 
-    <!-- The question above the number, which is the number's answer. Asked
-         rather than asserted, because a page that opens by telling somebody
-         they are committed has decided for them. -->
-    <string name="streak_intention_title">Can you keep this up?</string>
-    <!-- Under the streak. Names the stake in the only terms this game has: the
-         dog. Deliberately not a mechanic explanation; the player can see the
-         week filling in above it, and a paragraph about how streaks work would
-         be teaching something the picture already taught. -->
-    <string name="streak_intention_body">Every day you keep it going is another good day for this dog.</string>
-    <!-- One button, and it is an agreement rather than an instruction. "I'm
-         game" over "I'm committed" because this is a puzzle about dogs and the
-         contract register belongs to a language app. -->
-    <string name="streak_intention_cta">I'm game</string>
+    <!-- The first board after a break. The number on this screen is the run
+         that ended, not the 1 that is running, so the line under it says so.
+         The paragraph names the one good thing that is true: they played today,
+         so the next run has already started, and a record is the one number a
+         break cannot take. "A day" rather than "yesterday" because the gap has
+         no bound; a player back after a month is told the same true thing. -->
+    <string name="streak_over_kicker">Streak over</string>
+    <string name="streak_over_day_label">Day streak, ended</string>
+    <string name="streak_over_body">A day went by with no board finished. Today starts the next run, and your record still stands.</string>
+    <!-- The one action, and it is a dismissal: the run is already one. -->
+    <string name="streak_over_cta">Start from one</string>
+
+    <!-- Shown once, after the first streak day lands. The paragraph promises
+         only what the strip under it can show: a week filling in. -->
+    <string name="streak_intention_kicker">Day one</string>
+    <string name="streak_intention_body">You are in it now. Land all seven and the week fills in.</string>
+    <!-- One button, and it is an agreement rather than an instruction. -->
+    <string name="streak_intention_cta">I'm in</string>
 
     <!-- Under the big number. A plural because "1 days" is the kind of thing a
          player notices on the one screen that is congratulating them. -->

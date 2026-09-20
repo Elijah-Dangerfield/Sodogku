@@ -5,12 +5,13 @@ import com.sodogku.libraries.core.Catching
 import com.sodogku.libraries.core.logOnFailure
 import com.sodogku.libraries.flowroutines.SEAViewModel
 import com.sodogku.libraries.flowroutines.collectIn
-import kotlin.time.Duration
 import com.sodogku.libraries.progress.streak.StreakDay
 import com.sodogku.libraries.progress.streak.StreakPrompt
 import com.sodogku.libraries.progress.streak.StreakRepository
 import com.sodogku.libraries.progress.streak.StreakSummary
 import com.sodogku.libraries.sodogku.AppCache
+import com.sodogku.libraries.ui.components.streak.WeekDayState
+import kotlin.time.Duration
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.LocalDate
@@ -23,8 +24,8 @@ import me.tatarka.inject.annotations.Inject
  * [celebrating] and [lost] are the whole difference between the ways in, and
  * they are decided once, here, from the route. A page opened by tap must not
  * animate, and "must not animate" is easy to get wrong by leaving an entrance in
- * the composable and hoping nothing triggers it, so the screen has no entrance
- * at all and the one animated cell is opt-in.
+ * the composable and hoping nothing triggers it, so the plain page has no
+ * entrance at all and the one day that pops is only named on a ceremony.
  */
 @Inject
 class StreakViewModel(
@@ -44,9 +45,9 @@ class StreakViewModel(
         // the rollover.
         streak.observe().collectIn(viewModelScope) { takeAction(StreakAction.SummaryChanged(it)) }
         appCache.updates
-            .map { PlaybackSettings(it.hapticsEnabled, it.reduceAnimations) }
+            .map { it.hapticsEnabled }
             .distinctUntilChanged()
-            .collectIn(viewModelScope) { takeAction(StreakAction.PlaybackChanged(it)) }
+            .collectIn(viewModelScope) { takeAction(StreakAction.HapticsChanged(it)) }
         if (celebrating > 0) {
             // Recorded on arrival rather than on dismissal. A player who kills
             // the app mid-celebration has seen it, and showing it again on the
@@ -65,14 +66,7 @@ class StreakViewModel(
         when (action) {
             StreakAction.Load -> action.load()
             is StreakAction.SummaryChanged -> action.onSummary(action.summary)
-            is StreakAction.PlaybackChanged -> action.updateState {
-                it.copy(
-                    haptics = action.settings.haptics,
-                    // A page already open when the setting is flipped is not
-                    // re-animated; only whether the *next* fill runs changes.
-                    reduceAnimations = action.settings.reduceAnimations,
-                )
-            }
+            is StreakAction.HapticsChanged -> action.updateState { it.copy(haptics = action.enabled) }
             StreakAction.MarkCelebrated -> {
                 Catching { streak.onPromptShown(StreakPrompt.Celebrate(celebrating)) }
                     .logOnFailure { "Failed to record the streak celebration" }
@@ -93,13 +87,11 @@ class StreakViewModel(
      * nothing writes a result the screen would sit loading forever.
      */
     private suspend fun StreakAction.load() {
-        val playback = Catching {
-            appCache.get().let { PlaybackSettings(it.hapticsEnabled, it.reduceAnimations) }
-        }
-            .logOnFailure { "Failed to read the playback settings" }
+        val haptics = Catching { appCache.get().hapticsEnabled }
+            .logOnFailure { "Failed to read the haptics setting" }
             .getOrNull()
-            ?: PlaybackSettings(haptics = true, reduceAnimations = false)
-        updateState { it.copy(haptics = playback.haptics, reduceAnimations = playback.reduceAnimations) }
+            ?: true
+        updateState { it.copy(haptics = haptics) }
 
         val summary = Catching { streak.summary() }
             .logOnFailure { "Failed to read the streak" }
@@ -118,17 +110,6 @@ class StreakViewModel(
                 days = summary.days,
                 playedToday = summary.playedToday,
                 untilTomorrow = summary.untilTomorrow,
-                // Resolved here rather than in the screen, so the composable
-                // never searches a list during composition, and so a
-                // celebration that arrives with nothing completed (a wiped
-                // table, a config change mid-flight) animates nothing instead
-                // of reaching for a day that is not there.
-                //
-                // Null too when the player has asked for less motion. The page
-                // still says the number; what it does not do is move.
-                fillingIndex = summary.days
-                    .indexOfFirst { day -> day == summary.latestCompleted }
-                    .takeIf { index -> index >= 0 && it.ceremony && !it.reduceAnimations },
             )
         }
     }
@@ -148,35 +129,44 @@ data class StreakState(
 
     /** The player's setting. Provided to the design system, not read here. */
     val haptics: Boolean = true,
-    val reduceAnimations: Boolean = false,
 
     /** The run this page was opened to celebrate, or `0` for a plain visit. */
     val celebrating: Int = 0,
 
     /** The run that broke, if this page was opened to say so, or `0`. */
     val lost: Int = 0,
-
-    /** Index into [days] of the single cell that animates, or null. */
-    val fillingIndex: Int? = null,
 ) {
 
     /**
      * Whether the page was pushed at the player rather than opened by them.
      *
-     * Both ceremonies perform, and a lost run performs the same way a won day
-     * does: the beats arrive, and today's square lands in a calendar that is
-     * showing the gap beside it. That square is the only good news the page has,
-     * and it is the reason this is a moment rather than a notice.
+     * A ceremony is the handoff's band layout and it performs: the number
+     * climbs and today's day pops into the week. A plain visit is the status
+     * page with the five-week calendar, and nothing on it moves.
      */
     val ceremony: Boolean
         get() = celebrating > 0 || lost > 0
+
+    /** The current week, Monday first, as the strip draws it. See [weekStripStates]. */
+    val weekStrip: List<WeekDayState>
+        get() = days.weekStripStates()
+
+    /**
+     * The day that pops into the week strip, or null.
+     *
+     * Only on a ceremony. A page the player opened by tap shows the finished
+     * week, and the reduce-animations setting is the strip's own business:
+     * the cell holds still under it, so nothing here has to withhold the day.
+     */
+    val justLanded: Int?
+        get() = if (ceremony) days.justLandedIndex() else null
 
     /**
      * What the big number counts up **from**, or null for a page that should not
      * count at all.
      *
      * Three answers, not two, and the third is the one SD-121 created. A
-     * ceremony can now fire on a run of **one** — the day a player comes back to
+     * ceremony can now fire on a run of **one**, the day a player comes back to
      * a run that had broken, which is the day they are most likely to break it
      * again. The run before that day was zero, so "the old run" is honestly
      * zero; but `0 → 1` in display type is the page opening by telling them they
@@ -190,8 +180,8 @@ data class StreakState(
      * run grows.
      *
      * A lost run never counts, by the same argument carried further: that page
-     * is already saying a number went down, and animating the 1 climbing would
-     * be the page congratulating itself in the middle of an apology.
+     * shows the run that ended, and animating a number that is already over
+     * would be the page congratulating itself in the middle of an apology.
      */
     val countUpFrom: Int?
         get() = when {
@@ -227,9 +217,6 @@ data class StreakState(
     }
 }
 
-/** The two `AppData` toggles the celebration has to obey. */
-data class PlaybackSettings(val haptics: Boolean, val reduceAnimations: Boolean)
-
 sealed interface StreakEvent {
     data object NavigateBack : StreakEvent
 }
@@ -237,7 +224,7 @@ sealed interface StreakEvent {
 sealed interface StreakAction {
     data object Load : StreakAction
     data class SummaryChanged(val summary: StreakSummary) : StreakAction
-    data class PlaybackChanged(val settings: PlaybackSettings) : StreakAction
+    data class HapticsChanged(val enabled: Boolean) : StreakAction
     data object MarkCelebrated : StreakAction
     data object MarkLost : StreakAction
     data object Back : StreakAction

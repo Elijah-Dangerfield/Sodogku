@@ -42,6 +42,9 @@ kotlin {
         commonTest.dependencies {
             implementation(projects.libraries.flowroutines.testing)
             implementation(projects.libraries.progress)
+            // The week strip's states are the design system's enum, decided
+            // on the view model's state so a test can read them.
+            implementation(projects.libraries.ui)
             implementation(projects.libraries.core)
             implementation(projects.libraries.sodogku)
             implementation(libs.kotlinx.coroutines.test)

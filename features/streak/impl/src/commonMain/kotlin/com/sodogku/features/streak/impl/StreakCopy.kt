@@ -2,10 +2,11 @@ package com.sodogku.features.streak.impl
 
 import androidx.compose.runtime.Composable
 import com.sodogku.libraries.progress.streak.StreakDay
-import com.sodogku.libraries.ui.components.streak.StreakWeekDay
 import com.sodogku.libraries.progress.streak.StreakDayState
 import com.sodogku.libraries.ui.components.streak.StreakCell
 import com.sodogku.libraries.ui.components.streak.StreakCellState
+import com.sodogku.libraries.ui.components.streak.WeekDayState
+import com.sodogku.libraries.ui.components.streak.WeekStripDay
 import kotlinx.datetime.number
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -115,24 +116,29 @@ private val MonthNames = listOf(
 )
 
 /**
- * The last seven days of the calendar, as the strip [StreakHero] draws.
+ * The current week as the strip draws it: the letter and the spoken date
+ * joined onto a state the view model already decided.
  *
- * Takes the tail of the grid the repository already built rather than asking for
- * a second window. The repository's last row *is* the current week, Monday
- * first, so slicing it means the strip and the full calendar can never disagree
- * about which day is which.
+ * Only copy happens here. Which state each day is in is [weekStripStates],
+ * a function over plain values with a test; this is the composable beside it
+ * that does nothing but look up strings.
  */
 @Composable
-internal fun List<StreakDay>.toWeekStrip(): List<StreakWeekDay> {
-    val week = takeLast(DaysInWeek)
-    return week.mapIndexed { index, day ->
-        StreakWeekDay(
-            initial = stringResource(WeekdayInitials[index]),
-            filled = day.state == StreakDayState.Completed || day.state == StreakDayState.Bridged,
-            isToday = day.isToday,
-            spoken = day.toCell().description + ", " + stringResource(day.state.spoken()),
+internal fun List<StreakDay>.toWeekStrip(states: List<WeekDayState>): List<WeekStripDay> =
+    currentWeek().zip(states).mapIndexed { index, (day, state) ->
+        WeekStripDay(
+            letter = stringResource(WeekdayInitials[index]),
+            state = state,
+            spoken = day.toCell().description + ", " + stringResource(state.spoken()),
         )
     }
-}
 
-private const val DaysInWeek = 7
+/**
+ * Spoken from the strip's own state rather than the day's, so a today that
+ * is drawn empty is read as "not yet" rather than "missed".
+ */
+private fun WeekDayState.spoken(): StringResource = when (this) {
+    WeekDayState.Done -> Res.string.streak_day_completed
+    WeekDayState.Missed -> Res.string.streak_day_missed
+    WeekDayState.Empty -> Res.string.streak_day_future
+}

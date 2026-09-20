@@ -13,12 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import com.sodogku.libraries.ui.PreviewContent
 import com.sodogku.libraries.ui.system.Feel
 import com.sodogku.libraries.ui.system.LocalHaptics
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.system.AppTheme
+import com.sodogku.system.Dimension
 import com.sodogku.system.typography.TypographyResource
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -58,6 +60,13 @@ fun CountUpNumber(
     countUpFrom: Int? = null,
     typography: TypographyResource = AppTheme.typography.Display.D1500,
     color: ColorResource = AppTheme.colors.accentBrand,
+    /**
+     * The outline. The defaults are [OutlinedText]'s own; the streak
+     * ceremonies pass `textOutline` at [HeroNumeralStrokeWidth], the handoff's
+     * cream stroke behind the biggest number in the app.
+     */
+    strokeColor: ColorResource = AppTheme.colors.surfacePrimary,
+    strokeWidth: Dp = Dimension.D100,
     /**
      * How long the climb waits before it starts.
      *
@@ -100,6 +109,8 @@ fun CountUpNumber(
         text = shown.toString(),
         typography = typography,
         color = color,
+        strokeColor = strokeColor,
+        strokeWidth = strokeWidth,
         textAlign = TextAlign.Center,
         // Read in the layer, never in composition. A spring on a number this
         // size would otherwise re-lay-out the whole column every frame.
@@ -118,6 +129,17 @@ fun CountUpNumber(
  * down from too large reads as landing, which is the difference the thump is for.
  */
 private const val SlamFrom = 1.6f
+
+/**
+ * How long the climb from [countUpFrom] to [value] takes, not counting the
+ * wait before it or the thump after it. Zero for a number that does not climb.
+ *
+ * Public so a screen that has something scheduled *after* the number, the
+ * week strip's day popping in, can wait for the digits to stop rather than
+ * guessing at a delay that is right for a two and wrong for a twelve.
+ */
+fun countUpMillis(countUpFrom: Int?, value: Int): Int =
+    if (countUpFrom == null || countUpFrom >= value) 0 else ((value - countUpFrom) * TickMillis).toInt()
 
 /** Per digit while counting. Fast, because nobody is reading the intermediate values. */
 private const val TickMillis = 90L

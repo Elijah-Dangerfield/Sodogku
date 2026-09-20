@@ -123,6 +123,15 @@ interface Colors {
     val textOutline: ColorResource
 
     /**
+     * A number that has ended: the run on the lost-streak screen, drawn at
+     * display size in the same outline the live number gets. Not
+     * [textDisabled], which is a step too pale to hold 84sp on the cream, and
+     * not [textMuted], which is body ink and would make the ended run read as
+     * a caption rather than as the number it used to be.
+     */
+    val textEnded: ColorResource
+
+    /**
      * Text on a coloured band: the kicker and the status bar on the streak
      * screens. Cream rather than white for the same reason as [textOutline].
      */
@@ -130,6 +139,16 @@ interface Colors {
 
     /** The band behind a lost streak. A brown, the one thing in the app that is not amber or blue. */
     val bandLoss: ColorResource
+
+    /**
+     * The paw watermark across an amber band. The blue and brown bands wash
+     * [onAccentPrimary] over themselves; on the amber a white paw disappears,
+     * so it is drawn in a dark amber instead.
+     */
+    val watermarkOnBrand: ColorResource
+
+    /** The drop of sweat on the lost dog. */
+    val sweatDrop: ColorResource
 
     val status: StatusColor
 
@@ -237,8 +256,11 @@ val defaultColors = object : Colors {
     override val textSecondary = ColorResource.Brown700
     override val textMuted = ColorResource.Brown500
     override val textOutline = ColorResource.Cream10
+    override val textEnded = ColorResource.Brown400
     override val onBand = ColorResource.Cream20
     override val bandLoss = ColorResource.Brown600
+    override val watermarkOnBrand = ColorResource.Amber950
+    override val sweatDrop = ColorResource.Sky300
 
     override val status = object : StatusColor {
         override val okay = ColorResource.Green600
@@ -627,8 +649,11 @@ private fun PaletteGridSection(colors: Colors) {
         colors.textMuted,
         colors.textDisabled,
         colors.textOutline,
+        colors.textEnded,
         colors.onBand,
         colors.bandLoss,
+        colors.watermarkOnBrand,
+        colors.sweatDrop,
         colors.danger,
         colors.border,
         colors.borderStrong,

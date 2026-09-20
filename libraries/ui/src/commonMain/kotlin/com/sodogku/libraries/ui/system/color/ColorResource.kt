@@ -104,6 +104,14 @@ sealed class ColorResource(val color: Color, val designSystemName: String) {
     object Amber700 : ColorResource(Color(0xFFC88C00), "amber-700")
     object Amber800 : ColorResource(Color(0xFFB9761D), "amber-800")
     object Amber900 : ColorResource(Color(0xFF8A5510), "amber-900")
+    // 950 is the paw watermark washed across an amber band, where a white
+    // paw would vanish.
+    object Amber950 : ColorResource(Color(0xFF7D4A12), "amber-950")
+
+    // Sky - the one drop of sweat on the lost dog. Not a rung of the blue
+    // ramp: it is paler than any blue a button wears and must never be picked
+    // for one.
+    object Sky300 : ColorResource(Color(0xFF6EC3F7), "sky-300")
 
     // Gold - a bone. Duller than the amber on purpose, so a bone and a paw
     // beside each other read as two materials rather than one colour twice.
@@ -151,10 +159,15 @@ sealed class ColorResource(val color: Color, val designSystemName: String) {
     // 600 is not ink. It is the band behind a lost streak, a brown that is
     // deliberately a shade off the muted text beside it so the two never get
     // confused for one token.
+    //
+    // 400 is a number that has ended, drawn at display size. It sits between
+    // the muted text and the disabled text and is neither: it has to carry
+    // 84sp of numeral on the cream, which the disabled rung is too pale for.
     object Brown900 : ColorResource(Color(0xFF3F2A1E), "brown-900")
     object Brown700 : ColorResource(Color(0xFF6B5648), "brown-700")
     object Brown600 : ColorResource(Color(0xFF8A6A58), "brown-600")
     object Brown500 : ColorResource(Color(0xFF8A6E5C), "brown-500")
+    object Brown400 : ColorResource(Color(0xFFB9A293), "brown-400")
     object Brown300 : ColorResource(Color(0xFFC2ABA6), "brown-300")
 
     // Utility colors
@@ -253,6 +266,8 @@ private val colors = listOf(
     ColorResource.Amber700,
     ColorResource.Amber800,
     ColorResource.Amber900,
+    ColorResource.Amber950,
+    ColorResource.Sky300,
     ColorResource.Gold500,
     ColorResource.Rose100,
     ColorResource.Rose400,
@@ -278,6 +293,7 @@ private val colors = listOf(
     ColorResource.Brown700,
     ColorResource.Brown600,
     ColorResource.Brown500,
+    ColorResource.Brown400,
     ColorResource.Brown300,
     // Utilities
     ColorResource.Black,

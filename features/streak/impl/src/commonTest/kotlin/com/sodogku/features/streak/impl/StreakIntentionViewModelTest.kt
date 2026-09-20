@@ -8,6 +8,7 @@ import com.sodogku.libraries.progress.streak.StreakRepository
 import com.sodogku.libraries.progress.streak.StreakSummary
 import com.sodogku.libraries.sodogku.AppCache
 import com.sodogku.libraries.sodogku.AppData
+import com.sodogku.libraries.ui.components.streak.WeekDayState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.datetime.LocalDate
@@ -46,6 +47,28 @@ class StreakIntentionViewModelTest : CoroutineTest() {
 
         assertEquals(1, state.streak)
         assertEquals(7, state.week.size, "the week under the number came through")
+    }
+
+    @Test
+    fun theWeekIsOnTheStripAndTodayIsTheDayThatLands() = runUnitTest {
+        // The fake's week is Monday to Sunday around a Wednesday, with every
+        // day up to today played. So three done, four empty, and the third is
+        // the one that pops.
+        val state = viewModel(RecordingStreak(current = 1)).state
+
+        assertEquals(
+            listOf(
+                WeekDayState.Done,
+                WeekDayState.Done,
+                WeekDayState.Done,
+                WeekDayState.Empty,
+                WeekDayState.Empty,
+                WeekDayState.Empty,
+                WeekDayState.Empty,
+            ),
+            state.weekStrip,
+        )
+        assertEquals(2, state.justLanded, "today is Wednesday, the third day of the strip")
     }
 
     @Test

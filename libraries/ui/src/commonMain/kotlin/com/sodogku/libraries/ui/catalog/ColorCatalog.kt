@@ -27,6 +27,8 @@ internal fun ColorSurfacesContent() {
             ColorRow("surfaceMuted", c.surfaceMuted, null, "A thing not yet: an empty day, the disc behind a locked badge.")
             ColorRow("track", c.track, null, "The unfilled length of a progress bar.")
             ColorRow("bandLoss", c.bandLoss, c.onBand, "The band behind a lost streak.")
+            ColorRow("watermarkOnBrand", c.watermarkOnBrand, null, "The paw watermark across an amber band.")
+            ColorRow("sweatDrop", c.sweatDrop, null, "The drop of sweat on the lost dog.")
             ColorRow("backgroundOverlay", c.backgroundOverlay, null, "Dims the screen behind a modal or bottom sheet.")
             ColorRow("shadow", c.shadow, null, "Drop-shadow color cast by elevated surfaces.")
         }
@@ -42,6 +44,7 @@ internal fun ColorSurfacesContent() {
             ColorRow("textMuted", c.textMuted, c.background, "Counts, fractions, the line under a badge name. 4.1:1, so never body copy.")
             ColorRow("textDisabled", c.textDisabled, c.background, "Disabled text and icons.")
             ColorRow("textOutline", c.textOutline, c.accentBrand, "The stroke behind a display numeral.")
+            ColorRow("textEnded", c.textEnded, c.background, "A number that has ended: the run on the lost-streak screen.")
             ColorRow("onBand", c.onBand, c.accentPrimary, "Kicker and status text on a coloured band.")
         }
     }

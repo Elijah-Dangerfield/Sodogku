@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -42,8 +43,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * would be the first thing anyone noticed.
  *
  * The band bleeds under the status bar on purpose. Add the inset to
- * [kickerTopPadding]; do not pad the band itself, or the top of the screen
- * shows a strip of page above the colour.
+ * [kickerTopPadding], on top of [HeroBandKickerTop]; do not pad the band
+ * itself, or the top of the screen shows a strip of page above the colour.
  *
  * The watermark is the paw from `paw.svg`, drawn at the three placements the
  * handoff's board fixes on a 390-wide frame and scaled with the band's width,
@@ -56,7 +57,7 @@ fun HeroBand(
     watermark: ColorResource = AppTheme.colors.onAccentPrimary,
     watermarkAlpha: Float = DefaultWatermarkAlpha,
     overhang: Dp = HeroOverhang,
-    kickerTopPadding: Dp = KickerTop,
+    kickerTopPadding: Dp = HeroBandKickerTop,
     kicker: @Composable () -> Unit,
     hero: @Composable () -> Unit,
 ) {
@@ -67,6 +68,11 @@ fun HeroBand(
             Box(
                 Modifier
                     .layoutId(BandSlot)
+                    // Tagged so a composition test can find the painted band.
+                    // It has no semantics of its own, so without the tag the
+                    // overhang, which is the whole point of this layout, is
+                    // invisible to anything but a pair of eyes.
+                    .testTag(HeroBandTestTag)
                     .clip(BandShape)
                     .background(color.color)
                     .drawBehind { drawWatermark(wash) },
@@ -145,14 +151,28 @@ private const val DefaultWatermarkAlpha = 0.14f
 private val HeroOverhang = 56.dp
 
 /**
+ * The dog that hangs off the band, at the handoff's 124px. Off the dimension
+ * scale, like the overhang and the corner, because the three were tuned
+ * together on the board and this is the one dog drawn at this size.
+ */
+val HeroBandHeroSize: Dp = 124.dp
+
+/**
  * Not on the dimension scale: 34 reads as a card and 40 as a sheet, and the
  * band is neither. It is the one corner in the app at this size.
  */
 private val BandCornerRadius = 36.dp
 private val BandShape = RoundedCornerShape(bottomStart = BandCornerRadius, bottomEnd = BandCornerRadius)
 
-private val KickerTop = Dimension.D850
+/**
+ * The kicker's distance from the top of the band, before any status-bar inset
+ * a screen adds to it.
+ */
+val HeroBandKickerTop: Dp = Dimension.D850
 private val KickerToHero = Dimension.D750
+
+/** The painted band's tag, for a composition test. See the note at the band slot. */
+const val HeroBandTestTag = "hero-band"
 
 private const val BandSlot = "band"
 private const val KickerSlot = "kicker"
@@ -171,7 +191,7 @@ private fun HeroBandPreview() {
                 textAlign = TextAlign.Center,
             )
         }) {
-            Dog(pose = DogPose.Solved, size = PreviewDogSize)
+            Dog(pose = DogPose.Solved, size = HeroBandHeroSize)
         }
     }
 }
@@ -192,10 +212,9 @@ private fun HeroBandLossPreview() {
                 )
             },
         ) {
-            Dog(pose = DogPose.Thinking, size = PreviewDogSize)
+            Dog(pose = DogPose.Thinking, size = HeroBandHeroSize)
         }
     }
 }
 
-private val PreviewDogSize = Dimension.D1900 + Dimension.D900
 private const val LossWatermarkAlpha = 0.1f

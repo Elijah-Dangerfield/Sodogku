@@ -7,6 +7,7 @@ import com.sodogku.libraries.progress.streak.StreakDay
 import com.sodogku.libraries.progress.streak.StreakPrompt
 import com.sodogku.libraries.progress.streak.StreakRepository
 import com.sodogku.libraries.sodogku.AppCache
+import com.sodogku.libraries.ui.components.streak.WeekDayState
 import me.tatarka.inject.annotations.Inject
 
 /**
@@ -90,7 +91,19 @@ data class StreakIntentionState(
 
     /** The player's setting. Provided to the design system, not read here. */
     val haptics: Boolean = true,
-)
+) {
+    /** The current week as the strip draws it. See [weekStripStates]. */
+    val weekStrip: List<WeekDayState>
+        get() = week.weekStripStates()
+
+    /**
+     * Today, which has just landed: this screen only opens off the back of a
+     * finished board. Null if the read came back with today unplayed, in which
+     * case the strip draws what it has and nothing pops.
+     */
+    val justLanded: Int?
+        get() = week.justLandedIndex()
+}
 
 sealed interface StreakIntentionEvent {
     data object Close : StreakIntentionEvent
