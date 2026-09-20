@@ -155,45 +155,48 @@ ship, plus the owner's own ideas in the same conversation. The competitor notes
 live in `docs/reference/meowdoku.md`, which until now only covered the look.
 -->
 
-## SD-129 [P2] — Look at the two things this batch changed that only a device can judge
+## SD-129 [P2] — Look at everything the two September batches changed that only a device can judge
 
-**Ask:** Two changes landed whose acceptance criterion is "does it look right",
-and neither has been looked at. Both are reasoned about and tested structurally;
-neither has been run.
+**Ask:** Two batches of work landed whose acceptance criterion is "does it look
+right", and none of it has been run. Every piece is reasoned about and tested
+structurally; nothing has been seen. Boot a phone and go through this list.
 
-**Done when:** somebody has opened the app and said yes or no to each.
+**Done when:** somebody has opened the app and said yes or no to each line.
 
-**The press, from SD-119.** `bounceClick` moved above the fill inside `Surface`,
-so every clickable `Surface` now scales its border, shadow and fill along with
-its content, where before the content shrank away from a border that held still.
-Press `Card`, `CardSecondary`, `NoticeBanner`, `StreakButton` and `IconButton`.
-If the new press is wrong, the fix is a parameter, not a revert: the four SD-119
-call sites need the new order to keep the press they already had.
+**The palette, app-wide (visual handoff, 2026-09-20).** Every semantic token
+moved a shade: blue `#2F8EF4`, ink `#3F2A1E`, page `#F5EFE7`, ivory cards, the
+handoff's red and green. Walk the board, the level pane, settings and the
+paywall, which are *not* in the handoff and shifted anyway. The board's region
+palette did not move.
 
-**The win celebration, from SD-123.** Finish a level. The panel should rise from
-the bottom over 340ms and the beats should land one at a time behind it, paws
-staggered, score rolling up from zero. Things to look at specifically, because
-they are the ones that were reasoned about rather than seen: the proportions on a
-short display, the system-bar inset at the top, whether the stagger reads as
-celebratory or as slow, and the script at its longest — a daily clear with a near
-miss, a new best time, a treat and a streak is nine beats, which is when the new
-`verticalScroll` starts mattering.
+**The press, from SD-119.** `bounceClick` moved above the fill inside
+`Surface`, so every clickable `Surface` scales its border and fill with its
+content. Press `Card`, `NoticeBanner`, `StreakButton`, `IconButton`.
 
-**The streak ceremony, from SD-124.** Clear a board on a day that grows the run.
-The page should rise over a board that holds still, and the number should count
-to the new run and thump. Two specific things: a run of **one** deliberately does
-not flip (it starts where it ends, so only the thump lands), and
-`StreakIntentionScreen` still counts `0 → 1` on the first-ever run — the two
-pages now disagree about what a run of one does, which is defensible since they
-are different moments, but somebody should look at them back to back and confirm
-that.
+**The streak ceremonies (rows 06, 07, 08).** Clear a board on a day that grows
+the run: the band should bleed under the status bar, the dog should hang off
+its edge, the number should count up after the page lands, and the week strip's
+new day should pop after the number settles. Then break a run and come back for
+the brown page. Specifically: the status-bar icons are dark on every band, which
+is wrong on blue and brown (SD-144); the dog has no drop shadow; and a run of one
+does not flip while `StreakIntentionScreen` still counts `0 → 1`.
 
-**Hints:** `Surface.kt`, the `Box` modifier chain, and the KDoc section "Why the
-press is applied before the fill". `bounceClick` is `graphicsLayer` then
-`clickable`, and a `graphicsLayer` only transforms what is drawn below it, which
-is the whole mechanism. `BasicButton` already works around the old order by
-wrapping a non-clickable `Surface` in a `Box` that carries the press — if the new
-order is right, that workaround comes out under SD-130.
+**Board cleared (row 03).** The ray burst overruns its band by about 25dp under
+the scroll column; the three chip glyphs are `⚡ ⏱ ❌` as text and will render
+differently on Android and iOS; the mistakes chip is red on a zero; and the
+longest script (a daily with a near miss, a treat and a streak) is eight beats on
+a short display.
+
+**Achievements (row 10).** The grid drops from three columns to two, then one,
+when the longest badge name cannot fit at the system font size; the locked
+glyphs are desaturated through a `graphicsLayer` colour filter; See all should
+scroll, not navigate. Set the font scale to 2 and look at the grid.
+
+**The toast.** It hangs off the lives pill. On a phone whose header is taller
+than the design's, check it clears the buttons. Three badges at once now cost
+twelve seconds unless tapped.
+
+**The loading bone.** No outline now. Check it on the iOS splash overlay too.
 
 ## SD-130 [P2] — Fold the three hand-rolled presses in `libraries/ui` back onto `Surface`
 
@@ -670,3 +673,71 @@ The owner has to say which, or both; do not pick silently.
 
 `DailyOutcome.Frozen` and `Restored` stay parseable forever regardless. It is the
 offers that retire, not the vocabulary.
+
+## SD-144 [P2] — Status-bar icons per screen, so the blue and brown bands do not get dark icons
+
+**Ask:** The three streak ceremonies bleed a coloured band under the status bar,
+by design. Android sets `SystemBarStyle.light` once in `MainActivity` (dark icons
+everywhere) and iOS declares nothing, so the blue and brown bands show dark
+icons on a dark colour, and the amber band happens to be right.
+
+**Done when:** a screen can ask for light or dark status-bar icons and the three
+ceremonies ask for the right ones.
+
+**Hints:** No per-screen mechanism exists. `StreakCeremonyLayout` in
+`features/streak/impl` is the one place that needs it today; `HeroBand`'s KDoc
+records that the band deliberately bleeds under the bar. On Android this is
+`enableEdgeToEdge` with a per-destination style or a `WindowInsetsController`
+call scoped to the route; on iOS `preferredStatusBarStyle` through the
+`ComposeUIViewController` host. Found by the streak pass on 2026-09-20; not built
+because it is platform plumbing rather than a screen.
+
+## SD-145 [P2] — The handoff's behaviours that were deliberately not built
+
+**Ask:** The 2026-09-20 visual handoff describes four behaviours that are not
+visual and were not built, because each is a product change and one of them
+conflicts with a decision the owner made the same day. They are recorded here so
+they are decided rather than forgotten.
+
+**Done when:** each has a yes, a no, or its own item.
+
+- **The day-seven present** and the weekly present economy behind it, with
+  freezes in its randomised pool and rewards taken off the level ladder. This
+  is the SD-143 conflict: the freeze source the owner chose is the campaign
+  first-clear reward. Not built; no `pendingPresent` state exists; the intention
+  copy no longer promises a present on Sunday.
+- **Badges granting bones.** The toast design carries a `+3` bone pill. Badges
+  grant nothing today. The toast has a trailing slot and no pill.
+- **Streak lost shown on app open.** The handoff's table says the lost page
+  appears when the app is opened after a missed day. Today it appears after the
+  first board finished on the first day back (`pendingPrompt` runs on
+  completion). Different moment, different design; the current one was chosen
+  in SD-127 and has a reason.
+- **`I'M IN` enabling a daily reminder.** There are no notifications in this app
+  of any kind. The button records the commitment and nothing else.
+
+**Hints:** `docs/design/streak-freeze.md` and the SD-28 decision in
+`docs/decisions.md` for the first; `UnlockToast.kt`'s `trailing` slot for the
+second; `StreakPrompts.kt` for the third.
+
+## SD-146 [P2] — Small things the visual pass turned up and did not fix
+
+**Ask:** Six findings from the four screen passes, none worth its own item.
+
+**Done when:** each is fixed or dismissed in writing.
+
+- `Scoring.nearMiss` has no production caller since `pointsToNextPaw` took over;
+  only tests read it. Delete it or say why it stays.
+- `FullScreenLoader` is a Material `CircularProgressIndicator` on a design
+  system whose rule is "avoid Material directly", and it is what the streak,
+  achievements and game screens show while loading. The bone is the app's
+  loader; it should probably be this too.
+- The unlock toast is a clickable `Row` holding three `Text` nodes, so a screen
+  reader hears the label, the title and the reason as separate fragments. Same
+  shape as the SD-119 finding; `Surface(contentDescription =)` is the fix.
+- `PawRatingHoldsStillTest.EVERY_PAW = 3` is a stale name since five paws.
+- `NonLazyVerticalGrid` appends a trailing spacer after its last row, so every
+  achievements shelf carries 12dp of extra bottom space.
+- Four other bones keep their outline (the lives row, the refill control, the
+  level reward chip, `GameHud`'s `LiveBoneEdge`); the handoff only changed the
+  loading bone. Decide whether the rest follow.
