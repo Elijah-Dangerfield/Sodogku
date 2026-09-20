@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -24,7 +23,7 @@ import com.sodogku.system.Dimension
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
- * A big thick bone that fills up, for the moments the app is not ready yet.
+ * A big flat bone that fills up, for the moments the app is not ready yet.
  *
  * **Indeterminate, and drawn as though it were not.** There is no honest
  * percentage available at launch: the app is waiting on a local cache read and a
@@ -38,11 +37,13 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * the refill button and for the level reward chip, and a generic track here
  * would be the one loading affordance in the app that came from somewhere else.
  *
- * The fill is a clip rather than a second shape. `drawBone` paints an outline
- * and insets a fill over it, so a "half a bone" cannot be expressed by drawing a
- * narrower bone: that would be a *smaller* bone, not a partly filled one. Same
- * geometry twice, once empty and once full, with the full one clipped to the
- * sweep.
+ * No outline, unlike those bones. The 2026-09 handoff draws it as a grey track
+ * with the amber fill clipped in from the left, and a rim on a shape that is
+ * mostly track read as a hollow bone slowly gaining a lining. The fill is a clip
+ * rather than a narrower bone for the same reason as before: a bone drawn
+ * narrower is a *smaller* bone, not a partly filled one, so the same geometry is
+ * drawn twice, once as the track and once as the fill, and the fill is clipped
+ * to the sweep.
  */
 @Composable
 fun BoneLoader(
@@ -53,16 +54,14 @@ fun BoneLoader(
 ) {
     val still = LocalReduceAnimations.current || LocalInspectionMode.current
 
-    val empty = AppTheme.colors.surfaceDisabled.color
-    val emptyEdge = AppTheme.colors.borderSecondary.color
-    val full = AppTheme.colors.bone.color
-    val fullEdge = BoneEdge
+    val track = AppTheme.colors.track.color
+    val fill = AppTheme.colors.bone.color
 
     val sweep = remember { Animatable(0f) }
     LaunchedEffect(still) {
         if (still) {
             // A single filled bone, held. Reduce-animations should get the
-            // shape rather than an empty outline that never fills, which reads
+            // shape rather than an empty track that never fills, which reads
             // as broken rather than as still.
             sweep.snapTo(1f)
             return@LaunchedEffect
@@ -80,9 +79,9 @@ fun BoneLoader(
             // Read in the draw phase, never in composition: the sweep changes
             // every frame and this is on screen for the whole of launch.
             .drawBehind {
-                drawBone(fill = empty, edge = emptyEdge)
+                drawBone(fill = track)
                 clipRect(left = 0f, top = 0f, right = size.width * sweep.value, bottom = size.height) {
-                    drawBone(fill = full, edge = fullEdge)
+                    drawBone(fill = fill)
                 }
             },
     )
@@ -94,20 +93,14 @@ fun BoneLoader(
  *
  * The ratio matters more than either number: `drawBone` is drawn against a box
  * meaningfully wider than it is tall, and at anything near square the two lobes
- * merge into a lump.
+ * merge into a lump. The handoff's 200 by 46, which the scale reaches as two
+ * steps added rather than one named.
  */
 private val DefaultWidth: Dp = Dimension.D1900 * 2
-private val DefaultHeight: Dp = Dimension.D1300
+private val DefaultHeight: Dp = Dimension.D1200 + Dimension.D200
 
 /** One pass end to end. Slow enough to read as filling, quick enough to repeat. */
 private const val SweepMillis = 1_400
-
-/**
- * The rim around the fill. The fill itself is the `bone` token; the rim has no
- * token because the handoff's loading bone has no rim at all, and this goes
- * with the outline when that lands rather than earning a name first.
- */
-private val BoneEdge = Color(0xFFC8871B)
 
 @Preview
 @Composable

@@ -27,8 +27,11 @@ import kotlin.math.sin
  * Drawn in a box wider than it is tall. A bone in a square reads as a blob,
  * which is exactly what the first pass produced — the lobes were large enough
  * relative to the bar that they merged into one lump.
+ *
+ * With no [edge], or an edge the same colour as the fill, the bone is one flat
+ * shape: the loading bone has no rim by design.
  */
-fun DrawScope.drawBone(fill: Color, edge: Color) {
+fun DrawScope.drawBone(fill: Color, edge: Color = fill) {
     val width = size.width
     val height = size.height
     val lobe = height * BONE_LOBE_FRACTION
@@ -39,7 +42,8 @@ fun DrawScope.drawBone(fill: Color, edge: Color) {
     // Outline first, fill inset over it: drawing an edge as a stroke would trace
     // the seams between the bar and the lobes and make the bone look welded.
     val rim = lobe * BONE_RIM_FRACTION
-    listOf(edge to 0f, fill to rim).forEach { (color, inset) ->
+    val passes = if (edge == fill) listOf(fill to 0f) else listOf(edge to 0f, fill to rim)
+    passes.forEach { (color, inset) ->
         drawRoundRect(
             color = color,
             topLeft = Offset(lobe, centreY - barHeight / 2f + inset),

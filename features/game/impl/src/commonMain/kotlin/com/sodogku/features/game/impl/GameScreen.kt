@@ -53,7 +53,10 @@ import com.sodogku.libraries.ui.components.game.RuleDiagram
 import com.sodogku.libraries.ui.components.game.ScoreCounter
 import com.sodogku.libraries.ui.components.icon.IconButton
 import com.sodogku.libraries.ui.components.icon.Icons
+import com.sodogku.libraries.ui.system.AnchoredCard
+import com.sodogku.libraries.ui.system.LocalFocusRegistry
 import com.sodogku.libraries.ui.system.coveredByOverlay
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -219,30 +222,33 @@ fun GameScreen(
             // first clear can earn First Steps, Perfect Form and Speed Demon in
             // the same second — and they must not push Next level down the card.
             // Gone entirely when the player has turned badges off.
+            //
+            // `onDismiss` leaves the list alone on purpose. `newBadges` is reset
+            // by the next attempt, and "has the player seen this" is the
+            // achievements watermark, which the grid moves when they go and
+            // look. The toast reads the list and never writes it, so the two
+            // cannot disagree.
             if (state.showAchievements && state.newBadges.isNotEmpty()) {
-                UnlockToasts(
+                BoardToast(
                     items = state.newBadges.map { badge ->
                         UnlockToastItem(
                             glyph = AchievementCopy.glyph(badge.id),
                             label = stringResource(Res.string.achievements_unlocked_toast),
                             title = stringResource(AchievementCopy.name(badge.id)),
+                            body = stringResource(AchievementCopy.description(badge.id)),
                         )
                     },
                     onDismiss = {},
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(padding)
-                        .padding(top = Dimension.D700),
                 )
             }
 
             // The one acknowledgement of a refill nobody paid for. Same toast as
             // a badge unlock and for the same reason: it is a moment worth
             // marking that must not cost the player a tap, on a board they are
-            // in the middle of. Never stacked with the badges — a refill happens
+            // in the middle of. Never queued with the badges — a refill happens
             // on a board in play and badges land when one ends.
             if (state.freeBonesGrant) {
-                UnlockToasts(
+                BoardToast(
                     items = listOf(
                         UnlockToastItem(
                             glyph = FreeBonesGlyph,
@@ -251,10 +257,6 @@ fun GameScreen(
                         ),
                     ),
                     onDismiss = { onAction(GameAction.DismissFreeBonesGrant) },
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(padding)
-                        .padding(top = Dimension.D700),
                 )
             }
 
@@ -328,6 +330,26 @@ fun GameScreen(
             onOpenFeedback = { onAction(GameAction.OpenFeedback) },
             appVersion = BuildInfo.versionName,
         )
+    }
+}
+
+/**
+ * A toast where the last-bone bubble goes: hung off the lives pill, below the
+ * header.
+ *
+ * The handoff puts it at a fixed 117 on its frame, chosen to clear the header
+ * buttons and to sit where "One chance left" sits. That bubble is not at a
+ * fixed offset here, it is an [AnchoredCard] under the pill the warning lights,
+ * so the toast takes the same anchor and the same gap and lands in the same
+ * place on every phone, including one where the header is taller than the
+ * design's. With no pill on screen yet the anchor is the origin and the card's
+ * own floor keeps it under the status bar.
+ */
+@Composable
+private fun BoardToast(items: List<UnlockToastItem>, onDismiss: () -> Unit) {
+    val anchor = LocalFocusRegistry.current.boundsOf(LivesFocusKey) ?: Rect.Zero
+    AnchoredCard(anchor = anchor) {
+        UnlockToasts(items = items, onDismiss = onDismiss, modifier = Modifier.fillMaxWidth())
     }
 }
 
