@@ -145,6 +145,18 @@ internal object Paw {
      */
     const val OUTLINE = 6f
 
+    /**
+     * The 2026-09 handoff's unearned paw, which is a different drawing rather
+     * than the filled one hollowed out: a 7-unit stroke on a pad and toes each
+     * pulled in by about half of it, so the stroke's outer edge lands where the
+     * filled paw's edge is and the five paws in a rating read as one row of
+     * shapes. Straight off the board's SVG, not derived from [OUTLINE].
+     */
+    const val STROKE = 7f
+    const val STROKED_PAD_RADIUS_X = 26f
+    const val STROKED_PAD_RADIUS_Y = 20f
+    const val STROKED_TOE_RADIUS = 9f
+
     /** Where the ink actually starts and how far it runs, in the same units. */
     const val INK_LEFT = 16f
     const val INK_TOP = 19f
@@ -203,6 +215,44 @@ fun DrawScope.drawPaw(color: Color, filled: Boolean) {
         drawCircle(
             color = color,
             radius = Paw.TOE_RADIUS * fit.scale,
+            center = Offset(fit.x(x), fit.y(y)),
+            style = style,
+        )
+    }
+}
+
+/**
+ * The handoff's stroked paw: the mark for a paw a clear did not earn, on the
+ * board-cleared screen.
+ *
+ * Not [drawPaw] with `filled = false`. That one strokes the filled geometry
+ * down its centre line, so the outline sits a few units proud of a filled paw
+ * beside it; this one strokes a smaller pad and smaller toes so its outer edge
+ * is the filled paw's edge. Both survive because both ship: the level list and
+ * the daily card recall a rating in the hollow one, and the celebration awards
+ * one in this.
+ *
+ * Fitted to the same box as [drawPaw], so a rating can mix the two and the
+ * earned and unearned paws share a baseline.
+ */
+fun DrawScope.drawStrokedPaw(color: Color) {
+    val fit = Paw.fitTo(size.width, size.height)
+    val style = Stroke(width = Paw.STROKE * fit.scale)
+
+    drawOval(
+        color = color,
+        topLeft = Offset(
+            fit.x(Paw.EXTENT / 2f - Paw.STROKED_PAD_RADIUS_X),
+            fit.y(Paw.PAD_CENTRE_Y - Paw.STROKED_PAD_RADIUS_Y),
+        ),
+        size = Size(Paw.STROKED_PAD_RADIUS_X * 2f * fit.scale, Paw.STROKED_PAD_RADIUS_Y * 2f * fit.scale),
+        style = style,
+    )
+
+    Paw.TOES.forEach { (x, y) ->
+        drawCircle(
+            color = color,
+            radius = Paw.STROKED_TOE_RADIUS * fit.scale,
             center = Offset(fit.x(x), fit.y(y)),
             style = style,
         )

@@ -151,6 +151,7 @@ sealed class ColorResource(val color: Color, val designSystemName: String) {
     object Cream250 : ColorResource(Color(0xFFE3D7C8), "cream-250")
     object Cream275 : ColorResource(Color(0xFFE2D3C3), "cream-275")
     object Cream300 : ColorResource(Color(0xFFDCCCBE), "cream-300")
+    object Cream350 : ColorResource(Color(0xFFD8C9B9), "cream-350")
 
     // Brown - every text colour. Pure black on cream reads as newsprint printed
     // on the wrong paper; the ink has to be warm too or the cream looks like a
@@ -289,6 +290,7 @@ private val colors = listOf(
     ColorResource.Cream250,
     ColorResource.Cream275,
     ColorResource.Cream300,
+    ColorResource.Cream350,
     ColorResource.Brown900,
     ColorResource.Brown700,
     ColorResource.Brown600,

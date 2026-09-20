@@ -116,6 +116,42 @@ class PawRatingHoldsStillTest {
         )
     }
 
+    /**
+     * The board-cleared screen's own drawing of the rating, which is the one
+     * with the stagger and the one a screenshot of the celebration captures.
+     * A separate branch of the draw, so a separate check: the stroked mode
+     * is drawn through its own `when` arm and could grow its own animation
+     * without the faint one noticing.
+     */
+    @Test
+    fun aStrokedRatingIsStillArrivingWhenNothingIsWatching() {
+        val changes = stateChangesWhileTheRatingArrives(
+            inspecting = false,
+            reduceAnimations = false,
+            unearned = UnearnedPaw.Stroked,
+        )
+
+        assertTrue(
+            changes > MIN_MOVING_CHANGES,
+            "the stroked rating produced $changes state writes, so its stagger is not running " +
+                "and the stillness check below it passes for free",
+        )
+    }
+
+    @Test
+    fun aStrokedRatingHoldsStillUnderInspection() {
+        assertEquals(
+            0,
+            stateChangesWhileTheRatingArrives(
+                inspecting = true,
+                reduceAnimations = false,
+                unearned = UnearnedPaw.Stroked,
+            ),
+            "the board-cleared rating was still arriving in a preview, so a capture taken " +
+                "before the last paw lands is a rating with paws missing",
+        )
+    }
+
     @Test
     fun aRecalledRatingNeverMovesInTheFirstPlace() {
         // `animated = false` is the level list and the daily recap: the rating
@@ -146,6 +182,7 @@ class PawRatingHoldsStillTest {
         inspecting: Boolean,
         reduceAnimations: Boolean,
         animated: Boolean = true,
+        unearned: UnearnedPaw = UnearnedPaw.Faint,
     ): Int {
         compose.mainClock.autoAdvance = false
         compose.setContent {
@@ -158,6 +195,7 @@ class PawRatingHoldsStillTest {
                         paws = EVERY_PAW,
                         animated = animated,
                         staggerMillis = STAGGER_MILLIS,
+                        unearned = unearned,
                     )
                 }
             }

@@ -4875,7 +4875,7 @@ class GameViewModelTest : CoroutineTest() {
         strikesThisAttempt = Blank.strikesThisAttempt,
         score = Blank.score,
         paws = Blank.paws,
-        nearMiss = Blank.nearMiss,
+        pawGap = Blank.pawGap,
         standing = Blank.standing,
         treatAwarded = Blank.treatAwarded,
         elapsedMs = Blank.elapsedMs,

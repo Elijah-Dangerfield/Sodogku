@@ -176,6 +176,14 @@ interface Colors {
     /** A missed day on the week strip: the fill, and the cross drawn on it. */
     val missFill: ColorResource
     val missMark: ColorResource
+
+    /**
+     * The paw a clear did not earn, drawn as a stroke beside the ones it did.
+     * A step past [borderSecondary], because the two sit at the same weight on
+     * the same cream and one has to read as an outline where the other reads
+     * as an edge.
+     */
+    val pawUnearned: ColorResource
 }
 
 interface StatusColor {
@@ -244,6 +252,7 @@ val defaultColors = object : Colors {
     override val track = ColorResource.Cream200
     override val missFill = ColorResource.Rose100
     override val missMark = ColorResource.Rose400
+    override val pawUnearned = ColorResource.Cream350
     override val background = ColorResource.Cream50
     override val onBackground = ColorResource.Brown900
     override val border = ColorResource.Cream200
@@ -663,6 +672,7 @@ private fun PaletteGridSection(colors: Colors) {
         colors.surfaceMuted,
         colors.missFill,
         colors.missMark,
+        colors.pawUnearned,
         colors.shadow
     ).distinctBy { it.designSystemName }
 

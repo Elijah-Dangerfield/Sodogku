@@ -27,10 +27,11 @@ data class NearMiss(
 /**
  * The gap to the next paw, or null when there is nothing useful to say.
  *
- * Null in three cases, each of which would otherwise produce a bad message:
- * there is no rung above this run (it did not finish, or it earned every paw),
- * the score already clears the next rung, or the gap is wider than
- * [NearMissFraction] of par.
+ * [pointsToNextPaw] with a closeness gate on it: null when there is no rung
+ * above this run, and null when the gap is wider than [NearMissFraction] of
+ * par. The board-cleared screen stopped reading this in favour of the ungated
+ * number when the 2026-09 handoff put the footnote on every clear short of
+ * five paws; it stays as the one place "close" is defined.
  */
 fun Scoring.nearMiss(
     score: Int,
@@ -41,6 +42,47 @@ fun Scoring.nearMiss(
     placements: Int = size,
     config: ScoringConfig = ScoringConfig.Default,
 ): NearMiss? {
+    val gap = pointsToNextPaw(score, size, difficulty, completed, placements, config) ?: return null
+    val par = parScore(size, difficulty, placements, config)
+    if (gap.pointsShort > par * NearMissFraction) return null
+    return NearMiss(nextPaw = gap.nextPaw, pointsShort = gap.pointsShort)
+}
+
+/**
+ * The rung above what a run earned and the points it fell short by, with no
+ * opinion about whether the gap is worth mentioning.
+ *
+ * Same fields as [NearMiss] and a different promise. A near miss is only ever
+ * reported when it is near; this is reported whenever there is a rung to
+ * report, which on the board-cleared screen is every clear short of five paws.
+ * The two are kept as separate types so a caller holding one cannot be handed
+ * the other and quietly start printing "2,000 points off" as encouragement.
+ */
+data class PawGap(
+    /** The rating one rung above what this run earned. */
+    val nextPaw: Int,
+
+    /** Points still needed. Always positive. */
+    val pointsShort: Int,
+)
+
+/**
+ * How many more points the run needed for its next paw.
+ *
+ * Null when there is no rung above this one, which is an unfinished run (rated
+ * zero) or a perfect one (rated [Scoring.MAX_PAWS]). Otherwise the smallest
+ * score that clears the next rung is `ceil(par * fraction)`, and the gap is
+ * that less the score.
+ */
+fun Scoring.pointsToNextPaw(
+    score: Int,
+    size: Int,
+    difficulty: Int,
+    completed: Boolean,
+    /** Dogs the player placed. Pass `ScoreCard.placements`; see [Scoring.parScore]. */
+    placements: Int = size,
+    config: ScoringConfig = ScoringConfig.Default,
+): PawGap? {
     val earned = paws(score, size, difficulty, completed, placements, config)
     val par = parScore(size, difficulty, placements, config)
 
@@ -75,12 +117,13 @@ fun Scoring.nearMiss(
     //
     // The number is the only thing this file offers, and a number the player can
     // act on and be wrong about is worse than no number.
+    //
+    // No `short <= 0` guard: `paws` put the run below `par * fraction`, so the
+    // ceiling of that product is above the score by at least one. A guard here
+    // would be a second copy of the rating's own comparison, and one no test
+    // could ever fail.
     val needed = ceil(par * nextFraction).toInt()
-    val short = needed - score
-    if (short <= 0) return null
-    if (short > par * NearMissFraction) return null
-
-    return NearMiss(nextPaw = earned + 1, pointsShort = short)
+    return PawGap(nextPaw = earned + 1, pointsShort = needed - score)
 }
 
 /**

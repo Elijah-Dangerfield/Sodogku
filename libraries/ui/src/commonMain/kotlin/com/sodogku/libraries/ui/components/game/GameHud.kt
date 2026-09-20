@@ -92,6 +92,27 @@ fun LifeRow(
 }
 
 /**
+ * How a [PawRating] draws the paws it did not earn. Both are outlines; they
+ * differ in colour, weight and geometry, and each is the right one somewhere.
+ */
+enum class UnearnedPaw {
+    /**
+     * The filled paw hollowed out, in a translucent ink. The level list, the
+     * daily card and the recap: a rating being recalled, small, in a row of
+     * other things.
+     */
+    Faint,
+
+    /**
+     * The 2026-09 handoff's stroked paw in [com.sodogku.libraries.ui.system.color.Colors.pawUnearned],
+     * for the board-cleared screen, where the rating is the size of a headline
+     * and the missing paws are the ones the footnote is about. Opt in; nothing
+     * that recalls a rating should take it.
+     */
+    Stroked,
+}
+
+/**
  * Paws earned, 0 to [MaxPaws]. Unearned paws stay visible in outline so the
  * player can see what they missed rather than just what they got.
  */
@@ -100,6 +121,8 @@ fun PawRating(
     paws: Int,
     modifier: Modifier = Modifier,
     size: Dp = Dimension.D1100,
+    gap: Dp = Dimension.D300,
+    unearned: UnearnedPaw = UnearnedPaw.Faint,
     /**
      * False draws the paws already earned, with no pop.
      *
@@ -128,8 +151,9 @@ fun PawRating(
     // capturing a rating whose later paws have not arrived at all.
     val still = !animated || LocalReduceAnimations.current || LocalInspectionMode.current
     val earnedPaw = AppTheme.colors.accentBrand.color
+    val strokedPaw = AppTheme.colors.pawUnearned.color
     Row(
-        horizontalArrangement = Arrangement.spacedBy(Dimension.D300),
+        horizontalArrangement = Arrangement.spacedBy(gap),
         modifier = modifier,
     ) {
         repeat(MaxPaws) { index ->
@@ -159,7 +183,11 @@ fun PawRating(
                         scaleY = scale
                     }
                     .drawBehind {
-                        drawPaw(if (earned) earnedPaw else UnearnedPaw, filled = earned)
+                        when {
+                            earned -> drawPaw(earnedPaw, filled = true)
+                            unearned == UnearnedPaw.Stroked -> drawStrokedPaw(strokedPaw)
+                            else -> drawPaw(FaintPaw, filled = false)
+                        }
                     },
             )
         }
@@ -456,8 +484,13 @@ private val LiveBoneEdge = Color(0xFFC8871B)
 private val SpentBone = Color(0xFFDEDAD6)
 private val SpentBoneEdge = Color(0xFFB4AEA8)
 
-/** An earned paw is `accentBrand`, read in [PawRating]; only the hollow one has no token. */
-private val UnearnedPaw = Color(0x33000000)
+/**
+ * The [UnearnedPaw.Faint] outline. An earned paw is `accentBrand` and a
+ * stroked one `pawUnearned`, both read in [PawRating]; this is the one paw
+ * with no token, a translucent ink that takes its tone from whatever row it
+ * is sitting in.
+ */
+private val FaintPaw = Color(0x33000000)
 
 @Preview
 @Composable

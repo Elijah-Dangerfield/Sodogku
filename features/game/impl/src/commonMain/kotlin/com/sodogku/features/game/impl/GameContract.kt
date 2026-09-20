@@ -15,7 +15,7 @@ import com.sodogku.libraries.puzzle.Technique
 import com.sodogku.libraries.scoring.Praise
 import com.sodogku.libraries.scoring.ScoreCard
 import com.sodogku.libraries.scoring.Scoring
-import com.sodogku.libraries.scoring.NearMiss
+import com.sodogku.libraries.scoring.PawGap
 import com.sodogku.libraries.scoring.ScoringConfig
 import com.sodogku.libraries.scoring.Standing
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -171,11 +171,15 @@ data class GameState(
     val paws: Int = 0,
 
     /**
-     * How close this run came to another paw, or null when there is nothing
-     * honest to say. Resolved when the run is scored, not in the sheet, because
-     * it needs the config the attempt was actually scored against.
+     * The paw above this run and the points it fell short by, or null at five
+     * paws. Resolved when the run is scored, not in the sheet, because it needs
+     * the config the attempt was actually scored against.
+     *
+     * The ungated gap rather than the near miss: the board-cleared footnote
+     * says it on every clear with a paw left to earn (2026-09 handoff), not
+     * only when the gap is close.
      */
-    val nearMiss: NearMiss? = null,
+    val pawGap: PawGap? = null,
 
     /**
      * Days in a row the player has finished *any* board.

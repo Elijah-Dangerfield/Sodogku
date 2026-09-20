@@ -148,10 +148,27 @@
     <string name="game_stat_paws">Paws</string>
     <string name="game_stat_paws_spoken">%1$d paws collected</string>
 
-    <!-- Shown only when the gap is small. Points rather than seconds: score is
-         time and combo and mistakes together, so telling somebody how much
-         faster to go is a promise the scoring cannot keep. -->
-    <string name="game_near_miss">%1$d more points would have earned a %2$d paw run.</string>
+    <!-- The footnote under the stat chips on a clear, on every clear short of
+         five paws. Points rather than seconds: score is time and combo and
+         mistakes together, so telling somebody how much faster to go is a
+         promise the scoring cannot keep. Digits rather than words, because
+         words do not survive an arbitrary count. The second argument is one of
+         the paw ordinals below. -->
+    <plurals name="game_points_to_next_paw">
+        <item quantity="one">%1$d more point would have earned a %2$s paw.</item>
+        <item quantity="other">%1$d more points would have earned a %2$s paw.</item>
+    </plurals>
+    <string name="paw_ordinal_second">second</string>
+    <string name="paw_ordinal_third">third</string>
+    <string name="paw_ordinal_fourth">fourth</string>
+    <string name="paw_ordinal_fifth">fifth</string>
+
+    <!-- The line under the verdict on a clear. The second form folds in what
+         used to be its own "New best" line: a run that beat the level's
+         previous best says so here rather than as another row. The daily has
+         no level number and reuses daily_done. -->
+    <string name="game_cleared_level">Level %1$d cleared.</string>
+    <string name="game_cleared_level_best">Level %1$d cleared. That is your best run yet.</string>
     <string name="game_skip_level">Skip this level</string>
     <string name="game_skip_remaining">%1$d skips left today</string>
     <string name="game_skip_none_left">No skips left today</string>
@@ -686,13 +703,6 @@
          a player who cannot separate the two inks still reads the change. -->
     <string name="game_time_to_beat">To beat %1$s</string>
     <string name="game_time_over_best">Over %1$s</string>
-
-    <!-- Under the clock on the win sheet, on a clear that came in faster than
-         the level's previous best. One more fact next to the run's own time,
-         and only on the good side of the comparison: the board already said so
-         while the run was going, and a sheet that told a player how far off
-         they were would be scolding them for a level they just finished. -->
-    <string name="game_time_new_best">New best, was %1$s</string>
 
     <!-- The trophy beside the gear on the board. The count in the second one is
          badges earned since the player last looked at the grid, so the button

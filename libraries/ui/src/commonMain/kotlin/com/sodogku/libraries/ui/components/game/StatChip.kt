@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.ZeroCornerSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -27,7 +30,6 @@ import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.system.AppTheme
 import com.sodogku.system.Dimension
 import com.sodogku.system.Radii
-import com.sodogku.system.clip
 import com.sodogku.system.typography.TypographyResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -59,7 +61,22 @@ data class StatChipSpec(
     val spoken: String,
     /** An emoji beside the value, or nothing. */
     val glyph: String? = null,
+    /**
+     * Roll the value up from zero when the chip lands, with the paw burst over
+     * it, instead of drawing it at rest. [value] is still what the chip reads
+     * once the roll is done, and what a measurement or a screenshot sees.
+     */
+    val roll: StatChipRoll? = null,
 )
+
+/**
+ * The score chip's entrance on a clear: the number is *earned* rather than
+ * found, rolling up to [to] while a handful of paws fall into it from the
+ * rating above. Waits [startDelayMillis] for the chip itself to arrive, or the
+ * roll happens behind an alpha of zero and the number fades in already landed.
+ */
+@Immutable
+data class StatChipRoll(val to: Int, val startDelayMillis: Int)
 
 /**
  * The row of chips under a verdict: three across, equal widths.
@@ -107,16 +124,19 @@ fun StatChip(spec: StatChipSpec, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .semantics { contentDescription = spec.spoken }
-            // Border before the clip, as `Modifier.border`'s own doc asks, so
-            // the stroke's outer edge is not shaved at the corners.
+            // The chip is not clipped to its own shape. The rolling score's
+            // paw burst launches from above the number and would be cut off
+            // at the label bar; so the interior is a shaped background and
+            // the bar clips its own two top corners instead. The border is
+            // drawn over both, which is what hides the bar's fill under it.
             .border(Border(spec.tint, ChipBorderWidth), Radii.Chip)
-            .clip(Radii.Chip)
-            .background(AppTheme.colors.surfacePrimary.color),
+            .background(AppTheme.colors.surfacePrimary.color, Radii.Chip.shape),
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxWidth()
+                .clip(LabelBarShape)
                 .background(spec.tint.color)
                 .padding(vertical = LabelBarPadding, horizontal = ChipInset),
         ) {
@@ -139,14 +159,27 @@ fun StatChip(spec: StatChipSpec, modifier: Modifier = Modifier) {
             if (spec.glyph != null) {
                 Text(text = spec.glyph, typography = AppTheme.typography.Body.B700, maxLines = 1, softWrap = false)
             }
-            Text(
-                text = spec.value,
-                typography = StatChipValueTypography,
-                color = spec.valueInk,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
-            )
+            if (spec.roll != null) {
+                Box(contentAlignment = Alignment.Center) {
+                    ScoreCounter(
+                        score = spec.roll.to,
+                        countFrom = 0,
+                        typography = StatChipValueTypography,
+                        color = spec.valueInk,
+                        startDelayMillis = spec.roll.startDelayMillis,
+                    )
+                    ScorePawBurst(startDelayMillis = spec.roll.startDelayMillis)
+                }
+            } else {
+                Text(
+                    text = spec.value,
+                    typography = StatChipValueTypography,
+                    color = spec.valueInk,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                )
+            }
         }
     }
 }
@@ -167,6 +200,14 @@ private val ChipGap = Dimension.D500
 
 /** Off the dimension scale, which steps 2, 4. A 2dp edge read as a hairline and 4 as a frame. */
 private val ChipBorderWidth = 3.dp
+
+/** The bar's top corners are the chip's; its bottom edge is square against the interior. */
+private val LabelBarShape = RoundedCornerShape(
+    topStart = Radii.Chip.cornerSize,
+    topEnd = Radii.Chip.cornerSize,
+    bottomEnd = ZeroCornerSize,
+    bottomStart = ZeroCornerSize,
+)
 private val LabelBarPadding = Dimension.D200
 private val ValuePadding = Dimension.D500
 private val ChipInset = Dimension.D300
