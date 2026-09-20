@@ -23,7 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sodogku.libraries.ui.system.LocalContentColor
+import com.sodogku.libraries.ui.system.color.BadgeSetPalette
 import com.sodogku.libraries.ui.system.color.ColorCard
+import com.sodogku.libraries.ui.system.color.defaultBadgeSets
 import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.libraries.ui.system.color.toHexString
 import com.sodogku.system.Dimension
@@ -105,6 +107,24 @@ interface Colors {
     /** The 2dp line that fills the gap in a section header. */
     val rule: ColorResource
 
+    /**
+     * The soft stroke drawn just inside a card's edge: the achievements cards,
+     * where the design uses an inset box-shadow rather than a border. Paler
+     * than [borderStrong] and warmer than [border], because it sits on an
+     * ivory card over the cream page and has to read as the card's own edge
+     * rather than as a line drawn round it.
+     */
+    val cardInset: ColorResource
+
+    /**
+     * The disc behind an earned badge, on the grid, the spotlight and the
+     * unlock toast alike. A pale amber rather than the set's own colour: the
+     * handoff board draws every earned disc this one shade so that "earned"
+     * reads the same across nine shelves, and the set colour is left to say
+     * which shelf a locked badge is climbing.
+     */
+    val badgeEarnedDisc: ColorResource
+
     /* Texts */
     val text: ColorResource
     val textSecondary: ColorResource
@@ -184,6 +204,14 @@ interface Colors {
      * as an edge.
      */
     val pawUnearned: ColorResource
+
+    /**
+     * The colour each set of badges is drawn in. Keyed by the set rather than
+     * flattened into nine times three tokens here, because nothing asks for
+     * "the campaign disc" on its own: a card asks for its set and draws the
+     * three parts together. See [BadgeSetPalette].
+     */
+    val badgeSets: BadgeSetPalette
 }
 
 interface StatusColor {
@@ -260,6 +288,8 @@ val defaultColors = object : Colors {
     override val borderDisabled = ColorResource.Cream100
     override val borderStrong = ColorResource.Cream275
     override val rule = ColorResource.Cream225
+    override val cardInset = ColorResource.Cream75
+    override val badgeEarnedDisc = ColorResource.Amber100
     override val text = ColorResource.Brown900
     override val backgroundOverlay = ColorResource.Black_A70
     override val textSecondary = ColorResource.Brown700
@@ -270,6 +300,7 @@ val defaultColors = object : Colors {
     override val bandLoss = ColorResource.Brown600
     override val watermarkOnBrand = ColorResource.Amber950
     override val sweatDrop = ColorResource.Sky300
+    override val badgeSets = defaultBadgeSets
 
     override val status = object : StatusColor {
         override val okay = ColorResource.Green600
@@ -668,6 +699,8 @@ private fun PaletteGridSection(colors: Colors) {
         colors.borderStrong,
         colors.borderDisabled,
         colors.rule,
+        colors.cardInset,
+        colors.badgeEarnedDisc,
         colors.track,
         colors.surfaceMuted,
         colors.missFill,

@@ -289,27 +289,26 @@ data class AchievementsState(
      * have not done; these three are the ones within reach, and with every
      * counter at zero "nearest" settles on the cheapest targets, one from each
      * shelf. One per group rather than three rungs of the same ladder, so the
-     * row reads as a set of ways to play instead of as one task repeated.
+     * row reads as a set of ways to play instead of as one task repeated: each
+     * shelf offers its own [BadgeSection.nearest], and the three nearest of
+     * those are the row.
      *
      * Mystery badges are never here. Naming one would give away the half of the
-     * surprise worth keeping, and "Next up: ???" is not a goal anybody can act on.
+     * surprise worth keeping, and "Closest to done: ???" is not a goal anybody
+     * can act on.
      */
     val spotlight: Spotlight?
         get() {
             if (justEarned.isNotEmpty()) return Spotlight(SpotlightKind.JustEarned, justEarned)
 
-            val nearest = badges.asSequence()
-                .filter { !it.unlocked && !it.mystery }
+            val nearest = sections
+                .mapNotNull { it.nearest }
                 // A stable sort, so catalog order breaks every tie. That is the
                 // whole of what a fresh install needs: every counter is zero, so
                 // every candidate ties, and `AchievementSection` declares each
-                // shelf easiest first. Sorting on the target as well looked like
-                // insurance and turned out to be unreachable — a shelf whose
-                // cheapest badge is unearned always has it first anyway.
+                // shelf easiest first.
                 .sortedByDescending { it.progress }
-                .distinctBy { it.group }
                 .take(NextUpSize)
-                .toList()
 
             return if (nearest.isEmpty()) null else Spotlight(SpotlightKind.NextUp, nearest)
         }
@@ -322,7 +321,22 @@ private const val NextUpSize = 3
 data class BadgeSection(
     val group: AchievementGroup,
     val badges: List<Badge>,
-)
+) {
+    /**
+     * The rung the player is on: the locked badge on this shelf that is
+     * furthest along, or null once the shelf is finished or holds only
+     * mysteries.
+     *
+     * The grid draws this one in the set's colour and greys the rest of the
+     * shelf, and the spotlight is built from these. Progress rather than
+     * catalog position, because two ladders share a shelf: at twenty-five
+     * levels and a six-wide board cleared, the seven-wide board is the nearer
+     * ask on the campaign shelf even though the fifty-level badge is declared
+     * first. Ties fall to catalog order, which lists each ladder easiest first.
+     */
+    val nearest: Badge?
+        get() = badges.filter { !it.unlocked && !it.mystery }.maxByOrNull { it.progress }
+}
 
 sealed interface AchievementsEvent {
     data object NavigateBack : AchievementsEvent

@@ -28,6 +28,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import com.sodogku.libraries.ui.system.LocalReduceAnimations
 import com.sodogku.libraries.ui.system.color.ColorResource
 import com.sodogku.system.Radii
@@ -166,10 +169,15 @@ fun ProgressBar(
     track: ColorResource = AppTheme.colors.track,
 ) {
     val still = LocalReduceAnimations.current || LocalInspectionMode.current
+    val shown = progress.coerceIn(0f, 1f)
     ProgressRow(
-        progressPercent = progress,
+        progressPercent = shown,
         animateChanges = !still,
-        modifier = modifier.height(ProgressBarHeight),
+        // Announced as a progress bar, so a screen reader and a test both know
+        // a bar is here without either having to recognise the drawing.
+        modifier = modifier
+            .height(ProgressBarHeight)
+            .semantics { progressBarRangeInfo = ProgressBarRangeInfo(shown, 0f..1f) },
         shape = Radii.Progress.shape,
         backgroundColor = track,
         progressColor = fill,

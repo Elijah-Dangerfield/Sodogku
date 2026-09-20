@@ -626,6 +626,69 @@ class AchievementsViewModelTest : CoroutineTest() {
         assertEquals(Achievements.catalog.size - campaign.achievements.size - 1, vm.state.lockedCount)
     }
 
+    /**
+     * The other direction of the same count, so "always one" cannot pass it:
+     * a finished catalog is every shelf, and the chip reads "9/9" off these two
+     * numbers.
+     */
+    @Test
+    fun aFinishedCatalogCountsEveryShelfAsASet() = runUnitTest {
+        val vm = viewModel(
+            FakeAchievements(
+                AchievementState(unlocked = Achievements.catalog.associate { it.id to Unlock(OlderUnlock) }),
+            ),
+        )
+
+        assertEquals(Achievements.sections.size, vm.state.completedSetCount)
+        assertEquals(vm.state.sections.size, vm.state.completedSetCount, "every shelf the page draws is finished")
+    }
+
+    /**
+     * The rung the player is on, per shelf. Progress rather than catalog
+     * position: the campaign shelf carries a level ladder and a board-size
+     * ladder, and at twenty-five levels with a six-wide board cleared the
+     * seven-wide board (6/7) is nearer than the fifty-level badge (25/50), even
+     * though the catalog declares the level ladder first.
+     */
+    @Test
+    fun aShelfsNearestRungIsItsLockedBadgeFurthestAlong() = runUnitTest {
+        val vm = viewModel(
+            FakeAchievements(
+                AchievementState(
+                    counters = counters(Stat.LevelsCleared to 25L, Stat.LargestGridCleared to 6L),
+                    unlocked = Achievements.catalog
+                        .filter { it.stat == Stat.LevelsCleared && it.target <= 25 }
+                        .associate { it.id to Unlock(OlderUnlock) },
+                ),
+            ),
+        )
+
+        val campaign = vm.state.sections.first { it.group == AchievementGroup.Campaign }
+
+        assertEquals(AchievementId.GridSeven, campaign.nearest?.id)
+    }
+
+    @Test
+    fun aFinishedShelfAndAShelfOfMysteriesHaveNoNearestRung() = runUnitTest {
+        val campaign = Achievements.sections.first { it.group == AchievementGroup.Campaign }
+        val vm = viewModel(
+            FakeAchievements(
+                AchievementState(unlocked = campaign.achievements.associate { it.id to Unlock(OlderUnlock) }),
+            ),
+        )
+
+        assertNull(vm.state.sections.first { it.group == AchievementGroup.Campaign }.nearest)
+        assertNull(
+            vm.state.sections.first { it.group == AchievementGroup.Secrets }.nearest,
+            "a mystery is never the next rung: naming it gives the surprise away",
+        )
+        assertEquals(
+            AchievementId.PerfectForm,
+            vm.state.sections.first { it.group == AchievementGroup.CleanPlay }.nearest?.id,
+            "an untouched shelf's nearest rung is its cheapest badge",
+        )
+    }
+
     private fun viewModel(
         repository: AchievementsRepository = FakeAchievements(),
         cache: AppCache = InMemoryAppCache(),

@@ -28,6 +28,12 @@ kotlin {
             api(projects.libraries.resources)
             // TODO honestly the sodogku library should expose the component that require sodogku domain
             implementation(projects.libraries.sodogku)
+            // For `AchievementGroup` alone: the badge-set palette is keyed by
+            // it with an exhaustive `when`, so a tenth set fails this module's
+            // build until it has colours, the same way a badge without copy
+            // fails `AchievementCopy`. A design-system enum mirroring it would
+            // have been a second list to keep in step.
+            implementation(projects.libraries.achievements)
             api(compose.ui)
             api(compose.uiUtil)
             api(compose.runtime)
@@ -53,6 +59,11 @@ kotlin {
             // biggest board the engine will hand it, and that is an assertion
             // rather than a call.
             implementation(projects.libraries.puzzle)
+            // Repeated rather than inherited, like scoring in the achievements
+            // module: `commonMain` declares it as `implementation`, which a
+            // test compilation does not see. `BadgeSetPaletteTest` walks the
+            // groups.
+            implementation(projects.libraries.achievements)
         }
 
         // The composition-under-test tier, second module to take it after

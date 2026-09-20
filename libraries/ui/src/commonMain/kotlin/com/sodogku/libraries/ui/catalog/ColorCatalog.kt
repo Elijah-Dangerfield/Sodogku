@@ -120,6 +120,8 @@ internal fun ColorStatusBorders() {
             ColorRow("borderStrong", c.borderStrong, null, "An edge with nothing filled inside it: the ghost button.")
             ColorRow("borderDisabled", c.borderDisabled, null, "Edges of disabled controls.")
             ColorRow("rule", c.rule, null, "The 2dp line across a section header.")
+            ColorRow("cardInset", c.cardInset, null, "The soft stroke just inside an achievements card's edge.")
+            ColorRow("badgeEarnedDisc", c.badgeEarnedDisc, null, "The pale amber disc behind every earned badge.")
         }
     }
 }

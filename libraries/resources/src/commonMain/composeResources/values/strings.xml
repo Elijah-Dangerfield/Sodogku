@@ -425,11 +425,17 @@
     <string name="achievements_title">Achievements</string>
     <string name="achievements_hero_label">of %1$s earned</string>
     <string name="achievements_progress">%1$s / %2$s</string>
+    <!-- The tighter form on the "closest to done" rows, where the bar beside it carries the space. -->
+    <string name="achievements_card_fraction">%1$s/%2$s</string>
+    <!-- Earned out of the shelf's badges, at the far end of a section header. -->
+    <string name="achievements_section_count">%1$s of %2$s</string>
     <string name="achievements_earned">Earned</string>
     <string name="achievements_locked">Keep going</string>
     <string name="achievements_empty_body">Nothing earned yet. Finishing a board is what lights the first one up.</string>
     <string name="achievements_just_earned">Just earned</string>
-    <string name="achievements_next_up">Next up</string>
+    <string name="achievements_closest_to_done">Closest to done</string>
+    <!-- The whole catalog's size. Rendered in capitals on the button. -->
+    <string name="achievements_see_all">See all %1$s</string>
     <string name="achievements_stat_earned">Earned</string>
     <string name="achievements_stat_earned_spoken">%1$s badges earned</string>
     <string name="achievements_stat_to_go">To go</string>

@@ -98,6 +98,7 @@ sealed class ColorResource(val color: Color, val designSystemName: String) {
     object Orange400 : ColorResource(Color(0xFFFFA726), "orange-400")
     object Orange500 : ColorResource(Color(0xFFFF9800), "orange-500")
     object Orange600 : ColorResource(Color(0xFFFB8C00), "orange-600")
+    object Amber100 : ColorResource(Color(0xFFFFE3A8), "amber-100")
     object Amber200 : ColorResource(Color(0xFFFFD98A), "amber-200")
     object Amber500 : ColorResource(Color(0xFFFFC107), "amber-500")
     object Amber600 : ColorResource(Color(0xFFFFB300), "amber-600")
@@ -145,6 +146,9 @@ sealed class ColorResource(val color: Color, val designSystemName: String) {
     object Cream10 : ColorResource(Color(0xFFFDF8F2), "cream-10")
     object Cream20 : ColorResource(Color(0xFFFDF6EC), "cream-20")
     object Cream50 : ColorResource(Color(0xFFF5EFE7), "cream-50")
+    // 75 is the soft inset stroke on a card: a shade off the page and a shade
+    // off the warm surface, so it edges an ivory card without boxing it.
+    object Cream75 : ColorResource(Color(0xFFEFE2D3), "cream-75")
     object Cream100 : ColorResource(Color(0xFFECE2D6), "cream-100")
     object Cream200 : ColorResource(Color(0xFFE8DBCC), "cream-200")
     object Cream225 : ColorResource(Color(0xFFE4D8CA), "cream-225")
@@ -261,6 +265,7 @@ private val colors = listOf(
     ColorResource.Orange400,
     ColorResource.Orange500,
     ColorResource.Orange600,
+    ColorResource.Amber100,
     ColorResource.Amber200,
     ColorResource.Amber500,
     ColorResource.Amber600,
@@ -284,6 +289,7 @@ private val colors = listOf(
     ColorResource.Cream10,
     ColorResource.Cream20,
     ColorResource.Cream50,
+    ColorResource.Cream75,
     ColorResource.Cream100,
     ColorResource.Cream200,
     ColorResource.Cream225,

@@ -43,6 +43,8 @@ object Radii {
     val R400 = Radius(CornerSize(DimensionResource.D400.dp))
     val R600 = Radius(CornerSize(DimensionResource.D600.dp))
     val R750 = Radius(CornerSize(DimensionResource.D750.dp))
+    val R800 = Radius(CornerSize(DimensionResource.D800.dp))
+    val R850 = Radius(CornerSize(DimensionResource.D850.dp))
     val R900 = Radius(CornerSize(DimensionResource.D900.dp))
     val None = Radius(SquareCornerSize)
 
@@ -61,6 +63,15 @@ object Radii {
     val Banner get() = R400
     val Header get() = None
     val Card get() = R400
+
+    /**
+     * The two achievements cards, from the 2026-09 handoff: 20 on a badge tile
+     * in the grid, 22 on the wider "closest to done" row above it. Both are
+     * bigger than [Card] because both carry an inset stroke rather than a
+     * border, and a stroke drawn inside a 10dp corner pinches.
+     */
+    val BadgeTile get() = R800
+    val BadgeSpotlight get() = R850
 
     /**
      * A progress bar's track and its fill.
