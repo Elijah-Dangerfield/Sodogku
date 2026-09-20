@@ -235,7 +235,7 @@ fun GameScreen(
                             glyph = AchievementCopy.glyph(badge.id),
                             label = stringResource(Res.string.achievements_unlocked_toast),
                             title = stringResource(AchievementCopy.name(badge.id)),
-                            body = stringResource(AchievementCopy.description(badge.id)),
+                            body = AchievementCopy.describe(badge.id),
                         )
                     },
                     onDismiss = {},

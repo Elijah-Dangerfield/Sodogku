@@ -217,7 +217,11 @@ object Achievements {
         AchievementSection(
             AchievementGroup.CleanPlay,
             listOf(
-                Achievement(AchievementId.PerfectForm, Stat.FlawlessClears, target = 1),
+                // The first rung of every ladder used to be 1, and a clean,
+                // quick, three-paw level 1 earned five badges in one second
+                // (2026-09-20). First Steps is the badge for finishing level 1;
+                // the others start where a 4x4 formality stops counting.
+                Achievement(AchievementId.PerfectForm, Stat.FlawlessClears, target = 5),
                 Achievement(AchievementId.Spotless, Stat.FlawlessClears, target = 25),
                 Achievement(AchievementId.SqueakyClean, Stat.FlawlessClears, target = 100),
                 Achievement(AchievementId.HatTrick, Stat.BestFlawlessStreak, target = 3),
@@ -244,7 +248,7 @@ object Achievements {
         AchievementSection(
             AchievementGroup.Speed,
             listOf(
-                Achievement(AchievementId.SpeedDemon, Stat.SprintClears, target = 1),
+                Achievement(AchievementId.SpeedDemon, Stat.SprintClears, target = 10),
                 Achievement(AchievementId.QuickPaws, Stat.SprintClears, target = 25),
                 Achievement(AchievementId.BlurOfFur, Stat.SprintClears, target = 100),
                 Achievement(AchievementId.Blitz, Stat.BigBoardSprintClears, target = 1),
@@ -255,7 +259,7 @@ object Achievements {
         AchievementSection(
             AchievementGroup.Score,
             listOf(
-                Achievement(AchievementId.TreatMoney, Stat.BestScore, ScoreLadder.goodFirstBoard),
+                Achievement(AchievementId.TreatMoney, Stat.BestScore, ScoreLadder.goodSmallBoard),
                 Achievement(AchievementId.HighRoller, Stat.BestScore, ScoreLadder.solidTopBoard),
                 Achievement(AchievementId.Jackpot, Stat.BestScore, ScoreLadder.sharpTopBoard),
                 Achievement(AchievementId.ChainOfFive, Stat.BestCombo, target = 5),
@@ -268,7 +272,7 @@ object Achievements {
         AchievementSection(
             AchievementGroup.Paws,
             listOf(
-                Achievement(AchievementId.ThreePawsUp, Stat.ThreePawClears, target = 1),
+                Achievement(AchievementId.ThreePawsUp, Stat.ThreePawClears, target = 5),
                 Achievement(AchievementId.ShowDog, Stat.ThreePawClears, target = 10),
                 Achievement(AchievementId.Pedigree, Stat.ThreePawClears, target = 50),
                 Achievement(AchievementId.BlueRibbon, Stat.ThreePawClears, target = 150),
@@ -349,9 +353,13 @@ object Achievements {
  * So each rung is a fraction of [Scoring.parScore] — the same par the paws are
  * fractions of — at the same two fractions the paws use. [solidTopBoard] is a
  * two-paw run on the biggest board the game ships and [sharpTopBoard] is a
- * three-paw one; [goodFirstBoard] is a three-paw run on the smallest. That makes
- * the ladder say something ("a great run on a big board") rather than name a
+ * three-paw one; [goodSmallBoard] is a three-paw run on a 5x5. That makes the
+ * ladder say something ("a great run on a big board") rather than name a
  * number, and it moves with the coefficients on its own.
+ *
+ * The bottom rung is the 5x5 and not the 4x4 the game opens on, because a
+ * three-paw level 1 is the ordinary first clear and already earns First Steps.
+ * Priced on the 4x4 this badge landed in the same second (2026-09-20).
  *
  * Every rung is priced at **difficulty 1**, which no board of either size
  * actually ships at — the 10x10 band is tiers 3 and 4. Par climbs with
@@ -367,8 +375,11 @@ object Achievements {
  */
 internal object ScoreLadder {
 
-    /** Duplicated from `Board.MIN_SIZE`, pinned by `AchievementReachabilityTest`. */
-    const val MIN_BOARD_SIZE: Int = 4
+    /**
+     * The second board size the campaign ships, one up from `Board.MIN_SIZE`.
+     * `AchievementReachabilityTest` pins that a pack actually has one.
+     */
+    const val SMALL_BOARD_SIZE: Int = 5
 
     /**
      * The tier every rung is priced at. Not a real board's difficulty — the
@@ -376,7 +387,7 @@ internal object ScoreLadder {
      */
     private const val EASIEST_DIFFICULTY: Int = 1
 
-    val goodFirstBoard: Long = rung(MIN_BOARD_SIZE, ScoringConfig.Default.threePawFraction)
+    val goodSmallBoard: Long = rung(SMALL_BOARD_SIZE, ScoringConfig.Default.threePawFraction)
     val solidTopBoard: Long = rung(AchievementCounters.MAX_BOARD_SIZE, ScoringConfig.Default.twoPawFraction)
     val sharpTopBoard: Long = rung(AchievementCounters.MAX_BOARD_SIZE, ScoringConfig.Default.threePawFraction)
 

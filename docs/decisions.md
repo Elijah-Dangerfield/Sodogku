@@ -6,6 +6,36 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-20: level 1 earns one badge, not five
+
+A clean, quick, three-paw clear of level 1 (a 4x4 at difficulty 1, with the
+tutorial holding the player's hand) earned First Steps, Perfect Form, Speed Demon,
+Three Paws Up and Treat Money in the same second. The toast shows one at a time
+for four seconds each, so the first thing a new player saw after their first win
+was twenty seconds of badges, and the owner's word for it was "spammed".
+
+**The first rung of each ladder moved, rather than the ladders losing a rung.**
+Perfect Form is now five flawless clears, Speed Demon ten sprints, Three Paws Up
+five three-paw levels, and Treat Money is priced as a three-paw run on a 5x5
+rather than the 4x4 the game opens on. The ids, copy and shelf order are all
+unchanged, and `features.md#achievements` already promises that moving a target
+never retracts a badge somebody holds, so this is the cheap edit. Deleting the
+four would have started three shelves at 25 and left the Score shelf's bottom rung
+on the biggest boards, which is the other failure: a new player's page with
+nothing within reach.
+
+**Not done: a "+N more" collapse on the toast.** It was the other option raised.
+After the retarget, two badges landing together is rare (a first clear at 3am is
+the likely case, First Steps plus Night Owl) and the queue already shows them one
+at a time, so a collapse would be built for a case that no longer happens. If a
+backfill or a later catalog lands several at once, `UnlockToasts` has the
+`trailing` seam for exactly that pill.
+
+**Found on the way:** the three score badges' copy was typed by hand and had
+drifted from the derived targets (450, 1,600 and 2,300 against 360, 2,100 and
+2,600). The number now comes from the catalog through a format argument, which
+is the only way the copy cannot drift again when the scoring coefficients move.
+
 ## 2026-09-20: one freeze economy, on the play streak, and the daily's retires
 
 SD-28 has been open since 2026-09-09 on what a streak freeze even covers, now that

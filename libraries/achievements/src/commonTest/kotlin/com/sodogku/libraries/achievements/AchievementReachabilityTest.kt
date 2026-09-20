@@ -48,9 +48,9 @@ class AchievementReachabilityTest {
             "the catalog's idea of a full-size board has drifted from the puzzle module's",
         )
         assertEquals(
-            Board.MIN_SIZE,
-            ScoreLadder.MIN_BOARD_SIZE,
-            "the score ladder's idea of the first board has drifted from the puzzle module's",
+            Board.MIN_SIZE + 1,
+            ScoreLadder.SMALL_BOARD_SIZE,
+            "the score ladder's bottom rung is meant to be one size up from the board the game opens on",
         )
         assertTrue(
             allLevels.any { it.size >= AchievementCounters.BIG_BOARD_SIZE },
@@ -60,9 +60,8 @@ class AchievementReachabilityTest {
             allLevels.any { it.size >= AchievementCounters.MAX_BOARD_SIZE },
             "no shipped level is full size",
         )
-        assertEquals(
-            ScoreLadder.MIN_BOARD_SIZE,
-            allLevels.minOf { it.size },
+        assertTrue(
+            allLevels.any { it.size == ScoreLadder.SMALL_BOARD_SIZE },
             "the score ladder prices its first rung on a board no pack ships",
         )
     }

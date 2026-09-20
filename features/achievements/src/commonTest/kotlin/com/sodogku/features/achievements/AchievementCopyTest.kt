@@ -46,6 +46,27 @@ class AchievementCopyTest {
         assertEquals(emptySet(), names intersect bodies)
     }
 
+    /**
+     * The score rungs say a number the catalog derives, and the number in the
+     * copy is the catalog's. Three typed numbers drifted from three derived
+     * targets without failing anything (2026-09-20), which is why the copy no
+     * longer holds the number at all.
+     */
+    @Test
+    fun theScoreBadgesSayTheirOwnTarget() {
+        assertEquals(listOf("580"), AchievementCopy.descriptionArgs(AchievementId.TreatMoney))
+        assertEquals(listOf("2,100"), AchievementCopy.descriptionArgs(AchievementId.HighRoller))
+        assertEquals(listOf("2,600"), AchievementCopy.descriptionArgs(AchievementId.Jackpot))
+    }
+
+    @Test
+    fun everyOtherBadgeHasItsNumberInTheWords() {
+        val scoreBadges = setOf(AchievementId.TreatMoney, AchievementId.HighRoller, AchievementId.Jackpot)
+        val withArgs = AchievementId.entries.filter { AchievementCopy.descriptionArgs(it).isNotEmpty() }
+
+        assertEquals(scoreBadges, withArgs.toSet(), "a badge whose copy has no %1\$s slot was handed an argument")
+    }
+
     private fun <K, V> assertNoDuplicates(byKey: Map<K, V>) {
         val shared = byKey.entries
             .groupBy({ it.value }, { it.key })

@@ -41,11 +41,15 @@ fun AnchoredCard(
         val width = constraints.maxWidth
         val height = constraints.maxHeight
 
+        // No card is a legal state, not a crash. A toast that has finished
+        // leaving composes nothing while its host is still on screen, and a
+        // Layout with no children still has to measure.
+        val measurable = measurables.firstOrNull()
+            ?: return@Layout layout(width, height) {}
+
         // Loose constraints: the card is as big as it wants to be within the
         // scrim, not stretched to fill it.
-        val card = measurables.first().measure(
-            constraints.copy(minWidth = 0, minHeight = 0),
-        )
+        val card = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
 
         val top = anchoredCardTop(
             anchorTop = anchor.top,

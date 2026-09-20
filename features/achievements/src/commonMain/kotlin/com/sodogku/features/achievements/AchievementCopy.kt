@@ -1,8 +1,12 @@
 package com.sodogku.features.achievements
 
+import androidx.compose.runtime.Composable
 import com.sodogku.libraries.achievements.AchievementGroup
 import com.sodogku.libraries.achievements.AchievementId
+import com.sodogku.libraries.achievements.Achievements
+import com.sodogku.libraries.achievements.Stat
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import sodogku.libraries.resources.generated.resources.Res
 import sodogku.libraries.resources.generated.resources.achievement_all_your_own_work_body
 import sodogku.libraries.resources.generated.resources.achievement_all_your_own_work_name
@@ -429,4 +433,28 @@ object AchievementCopy {
         AchievementId.EarlyBird -> "🌅"
         AchievementId.SunriseRitual -> "🐓"
     }
+
+    /**
+     * What [description] needs filled in: the target, for the badges whose
+     * copy says a number the catalog derives.
+     *
+     * The three score rungs are fractions of par and move when the scoring
+     * coefficients do. Typed into the string they drifted, and were found on
+     * 2026-09-20 promising 450, 1,600 and 2,300 points against targets of 360,
+     * 2,100 and 2,600. Every other badge's number is a hand-picked count that
+     * the copy is the source of ("Clear 25 levels"), so those take nothing.
+     */
+    fun descriptionArgs(id: AchievementId): List<Any> =
+        if (Achievements[id].stat == Stat.BestScore) listOf(groupThousands(Achievements[id].target)) else emptyList()
+
+    /** [description] resolved, with its number filled in. */
+    @Composable
+    fun describe(id: AchievementId): String =
+        stringResource(description(id), *descriptionArgs(id).toTypedArray())
+
+    /** `2100` as `2,100`. English copy, so the English separator. */
+    private fun groupThousands(value: Long): String =
+        value.toString().reversed().chunked(THOUSANDS).joinToString(",").reversed()
+
+    private const val THOUSANDS = 3
 }

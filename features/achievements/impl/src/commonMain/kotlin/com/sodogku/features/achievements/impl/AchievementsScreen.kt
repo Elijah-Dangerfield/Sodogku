@@ -588,7 +588,7 @@ private fun Badge.displayName(): String = if (mystery) {
 private fun Badge.displayDescription(): String = if (mystery) {
     stringResource(Res.string.achievements_hidden_body)
 } else {
-    stringResource(AchievementCopy.description(id))
+    AchievementCopy.describe(id)
 }
 
 @Composable
