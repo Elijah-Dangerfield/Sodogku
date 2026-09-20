@@ -514,16 +514,23 @@ Found by the SD-6 review of `libraries/progress`, 2026-09-16.
 someone finished at 12:02 they should still get it for the previous day. IFF they
 didn't already have one for that day. But not the next day."*
 
-A player who finishes at 00:02 has almost certainly been playing since before
-midnight, and charging them a broken run for two minutes is the app being right
-and unhelpful at the same time.
+Clarified by the owner the same day: *"buffer just means we give the user a
+little room in case they missed the midnight cut off. So we will give them a
+little room to not mess up their streak."*
+
+**So the purpose leads, and it settles the edges.** The point is that a run does
+not break over a couple of minutes. A player who finishes at 00:02 has almost
+certainly been playing since before midnight, and charging them a broken run for
+that is the app being right and unhelpful at the same time. Where the rule below
+is ambiguous, pick the reading that keeps the run alive.
 
 **Done when:** a board finished within 15 minutes after local midnight marks
-**yesterday** rather than today, but only if yesterday is not already marked; and
-a board finished at 00:16 or later marks today as it does now.
+**yesterday** rather than today, but only if yesterday is not already marked; a
+board finished at 00:16 or later marks today as it does now; and a player in the
+window still gets the page for the day they just saved rather than losing the
+next one (see the bookkeeping trap below, which is the part that will bite).
 
-**The rule, spelled out**, because "buffer" can mean three things and only one of
-them is what was asked for:
+**The rule, spelled out**, because there is more than one way to read "buffer":
 
 - Finish at 00:02, yesterday **not** already in `play_day` → write **yesterday**.
   Not today as well. One row, dated yesterday. The player has therefore not
@@ -554,6 +561,27 @@ of this kind is in `libraries/config/.../values/`, and a grace window is exactly
 the sort of number that gets argued about after launch. Note SD-131 first: no
 shipped build can read config today, so a key is forward-looking rather than
 immediately useful.
+
+**The trap, and it is not the write path.** The grace window credits the board to
+yesterday, but `pendingPrompt()` and `onPromptShown()` both work off `today()`, so
+the *ceremony* bookkeeping would still spend the new day. Traced against the
+current code, a player in the window gets `Celebrate(N)` for the run through
+yesterday, `celebratedOn` is set to today, and then the board they play properly
+this afternoon takes the run to N+1 and says **nothing**, because the day-scoped
+guard thinks it has already spoken. The grace window would hand them yesterday's
+page and take today's away, which is the opposite of "room to not mess up their
+streak".
+
+The fix is that the whole session belongs to yesterday, not just the `play_day`
+row: when the window applies, the prompt is decided for and spends **yesterday**
+too. `promptFor` already takes `today` as its first argument and
+`StreakRepositoryImpl` already remembers `promptedFor` for the midnight-crossing
+fix, so both seams exist. Whatever date the window picks should be computed once
+and handed to the write, the prompt, and `onPromptShown` alike, rather than each
+of the three asking the clock again.
+
+Worth a test per leg: the row lands on yesterday, the page is for yesterday, and
+the afternoon board still earns its own page.
 
 **This largely dissolves SD-137 for the case that actually happens.** SD-137 is
 that a board finished after midnight counts for the day it finished in the streak
