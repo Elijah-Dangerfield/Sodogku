@@ -90,11 +90,17 @@ config, per `LegalConfigValues.kt`.
 **App Store Connect rejects the upload (ITMS-90717).**
 
 ```
-$ sips -g all "apps/ios/iosApp/Assets.xcassets/AppIcon.appiconset/Sodogku Icon-selection (7).png"
+$ sips -g all "apps/ios/iosApp/Assets.xcassets/AppIcon.appiconset/Sodogku Icon-selection (8).png"
   pixelWidth: 1024
   pixelHeight: 1024
   hasAlpha: yes
 ```
+
+Re-checked 2026-09-19 against the file actually in the asset catalogue, which is
+export **(8)**, not the **(7)** this said before. Same verdict. The Play listing
+icon, `apps/compose/src/androidMain/ic_launcher-playstore.png`, is 512x512 and
+also reports `hasAlpha: yes`; Play wants a 32-bit PNG with no transparency, so
+flatten both in one pass.
 
 Apple requires a flattened, opaque, full-bleed 1024x1024 with square corners.
 The current file has an alpha channel and pre-rounded corners. Apple draws the
@@ -221,12 +227,18 @@ Two related gaps:
 - **No `app-ads.txt`.** `pages/` does not have one. AdMob wants it on the
   developer website named in the listing to authorise sellers. Missing it
   depresses fill rate.
-- **iOS serves no ads at all.** The Google Mobile Ads SDK is not in the Xcode
-  project: `project.pbxproj:398` has exactly one package reference,
-  `sentry-cocoa`. Every ad path is behind `#if canImport(GoogleMobileAds)`
-  (`Platform/AdNetwork.swift:42-47`), so on iOS the shared Kotlin grants every
-  reward for free. Adding the SPM dependency is an agent's job, not yours, but
-  it is a hard revenue blocker and belongs in the same conversation.
+- **The iOS ads SDK is in the project now**, so the rest of this bullet is what
+  is left rather than the whole of it. `project.pbxproj:426-429` references the
+  `GoogleMobileAds` product from `swift-package-manager-google-mobile-ads`, and
+  it resolves and links in a device build. The `#if canImport(GoogleMobileAds)`
+  guards in `Platform/AdNetwork.swift` are therefore live rather than compiled
+  out, and iOS no longer grants every reward for free. What is still a revenue
+  blocker is the four real ad unit ids below.
+
+  One thing to watch: the project references only the `GoogleMobileAds` product,
+  and consent is guarded by `#if canImport(UserMessagingPlatform)` on the
+  assumption that the ads product carries it. If that stops being true for a
+  pinned version, consent is skipped with no build error.
 
 ---
 

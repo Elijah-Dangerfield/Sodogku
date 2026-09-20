@@ -9,8 +9,11 @@ First derived 2026-09-08. **Re-derived 2026-09-10** against the tree at that dat
 citation below was re-opened rather than carried over. **Re-derive it whenever a network call, an
 SDK, or a telemetry attribute changes.**
 
-**Do not fill a store form straight out of this file.** The forms have been filed once already, so
-every future use of this document is a use against a tree it was not written for. Treat the code
+**Do not fill a store form straight out of this file.** This document was derived once, against the
+tree as it stood, so every future use of it is a use against a tree it was not written for. (This
+sentence used to read "the forms have been filed once already", which was about the derivation and
+was widely misread as meaning the store questionnaires had been submitted. As of 2026-09-19 no
+store form has been filed, and `docs/OWNER-TODO.md` says neither store app record exists.) Treat the code
 citations as a map of where to look and re-open them; treat §6 and §7, which are policy reasoning
 rather than code facts, as the part that keeps its value between derivations. §8 is the section
 that goes stale first, because it lists code defects and code defects get fixed.

@@ -1,6 +1,6 @@
 # Release automation
 
-This template ships to the App Store and Play Store with no human clicks after one-time setup. This doc has two short sections for the two things most people ask, then reference material for when something breaks.
+Sodogku ships to the App Store and Play Store with no human clicks after one-time setup. This doc has two short sections for the two things most people ask, then reference material for when something breaks.
 
 ---
 
@@ -12,7 +12,7 @@ This template ships to the App Store and Play Store with no human clicks after o
 2. **Merge that PR.** release-please creates the `vX.Y.Z` tag + GitHub Release.
 3. release-please.yml then dispatches [release.yml](../.github/workflows/release.yml) for that tag (it can't rely on the tag-push trigger — GitHub's default `GITHUB_TOKEN` deliberately doesn't cascade workflow triggers). release.yml:
    - Android → Play Console production track, 10% staged rollout
-   - iOS → TestFlight external group "main" → submitted to App Store review with Apple's built-in phased release
+   - iOS → TestFlight external group "External Testers" → submitted to App Store review with Apple's built-in phased release
 4. Apple review (1–3 days) and Play review (few hours) approve. Builds roll out automatically.
 
 ### What if the release PR doesn't exist?
@@ -114,9 +114,16 @@ Sentry triage is not a workflow — it runs as a Claude Code routine on the main
 
 Set under **Settings → Secrets and variables → Actions**. Secrets are encrypted, variables (`vars.*`) are plaintext.
 
-### Already set
+### Believed set, unverified
 
 - `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64`
+
+**This heading said "Already set" until 2026-09-19 and it contradicts
+`docs/OWNER-TODO.md`, which says every secret is still unset.** Neither can be
+checked from the repo. Look in Settings → Secrets and variables → Actions before
+trusting either document. One weak corroboration for the Apple team id at least:
+`DEVELOPMENT_TEAM = MSMDV43SUS` is committed in the Xcode project and a device
+build signs with it.
 
 ### Needed for iOS releases (cert reuse)
 
@@ -172,11 +179,11 @@ All three empty = Sentry release creation is skipped; the pipeline otherwise run
 
 ### Play service account — one-time setup
 
-1. Google Cloud Console → new project "This template CI".
+1. Google Cloud Console → new project, e.g. "Sodogku CI". (This said "This template CI" until 2026-09-19, a leftover from the template this repo was generated from.)
 2. APIs & Services → Library → **Google Play Android Developer API** → Enable.
 3. IAM & Admin → Service Accounts → Create → name `sodogku-ci`, role none.
 4. Click the service account → Keys → Add Key → JSON → save the downloaded file.
-5. Play Console → Users and permissions → Invite new user → paste the service-account email → grant **Release manager** on the This template app.
+5. Play Console → Users and permissions → Invite new user → paste the service-account email → grant **Release manager** on the Sodogku app.
 6. GitHub secrets: paste the **full JSON** (not base64) into `PLAY_SERVICE_ACCOUNT_JSON`.
 
 ### One-time App Store Connect setup
@@ -189,7 +196,7 @@ The pipeline ships only the binary + release notes (`skip_metadata: true`, `skip
 - [ ] Description, keywords, support URL
 - [ ] Age rating + App Privacy declaration
 - [ ] Review info (contact, demo account if relevant)
-- [ ] External TestFlight group named **main** with invited testers — the pipeline uploads to this group by name
+- [ ] External TestFlight group named **External Testers** with invited testers, and the name has to match exactly, because the pipeline uploads to it by name. This document said **main** until 2026-09-19 and was wrong: `release.yml` sets `TESTFLIGHT_EXTERNAL_GROUP: External Testers` and the Fastfile defaults to the same. A group called `main` will not be found.
 
 ### One-time Play Console setup
 

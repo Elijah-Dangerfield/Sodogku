@@ -1,8 +1,10 @@
 # App icon and store artwork: what ships today, what has to be replaced
 
-Audited 2026-09-08 against the tree at that date. Nothing here was changed; the icon redraw is on
-the user's list (`docs/OWNER-TODO.md`) and two of the files below are template placeholders that will fail
-review.
+Audited 2026-09-08 against the tree at that date, and **re-audited 2026-09-19**. The icon redraw
+has since happened: both store icons are real dog art now, not template placeholders. What still
+fails review is that both carry an alpha channel. Every claim below that said "template
+placeholder" has been corrected in place and marked with the re-audit date, so the rest of this
+document can still be read as the spec sheet it is.
 
 ---
 
@@ -14,13 +16,14 @@ review.
 | Android adaptive background layer | Real. Flat brand cream `#FAF5EB`. | No |
 | Android themed (monochrome) icon | **Absent.** No `<monochrome>` element, so Android 13+ themed icons fall back to the standard icon. | No, cosmetic |
 | Android notification icon | Not present, and not needed: the app posts no notifications. | No |
-| Play Store listing icon, 512x512 | **Template placeholder**, reads "YOUR APPS IMAGE HERE". | **Yes** |
+| Play Store listing icon, 512x512 | **Real art** since `df270fc`. But `hasAlpha: yes`, and Play wants no transparency. | **Yes**, for the alpha |
 | Play feature graphic, 1024x500 | Does not exist. | **Yes**, Play requires one |
-| iOS app icon set | **Template placeholder**, same grey "YOUR APPS IMAGE HERE" square. | **Yes**, App Store review rejects placeholder icons |
+| iOS app icon set | **Real art**, `Sodogku Icon-selection (8).png`. But 1024x1024 `hasAlpha: yes`. | **Yes**, Apple auto-rejects with ITMS-90717 |
 | `art/source/stills/dog-appmark.png` | Has a sudoku grid with the numerals 3, 7, 1, 9. Sodogku has no numbers. | Source art, not shipped |
 
-Two of these are hard blockers on submission and neither is a code problem: they are files waiting
-for artwork.
+Two of these are hard blockers on submission and neither is a code problem. As of the 2026-09-19
+re-audit they are no longer *missing* artwork, they are artwork with the wrong alpha: flatten both
+onto an opaque background. The feature graphic is still genuinely absent.
 
 ---
 
@@ -110,15 +113,17 @@ Neither is used, neither is harmful, and both should go when someone is next in 
 - `Contents.json`, declaring three universal 1024x1024 entries: the default appearance, a `dark`
   luminosity variant, and a `tinted` variant. This is the modern single-size iOS 18 layout, which is
   correct.
-- `icon_template.png`, 1024x1024, **the template placeholder**: a grey circle on white reading
-  "YOUR APPS IMAGE HERE".
+- `Sodogku Icon-selection (8).png`, 1024x1024, real dog art. **Re-audited 2026-09-19**: this was
+  `icon_template.png`, the grey "YOUR APPS IMAGE HERE" placeholder, when this document was first
+  written. `sips` reports `hasAlpha: yes`, which is the live problem.
 
 The `dark` and `tinted` entries have **no `filename` key**, so they are declared and empty. Xcode
 falls back to the default appearance for both, which is legal. Filling them is optional polish and
 worth doing for a game with a cream icon, because the default will look washed out in dark mode.
 
-**This is a hard blocker.** App Store review rejects builds shipping placeholder art, and this one
-literally says "your app's image here".
+**This is still a hard blocker, for a different reason than it was.** The art is real; the alpha
+channel is not allowed. App Store Connect rejects a transparent icon automatically at upload with
+ITMS-90717, before a human reviews anything.
 
 ---
 
@@ -126,9 +131,9 @@ literally says "your app's image here".
 
 | Asset | Required by | Spec | State |
 |---|---|---|---|
-| Play app icon | Play, mandatory | 512x512, 32-bit PNG, no alpha channel used for transparency, no rounded corners baked in (Play masks) | `apps/compose/src/androidMain/ic_launcher-playstore.png` exists at the right size and is **the template placeholder**, dated to the generation commit `02ec89c` |
+| Play app icon | Play, mandatory | 512x512, 32-bit PNG, no alpha channel used for transparency, no rounded corners baked in (Play masks) | `apps/compose/src/androidMain/ic_launcher-playstore.png` is real art at the right size. **Re-audited 2026-09-19**: `hasAlpha: yes`, so it needs flattening |
 | Play feature graphic | Play, mandatory | 1024x500 PNG or JPEG, no transparency, no text near the edges (Play crops it in some placements) | Does not exist |
-| App Store icon | App Store, mandatory | 1024x1024, no alpha, no rounded corners | The `icon_template.png` above |
+| App Store icon | App Store, mandatory | 1024x1024, no alpha, no rounded corners | `Sodogku Icon-selection (8).png` above. Real art, needs flattening |
 | Play promo video, App Store preview | Optional | | Neither exists |
 
 ---
@@ -138,11 +143,14 @@ literally says "your app's image here".
 Assume the deliverable is a single square master with no numerals, plus a transparent foreground
 layer. Then, in order:
 
+**Re-audited 2026-09-19: steps 1 and 2 have been done once already**, so read them as "re-export
+the master flattened" rather than "supply art". The art is right; the alpha is not.
+
 **One master file, 1024x1024, no alpha, no baked rounded corners:**
 
-1. `apps/ios/iosApp/Assets.xcassets/AppIcon.appiconset/icon_template.png` — replace in place, or
-   rename and update the `filename` in `Contents.json`. Optionally add `dark` and `tinted` variants
-   and give those entries filenames too.
+1. `apps/ios/iosApp/Assets.xcassets/AppIcon.appiconset/Sodogku Icon-selection (8).png`. Replace in
+   place, keeping the `filename` in `Contents.json` pointing at whatever you name it. Optionally add
+   `dark` and `tinted` variants and give those entries filenames too.
 2. `apps/compose/src/androidMain/ic_launcher-playstore.png` — downscale the same master to 512x512.
    This is the Play listing icon and is not compiled into the APK.
 

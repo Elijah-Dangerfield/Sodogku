@@ -34,17 +34,21 @@ data class StreakDay(
 /**
  * Everything the streak page renders, resolved for one local date.
  *
- * Like `DailyStatus`, every field comes from the same snapshot of the clock, so
- * a page built from one summary cannot show today's run against yesterday's
- * calendar.
+ * Like `DailyStatus`, every field is meant to come from the same snapshot of the
+ * clock, so a page built from one summary cannot show today's run against
+ * yesterday's calendar. [untilTomorrow] is the one exception and it is a known
+ * defect rather than a design: `StreakRepositoryImpl.summaryOn` reads the clock a
+ * second time for it, so a refresh in the moment after midnight can pair
+ * tomorrow's date with a full day's countdown. It self-heals on the next
+ * emission. See SD-140.
  *
  * Nothing in here is stored. [current] and [longest] are both folded out of the
- * `daily_result` rows on every read, for the reason `DailyRepository` gives at
+ * `play_day` rows on every read, for the reason `DailyRepository` gives at
  * length: a counter on disk is one dropped write away from a number nobody can
  * reconstruct and the player cannot dispute.
  */
 data class StreakSummary(
-    /** Consecutive days completed, as `DailyStatus.streak` reports it. */
+    /** Consecutive days on which the player finished a board, ending at [today]. */
     val current: Int,
 
     /**

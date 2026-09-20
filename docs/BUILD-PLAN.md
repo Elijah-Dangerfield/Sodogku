@@ -1284,15 +1284,15 @@ and `PLAYER_REPORT_LIMIT` for endpoints deleted in C0, and both the Android mani
 
 | Item | Waiting on |
 |---|---|
-| iOS app icon and the Play 512x512 listing icon | Artwork. Both are still the template's "YOUR APPS IMAGE HERE" placeholder and both are hard submission blockers. `docs/store/icons.md` §5 lists every file. |
+| iOS app icon and the Play 512x512 listing icon | A flattened re-export. **Corrected 2026-09-19:** both are real dog art now, not the template placeholder. Both still carry an alpha channel, which Apple auto-rejects (ITMS-90717), so both are still blockers. `docs/store/icons.md` §5. |
 | Play feature graphic, 1024x500 | Artwork. Does not exist. |
 | iOS screenshots (6.9", and 13" if iPad is supported) | An iOS simulator. `xcode-select` still points somewhere that is not Xcode, so iOS has never run. Android renders must not be submitted as iPhone frames. |
 | Onboarding / tutorial screenshot | Ten minutes with a fresh install. Skipped here because `drive.py launch --fresh` wipes app data and another agent was mid-session on the same emulator. |
-| `PrivacyInfo.xcprivacy` | The final iOS SDK set, which is blocked on adding the Google Mobile Ads Swift package. |
+| `PrivacyInfo.xcprivacy` | Nothing. **Corrected 2026-09-19:** the Google Mobile Ads Swift package is in the Xcode project (`project.pbxproj:426-429`) and resolves in a device build, so the SDK set is final and this is now just unwritten. |
 | Filing either form | The `features.md#audience-and-consent` decision, plus a deletion-request answer (finding 4). |
 | Play target-audience questionnaire | The `features.md#audience-and-consent` decision. |
 | IAP product configuration, TestFlight, internal track | Play Console, App Store Connect and AdMob accounts. `docs/OWNER-TODO.md` lists what to create and where each value lands. |
-| Privacy policy and terms text | Nobody has written `pages/privacy.html` or `pages/terms.html`. `data-safety.md` is the input for both; the AdMob disclosure and the session-log attachment on feedback are the two paragraphs that cannot be boilerplate. |
+| Privacy policy and terms text | The owner reading them. **Corrected 2026-09-19:** both were written on 2026-09-10 and are live on GitHub Pages, linked from `LegalConfigValues.kt`. What is outstanding is that a person has to read both end to end and accept them as their own. |
 
 **Not verified.** The screenshot crop offsets are tuned to the current layout on a 1080x2424
 emulator; a layout change moves them. No iOS surface in this chunk was verified on a device,

@@ -252,9 +252,48 @@ Default it to a noop, never `error("not provided")`. This keeps `@Preview` and u
 
 - Code like a staff engineer
 - Use `Catching { }` from libraries/core instead of `runCatching`
-- No comments in code
 - Custom UI components in libraries/ui—avoid Material directly
 - Check `ComposeApp.h` for Swift names of Kotlin types before using in Swift
+
+### A comment has to earn its upkeep
+
+**Don't write a comment that restates the code.** It adds nothing on the day it
+is written and it lies the day the code changes. The bar is: would a competent
+reader be surprised, or waste time, without it? A comment that records *why* a
+non-obvious choice was made clears that bar and is usually the most valuable line
+in the diff. A comment naming a file, a line number, a constant's value, a test
+name, a count ("fifteen call sites"), or a state of the world ("nobody has
+written X yet") does not, unless the reader genuinely cannot proceed without it,
+because every one of those is a hostage to the next change.
+
+**When you change something, update what describes it, in the same commit.** Not
+just the KDoc on the function you touched: grep for the symbol, the file name and
+the claim you have just made false. This repo has been bitten repeatedly, and
+every time it cost somebody an hour of believing a document over the code:
+
+- `docs/store/icons.md`, `docs/BUILD-PLAN.md` and `docs/OWNER-TODO.md` all
+  described both app icons as the template's "YOUR APPS IMAGE HERE" placeholder
+  for eleven days after they were replaced with real art. Two of them also named
+  the wrong export of the file.
+- `docs/OWNER-TODO.md` said "iOS serves no ads at all, the Google Mobile Ads SDK
+  is not in the Xcode project" after the SPM package was added.
+- `docs/BUILD-PLAN.md` said nobody had written the privacy policy or terms, nine
+  days after both were written and published.
+- `StreakSummary`'s KDoc said the run was folded from `daily_result` and cited
+  `DailyStatus.streak` long after the streak stopped being the daily's.
+- `docs/release-automation.md` named the TestFlight group `main` while the
+  workflow uploads to `External Testers`, which would have failed the first real
+  release, and still carried "This template CI" from the repo this was generated
+  from.
+
+**If a claim is worth writing and will go stale, date it or make it checkable.**
+"Audited 2026-09-08" is honest and ages visibly. Better still, put the claim in a
+test: `FallbackConfigCompletenessTest`, `ConfigValuesAreReadTest` and
+`DocReferencesResolveTest` all exist because an assertion that fails beats a
+sentence that rots.
+
+**Deleting a stale comment is a fix, not tidying.** Prefer correcting it, but a
+wrong comment is worse than none.
 
 ## Porting things back to the template
 

@@ -440,16 +440,38 @@ which means the Celebrate floor stays at 2 and the "a run of one is somebody who
 came back" rule never applies to them at all.
 
 **Done when:** either the intention can be spent by a daily, or the two rules
-that read `intentionShown` use something a daily-only player can reach.
+that read `intentionShown` use something a daily-only player can reach. **And a
+player who has finished the whole campaign is a first-class player from then on**,
+not a degraded one.
 
-**Two consequences, both reachable:**
+**Owner, 2026-09-20:** *"we should have some mechanism to still support the daily
+board player because I assume people could finish all games and then want to just
+play daily only."* That is the case that makes this more than an edge. The
+campaign is 1,000 levels and the daily pool covers two years, so the intended
+long-term player is a daily-only player. Right now the streak rules treat them as
+somebody who has not started yet, forever.
+
+**Three consequences, all reachable:**
 
 - A daily-only player who plays every other day sees no page, ever.
+- **A player who clears all 1,000 campaign levels and then plays only dailies**
+  has `intentionShown` true, so they are fine. But a player who *never* touches
+  the campaign, or stops early and switches to dailies, is stuck at the floor of
+  2 forever. So the rule accidentally rewards finishing the campaign rather than
+  turning up, which is the opposite of what the streak is for.
 - A daily-only player whose 12-day run broke yesterday clears their first two
   campaign boards today. `promptFor` returns `Intention`, that spends the day,
   tomorrow the run is 2, and `Lost(12)` is never shown. This is pinned today by
   `theIntentionOutranksALostRunToo`, so changing it means changing that test
   deliberately.
+
+**The likely shape**, not a decision: `boardsCleared` is the wrong input. The
+intention is asking "has this player played enough to be asked for a habit", and
+`play_day` already answers that without caring which puzzle, which is the same
+argument that moved the streak off `daily_result` in the first place. Counting
+finished boards of any kind, or even rows in `play_day`, would make every rule
+reachable by everybody. Check what else reads `boardsCleared` before changing its
+meaning.
 
 **Hints:** `StreakPrompts.kt:126-133` and `intentionIsDue`. Two comments in
 `StreakPromptsTest` (around lines 141 and 237) assert these collisions are
@@ -485,3 +507,63 @@ verified; whether the outcome is wrong is a judgement call.
   it". Both predate the `play_day` split.
 
 Found by the SD-6 review of `libraries/progress`, 2026-09-16.
+
+## SD-141 [P2] — Give the streak a 15-minute grace window after midnight
+
+**Ask:** The owner, 2026-09-20: *"I want streaks to have a 15 min buffer. So if
+someone finished at 12:02 they should still get it for the previous day. IFF they
+didn't already have one for that day. But not the next day."*
+
+A player who finishes at 00:02 has almost certainly been playing since before
+midnight, and charging them a broken run for two minutes is the app being right
+and unhelpful at the same time.
+
+**Done when:** a board finished within 15 minutes after local midnight marks
+**yesterday** rather than today, but only if yesterday is not already marked; and
+a board finished at 00:16 or later marks today as it does now.
+
+**The rule, spelled out**, because "buffer" can mean three things and only one of
+them is what was asked for:
+
+- Finish at 00:02, yesterday **not** already in `play_day` → write **yesterday**.
+  Not today as well. One row, dated yesterday. The player has therefore not
+  played "today" yet and needs another board to extend the run, which is
+  deliberate and matches what the daily already does.
+- Finish at 00:02, yesterday **already** in `play_day` → write **today**, the
+  current behaviour. Nothing is gained by back-dating a day they already hold,
+  and writing yesterday twice is a no-op that would silently lose the day.
+- Finish at 00:16 → write **today**. No window.
+
+**Hints:** `StreakRepositoryImpl.onBoardCompleted()` is the whole write path and
+is currently one line, `dao.insertIfAbsent(PlayDayEntity(date = today().toString()))`.
+It will now have to read the existing rows to answer the "unless they already
+have it" clause, so it needs `dao.all()` first. Keep the date arithmetic in
+`PlayStreak.kt` as a pure function over `(now, zone, played)` so the window is one
+assertion rather than a scenario; that is the pattern every other date rule here
+follows and the reason they are testable at all.
+
+Assertions worth having, most of which are cheap once the decision is a pure
+function: 00:00:00 exactly, 00:14:59, 00:15:00 (decide which side the boundary
+falls on and pin it), 00:02 with yesterday already held, 00:02 on a day where
+yesterday is held *and* today is held, and the same times across a DST
+spring-forward boundary, where `atStartOfDayIn` is the only safe way to ask when
+midnight was and in a few zones midnight does not exist at all.
+
+**Make the 15 a named constant, and consider a config key.** Every other tunable
+of this kind is in `libraries/config/.../values/`, and a grace window is exactly
+the sort of number that gets argued about after launch. Note SD-131 first: no
+shipped build can read config today, so a key is forward-looking rather than
+immediately useful.
+
+**This largely dissolves SD-137 for the case that actually happens.** SD-137 is
+that a board finished after midnight counts for the day it finished in the streak
+and the day it *started* in the daily, so the two tables disagree about the same
+session. Inside the window the two now agree. They still disagree for a long
+session that crosses midnight by more than 15 minutes, so SD-137 does not close,
+but the common case stops being wrong. Read SD-137 before starting this and
+decide whether to do both at once.
+
+**What this does not fix, deliberately:** a day genuinely skipped. A player who
+flies east across the dateline can lose a local calendar day they never had a
+chance to play. That is a freeze's job (SD-28 in `docs/backlog.md`), not a grace
+window's.
