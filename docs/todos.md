@@ -630,3 +630,43 @@ off the daily. Whatever the fix, the resource wants renaming with it.
 
 Found while planning the streak freeze, 2026-09-20. Verified by reading both call
 sites; not yet seen on a device.
+
+## SD-143 [P2] — Build phase 1 of the streak freeze
+
+**Ask:** The owner decided on 2026-09-20: one freeze economy, on the play streak,
+and the daily's freeze and restore retire. The plan is written; nothing is built.
+This item is the build.
+
+**Done when:** `docs/design/streak-freeze.md` phase 1 is shipped end to end: a
+player who misses a day and holds a credit keeps their run and sees the bridged
+day on the calendar; the daily card no longer offers a freeze or a restore; and
+SD-28 and SD-138 are closed in the same commit.
+
+**Read first:** `docs/design/streak-freeze.md` (the plan, with the file list and
+the five config keys) and the 2026-09-20 entry in `docs/decisions.md` (the call).
+
+**Still open, with the recommended answer for each.** Take these unless the
+owner says otherwise:
+
+- Numbers: starting balance 3, holding cap 5, auto-cover 2 consecutive days,
+  retroactive reach 3 days. SD-131 means these defaults *are* the product until
+  config can reach a build, so pick them as if they cannot change.
+- The rollout flag has to ship `true` or the feature has to not ship, for the
+  same reason: a `false` no console can flip is a dark feature forever.
+- The daily card stops printing its own streak number (SD-142 closes with this).
+- No cash purchase in this phase. Phase 3 at the earliest.
+
+**Sequencing:** land SD-141 (the 15-minute grace window) first. It changes what
+counts as a missed day, which is the input to every freeze rule, and a credit
+spent on a day the grace would have saved is burned for nothing.
+
+**A conflict to resolve before starting**, found 2026-09-20 in the visual design
+handoff (`~/Documents/design_handoff_streak_rewards/README.md`): that document
+proposes a *weekly streak present* on day seven as the main source of help, with
+freezes in its randomised pool, and removes rewards from the level ladder. The
+design doc and the owner's SD-28 answer put the freeze source on the campaign
+first-clear reward. Those are two different sources and two different cadences.
+The owner has to say which, or both; do not pick silently.
+
+`DailyOutcome.Frozen` and `Restored` stay parseable forever regardless. It is the
+offers that retire, not the vocabulary.
