@@ -128,9 +128,15 @@ The bundle ID is **`com.sodogku.Sodogku`**, not `com.sodogku`
 Android uses `com.sodogku` (`versions.properties:1`). The two stores get
 different identifiers. Anything that says otherwise is stale.
 
-**App Store Connect:**
+**App Store Connect: done on 2026-09-21.** App record `6814528705` ("Sodogku",
+SKU `sodogku`, team Nightjar Labs LLC). The non-consumable `sodogku_pro` is
+created (Apple ID `6814529334`, $4.99 base, 175 regions, English localisation);
+it still needs a review screenshot, and it ships with the first app version. All
+three Game Center boards exist with the exact ids and an English localisation:
+Lifetime Score and Longest Streak (Classic) and Weekly Score (Recurring, 7-day
+duration and interval, first occurrence Monday 2026-09-28 00:00 EDT). None of
+them has an image yet. What follows is the reference for those records.
 
-- Create the app record for `com.sodogku.Sodogku`.
 - Two **Classic** Game Center leaderboards under Features → Game Center:
 
   | Reference name | Leaderboard ID | Format | Sort | Range |
@@ -170,7 +176,16 @@ which is the designed behaviour and produces no error anywhere.
 Package `com.sodogku`, read from `versions.properties:1` by
 `.github/workflows/release.yml:145-152`.
 
-- Create the app.
+**Done on 2026-09-21** under the Nightjar Labs account (app id
+`4973873913912329622`): the app record ("Sodogku: Dog Logic Puzzle", Game, Free),
+and the default store listing with the short and long description from
+`docs/store/listing.md`, the 512 icon, the feature graphic and four phone
+screenshots from the owner's export. Still missing on the listing: 7-inch
+tablet screenshots, which the form marks required.
+
+- **The `sodogku_pro` managed product cannot be created yet.** Play only offers
+  the in-app products page once a build carrying the billing permission has
+  been uploaded, so it waits on the first internal-testing upload.
 - **Generate the upload keystore** and keep it somewhere you will not lose it.
   Command at `docs/release-automation.md:158-161`. Losing it means never being
   able to update the listing.
