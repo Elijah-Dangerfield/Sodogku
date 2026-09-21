@@ -154,11 +154,12 @@ mechanism. Apple's own note on the result: the app will not be sold in
 and board are the author's, which is what `pages/terms.html` already says, and
 the question is about licensed content rather than about linked SDKs.
 
-The `sodogku_pro` **review screenshot is uploaded** as well, a real capture of
-the paywall rather than an export frame (`docs/store/listing.md` §4 says where
-the copy lives and how it was staged). Its Review Notes field is still empty,
-and a line naming the path to the purchase, Settings then "Get Sodogku Pro", is
-worth adding before submission.
+The `sodogku_pro` **review screenshot and review notes are both filed**: a real
+capture of the paywall rather than an export frame, and notes naming every route
+to the purchase, what Pro unlocks, where Restore lives, and that no demo account
+is needed. `docs/store/listing.md` §4 keeps a copy of both and says how the
+capture was staged. The notes describe entry points, so they go stale if one
+moves.
 
 Still yours on the Apple side: a build, and images for the three leaderboards.
 All

@@ -195,6 +195,36 @@ Frames were driven with `scripts/dev/drive.py` (`text`, `tap`, `shot`) against a
     relaunched from the home screen first, because launching it over another app leaves a
     "◀ Doublestack" return chip in the corner that no override removes. Clear the override
     afterwards.
+
+### The `sodogku_pro` review notes, as filed
+
+Kept here because the console is the only other copy, and because the paragraph about where the
+purchase lives goes stale the moment an entry point moves. Re-check it against
+`features.md#pro` before a resubmission.
+
+> Sodogku Pro is the app's only in-app purchase. It is a one-time non-consumable, not a
+> subscription, and nothing renews.
+>
+> How to reach the purchase screen shown in the attached screenshot: from the board, tap the gear
+> in the top right to open Settings, scroll to the "Sodogku Pro" section, and tap "Get Sodogku
+> Pro". The same screen also opens from the Go Pro button in the level drawer, and from the
+> level-complete and level-failed screens.
+>
+> What Pro unlocks: no ads, unlimited offline play, continues, skips and streak freezes without
+> watching an ad, boosters topped back up at the start of every attempt, and every level in the
+> campaign open from the start.
+>
+> Restoring a purchase: Settings has a "Restore purchases" row directly under "Get Sodogku Pro".
+> It is always present, whether or not the player already owns Pro, and it calls
+> `AppStore.sync()`.
+>
+> The app has no accounts and no sign-in. The entitlement belongs to the Apple Account that bought
+> it, so no demo credentials are needed to test any of the above.
+
+**If you are filling these fields with a browser agent:** App Store Connect's text fields are
+React-controlled. Setting `value` on the element makes the page look right and even enables Save,
+but the next render throws the text away and Save silently does nothing. Type real keystrokes.
+Uploads are the opposite: a file input persists as soon as it is set, with no Save at all.
 - **No feature graphic** (Play, 1024x500) and no App Store preview video. Both want the icon
   artwork first.
 
