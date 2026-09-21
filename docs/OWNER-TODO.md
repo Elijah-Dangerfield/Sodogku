@@ -735,41 +735,47 @@ Stated so nobody adds them by reflex.
 
 ## 17. Watch a rewarded ad on the board, then try the controls
 
-This is the app's only P0 and it is one reproduction away from closed. It was
-SD-26 and SD-48 in `todos.md`, moved here because nothing else can move it.
+**The mechanism is confirmed and two fixes have shipped. What is left is your
+half: reproduce it once on a phone and say whether it still happens.**
 
-**What you reported:** taps did nothing. Not just navigation. Marks would not
-draw either, and it only recovered when the shake dialog reappeared. A later
-report of the same thing carried `GADFullScreenAdViewController` as its
-transaction, which means a rewarded ad had been on screen.
+`SODOGKU-R`, 2026-09-20, from a real iPhone, carried every part of the signature
+this item was written to look for: `Host lifecycle is CREATED`,
+`GADFullScreenAdViewController` in `view_names`, five navigation commands
+waiting, four seconds elapsed. The theory in the old version of this item is now
+a reading, not a guess. The Sentry issue is marked resolved, which was somebody
+clicking resolve rather than anything changing in the code.
 
-**Why the ad is the way in.** The mechanism is settled from the androidx and
-Compose Multiplatform sources. The symptom is only producible by the Compose
-host believing its view is off screen, and the only two things in this app that
-can do that are the two `present(` calls in `apps/ios/iosApp/Platform/AdNetwork.swift`,
-the rewarded ad and the consent form. The keyboard cannot do it and neither can
-any floating window, both ruled out by reading the sources rather than guessing.
+**What shipped on 2026-09-21:**
 
-**What to do**, on a device, with Sentry attached and log capture on:
+- `AdNetwork.swift` presents from the **top of the presentation chain** instead
+  of the window root, and no longer drops an ad when the scene is
+  `.foregroundInactive`. The second of those was already written down in this
+  item as "worth a look"; it cost the first rewarded ad on a fresh install,
+  silently, because the scene sits inactive for a beat after the ATT prompt.
+- `HostLifecycleWatchdog` went from a detector to a repair. When a press lands
+  on a host that has claimed to be off screen for more than two seconds, it
+  drains the navigation queue anyway through `NavigationRecovery`. A press
+  cannot reach a covered view, so the host is provably the half that is wrong.
 
-1. Get to a board and trigger a rewarded ad, through Hint or the
-   continue-after-fail path. Watch it to completion and dismiss it.
-2. Tap Levels and Start over a few times.
-3. Repeat five to ten times. It is intermittent, and one clean run refutes
-   nothing.
+**What that does and does not buy.** Navigation works again, so a tap that asked
+for a screen gets it. State collection and event delivery hang off the same
+lifecycle and are not ours to drive, so a board mid-attempt may still need the
+next navigation before it redraws. If the presentation fix is right, none of
+this ever runs.
 
-**What the log settles.** A `HostLifecycle` error saying presses reached the app
-while the host was below STARTED is conclusive: the hosting view controller
-thinks its view is off screen and the ad's `viewWillAppear` never came back. The
-fix is then on the iOS presentation side. Controls dead with **no** such error
-means the mechanism above is wrong and the answer is somewhere three separate
-investigations ruled out, and that log is worth more than anything else in this
-file.
+**What to do**, on a device, with Sentry attached:
 
-**Also worth a look while you are in there**, unrelated to the stall:
-`AdNetwork.rootViewController()` filters on `.foregroundActive`, and right after
-the ATT prompt the scene can still be `.foregroundInactive`, so the first ad on a
-fresh install can silently not show.
+1. Trigger a rewarded ad through Hint or the continue-after-fail path, watch it
+   to the end, dismiss it.
+2. Tap Levels and Start a few times.
+3. Repeat five to ten times. It was always intermittent and one clean run
+   refutes nothing.
+
+**What the logs settle.** No `HostLifecycle` error at all means the presentation
+fix held. An error followed by `Recovery drained N queued navigation(s)` means
+the lifecycle still breaks and the repair caught it, which is a worse result
+worth knowing about: it means the root cause is somewhere the presentation
+change did not reach.
 
 ## 18. Long-press the app icon on an Android build
 

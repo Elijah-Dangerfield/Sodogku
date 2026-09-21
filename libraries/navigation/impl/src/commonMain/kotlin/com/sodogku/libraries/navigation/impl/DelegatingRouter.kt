@@ -17,6 +17,7 @@ import com.sodogku.libraries.flowroutines.AppCoroutineScope
 import com.sodogku.libraries.flowroutines.observeWithLifecycle
 import com.sodogku.libraries.navigation.BlockingErrorRoute
 import com.sodogku.libraries.navigation.NavigationOptions
+import com.sodogku.libraries.navigation.NavigationRecovery
 import com.sodogku.libraries.navigation.NavigationTracker
 import com.sodogku.libraries.navigation.Route
 import com.sodogku.libraries.navigation.Router
@@ -40,12 +41,13 @@ import kotlin.time.Duration.Companion.seconds
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = Router::class)
+@ContributesBinding(AppScope::class, boundType = NavigationRecovery::class)
 @Inject
 class DelegatingRouter(
     private val appScope: AppCoroutineScope,
     private val webLinkLauncher: WebLinkLauncher,
     private val navigationTracker: NavigationTracker,
-) : Router {
+) : Router, NavigationRecovery {
 
     private val logger = KLog.withTag("DelegatingRouter")
     private val navigationRequests = Channel<NavHostController.() -> Unit>(Channel.UNLIMITED)
@@ -195,6 +197,39 @@ class DelegatingRouter(
         }
     }
 
+    /**
+     * See [NavigationRecovery.drainQueueNow]. Takes the same channel the gated
+     * drain takes from, so the two cannot both run a command: `tryReceive` hands
+     * each one to exactly one of them.
+     *
+     * On the main dispatcher because a `NavHostController` may only be touched
+     * there, and the caller is a pointer handler that has no business blocking.
+     *
+     * Failures are caught per command rather than per batch. A command that
+     * throws is one command; letting it take the other four with it would turn a
+     * recovery into a second fault.
+     */
+    override fun drainQueueNow() {
+        appScope.launch {
+            withContext(Dispatchers.Main) {
+                val controller = navController ?: run {
+                    logger.i { "Recovery drain asked for with no controller attached; nothing to do" }
+                    return@withContext
+                }
+                val applied = navigationRequests.drainInto(controller)
+                if (applied > 0) {
+                    logger.w {
+                        "Recovery drained $applied queued navigation(s) past a host lifecycle of " +
+                            "${gatingLifecycle?.currentState}. The host said the view was not on " +
+                            "screen and a touch proved otherwise."
+                    }
+                    watchdog.drained()
+                    queueHasWork.value = watchdog.isWaiting
+                }
+            }
+        }
+    }
+
     override fun openWebLink(url: String) {
         webLinkLauncher
             .open(url)
@@ -268,3 +303,30 @@ class DelegatingRouter(
  * is navigating normally.
  */
 private val StallPollInterval = 1.seconds
+
+/**
+ * Takes every command currently queued and applies it to [target], returning
+ * how many ran.
+ *
+ * Its own function so the loop can be tested without a `NavHostController`,
+ * which needs a Compose host and an Android runtime and would turn three
+ * assertions into an instrumentation test.
+ *
+ * `tryReceive` rather than `receive` so this never waits: the queue as it
+ * stands at the moment of the call is the whole job, and a command enqueued
+ * while this runs belongs to whoever drains next.
+ *
+ * One command's failure is caught and the rest still run. A recovery that
+ * stopped on the first bad command would leave the queue half drained, which is
+ * the state it was called to get out of.
+ */
+internal fun <T> Channel<T.() -> Unit>.drainInto(target: T): Int {
+    var applied = 0
+    while (true) {
+        val command = tryReceive().getOrNull() ?: break
+        Catching { command(target) }
+            .logOnFailure { "A queued navigation failed during recovery drain" }
+        applied++
+    }
+    return applied
+}

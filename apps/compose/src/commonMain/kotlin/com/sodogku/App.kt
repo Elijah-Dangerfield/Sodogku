@@ -165,7 +165,7 @@ fun App(appComponent: AppComponent) {
                 // reads the host's own lifecycle owner. A press landing here
                 // while that lifecycle is below STARTED is SD-26 happening, and
                 // nothing else in the app can notice it.
-                Box(modifier = Modifier.fillMaxSize().reportingTapsThatGoNowhere()) {
+                Box(modifier = Modifier.fillMaxSize().reportingTapsThatGoNowhere(router)) {
                     // Stage 1: null until the async AppData read resolves — the
                     // platform splash (keyed on appViewModel.isReady) covers the
                     // gap. Stage 2: the Compose boot gate holds a loading screen

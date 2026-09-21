@@ -11,6 +11,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sodogku.libraries.core.logging.KLog
+import com.sodogku.libraries.navigation.NavigationRecovery
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.internal.SynchronizedObject
 import kotlinx.coroutines.internal.synchronized
@@ -115,15 +116,30 @@ internal class HostLifecycleWatchdog(
 
 /**
  * Watches every press that passes the root for one landing on a host that
- * cannot act on it, and says so at error level so it reaches Sentry.
+ * cannot act on it, says so at error level so it reaches Sentry, **and unsticks
+ * the navigation queue**.
  *
  * Placed at the root and reading on [PointerEventPass.Initial] so it sees a
  * press before any child does, and consuming nothing, so no behaviour changes.
  * A screen that has stopped recomposing still hit-tests, which is the only
  * reason this can observe the fault at all.
+ *
+ * **It reports and then repairs, in that order.** This was a detector only
+ * until `SODOGKU-R` arrived from a real phone with the exact signature it was
+ * built to catch: host at CREATED, `GADFullScreenAdViewController` in
+ * `view_names`, five navigation commands waiting, four seconds gone. Having
+ * proved the fault twice from the field, leaving the player stuck while writing
+ * a good log line about it is not a defensible trade.
+ *
+ * The repair is narrow on purpose. It drains navigation and nothing else, so a
+ * tap that asked for a screen gets that screen. It cannot restore state
+ * collection or event delivery, which are gated on the same lifecycle and are
+ * not ours to drive, so a board mid-attempt may still need the next navigation
+ * to redraw it. Fixing the lifecycle itself is the iOS presentation work in
+ * `AdNetwork.swift`; this is what happens when that is not enough.
  */
 @Composable
-internal fun Modifier.reportingTapsThatGoNowhere(): Modifier {
+internal fun Modifier.reportingTapsThatGoNowhere(recovery: NavigationRecovery): Modifier {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val watchdog = remember { HostLifecycleWatchdog() }
     val logger = remember { KLog.withTag("HostLifecycle") }
@@ -149,8 +165,9 @@ internal fun Modifier.reportingTapsThatGoNowhere(): Modifier {
                             "below STARTED for ${blind.blindFor}. Nothing gated on that lifecycle " +
                             "is running: no screen collects its state, no view model event is " +
                             "delivered, and the navigation queue cannot drain. Host lifecycle is " +
-                            "${lifecycle.currentState}."
+                            "${lifecycle.currentState}. Draining the navigation queue anyway."
                     }
+                    recovery.drainQueueNow()
                 }
             }
         }

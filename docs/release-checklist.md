@@ -65,7 +65,10 @@ ever.
 On QA, two things are worth doing deliberately because both have failed here and
 neither shows up in a test: **watch a rewarded ad to the end and check the board
 still takes taps**, and **long-press the app icon** to check both quick actions
-launch from cold and from warm. `SD-129` in `todos.md` lists what else has moved
+launch from cold and from warm. The first of those is not hypothetical: Sentry
+caught it on a real phone on 2026-09-20 and two fixes went in on 2026-09-21, so
+this run is the check on whether they worked. `OWNER-TODO.md` item 17 says what
+the logs should and should not contain. `SD-129` in `todos.md` lists what else has moved
 since anyone last looked at the app on a device.
 
 ---

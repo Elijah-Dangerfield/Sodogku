@@ -302,12 +302,42 @@ class IOSAdNetwork: NSObject, AdNetwork {
         #endif
     }
 
+    /// The controller an ad, a consent form or a privacy form should be
+    /// presented from: the **top of the presentation chain**, not the window
+    /// root.
+    ///
+    /// Two separate faults came out of returning the root, and both are quiet,
+    /// which is why they survived as long as they did.
+    ///
+    /// **The root can already be presenting.** `prepare()` runs UMP and then
+    /// ATT, both of which put a modal up from the same window. Asking a
+    /// controller that is already presenting to present again does nothing:
+    /// UIKit logs a line to the console and returns, so the ad never appears,
+    /// the SDK's delegate never fires, and the caller waits on a dismissal that
+    /// cannot come. Walking `presentedViewController` to the top means the
+    /// request always lands on a controller that can honour it.
+    ///
+    /// **It also cost the first ad on a fresh install.** The old filter took
+    /// only a scene at `.foregroundActive`, and the scene sits at
+    /// `.foregroundInactive` for a beat after the ATT prompt closes, so the
+    /// first rewarded ad a new player asked for silently did not show. The
+    /// filter now prefers an active scene and falls back to any scene with a
+    /// key window, because a scene holding the key window is on screen whatever
+    /// its activation state says it is mid-transition.
+    ///
+    /// Related: `SODOGKU-R`, where the Compose host stayed below STARTED after
+    /// a rewarded ad and the navigation queue stopped draining. That report is
+    /// what sent us here. This does not prove it was the cause, and the
+    /// recovery in `HostLifecycleWatchdog` is the belt to this pair of braces.
     @MainActor
     private static func rootViewController() -> UIViewController? {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }?
-            .keyWindow?
-            .rootViewController
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let scene = scenes.first { $0.activationState == .foregroundActive }
+            ?? scenes.first { $0.keyWindow != nil }
+        guard var top = scene?.keyWindow?.rootViewController else { return nil }
+        while let presented = top.presentedViewController, !presented.isBeingDismissed {
+            top = presented
+        }
+        return top
     }
 }
