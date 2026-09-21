@@ -770,26 +770,3 @@ player outside the EEA never sees a row that does nothing.
 beside `prepare`, and let the Settings view-model ask the ad gate whether the
 row applies. `pages/privacy.html`'s Ads section should mention the row once it
 exists.
-
-
-## SD-150 [P1] — The iOS app has no `PrivacyInfo.xcprivacy`, and the label is now filed without one
-
-**Ask:** Apple requires a privacy manifest in the app bundle declaring collected
-data types, required-reason API usage and tracking domains. There is no
-`PrivacyInfo.xcprivacy` anywhere under `apps/ios/`. The App Privacy label was
-filed and published on 2026-09-21, so the console now says one thing the binary
-does not say, and App Review rejects on the missing file rather than on the
-label.
-
-**Done when:** `apps/ios/iosApp/PrivacyInfo.xcprivacy` exists, is a member of
-the app target's resources, and its `NSPrivacyCollectedDataTypes` match §5 of
-`docs/store/data-safety.md` row for row, including the two tracking rows. It
-declares the required-reason APIs the app actually hits, `UserDefaults` at
-minimum, through `CacheFactory.persistent`. `NSPrivacyTracking` is true and
-`NSPrivacyTrackingDomains` lists AdMob's.
-
-**Hints:** the SDK set is known and fixed: `GoogleMobileAds` and `sentry-cocoa`
-(`apps/ios/iosApp.xcodeproj/project.pbxproj`). Both ship their own signed
-manifests, which cover their own APIs but not ours. Confirm that while writing
-the file rather than assuming it. `docs/store/data-safety.md` §7.4 is the long
-version of this item.

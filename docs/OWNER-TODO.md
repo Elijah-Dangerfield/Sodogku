@@ -139,9 +139,9 @@ Games / Puzzle / Board categories. **App Privacy is filed and published**, on
 2026-09-21, from §5 of `docs/store/data-safety.md`: the policy URL, eight data
 types, all of them Linked to the user, with Device ID and Advertising Data also
 marked Used for Tracking. Still yours on the Apple side: the age rating, pricing
-(Free), content rights, and a build. The privacy label and a build are coupled,
-because a release with no `PrivacyInfo.xcprivacy` (§7.4) can be rejected however
-the label reads. All
+(Free), content rights, and a build. The `PrivacyInfo.xcprivacy` the label
+implies is written and matches it row for row, so a build no longer carries that
+particular rejection risk (§7.4). All
 three Game Center boards exist with the exact ids and an English localisation:
 Lifetime Score and Longest Streak (Classic) and Weekly Score (Recurring, 7-day
 duration and interval, first occurrence Monday 2026-09-28 00:00 EDT). None of

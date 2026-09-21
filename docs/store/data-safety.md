@@ -526,21 +526,47 @@ plus a support email that accepts deletion requests. A second option is an in-ap
 data" toggle wired to the same gate `appEventsEnabled` uses. **Not determined; do not answer this
 question on the form until it is.**
 
-### 7.4 iOS privacy manifest is missing, and is no longer blocked
+### 7.4 iOS privacy manifest, written 2026-09-21
 
-Apple requires a `PrivacyInfo.xcprivacy` for the app, and requires that bundled third-party SDKs
-ship signed manifests. There is still no such file anywhere under `apps/ios/`. It has to declare:
-collected data types (matching §5), required-reason API usage (`UserDefaults` at minimum, via the
-persistent cache), and tracking domains.
+`apps/ios/iosApp/PrivacyInfo.xcprivacy` exists and its eight `NSPrivacyCollectedDataTypes` are §5
+row for row, including `Linked = true` on all eight and `Tracking = true` on Device ID and
+Advertising Data. It needs no entry in `project.pbxproj`: the `iosApp` folder is a
+`PBXFileSystemSynchronizedRootGroup`, so a file dropped in it is a target resource, and the only
+membership exception is `Info.plist`, which is consumed through `INFOPLIST_FILE` instead.
 
-The 2026-09-08 note said this was blocked behind adding the Google Mobile Ads package. **That
-package is now in the project** (`project.pbxproj:410-417`), along with `sentry-cocoa` (`:402-409`),
-so the SDK set for a first iOS release is known and the file can be written. Confirm while writing
-it that both packages ship their own signed manifests, which is the SDK-side half of the
-requirement and is not something our file can satisfy on their behalf. **What this needs:** the
-file authored and added to the iOS target. Filed as **SD-150**, and it went from P2 to P1 when the
-label was published on 2026-09-21, because the console now describes a binary that does not carry
-the matching manifest.
+**Two required-reason APIs are declared, and both were traced rather than guessed:**
+
+- `NSPrivacyAccessedAPICategoryUserDefaults`, reason `CA92.1`. `IosPreviousExitProvider.kt:35`
+  reads and writes `NSUserDefaults.standardUserDefaults` to carry an exit classification across
+  launches. The app's own data, which is what `CA92.1` covers.
+- `NSPrivacyAccessedAPICategoryFileTimestamp`, reason `C617.1`. Not from our source: okio's Apple
+  file system calls `lstat` and reads `st_mtimespec` / `st_ctimespec` on every `exists` and
+  `metadataOrNull` (okio 3.16.4, `appleMain/okio/ApplePosixVariant.kt`), and the telemetry disk
+  buffer calls `exists` on each read (`TelemetryFileSystemImpl.read`). Everything it touches is
+  under `<filesDir>/telemetry`, inside the app container, which is what `C617.1` covers.
+
+**Three categories are deliberately absent.** Boot time: nothing in our code reads it, and
+`IosProcessStartTimeProvider` documents at length why it declines to. Disk space: no `statfs` and
+no volume-capacity key anywhere in our source or in okio's. Active keyboard: no reader.
+
+`NSPrivacyTracking` is `true`, because the app does track once ATT is granted.
+`NSPrivacyTrackingDomains` is an **empty array**, which is the accurate answer rather than a lazy
+one: no code of ours contacts a tracking domain, and the Google Mobile Ads framework declares its
+own. Fill it only if we ever call one directly.
+
+Both third-party packages ship signed manifests of their own, which is the half our file cannot
+satisfy: `GoogleMobileAds.framework/PrivacyInfo.xcprivacy` (system boot time, user defaults, disk
+space) and `Sentry.framework/PrivacyInfo.xcprivacy` (user defaults, system boot time, file
+timestamp). Checked in DerivedData's `SourcePackages` on 2026-09-21.
+
+**One discrepancy to know about before review.** The Google Mobile Ads manifest declares that it
+collects **Coarse Location**, linked, for advertising and analytics. Our §5 label has no Location
+row, on the §2.8 reasoning that we neither request a location permission nor derive location from
+an IP. Both statements are true at once: the SDK's declaration covers what Google does with the
+request it receives, and the label covers what we collect. Apple's aggregated privacy report shows
+the union, so a reviewer can see a Location line that the label does not have. If that is ever
+questioned, adding Coarse Location as Linked, not for tracking, is an edit rather than a
+resubmission, and it would be the conservative answer.
 
 ### 7.5 Data safety "encrypted in transit" for the Grafana endpoint
 
