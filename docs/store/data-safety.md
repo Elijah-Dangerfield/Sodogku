@@ -123,8 +123,12 @@ Collected by the Google Mobile Ads SDK, not by our code. We never read it direct
   `GoogleMobileAds` at `:428-429`). The `#if canImport(GoogleMobileAds)` guards in
   `apps/ios/iosApp/Platform/AdNetwork.swift` therefore compile in. iOS serves real ads and the SDK
   reads the IDFA after ATT.
-- Child-directed flag: `TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE` at `AdMobAdNetwork.kt:145-151`.
-  `tagForUnderAgeOfConsent` is deliberately left unset, with the reason at `AdMobAdNetwork.kt:56-59`.
+- Child-directed flag: `TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE`, set in `AdMobAdNetwork.prepare`
+  alongside **`MAX_AD_CONTENT_RATING_G`**, which was added on 2026-09-21 once Play's target
+  audience was filed as starting at 13-15. iOS sets the same pair,
+  `ageRestrictedTreatment = .unspecified` and `maxAdContentRating = .general`
+  (`AdNetwork.swift`). `tagForUnderAgeOfConsent` stays unset, ruled on the same day; the class
+  KDoc carries the reasoning and `features.md#audience-and-consent` carries the residual risk.
 - EEA/UK consent runs before the first request: `AdMobAdNetwork.consentThenInitialise()`
   (`:123-158`), gated on `consent.canRequestAds()` at `:139`, form shown at `:176-185`. Order is
   enforced inside `prepare()` (`:86`) rather than at call sites, with the reasoning in the class
@@ -284,6 +288,12 @@ Collected by the Google Mobile Ads SDK, not by our code. We never read it direct
   There is **no** remote-notification registration anywhere, no device token, and no camera or
   photo-library usage string. Nothing to declare in either form on any of it, since no photo,
   video, audio or push identifier is collected.
+- iOS also declares **`SKAdNetworkItems`**, 50 entries, added 2026-09-21 from Google's published
+  list. Not a permission and not a disclosure: it names the ad buyers Apple is allowed to report
+  an install attribution to. Leaving it out breaks nothing visible, which is why it went missing
+  for so long. Ads still serve and the attribution is dropped in silence. **The list does not
+  update itself**, so re-scrape it from `developers.google.com/admob/ios/quick-start` before each
+  submission.
 
 ### 2.11 Game Center, iOS only, new since the last derivation
 

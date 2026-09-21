@@ -89,6 +89,11 @@ class IOSAdNetwork: NSObject, AdNetwork {
         // *is* the general-audience answer. It is also the default, so this line
         // is a statement of the decision rather than a change of behaviour.
         MobileAds.shared.requestConfiguration.ageRestrictedTreatment = .unspecified
+        // The Android side's `MAX_AD_CONTENT_RATING_G`. Not a duplicate of the
+        // line above: that one describes the player, this one caps what Google
+        // is allowed to serve them. Required because the Play target audience
+        // starts at 13-15, and consistent with the App Store's 4+ rating.
+        MobileAds.shared.requestConfiguration.maxAdContentRating = .general
         _ = await MobileAds.shared.start()
         initialised = true
         #endif

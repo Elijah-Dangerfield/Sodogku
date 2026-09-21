@@ -58,8 +58,17 @@ import kotlin.time.Duration.Companion.seconds
  *
  * `features.md#audience-and-consent` decides the app is general-audience, so
  * `TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE` is set and `tagForUnderAgeOfConsent`
- * is deliberately left unspecified. Setting the latter turns off personalised
- * ads for everyone, which is a revenue decision nobody made.
+ * is left unspecified. That second one was **ruled on by the owner on
+ * 2026-09-21** rather than merely left alone: the flag is all-or-nothing, so
+ * setting it turns off personalised ads for the whole audience and not only for
+ * under-16s in the EEA, and the UMP form already collects consent where the law
+ * requires it. Do not set it without asking again.
+ *
+ * `MAX_AD_CONTENT_RATING_G` is set alongside it, and that one is not optional:
+ * the Play target audience declared on 2026-09-21 starts at 13-15, which brings
+ * the ads part of Families policy into scope, and G is the rating that cannot
+ * conflict with a 4+ App Store rating either. It caps what Google may serve; it
+ * says nothing about who the player is.
  *
  * ## Nothing here throws
  *
@@ -152,6 +161,7 @@ class AdMobAdNetwork(
                     .setTagForChildDirectedTreatment(
                         RequestConfiguration.TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE,
                     )
+                    .setMaxAdContentRating(RequestConfiguration.MAX_AD_CONTENT_RATING_G)
                     .build(),
             )
             suspendCancellableCoroutine { cont ->

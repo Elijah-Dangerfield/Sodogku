@@ -520,8 +520,24 @@ and the ad network's child-directed tag set to not-child-directed. A heavily kid
 icon plus a 13+ declaration can still draw a review flag, so the art should read "cute"
 rather than "preschool".
 
-**This remains formally open for the owner**, because it gates filing either store's
-privacy form.
+**Settled in practice on 2026-09-21**, when both stores' forms were filed on this branch:
+Play's target audience is 13-15, 16-17 and 18+, Apple's rating calculates 4+, and neither
+Designed for Families nor the Kids Category was entered. The branch is still reversible, and
+§6 of `docs/store/data-safety.md` still describes what reversing it would cost, but it is no
+longer an open question blocking anything.
+
+Two ad-request settings follow from it, and both are now explicit in code rather than
+default:
+
+- **`MAX_AD_CONTENT_RATING_G`**, set on both platforms. A target audience starting at 13-15
+  brings the ads part of Families policy into scope, and G is also the only rating that
+  cannot contradict a 4+ App Store rating. It caps what Google may serve, and says nothing
+  about who the player is.
+- **`tagForUnderAgeOfConsent` stays unset.** Ruled on by the owner on 2026-09-21 rather than
+  left alone: the flag is all-or-nothing, so setting it would drop personalised ads for the
+  entire audience and not only for under-16s in the EEA, and the UMP form already collects
+  consent where the law requires it. The residual risk is named rather than hidden: an
+  under-16 EEA player who consents through UMP can receive personalised ads.
 
 **Consent.** Google's UMP form for the EEA and UK, and Apple's App Tracking Transparency
 on iOS. Both are raised **before the first ad request and not at launch**, at a moment

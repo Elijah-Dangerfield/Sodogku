@@ -169,7 +169,15 @@ the app icon's background and put a dog still or the streak flame on it; if
 real badge art ever lands, rerun the script against it rather than hand-editing
 three PNGs.
 
-Still yours on the Apple side: a build. All
+Still yours on the Apple side: a build.
+
+**Before you submit, have an agent re-scrape `SKAdNetworkItems`.** `Info.plist`
+carries 50 identifiers, copied from Google on 2026-09-21. Google adds ad buyers
+and the list does not update itself, and a missing entry fails silently: the ad
+still serves and Apple simply drops the install attribution. There is no error
+to notice, so a calendar reminder is the only detection there is.
+
+All
 three Game Center boards exist with the exact ids and an English localisation:
 Lifetime Score and Longest Streak (Classic) and Weekly Score (Recurring, 7-day
 duration and interval, first occurrence Monday 2026-09-28 00:00 EDT), and all
