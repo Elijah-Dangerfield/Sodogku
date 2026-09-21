@@ -351,7 +351,14 @@ jobs:
     # sizing history; macos-26-xlarge (14GB) works but bills per minute even on
     # public repos.
     runs-on: macos-26
-    timeout-minutes: 90
+    # Raised from 90 on 2026-09-21, after the first release hit it and was
+    # cancelled at the "Build + release iOS" step. A cancelled job never runs
+    # its cache-save steps, so the konan, SwiftPM and DerivedData caches were
+    # never written and the retry would have been exactly as slow: the timeout
+    # was not a slow build, it was a build that could never finish and could
+    # never warm the caches that make the next one quick. 150 gives the cold
+    # run room to finish once; a warm run is far under it.
+    timeout-minutes: 150
 
     env:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
