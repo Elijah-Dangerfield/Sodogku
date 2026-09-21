@@ -770,3 +770,53 @@ player outside the EEA never sees a row that does nothing.
 beside `prepare`, and let the Settings view-model ask the ad gate whether the
 row applies. `pages/privacy.html`'s Ads section should mention the row once it
 exists.
+
+## SD-150 [P1] — Move the legal pages to nightjarlabs.llc and retire `pages/`
+
+**Ask:** Sodogku's privacy policy and terms are four hand-written files in
+`pages/` published to `https://elijah-dangerfield.github.io/Sodogku/`. That URL
+carries a personal GitHub username and a repo name, and it is what gets filed
+with Apple and Google. Drop2048 moved off the same arrangement on 2026-09-21;
+do the same here.
+
+The studio site now renders each app's legal documents from Markdown the app
+repo owns. Sodogku is **already listed** on nightjarlabs.llc (icon, tagline,
+"Coming soon"), so the site half is done. What is left is the documents.
+
+**Done when:**
+
+- `legal/privacy.md` and `legal/terms.md` exist at the repo root, converted from
+  `pages/privacy.html` and `pages/terms.html` with frontmatter `app`, `title`,
+  `updated`, `contact`. The prose carries over as-is; it was written against the
+  code in `1ec24e0` and is owner-accepted.
+- `.github/workflows/legal-sync.yml` opens a PR against
+  `Elijah-Dangerfield/nightjar` on any push to `main` touching `legal/**`, with
+  `APP_SLUG: sodogku`.
+- `scripts/setup_legal_sync.sh` is in the repo (the owner runs it; see
+  `OWNER-TODO.md`).
+- Every compiled reference points at `https://nightjarlabs.llc/sodogku/…`.
+  There are eight, and missing one leaves the app opening a dead link from a
+  gate the player has to clear:
+  - `libraries/config/.../values/LegalConfigValues.kt:35` and `:58`
+  - `libraries/config/impl/.../model/FallbackConfigMap.kt:130` and `:132`
+  - `features/game/impl/.../GameFeatureEntryPoint.kt:87` and `:88`
+  - `apps/admin/config-manifest-registry.json:54` and `:56`
+- `pages/` and `.github/workflows/pages.yml` are deleted, and `SETUP.md:131`
+  and `docs/store/listing.md:243`-`:244` are updated.
+
+**Hints:** Copy the shape from Drop2048 (`legal/`, `legal/README.md`,
+`.github/workflows/legal-sync.yml`, `scripts/setup_legal_sync.sh`) or from
+`KMPTemplate`'s `template/ci/`, which stages the same files for new projects.
+The website side is an Astro content collection at `src/content/legal/<slug>/`;
+that repo's `docs/legal-sync.md` explains the contract and why the Markdown
+lives here rather than there.
+
+**`pages/app-ads.txt` needs care and is the one thing not covered by a
+copy-paste.** AdMob crawls the domain in the store listing's *website* field,
+so once that field points at `nightjarlabs.llc` the copy served from GitHub
+Pages stops being read. The studio site already serves the same one line at
+`https://nightjarlabs.llc/app-ads.txt` (same publisher id, it covers every
+Nightjar app), so nothing needs building. But the listing's website field must
+be the bare domain with no path, or the crawler looks in the wrong place. See
+`docs/app-ads.md` in the nightjar repo. A missing app-ads.txt does not error;
+it quietly drops fill rate.

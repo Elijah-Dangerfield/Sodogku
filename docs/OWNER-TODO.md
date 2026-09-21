@@ -25,6 +25,22 @@ a placeholder or a public test credential, it says so.
 
 **Both stores link to these pages, and both are live.**
 
+> **These pages are moving, and the move is queued as `SD-150` in `todos.md`.**
+> They will be written as `legal/privacy.md` and `legal/terms.md` at the repo
+> root and published to `https://nightjarlabs.llc/sodogku/privacy` and
+> `/terms`, the same arrangement Drop2048 moved to on 2026-09-21. The prose
+> carries over unchanged, so reading and accepting it now is not wasted.
+>
+> Two parts of that are yours and cannot be delegated. **Run
+> `./scripts/setup_legal_sync.sh` once** after the agent work lands, which
+> creates the token the sync needs and prompts you for it. Then **re-file the
+> store URLs**: the privacy policy URL, the listing website and the Data safety
+> delete-data URL on Play, and the Support URL on Apple. Free before
+> submission, two review cycles after.
+>
+> Sodogku is already listed on nightjarlabs.llc with its icon and tagline.
+> Nothing to do there.
+
 `pages/privacy.html` was rewritten against the code in `1ec24e0`; every statement traces to a
 file. `pages/terms.html` gained sections on ads, Sodogku Pro, and in-game items on 2026-09-10,
 written from `StoreBilling.kt`, `AdNetwork.kt`, the paywall strings and `features.md#pro` and
