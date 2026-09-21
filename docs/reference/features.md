@@ -431,7 +431,7 @@ common Kotlin entitlement layer, which is what makes the gates testable without 
 
 ## Ads
 
-**Four placements, all rewarded.** There is no format that interrupts.
+**Five placements: four rewarded, one floor.** Nothing on a board in play, ever.
 
 | Placement | Trigger |
 |---|---|
@@ -439,11 +439,24 @@ common Kotlin entitlement layer, which is what makes the gates testable without 
 | Booster grant | Refill a sniff, a treat or lives on a board still in play |
 | Skip | The skip offer |
 | Streak freeze | Cover a missed daily, or restore a run of them |
+| Level complete | Next level, when a free player has cleared `ads.interstitialEveryLevels` boards (5) without an ad of any kind |
 
-**Every placement being rewarded is policy, not an accident of what got built.** An
-interstitial, an app-open ad and a banner were all specified, built, and deleted, having
-produced no impressions because nothing ever called them. A test now pins the set, so a
-format that is not rewarded has to be argued for rather than merely added.
+**The floor and the ceiling are one counter.** Every board finished moves it along; every
+ad on screen, rewarded or not, watched out or closed early, puts it back to zero. So a
+careful player who never needs a continue still sees an ad every fifth level, and a
+struggling player who watches a continue every other board is never shown one on top.
+The interstitial pays nothing and withholds nothing: closing it opens the next board, a
+failure to serve opens the next board, and it never raises the Pro sheet (the Pro answer
+to it is the Go Pro line on the same screen). It never shows on the daily, offline (and
+spends no offline grace, which is about rewards the player was owed), for Pro, or inside
+the new-user grace.
+
+**Every other placement being rewarded is policy, not an accident of what got built.** An
+interstitial, an app-open ad and a banner were all specified, built, and deleted on
+2026-09-14, having produced no impressions because nothing ever called them. The
+interstitial came back on 2026-09-21 with exactly one caller; app-open and banner stay
+gone. `AdPolicyTest` names the one placement that is not rewarded, so a second has to be
+argued for in that file rather than merely added.
 
 **New-user grace: no ads before level 5 or the first 5 minutes**, and both legs have to be
 past. Day-zero ad exposure is the biggest single driver of first-session churn in this
@@ -456,7 +469,8 @@ grant. Only a deliberate dismissal withholds.
 
 **Kill switches are read at the point of use**, so switching ads off takes effect on the
 next config refresh rather than after a force-quit nobody performs mid-incident. There is
-a global switch and a per-placement map.
+a global switch, a per-placement map (the interstitial is in it as `level_complete`), and
+`ads.interstitialEveryLevels`, where zero turns the floor off.
 
 **Ad unit IDs are in the binary, never in config**, because a config outage that blanked
 them would take ads and purchases down together. **The app currently ships Google's

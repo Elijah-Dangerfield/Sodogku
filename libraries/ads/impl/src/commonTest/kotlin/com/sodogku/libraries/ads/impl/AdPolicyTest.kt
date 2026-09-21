@@ -4,50 +4,43 @@ import com.sodogku.libraries.ads.AdFormat
 import com.sodogku.libraries.ads.AdPlacement
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.assertNull
 
 /**
- * Every ad in this app is one the player asked for.
+ * Every ad in this app is one the player asked for, except one, and this test
+ * names it.
  *
- * That is the whole monetization policy, and it is worth a test rather than a
- * paragraph because the failure mode is additive: somebody adds an interstitial
- * placement, it looks like the others in the enum, and nothing anywhere objects.
+ * The monetization policy from 2026-09-14 was that no ad interrupts. On
+ * 2026-09-21 the owner added a floor (SD-148): a free player who has cleared
+ * several levels without seeing an ad gets an interstitial between two of
+ * them. That is one placement, one format, and one call site, and the failure
+ * mode is still additive: a second non-rewarded placement would look like this
+ * one in the enum and nothing anywhere would object. So the exception is
+ * spelled out here, and a new one has to be argued for in this file.
  *
- * This replaces two config tests that asserted the intrusive formats defaulted
- * *off* and that interstitials were rationed by three gates. Those guarded a
- * weaker property — the formats existed and were one remote config flip from
- * appearing. Now they do not exist, and this says so directly.
+ * AppOpen and Banner stay deleted. There is no format for an ad on a board.
  */
 class AdPolicyTest {
 
     @Test
-    fun theOnlyFormatIsTheOneThePlayerOptsInTo() {
+    fun theOnlyFormatsAreRewardedAndTheBetweenLevelsInterstitial() {
         assertEquals(
-            listOf(AdFormat.Rewarded),
-            AdFormat.entries.toList(),
-            "a format that is not rewarded is an ad nobody asked for",
+            setOf(AdFormat.Rewarded, AdFormat.Interstitial),
+            AdFormat.entries.toSet(),
+            "a format nobody argued for; banners and app-open ads were deleted on purpose",
         )
     }
 
     @Test
-    fun everyPlacementIsRewarded() {
-        // The mapping is what turns a placement into a request, so a placement
-        // that resolved to anything else would be the way an interruption got
-        // back in.
-        assertTrue(AdPlacement.entries.isNotEmpty(), "there are no placements, so this proves nothing")
-        assertTrue(
-            AdPlacement.entries.all { it.format == AdFormat.Rewarded },
-            "these placements are not rewarded: " +
-                AdPlacement.entries.filterNot { it.format == AdFormat.Rewarded },
+    fun exactlyOnePlacementIsNotRewardedAndItIsTheLevelCompleteFloor() {
+        // Named rather than counted. Each rewarded placement is a control the
+        // player pressed knowing an ad was coming; the one that is not is the
+        // floor between two cleared campaign boards.
+        assertEquals(
+            listOf(AdPlacement.LevelComplete),
+            AdPlacement.entries.filterNot { it.format == AdFormat.Rewarded },
+            "a second placement that is not rewarded has to be argued for here",
         )
-    }
-
-    @Test
-    fun everyPlacementIsSomethingThePlayerTapped() {
-        // Named individually rather than counted. Each of these is a control the
-        // player pressed knowing an ad was coming: a third strike, a booster
-        // refill, a skip offer, and covering a missed daily. Adding one that is
-        // not should have to be argued for here.
         assertEquals(
             setOf(
                 AdPlacement.ContinueLevel,
@@ -55,7 +48,15 @@ class AdPolicyTest {
                 AdPlacement.SkipLevel,
                 AdPlacement.StreakFreeze,
             ),
-            AdPlacement.entries.toSet(),
+            AdPlacement.entries.filter { it.format == AdFormat.Rewarded }.toSet(),
         )
+    }
+
+    @Test
+    fun theInterstitialNeverSells() {
+        // The rewarded gate puts Pro up beside a continue or a skip, because
+        // the player is already weighing "watch an ad or not". Nobody is
+        // weighing anything at the interstitial; selling there is the nag.
+        assertNull(AdPlacement.LevelComplete.paywallTrigger)
     }
 }

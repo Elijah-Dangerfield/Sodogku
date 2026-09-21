@@ -110,6 +110,8 @@ class IOSAdNetwork: NSObject, AdNetwork {
         switch format {
         case .rewarded:
             return await showRewarded(from: root)
+        case .interstitial:
+            return await showInterstitial(from: root)
         }
         #else
         return AdShowOutcome(result: .notShown, errorKind: "google_mobile_ads_not_linked")
@@ -126,6 +128,10 @@ class IOSAdNetwork: NSObject, AdNetwork {
                 guard self?.cachedRewarded == nil else { return }
                 self?.cachedRewarded = try? await RewardedAd.load(
                     with: AdUnits.shared.ios(format: .rewarded), request: Request())
+            case .interstitial:
+                guard self?.cachedInterstitial == nil else { return }
+                self?.cachedInterstitial = try? await InterstitialAd.load(
+                    with: AdUnits.shared.ios(format: .interstitial), request: Request())
             }
         }
         #endif
@@ -134,6 +140,38 @@ class IOSAdNetwork: NSObject, AdNetwork {
     #if canImport(GoogleMobileAds)
 
     private var cachedRewarded: RewardedAd?
+    private var cachedInterstitial: InterstitialAd?
+
+    /// No reward and no reward handler: closing is the ordinary ending, and
+    /// `.dismissed` is how the shared gate hears "it was on screen".
+    private func showInterstitial(from root: UIViewController) async -> AdShowOutcome {
+        let ad: InterstitialAd
+        do {
+            if let cached = cachedInterstitial {
+                ad = cached
+                cachedInterstitial = nil
+            } else {
+                ad = try await InterstitialAd.load(
+                    with: AdUnits.shared.ios(format: .interstitial), request: Request())
+            }
+        } catch {
+            return Self.loadFailure(error)
+        }
+
+        let delegate = DismissalDelegate()
+        ad.fullScreenContentDelegate = delegate
+        let dismissal = await withCheckedContinuation { (continuation: CheckedContinuation<Dismissal, Never>) in
+            delegate.onFinished = { continuation.resume(returning: $0) }
+            Task { @MainActor in
+                ad.present(from: root)
+            }
+        }
+
+        switch dismissal {
+        case .failed(let kind): return AdShowOutcome(result: .failed, errorKind: kind)
+        case .closed: return AdShowOutcome(result: .dismissed, errorKind: nil)
+        }
+    }
 
     private func showRewarded(from root: UIViewController) async -> AdShowOutcome {
         let ad: RewardedAd

@@ -36,9 +36,13 @@ data class AdState(
      */
     val firstSeenAtMs: Long = 0L,
 
-    /** Epoch-ms of the last interstitial actually shown. 0 = never. */
-
-    /** Levels finished since the last interstitial, for `ads.interstitialEveryNLevels`. */
+    /**
+     * Boards finished since the last ad of any kind was on screen, for
+     * `ads.interstitialEveryLevels`. Any ad shown, rewarded or not, puts it
+     * back to zero: the floor and the ceiling are one counter, so a player who
+     * just watched a continue is not shown an interstitial two taps later.
+     */
+    val levelsSinceLastAd: Int = 0,
 
     /**
      * Epoch-ms of the **first ad gate that could not be served offline**, which

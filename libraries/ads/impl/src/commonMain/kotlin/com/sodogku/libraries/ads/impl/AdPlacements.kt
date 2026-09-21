@@ -12,6 +12,8 @@ internal val AdPlacement.format: AdFormat
         AdPlacement.SkipLevel,
         AdPlacement.StreakFreeze,
         -> AdFormat.Rewarded
+
+        AdPlacement.LevelComplete -> AdFormat.Interstitial
     }
 
 /**
@@ -28,7 +30,11 @@ internal val AdPlacement.paywallTrigger: PaywallTrigger?
     get() = when (this) {
         AdPlacement.ContinueLevel -> PaywallTrigger.ContinueLevel
         AdPlacement.SkipLevel -> PaywallTrigger.SkipLevel
+        // The interstitial is the one ad nobody asked for, and selling off the
+        // back of it is the nag. The Pro answer to it is the button on the
+        // same screen (SD-147).
         AdPlacement.BoosterGrant,
         AdPlacement.StreakFreeze,
+        AdPlacement.LevelComplete,
         -> null
     }

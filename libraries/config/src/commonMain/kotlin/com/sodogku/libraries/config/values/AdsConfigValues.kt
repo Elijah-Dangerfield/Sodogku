@@ -114,9 +114,26 @@ class AdsOfflineGraceMinutes(appConfigMap: AppConfigMap) : IntConfigValue(appCon
 }
 
 /**
- * Per-placement enable switches for rewarded ads, keyed by the placement ids in
+ * How many boards a free player clears without an ad before Next level shows an
+ * interstitial (SD-148). A floor, not a schedule: any ad of any kind resets the
+ * count, so a player already watching rewarded ads is never shown one on top.
+ * Zero or less turns the interstitial off entirely.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class AdsInterstitialEveryLevels(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Interstitial every N levels"
+    override val path = "ads.interstitialEveryLevels"
+    override val default = 5
+}
+
+/**
+ * Per-placement enable switches, keyed by the placement ids in
  * `features.md#ads`. Structured rather than one key per placement so a new
- * placement needs no new config schema.
+ * placement needs no new config schema. The name says "rewarded" because for
+ * two weeks every placement was; `level_complete`, the interstitial, is gated
+ * here too rather than under a second key.
  *
  * Read it through [isEnabled], never by indexing: an unknown or missing key
  * resolves to **enabled**. Every rewarded placement is something the player asked
@@ -142,12 +159,14 @@ class AdsRewardedPlacements(appConfigMap: AppConfigMap) : JsonConfigValue<Map<St
         const val BOOSTER_GRANT = "booster_grant"
         const val SKIP_LEVEL = "skip_level"
         const val STREAK_FREEZE = "streak_freeze"
+        const val LEVEL_COMPLETE = "level_complete"
 
         val AllPlacementsOn: Map<String, Boolean> = mapOf(
             CONTINUE_LEVEL to true,
             BOOSTER_GRANT to true,
             SKIP_LEVEL to true,
             STREAK_FREEZE to true,
+            LEVEL_COMPLETE to true,
         )
     }
 }
@@ -161,4 +180,5 @@ fun adsConfigValues(appConfigMap: AppConfigMap): List<ConfiguredValue<*>> = list
     AdsOfflineGraceLevels(appConfigMap),
     AdsOfflineGraceMinutes(appConfigMap),
     AdsRewardedPlacements(appConfigMap),
+    AdsInterstitialEveryLevels(appConfigMap),
 )

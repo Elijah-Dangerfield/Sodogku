@@ -6,6 +6,40 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-21: one ad between levels for the player who has seen none
+
+Every ad in the app was one the player asked for, by policy, pinned by a test and
+promised on the legal pages. The owner reviewed how often ads actually show under
+that policy and the answer was: a careful free player, never. A struggling one,
+at every gate. Neither is the intent.
+
+**A floor, sharing a counter with the ceiling.** `ads.interstitialEveryLevels`
+(5) boards finished since the last ad of any kind, and Next level shows an
+interstitial. Any ad on screen, rewarded or not, watched or closed, puts the
+counter back to zero. One number does both jobs: the careful player gets an ad
+every fifth level and the struggling player, already watching continues, is
+never shown one on top. That is the whole "some ads, no spam" ask.
+
+**It goes through the same gate.** `RealAdGate.showInterstitial` beside
+`showRewarded`, with the same list of reasons to show nothing, in the same order,
+and then the floor. The alternatives were a second gate (two copies of the Pro
+and grace and kill-switch rules that would drift) or a "frequency" wrapper round
+the rewarded gate (which would have had to invent a reward to withhold).
+
+**What it deliberately does not do.** It never pays and never withholds, so a
+no-fill opens the next board like a dismissal does. It shows nothing offline and
+spends no offline grace, because that grace is about rewards the player was owed.
+It never raises the Pro sheet: the rewarded stand-in fills a slot the player
+volunteered, and this is the one ad nobody asked for, so selling off the back of
+it is the nag. The Pro answer to it is the Go Pro line under Next level (SD-147,
+the same day). Never on the daily, never for Pro, never inside the new-user grace.
+
+**The policy test and the legal pages changed in the same commit.**
+`AdPolicyTest` now names the one placement that is not rewarded, so a second has
+to be argued for there. The terms and the privacy policy say what the ad is and
+when it appears, dated 2026-09-21. `AdFormat.Interstitial` is back with one
+caller; AppOpen and Banner stay deleted.
+
 ## 2026-09-20: level 1 earns one badge, not five
 
 A clean, quick, three-paw clear of level 1 (a 4x4 at difficulty 1, with the

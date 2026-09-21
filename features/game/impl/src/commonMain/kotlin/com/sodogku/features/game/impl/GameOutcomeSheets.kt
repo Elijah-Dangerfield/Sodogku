@@ -539,10 +539,11 @@ private fun OnwardButton(state: GameState, onAction: (GameAction) -> Unit, modif
             size = ButtonSize.Hero,
             modifier = modifier.fillMaxWidth(),
         ) {
-            // No badge. Advancing plays no ad and cannot: the interstitial was
-            // deleted along with every format the player does not ask for, so
-            // the only thing a badge here could promise is something this app
-            // decided not to do.
+            // No badge, though advancing can now play an ad: the interstitial
+            // floor (SD-148) fires here one time in `ads.interstitialEveryLevels`
+            // for a free player who has seen none. The badge means "watch this
+            // and get that", and there is no that. A badge that lit only when
+            // the floor was met would be an honest alternative; it is not built.
             Text(stringResource(Res.string.game_next_level))
         }
     }

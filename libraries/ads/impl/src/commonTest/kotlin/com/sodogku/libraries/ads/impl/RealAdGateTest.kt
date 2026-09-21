@@ -7,6 +7,7 @@ import com.sodogku.libraries.ads.AdShowResult
 import com.sodogku.libraries.billing.PaywallTrigger
 import com.sodogku.libraries.config.AppConfigMap
 import com.sodogku.libraries.config.values.AdsEnabled
+import com.sodogku.libraries.config.values.AdsInterstitialEveryLevels
 import com.sodogku.libraries.config.values.AdsNewUserGraceLevels
 import com.sodogku.libraries.config.values.AdsNewUserGraceMinutes
 import com.sodogku.libraries.config.values.AdsOfflineGraceLevels
@@ -17,6 +18,7 @@ import com.sodogku.libraries.flowroutines.AppCoroutineScope
 import com.sodogku.libraries.flowroutines.testing.CoroutineTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
@@ -191,6 +193,147 @@ class RealAdGateTest : CoroutineTest() {
         gate(ads = config).showRewarded(AdPlacement.BoosterGrant)
 
         assertEquals(listOf(AdFormat.Rewarded), network.shown)
+    }
+
+    // ------------------------------------------------------------------
+    // The interstitial floor (SD-148)
+    // ------------------------------------------------------------------
+
+    @Test
+    fun theInterstitialWaitsForTheFloorAndThenShows() = runUnitTest {
+        val gate = gate(ads = mapOf("interstitialEveryLevels" to 3))
+        network.outcome = AdShowOutcome(AdShowResult.Dismissed)
+
+        gate.clearLevels(2)
+        assertFalse(gate.showInterstitial(AdPlacement.LevelComplete), "two boards is under a floor of three")
+        assertEquals(emptyList(), network.shown, "the network was asked before the floor was met")
+
+        gate.clearLevels(1)
+        assertTrue(gate.showInterstitial(AdPlacement.LevelComplete), "three boards meets a floor of three")
+        assertEquals(listOf(AdFormat.Interstitial), network.shown)
+    }
+
+    @Test
+    fun anAdOnScreenOfEitherKindResetsTheFloor() = runUnitTest {
+        // The ceiling is the same counter as the floor: a player who just
+        // watched a continue is not shown an interstitial two taps later.
+        val gate = gate(ads = mapOf("interstitialEveryLevels" to 2))
+        gate.clearLevels(2)
+
+        network.outcome = AdShowOutcome(AdShowResult.Rewarded)
+        gate.showRewarded(AdPlacement.ContinueLevel)
+
+        network.outcome = AdShowOutcome(AdShowResult.Dismissed)
+        assertFalse(gate.showInterstitial(AdPlacement.LevelComplete), "a rewarded ad did not reset the floor")
+        assertEquals(listOf(AdFormat.Rewarded), network.shown)
+
+        gate.clearLevels(2)
+        assertTrue(gate.showInterstitial(AdPlacement.LevelComplete))
+        gate.clearLevels(1)
+        assertFalse(gate.showInterstitial(AdPlacement.LevelComplete), "an interstitial did not reset its own floor")
+    }
+
+    @Test
+    fun aRewardedAdClosedEarlyStillCountsAsSeen() = runUnitTest {
+        // Withholding the reward is about the reward. The player still sat
+        // through part of an ad, and the floor is about ads seen.
+        val gate = gate(ads = mapOf("interstitialEveryLevels" to 1))
+        gate.clearLevels(1)
+
+        network.outcome = AdShowOutcome(AdShowResult.Dismissed)
+        gate.showRewarded(AdPlacement.BoosterGrant)
+
+        assertFalse(gate.showInterstitial(AdPlacement.LevelComplete))
+    }
+
+    @Test
+    fun anInterstitialThatCouldNotBeServedLeavesTheFloorMet() = runUnitTest {
+        // No fill showed nothing, so the next Next level asks again.
+        val gate = gate(ads = mapOf("interstitialEveryLevels" to 1))
+        gate.clearLevels(1)
+
+        network.outcome = AdShowOutcome(AdShowResult.NoFill)
+        assertFalse(gate.showInterstitial(AdPlacement.LevelComplete))
+
+        network.outcome = AdShowOutcome(AdShowResult.Dismissed)
+        assertTrue(gate.showInterstitial(AdPlacement.LevelComplete), "a no-fill spent the floor")
+    }
+
+    @Test
+    fun theInterstitialNeverPutsUpTheProSheet() = runUnitTest {
+        val gate = gate(ads = mapOf("interstitialEveryLevels" to 1))
+        gate.clearLevels(1)
+
+        network.outcome = AdShowOutcome(AdShowResult.NoFill)
+        gate.showInterstitial(AdPlacement.LevelComplete)
+        network.outcome = AdShowOutcome(AdShowResult.Dismissed)
+        gate.showInterstitial(AdPlacement.LevelComplete)
+
+        assertEquals(emptyList(), paywall.offers, "the one ad nobody asked for tried to sell")
+        assertEquals(emptyList(), paywall.standIns, "Pro stood in for an ad the player was never owed")
+    }
+
+    @Test
+    fun theInterstitialShowsNothingOfflineAndSpendsNoGrace() = runUnitTest {
+        appState.isDeviceOffline.value = true
+        val gate = gate(ads = mapOf("interstitialEveryLevels" to 1, "offlineGraceLevels" to 0))
+        gate.clearLevels(3)
+
+        assertFalse(gate.showInterstitial(AdPlacement.LevelComplete))
+        assertEquals(emptyList(), network.shown)
+        assertEquals(0, paywall.offlineBlocks, "an unowed ad raised the offline block")
+        assertEquals(0, cache.get().offlineGraceLevelsSpent, "an unowed ad spent the offline grace")
+    }
+
+    @Test
+    fun everyReasonTheRewardedPathIsFreeAlsoSilencesTheInterstitial() = runUnitTest {
+        network.outcome = AdShowOutcome(AdShowResult.Dismissed)
+        val floorMet = mapOf<String, Any>("interstitialEveryLevels" to 1)
+
+        entitlements.setPro(true)
+        gate(ads = floorMet).also { it.clearLevels(1) }.showInterstitial(AdPlacement.LevelComplete)
+        assertEquals(emptyList(), network.shown, "Pro was shown an interstitial")
+        entitlements.setPro(false)
+
+        gate(ads = floorMet + ("enabled" to false)).also { it.clearLevels(1) }
+            .showInterstitial(AdPlacement.LevelComplete)
+        assertEquals(emptyList(), network.shown, "the kill switch did not reach the interstitial")
+
+        gate(ads = floorMet + ("rewardedPlacements" to mapOf("level_complete" to false)))
+            .also { it.clearLevels(1) }.showInterstitial(AdPlacement.LevelComplete)
+        assertEquals(emptyList(), network.shown, "the placement switch did not reach the interstitial")
+
+        gate(ads = mapOf("interstitialEveryLevels" to 0)).also { it.clearLevels(9) }
+            .showInterstitial(AdPlacement.LevelComplete)
+        assertEquals(emptyList(), network.shown, "zero should turn the interstitial off")
+
+        progress.unlocked = 2
+        gate(ads = floorMet + mapOf("newUserGraceLevels" to 5, "newUserGraceMinutes" to 0))
+            .also { it.clearLevels(1) }.showInterstitial(AdPlacement.LevelComplete)
+        assertEquals(emptyList(), network.shown, "a day-zero player was shown an interstitial")
+    }
+
+    @Test
+    fun theFloorSurvivesAForceQuit() = runUnitTest {
+        val config = mapOf("interstitialEveryLevels" to 2)
+        gate(ads = config).clearLevels(2)
+
+        network.outcome = AdShowOutcome(AdShowResult.Dismissed)
+        // Same cache, new gate: a process restart forgets everything but disk.
+        assertTrue(gate(ads = config).showInterstitial(AdPlacement.LevelComplete))
+    }
+
+    @Test
+    fun aThrowingNetworkShowsNothingAndOpensTheNextBoard() = runUnitTest {
+        val exploding = object : com.sodogku.libraries.ads.AdNetwork {
+            override suspend fun prepare() = Unit
+            override suspend fun show(format: AdFormat): AdShowOutcome = error("SDK exploded")
+            override fun preload(format: AdFormat) = Unit
+        }
+        val gate = gate(ads = mapOf("interstitialEveryLevels" to 1), network = exploding)
+        gate.clearLevels(1)
+
+        assertFalse(gate.showInterstitial(AdPlacement.LevelComplete))
     }
 
     // ------------------------------------------------------------------
@@ -513,8 +656,11 @@ class RealAdGateTest : CoroutineTest() {
             rewardedPlacements = AdsRewardedPlacements(map),
             offlineGraceLevels = AdsOfflineGraceLevels(map),
             offlineGraceMinutes = AdsOfflineGraceMinutes(map),
+            interstitialEveryLevels = AdsInterstitialEveryLevels(map),
         )
     }
+
+    private suspend fun RealAdGate.clearLevels(n: Int) = repeat(n) { levelCleared() }
 
     private companion object {
         val NO_NEW_USER_GRACE: Map<String, Any> = mapOf(

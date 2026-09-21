@@ -41,6 +41,7 @@ object AdUnits {
     /** https://developers.google.com/admob/android/test-ads — reserved sample units. */
     object AndroidTest {
         const val rewarded = "ca-app-pub-3940256099942544/5224354917"
+        const val interstitial = "ca-app-pub-3940256099942544/1033173712"
 
         /** For the manifest, not for a request. */
         const val applicationId = "ca-app-pub-3940256099942544~3347511713"
@@ -49,6 +50,7 @@ object AdUnits {
     /** https://developers.google.com/admob/ios/test-ads — reserved sample units. */
     object IosTest {
         const val rewarded = "ca-app-pub-3940256099942544/1712485313"
+        const val interstitial = "ca-app-pub-3940256099942544/4411468910"
 
         /** For `Info.plist`'s `GADApplicationIdentifier`, not for a request. */
         const val applicationId = "ca-app-pub-3940256099942544~1458002511"
@@ -57,11 +59,13 @@ object AdUnits {
     /** Real Android units. Empty until the AdMob app exists — see [useTestUnits]. */
     object AndroidLive {
         const val rewarded = ""
+        const val interstitial = ""
     }
 
     /** Real iOS units. Empty until the AdMob app exists — see [useTestUnits]. */
     object IosLive {
         const val rewarded = ""
+        const val interstitial = ""
     }
 
     /**
@@ -73,9 +77,11 @@ object AdUnits {
     fun android(format: AdFormat): String = pick(
         test = when (format) {
             AdFormat.Rewarded -> AndroidTest.rewarded
+            AdFormat.Interstitial -> AndroidTest.interstitial
         },
         live = when (format) {
             AdFormat.Rewarded -> AndroidLive.rewarded
+            AdFormat.Interstitial -> AndroidLive.interstitial
         },
     )
 
@@ -83,9 +89,11 @@ object AdUnits {
     fun ios(format: AdFormat): String = pick(
         test = when (format) {
             AdFormat.Rewarded -> IosTest.rewarded
+            AdFormat.Interstitial -> IosTest.interstitial
         },
         live = when (format) {
             AdFormat.Rewarded -> IosLive.rewarded
+            AdFormat.Interstitial -> IosLive.interstitial
         },
     )
 

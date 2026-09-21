@@ -1,5 +1,6 @@
 package com.sodogku.libraries.ads.impl
 
+import com.sodogku.libraries.ads.AdFormat
 import com.sodogku.libraries.ads.AdGate
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.AdNetwork
@@ -9,6 +10,7 @@ import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
 import com.sodogku.libraries.billing.PaywallCoordinator
 import com.sodogku.libraries.config.values.AdsEnabled
+import com.sodogku.libraries.config.values.AdsInterstitialEveryLevels
 import com.sodogku.libraries.config.values.AdsNewUserGraceLevels
 import com.sodogku.libraries.config.values.AdsNewUserGraceMinutes
 import com.sodogku.libraries.config.values.AdsOfflineGraceLevels
@@ -84,6 +86,7 @@ class RealAdGate(
     private val rewardedPlacements: AdsRewardedPlacements,
     private val offlineGraceLevels: AdsOfflineGraceLevels,
     private val offlineGraceMinutes: AdsOfflineGraceMinutes,
+    private val interstitialEveryLevels: AdsInterstitialEveryLevels,
 ) : AdGate, AutoInit {
 
     private val logger = KLog.withTag("AdGate")
@@ -111,10 +114,23 @@ class RealAdGate(
         if (!adsEnabled()) return
         appScope.launch {
             Catching {
+                // An interstitial is only worth loading once it is due: a
+                // request per cleared level for an ad that shows one time in
+                // five is four wasted fills.
+                if (placement.format == AdFormat.Interstitial && !interstitialDue()) return@Catching
                 network.prepare()
                 network.preload(placement.format)
             }.logOnFailure { "Preload failed for $placement" }
         }
+    }
+
+    override suspend fun showInterstitial(placement: AdPlacement): Boolean =
+        Catching { interstitial(placement) }
+            .logOnFailure { "Interstitial path threw for $placement; showing nothing" }
+            .getOrElse { false }
+
+    override suspend fun levelCleared() {
+        adState.update { it.copy(levelsSinceLastAd = it.levelsSinceLastAd + 1) }
     }
 
     private suspend fun rewarded(placement: AdPlacement): RewardOutcome {
@@ -169,6 +185,10 @@ class RealAdGate(
             "error_kind" to outcome.errorKind,
         )
 
+        // Either of these had an ad on screen, and an ad on screen is what the
+        // interstitial floor counts from, whether or not it was watched out.
+        if (outcome.result.wasOnScreen) adState.update { it.copy(levelsSinceLastAd = 0) }
+
         return when (outcome.result) {
             AdShowResult.Rewarded -> {
                 // `features.md#offline`: the offline grace resets on a
@@ -187,6 +207,77 @@ class RealAdGate(
                 unserved(placement, RewardOutcome.Failed(kind), kind, offered)
             }
         }
+    }
+
+    /**
+     * The between-levels ad (SD-148). The same list of reasons to show nothing
+     * as [rewarded] has, in the same order, and then the floor. Nothing here
+     * decides a reward, so nothing here can withhold one; the only outputs are
+     * an ad on screen or not, and a log line saying which.
+     *
+     * Offline shows nothing and spends no grace. The offline grace is about
+     * rewards the player was owed and could not be served; an interstitial owes
+     * them nothing.
+     *
+     * No Pro sheet on a failure to serve, unlike the rewarded path's stand-in:
+     * that stand-in fills a slot the player volunteered. This is the one ad
+     * nobody asked for, and selling off the back of it is the nag. The Pro
+     * answer to this ad is the button on the cleared screen (SD-147).
+     */
+    private suspend fun interstitial(placement: AdPlacement): Boolean {
+        val every = interstitialEveryLevels()
+        val state = adState.get()
+        val skipped = when {
+            entitlements.isPro.value -> "pro"
+            !adsEnabled() -> "ads_disabled"
+            !rewardedPlacements.isEnabled(placement.configId) -> "placement_disabled"
+            every <= 0 -> "interstitials_off"
+            inNewUserGrace() -> "new_user_grace"
+            state.levelsSinceLastAd < every -> "not_due"
+            appState.isDeviceOffline.value -> "offline"
+            else -> null
+        }
+        // Not due is the ordinary case, four times in five, and not a gate
+        // being shown. Logging it would make the gate look four times busier
+        // than it is.
+        if (skipped == "not_due") return false
+
+        logger.logEvent(
+            "ads.gate_shown",
+            "placement" to placement.configId,
+            "device_offline" to appState.isDeviceOffline.value,
+            "levels_since_last_ad" to state.levelsSinceLastAd,
+        )
+        if (skipped != null) {
+            logger.logEvent(
+                "ads.result",
+                "placement" to placement.configId,
+                "outcome" to "skipped",
+                "reason" to skipped,
+            )
+            return false
+        }
+
+        val started = timeSource.markNow()
+        network.prepare()
+        val outcome = network.show(placement.format)
+        logger.logEvent(
+            "ads.result",
+            "placement" to placement.configId,
+            "outcome" to outcome.result.name,
+            "latency_ms" to started.elapsedNow().inWholeMilliseconds,
+            "error_kind" to outcome.errorKind,
+            "levels_since_last_ad" to state.levelsSinceLastAd,
+        )
+        val shown = outcome.result.wasOnScreen
+        if (shown) adState.update { it.copy(levelsSinceLastAd = 0) }
+        return shown
+    }
+
+    /** The floor is met: at least `ads.interstitialEveryLevels` boards since an ad. */
+    private suspend fun interstitialDue(): Boolean {
+        val every = interstitialEveryLevels()
+        return every > 0 && adState.get().levelsSinceLastAd >= every
     }
 
     /**
@@ -329,3 +420,12 @@ class RealAdGate(
         const val MILLIS_PER_MINUTE = 60_000L
     }
 }
+
+/**
+ * Whether an ad was actually in front of the player. Watched out or closed
+ * early both count; nothing to serve, no network, an SDK that failed and an
+ * ad that never showed do not. This is the reading the interstitial floor
+ * takes, and the only one: it is not a reward decision.
+ */
+private val AdShowResult.wasOnScreen: Boolean
+    get() = this == AdShowResult.Rewarded || this == AdShowResult.Dismissed

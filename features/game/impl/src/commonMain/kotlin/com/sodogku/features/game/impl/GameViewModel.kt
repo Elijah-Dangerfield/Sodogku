@@ -1937,6 +1937,12 @@ class GameViewModel(
                 .logOnFailure { "Failed to record the clear of level ${level.id}" }
             NoStreak
         }
+        // The interstitial floor counts finished boards, the daily included.
+        // The count is one cache write; the preload behind it only fetches
+        // once the floor is met, and is fire and forget, because this sheet
+        // must not wait on a network to appear.
+        adGate.levelCleared()
+        adGate.preload(AdPlacement.LevelComplete)
         val unlocked = unlockedThrough()
         val earnedBadges = recordAttempt(
             level,
@@ -2451,6 +2457,11 @@ class GameViewModel(
             sendEvent(GameEvent.NavigateBack)
             return
         }
+        // The one ad nobody asked for, between two campaign boards and only
+        // when the gate says it is due (SD-148). Pro skips the gate entirely,
+        // as every other ad path does, so a paying player never touches the
+        // SDK. Nothing is granted or withheld: the next board opens either way.
+        if (!entitlements.isPro.value) adGate.showInterstitial(AdPlacement.LevelComplete)
         attemptNumber = 1
         startAttempt(next, resume = savedBoardFor(next))
     }

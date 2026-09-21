@@ -203,6 +203,19 @@ seconds of toast unless tapped.
 
 **The loading bone.** No outline now. Check it on the iOS splash overlay too.
 
+**The Go Pro button (SD-147, 2026-09-21).** Three places: beside the streak
+button at the top of the level pane, a ghost line under Next level on the cleared
+screen, outlined under the revive on the lose sheet. None of them show before
+level 5 and five minutes (the new-user grace), so play past that first. Check the
+pane header still fits with the price on the button at a large font size, that a
+tap opens the store sheet with no Pro sheet first, that the toast lands on a
+purchase, and that the button is gone for Pro.
+
+**The between-levels ad (SD-148, 2026-09-21).** Clear five campaign levels past
+the grace with no other ad and tap Next level: one interstitial, then the board.
+Watch a continue and clear four more: nothing. Nothing on the daily's Next, nothing
+offline. Both are unverified on a device; only the gate is tested.
+
 ## SD-130 [P2] — Fold the three hand-rolled presses in `libraries/ui` back onto `Surface`
 
 **Ask:** Three design-system components build their own press rather than using
@@ -738,52 +751,3 @@ second; `StreakPrompts.kt` for the third.
 - Four other bones keep their outline (the lives row, the refill control, the
   level reward chip, `GameHud`'s `LiveBoneEdge`); the handoff only changed the
   loading bone. Decide whether the rest follow.
-
-## SD-148 [P1] — Ads between levels for players who have not seen one lately
-
-**Ask:** Owner, 2026-09-21: review how often ads show. Today every ad is one the
-player asked for (a continue, a booster, a skip, a freeze), so a careful free
-player sees none at all, which is a funding problem, and a struggling one sees one
-at every gate, which is a spam problem. The proposal: a floor and a ceiling. If a
-free player has cleared N levels since the last ad of any kind, the next Next
-level shows one. If they saw one recently, nothing more is added.
-
-**This reverses a written policy and the owner has to say so.** `features.md#ads`:
-"Every placement being rewarded is policy, not an accident", pinned by
-`AdPolicyTest`, and both `pages/terms.html` and `pages/privacy.html` promise "no
-ads that interrupt play". Building this means: a fifth placement `LevelComplete`
-with `AdFormat.Interstitial` back in `AdNetwork` (the KDoc there records it being
-deleted for having no caller; it now has one), the policy test rewritten to name
-the one non-rewarded placement and its gate, and both legal pages revised in the
-same commit with the date moved.
-
-**Done when:**
-- Config: `ads.interstitialEveryLevels` (default 5; 0 disables) and
-  `LevelComplete` in `ads.rewardedPlacements`' map (rename the key or add a
-  sibling; the map gates placements, not formats).
-- Gate: never for Pro, never in the new-user grace, never offline, never on the
-  daily, and only when `levelsSinceLastAd >= N`. Every ad the gate shows or
-  grants-without-ad resets the counter, so a player who just watched a continue
-  is not shown an interstitial two taps later. The counter lives in `AdState`
-  beside the grace fields.
-- The moment is the Next level tap on the cleared screen, before the next board
-  loads. Never mid-board, never on a loss. Dismissing it costs nothing (there is
-  no reward to withhold) and the board opens either way.
-- The fallback is the one the rewarded path already has: no fill or failure puts
-  up nothing (there is no reward the player was promised, so `requestAdStandIn`
-  is wrong here); a Pro sheet is not shown either, because this is the one ad
-  nobody asked for and selling off the back of it is the nag. The Pro answer to
-  this ad is the SD-147 button on the same screen.
-- Telemetry: `ads.gate_shown` / `ads.result` with the new placement id, plus
-  `levels_since_last_ad`.
-
-**One funnel, not two.** `RealAdGate.showRewarded` is already the single place
-that decides free-or-ad and falls back to Pro. Add `showInterstitial(placement)`
-to `AdGate` beside it rather than a second gate, sharing the free-reason `when`
-(pro, disabled, placement disabled, grace) and the offline handling. The only
-difference is the tail: no reward, no stand-in.
-
-**Hints:** the old `LevelComplete` placement is in git history
-(`git log -S LevelComplete -- libraries/ads`) with its triple gate and three keys;
-read it for what not to repeat. The offline grace should not be spent by an
-interstitial that could not load; it is about rewards the player was owed.

@@ -2855,6 +2855,58 @@ class GameViewModelTest : CoroutineTest() {
         )
     }
 
+    // ------------------------------------------------------------------
+    // The between-levels ad (SD-148)
+    // ------------------------------------------------------------------
+
+    @Test
+    fun aClearedBoardMovesTheInterstitialFloorAlong() = runUnitTest {
+        val gate = FixedAdGate(RewardOutcome.Rewarded)
+        val vm = viewModel(adGate = gate)
+        solveCurrent(vm)
+        settle()
+
+        assertEquals(1, gate.levelsCleared, "the gate was not told a board was finished")
+    }
+
+    @Test
+    fun nextLevelAsksTheGateForAnInterstitialOnTheCampaign() = runUnitTest {
+        val gate = FixedAdGate(RewardOutcome.Rewarded)
+        val vm = viewModel(adGate = gate)
+        solveCurrent(vm)
+
+        vm.takeAction(GameAction.NextLevel)
+        settle()
+
+        assertEquals(1, gate.interstitialsAsked, "Next level did not ask the gate")
+        assertEquals(PlainLevel + 1, vm.state.level?.id, "the next board did not open")
+    }
+
+    @Test
+    fun aProPlayerIsNeverAskedForAnInterstitial() = runUnitTest {
+        val gate = FixedAdGate(RewardOutcome.Rewarded)
+        val vm = viewModel(adGate = gate, entitlements = ProEntitlements())
+        solveCurrent(vm)
+
+        vm.takeAction(GameAction.NextLevel)
+        settle()
+
+        assertEquals(0, gate.interstitialsAsked, "Pro reached the ad gate")
+    }
+
+    @Test
+    fun theDailyNeverAsksForAnInterstitial() = runUnitTest {
+        val gate = FixedAdGate(RewardOutcome.Rewarded)
+        val vm = viewModel(isDaily = true, adGate = gate)
+        solveCurrent(vm)
+
+        vm.takeAction(GameAction.NextLevel)
+        settle()
+
+        assertEquals(0, gate.interstitialsAsked, "the daily's Next asked for an ad")
+        assertEquals(1, gate.levelsCleared, "a daily is still a finished board for the floor")
+    }
+
     @Test
     fun theLevelBeforeTheLastStillOpensTheNextOne() = runUnitTest {
         // The other half of the boundary. An ending one level early is a player
@@ -6916,10 +6968,23 @@ class GameViewModelTest : CoroutineTest() {
     private class FixedAdGate(private val outcome: RewardOutcome) : AdGate {
         var rewardedShown = 0
             private set
+        var interstitialsAsked = 0
+            private set
+        var levelsCleared = 0
+            private set
 
         override suspend fun showRewarded(placement: AdPlacement): RewardOutcome {
             rewardedShown++
             return outcome
+        }
+
+        override suspend fun showInterstitial(placement: AdPlacement): Boolean {
+            interstitialsAsked++
+            return false
+        }
+
+        override suspend fun levelCleared() {
+            levelsCleared++
         }
 
         override fun preload(placement: AdPlacement) = Unit

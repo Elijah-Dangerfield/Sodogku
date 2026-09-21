@@ -5,7 +5,8 @@
   { "path": "ads.failureMode", "type": "string", "default": "CONTINUE", "description": "Third strike: rewarded continue, or lock the level.", "allowedValues": ["CONTINUE", "LOCK"] },
   { "path": "ads.offlineGraceLevels", "type": "int", "default": 3, "description": "Levels a player finishes after an ad gate could not be served offline." },
   { "path": "ads.offlineGraceMinutes", "type": "int", "default": 20, "description": "The wall-clock half of the offline grace." },
-  { "path": "ads.rewardedPlacements", "type": "json", "default": { "continue_level": true, "booster_grant": true, "skip_level": true, "streak_freeze": true }, "description": "Per-placement enable map. An id missing from it resolves to enabled." },
+  { "path": "ads.rewardedPlacements", "type": "json", "default": { "continue_level": true, "booster_grant": true, "skip_level": true, "streak_freeze": true, "level_complete": true }, "description": "Per-placement enable map, the interstitial included. An id missing from it resolves to enabled." },
+  { "path": "ads.interstitialEveryLevels", "type": "int", "default": 5, "description": "Boards a free player clears without an ad before Next level shows an interstitial. 0 turns it off." },
 
   { "path": "progression.skipsPerDay", "type": "int", "default": 3, "description": "Skips a player may take per day, Pro included." },
   { "path": "progression.skipAfterFailedAttempts", "type": "int", "default": 2, "description": "Failed attempts on a level before Skip is offered." },

@@ -9,15 +9,19 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * Every place the app can show an ad. One entry per slot, so config can gate
  * them individually.
  *
- * All of them are **rewarded**, and all of them are asked for. That is the whole
- * policy: the player taps a thing that says an ad is coming and gets something
- * for it. There is no format here that interrupts.
+ * Four are **rewarded** and asked for: the player taps a thing that says an ad
+ * is coming and gets something for it. One is not. [LevelComplete] is the floor
+ * (SD-148, 2026-09-21): a free player who has cleared
+ * `ads.interstitialEveryLevels` levels since the last ad of any kind sees one on
+ * the next Next level, and a player who watched a continue two boards ago sees
+ * nothing extra. It pays nothing, it is never on a board in play, never on the
+ * daily, and never inside the new-user grace. The ceiling is the same counter:
+ * any ad shown, of either kind, resets it.
  *
- * There used to be `LevelComplete`, an interstitial fired automatically after a
- * level behind a frequency gate. It was built, configured, given a triple gate
- * and three remote keys, and never called by anything — so it produced no
- * impressions and cost nothing to delete, and leaving it would have meant the
- * one ad nobody asked for was a single call site away from shipping by accident.
+ * An earlier `LevelComplete` was deleted on 2026-09-14 for having no caller.
+ * This one has exactly one, `GameViewModel.nextLevel`, and `AdPolicyTest` names
+ * it as the one placement that is not rewarded so a second cannot arrive
+ * unargued.
  */
 enum class AdPlacement(
     /**
@@ -44,6 +48,13 @@ enum class AdPlacement(
 
     /** Cover a missed daily and keep the streak. */
     StreakFreeze("streak_freeze"),
+
+    /**
+     * Between two campaign levels, on the Next level tap, when the player has
+     * cleared enough of them without an ad. The one placement that pays
+     * nothing; see the class KDoc.
+     */
+    LevelComplete("level_complete"),
 }
 
 /** How a rewarded ad ended. */
@@ -104,6 +115,27 @@ interface AdGate {
      * false, which is what a gate with no grace to keep means.
      */
     suspend fun inNewUserGrace(): Boolean = false
+
+    /**
+     * The between-levels ad, if one is due. Returns whether an ad was put on
+     * screen, which no caller needs for anything but a log line: there is no
+     * reward to grant and nothing to withhold, and the next board opens either
+     * way. Every gate the rewarded path has (Pro, the kill switches, the
+     * new-user grace) applies, plus the floor: `ads.interstitialEveryLevels`
+     * boards cleared since the last ad of any kind. Offline shows nothing and
+     * spends no grace, because the offline grace is about rewards the player
+     * was owed. Defaults to none shown, which is what a gate with no
+     * interstitial means.
+     */
+    suspend fun showInterstitial(placement: AdPlacement): Boolean = false
+
+    /**
+     * A board was finished. Moves the floor's counter along; nothing else
+     * happens. Called for the daily too, because the counter is "levels since
+     * an ad" and a daily is a level, even though the ad itself never lands on
+     * the daily's Next.
+     */
+    suspend fun levelCleared() = Unit
 }
 
 /**

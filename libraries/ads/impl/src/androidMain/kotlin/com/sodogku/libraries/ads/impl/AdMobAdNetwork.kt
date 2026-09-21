@@ -9,6 +9,8 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.OnUserEarnedRewardListener
 import com.google.android.gms.ads.RequestConfiguration
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.android.ump.ConsentInformation
@@ -82,6 +84,7 @@ class AdMobAdNetwork(
     private var initialised = false
 
     private var rewarded: RewardedAd? = null
+    private var interstitial: InterstitialAd? = null
 
     override suspend fun prepare() {
         if (initialised) return
@@ -102,6 +105,7 @@ class AdMobAdNetwork(
         return Catching {
             when (format) {
                 AdFormat.Rewarded -> showRewarded(activity)
+                AdFormat.Interstitial -> showInterstitial(activity)
             }
         }
             .logOnFailure { "AdMob show threw for $format" }
@@ -115,6 +119,7 @@ class AdMobAdNetwork(
             Catching {
                 when (format) {
                     AdFormat.Rewarded -> if (rewarded == null) rewarded = loadRewarded().getOrNull()
+                    AdFormat.Interstitial -> if (interstitial == null) interstitial = loadInterstitial().getOrNull()
                 }
             }.logOnFailure { "AdMob preload failed for $format" }
         }
@@ -205,6 +210,40 @@ class AdMobAdNetwork(
     }
 
 
+
+    /**
+     * No reward listener and no reward: the only thing to learn is that the
+     * ad closed. `Dismissed` is that, and the gate reads it as "was on screen"
+     * rather than as a withheld reward, because there is none to withhold.
+     */
+    private suspend fun showInterstitial(activity: Activity): AdShowOutcome {
+        val ad = interstitial ?: loadInterstitial().getOrElse { return it.toOutcome() }
+        interstitial = null
+
+        val dismissal = withContext(dispatchers.main) {
+            suspendCancellableCoroutine { cont ->
+                ad.fullScreenContentCallback = resumeOnceCallback(cont::isActive) { cont.resume(it) }
+                ad.show(activity)
+            }
+        }
+
+        return when (dismissal) {
+            is Dismissal.Failed -> AdShowOutcome(AdShowResult.Failed, dismissal.kind)
+            Dismissal.Closed -> AdShowOutcome(AdShowResult.Dismissed)
+        }
+    }
+
+    private suspend fun loadInterstitial(): Catching<InterstitialAd> = load { cont ->
+        InterstitialAd.load(
+            context,
+            AdUnits.android(AdFormat.Interstitial),
+            AdRequest.Builder().build(),
+            object : InterstitialAdLoadCallback() {
+                override fun onAdLoaded(ad: InterstitialAd) = cont(Catching.success(ad))
+                override fun onAdFailedToLoad(error: LoadAdError) = cont(Catching.failure(error.asThrowable()))
+            },
+        )
+    }
 
     private suspend fun loadRewarded(): Catching<RewardedAd> = load { cont ->
         RewardedAd.load(

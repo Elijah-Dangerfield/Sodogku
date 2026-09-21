@@ -6,21 +6,27 @@ import kotlin.experimental.ExperimentalObjCName
 import kotlin.native.ObjCName
 
 /**
- * The one format the app serves.
+ * The two formats the app serves.
  *
- * An enum with a single entry looks like something that wants to be deleted, and
- * it is kept deliberately: the SDK request shape is per-format, the Swift side
- * names it, and a later decision to serve a second format should be an entry
- * here rather than a new parameter threaded through the network.
+ * The SDK request shape is per-format and the Swift side names each one, so a
+ * format is an entry here rather than a parameter threaded through the network.
  *
- * It had four. Interstitial, AppOpen and Banner were all reachable from the
- * network and unreachable from the game: nothing mapped a placement onto them,
- * so between them they had produced no impressions. The policy is that every ad
- * is asked for, and those three are the ones that cannot be.
+ * It had four, then one. Interstitial, AppOpen and Banner were deleted on
+ * 2026-09-14 for being reachable from the network and unreachable from the
+ * game. [Interstitial] came back on 2026-09-21 with exactly one caller (SD-148):
+ * the level-complete floor, for a player who has cleared several levels without
+ * being shown an ad of any kind. AppOpen and Banner stay gone, and
+ * `AdPolicyTest` names the one placement that is not rewarded.
  */
 @ObjCName("AdFormat", exact = true)
 enum class AdFormat {
     Rewarded,
+
+    /**
+     * Full screen, closed by the player, pays nothing. Shown between levels
+     * and nowhere else; [AdShowResult.Dismissed] is its ordinary ending.
+     */
+    Interstitial,
 }
 
 /**
