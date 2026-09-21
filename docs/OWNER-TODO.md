@@ -131,7 +131,14 @@ different identifiers. Anything that says otherwise is stale.
 **App Store Connect: done on 2026-09-21.** App record `6814528705` ("Sodogku",
 SKU `sodogku`, team Nightjar Labs LLC). The non-consumable `sodogku_pro` is
 created (Apple ID `6814529334`, $4.99 base, 175 regions, English localisation);
-it still needs a review screenshot, and it ships with the first app version. All
+it still needs a review screenshot, and it ships with the first app version.
+Version 1.0's page carries the promotional text, description, keywords, support
+URL and four 6.5" screenshots (the export's 1290x2796 frames resized to
+1284x2778, in the README's order); App Information has the subtitle and the
+Games / Puzzle / Board categories; App Privacy has the policy URL. Still yours
+on the Apple side: the App Privacy questionnaire ("Get Started", answers in
+`docs/store/data-safety.md`), the age rating, pricing (Free), content rights,
+and a build. All
 three Game Center boards exist with the exact ids and an English localisation:
 Lifetime Score and Longest Streak (Classic) and Weekly Score (Recurring, 7-day
 duration and interval, first occurrence Monday 2026-09-28 00:00 EDT). None of
@@ -183,6 +190,12 @@ and the default store listing with the short and long description from
 screenshots from the owner's export. Still missing on the listing: 7-inch
 tablet screenshots, which the form marks required.
 
+- Also done on the Play side: category Games / Puzzle, contact email and
+  website, the privacy policy URL, and the "contains ads" declaration. Still
+  yours from the dashboard's content list: sign-in details, content rating
+  (IARC), target audience, data safety (answers in `docs/store/data-safety.md`),
+  government apps, financial features, health. Plus the keystore, Play App
+  Signing, the service account, and the first internal upload.
 - **The `sodogku_pro` managed product cannot be created yet.** Play only offers
   the in-app products page once a build carrying the billing permission has
   been uploaded, so it waits on the first internal-testing upload.
