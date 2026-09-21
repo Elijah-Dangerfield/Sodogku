@@ -195,13 +195,33 @@ Frames were driven with `scripts/dev/drive.py` (`text`, `tap`, `shot`) against a
 | Category | Games → Puzzle | Games → Puzzle (secondary: Board) |
 | Contains ads | Yes | N/A (declared via the label) |
 | In-app purchases | Yes, one managed product `sodogku_pro`, $4.99 | Yes, one non-consumable, same id and price |
-| Content rating | Everyone / 4+, subject to the IARC questionnaire | 4+ |
+| App price | Free, all 175 regions | Free, all 175 regions |
+| Content rating | Everyone, IARC filed 2026-09-21, sole descriptor "In-Game Purchases" | 4+, calculated 2026-09-21, no override |
 | Target audience | 13+ on the general-audience branch (`features.md#audience-and-consent`) | N/A |
-| Privacy policy URL | `pages/privacy.html` via GitHub Pages, **not yet written** | same |
-| Support URL and email | **Not yet decided** (`docs/OWNER-TODO.md`) | same |
+| Privacy policy URL | `https://elijah-dangerfield.github.io/Sodogku/privacy.html` | same |
+| Support URL | `https://elijah-dangerfield.github.io/Sodogku/` | same |
 
 Data safety and the privacy nutrition label are in
 [`data-safety.md`](./data-safety.md), not here.
+
+### The two age-rating answers that are judgement, not fact
+
+Both are on Apple's form and both would be easy to answer differently on a
+re-file, so they are recorded rather than re-derived. Everything else on that
+questionnaire is None or No.
+
+- **Contests: Infrequent.** Apple's 2025 wording is "events that allow users to
+  compete with one another for rankings, rewards, or the achievement of personal
+  goals", which the Game Center boards plainly are. Infrequent rather than
+  Frequent because the boards are a screen you go to from Settings, not part of
+  the loop. It does not move the rating off 4+, but it is why Apple lists
+  **Afghanistan and Morocco** as places the app will not be sold under local law.
+  Answering None would be tidier and would not be true.
+- **Social Media Disabled for Users Under 13: No.** The row stays enabled even
+  with Social Media answered No, and Next will not advance until it is answered.
+  Yes would assert that we call the Declared Age Range API before enabling social
+  features. We have no social features and call no such API, so No is the answer
+  that is true. It has no effect on the rating.
 
 ---
 

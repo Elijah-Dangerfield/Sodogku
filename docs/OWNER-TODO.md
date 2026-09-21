@@ -138,10 +138,21 @@ URL and four 6.5" screenshots (the export's 1290x2796 frames resized to
 Games / Puzzle / Board categories. **App Privacy is filed and published**, on
 2026-09-21, from §5 of `docs/store/data-safety.md`: the policy URL, eight data
 types, all of them Linked to the user, with Device ID and Advertising Data also
-marked Used for Tracking. Still yours on the Apple side: the age rating, pricing
-(Free), content rights, and a build. The `PrivacyInfo.xcprivacy` the label
-implies is written and matches it row for row, so a build no longer carries that
-particular rejection risk (§7.4). All
+marked Used for Tracking, and the `PrivacyInfo.xcprivacy` it implies is written
+and matches it row for row (§7.4).
+
+**Age rating and pricing are done too**, same day. The rating questionnaire
+calculates **4+**, with the app free in all 175 countries and regions and no
+age override. Two answers in it are judgement calls rather than facts, so they
+are written down in `docs/store/listing.md` §5 rather than left to be
+re-derived: Contests is **Infrequent**, for the Game Center boards, and Social
+Media Disabled for Users Under 13 is **No**, because we implement no such
+mechanism. Apple's own note on the result: the app will not be sold in
+**Afghanistan or Morocco** under local law, whatever availability says.
+
+Still yours on the Apple side: content rights (one question, on App
+Information, the button says Set Up Content Rights Information), and a build.
+All
 three Game Center boards exist with the exact ids and an English localisation:
 Lifetime Score and Longest Streak (Classic) and Weekly Score (Recurring, 7-day
 duration and interval, first occurrence Monday 2026-09-28 00:00 EDT). None of
