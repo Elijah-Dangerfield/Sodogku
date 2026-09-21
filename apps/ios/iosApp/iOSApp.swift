@@ -11,10 +11,7 @@ struct iOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootComposeView(
-                appComponent: graph.component,
-                nativeViewFactory: graph.nativeViewFactory
-            )
+            RootComposeView(appComponent: graph.component)
             .onOpenURL { url in
                 // Forward URLs from custom-scheme links and Universal Links
                 // into the Kotlin DeepLinkBridge — App.kt collects from it
@@ -41,7 +38,6 @@ final class AppGraph {
     let reviewLauncher = IOSReviewLauncher()
     let adNetwork = IOSAdNetwork()
     let storeBilling = IOSStoreBilling()
-    let nativeViewFactory = IOSNativeViewFactory.shared
     let component: IosAppComponent
 
     private init() {
@@ -49,8 +45,7 @@ final class AppGraph {
             permissionManager: permissionManager,
             reviewLauncher: reviewLauncher,
             adNetwork: adNetwork,
-            storeBilling: storeBilling,
-            nativeViewFactory: nativeViewFactory
+            storeBilling: storeBilling
         )
         component.telemetry.initialize()
         // Construct every @AutoInit singleton up front — resolving the set is
@@ -143,20 +138,15 @@ final class SceneDelegate: NSObject, UIWindowSceneDelegate {
 struct RootComposeView: View {
     @Environment(\.scenePhase) private var scenePhase
     let appComponent: IosAppComponent
-    let nativeViewFactory: SodogkuNativeViewFactory
 
     var body: some View {
-        ComposeView(
-            appComponent: appComponent,
-            nativeViewFactory: nativeViewFactory
-        )
-        .ignoresSafeArea()
+        ComposeView(appComponent: appComponent)
+            .ignoresSafeArea()
     }
 }
 
 struct ComposeView: UIViewControllerRepresentable {
     let appComponent: IosAppComponent
-    let nativeViewFactory: SodogkuNativeViewFactory
 
     func makeUIViewController(context: Context) -> UIViewController {
         MainViewControllerKt.MainViewController(

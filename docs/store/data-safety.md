@@ -508,13 +508,40 @@ question of whether Auto Backup is itself a declarable transfer never has to be 
 Kept here rather than deleted because it is the reasoning behind an answer two forms depend on, and
 because a future release that flips the flag back re-opens every part of it.
 
-### 7.2 Withdrawn: the camera permission that was never there
+### 7.2 The camera scaffolding that Apple found before we did
 
-The 2026-09-08 pass recorded a `android.permission.CAMERA` line to remove from the manifest and a
-permission entry it would put on the Play listing. Neither exists. The manifest declares no
-permissions at all (§2.10). The scaffolding that suggested otherwise, `rememberCameraPermissionLauncher`
-in `:libraries:ui`, is Kotlin with no call sites and no manifest entry of its own, so it changes
-nothing about the listing. Nothing to do.
+Two passes got this wrong in opposite directions and both are worth keeping, because the shape of
+the mistake is the lesson.
+
+The 2026-09-08 pass claimed `android.permission.CAMERA` was declared in the manifest. It was not,
+and it never had been, so the 2026-09-10 pass withdrew the finding and called the scaffolding
+harmless: `rememberCameraPermissionLauncher` and `PhotoSaver` were Kotlin with no call sites and no
+manifest entry.
+
+**Apple rejected the first build for exactly that scaffolding**, ITMS-90683, on 2026-09-21: the
+`Sodogku.app` bundle referenced camera APIs and had no `NSCameraUsageDescription`. Both earlier
+passes had looked for a *declared permission* and found none. Neither looked for an **API
+reference**, and Apple's scanner only looks for the second. A `uses-permission` line is an Android
+concept; on iOS the trigger is `AVCaptureDevice.requestAccessForMediaType` appearing anywhere in
+the binary, called or not.
+
+What was actually in there, all of it template leftovers from a receipt-scanning app and none of it
+reachable from a game about dogs:
+
+- `IOSNativeViewFactory.swift`, a complete `AVCaptureSession` camera preview with flash control,
+  tilt detection and a guidance label reading "Hold phone flat over receipt". Wired into
+  `IosAppComponent` and provided to Compose, so it was live code rather than dead code.
+- `PermissionLauncher`, camera **and** microphone, on all three source sets.
+- `AudioRecorder`, `AVAudioSession` record permission.
+- `PhotoSaver`, which only touched Foundation and was harmless, deleted for company.
+
+All of it is gone as of 2026-09-21 rather than papered over with a purpose string, because a
+purpose string would have declared a camera use the app does not have and put it on the App Store
+listing. The build was checked afterwards: `strings` over the binary finds no `AVCaptureDevice`,
+`requestAccessForMediaType` or `AVCaptureSession`.
+
+**The lesson for the next SDK.** When asking whether a privacy declaration is needed, grep for the
+API, not for the permission. Dead code is still in the binary.
 
 ### 7.3 There is no deletion path, and no way for a player to name themselves
 

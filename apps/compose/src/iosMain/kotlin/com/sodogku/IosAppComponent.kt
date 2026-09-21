@@ -4,7 +4,6 @@ import com.sodogku.libraries.ads.AdNetwork
 import com.sodogku.libraries.billing.StoreBilling
 import com.sodogku.libraries.sodogku.PermissionManager
 import com.sodogku.libraries.review.ReviewLauncher
-import com.sodogku.libraries.ui.nativeviews.NativeViewFactory
 import me.tatarka.inject.annotations.Provides
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.MergeComponent
@@ -27,7 +26,6 @@ abstract class IosAppComponent(
     private val reviewLauncher: ReviewLauncher,
     private val adNetwork: AdNetwork,
     private val storeBilling: StoreBilling,
-    val nativeViewFactory: NativeViewFactory
 ) : AppComponent {
 
     @Provides
@@ -50,5 +48,4 @@ expect fun create(
     reviewLauncher: ReviewLauncher,
     adNetwork: AdNetwork,
     storeBilling: StoreBilling,
-    nativeViewFactory: NativeViewFactory
 ): IosAppComponent
