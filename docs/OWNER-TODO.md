@@ -150,9 +150,12 @@ Media Disabled for Users Under 13 is **No**, because we implement no such
 mechanism. Apple's own note on the result: the app will not be sold in
 **Afghanistan or Morocco** under local law, whatever availability says.
 
-Still yours on the Apple side: content rights (one question, on App
-Information, the button says Set Up Content Rights Information), and a build.
-All
+**Content rights** is answered too: no third-party content. The app's art, name
+and board are the author's, which is what `pages/terms.html` already says, and
+the question is about licensed content rather than about linked SDKs.
+
+Still yours on the Apple side: a build, the `sodogku_pro` review screenshot, and
+images for the three leaderboards. All
 three Game Center boards exist with the exact ids and an English localisation:
 Lifetime Score and Longest Streak (Classic) and Weekly Score (Recurring, 7-day
 duration and interval, first occurrence Monday 2026-09-28 00:00 EDT). None of
@@ -174,7 +177,8 @@ them has an image yet. What follows is the reference for those records.
   set of ways to go wrong, so it is item 15 rather than a fourth row here.
 
 - A **non-consumable** with product id `sodogku_pro` (see item 7).
-- Age rating and content rights. App Privacy and the screenshots are done.
+- Nothing on the form itself. App Privacy, the age rating, pricing, content
+  rights and the screenshots are all filed; a build is what is missing.
 
 **developer.apple.com → Certificates, Identifiers & Profiles → the App ID:**
 
