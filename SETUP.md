@@ -71,7 +71,7 @@ And under **Settings → Secrets and variables → Actions → Variables** (not 
 | `SENTRY_ORG` | Your Sentry org slug |
 | `SENTRY_PROJECT` | Your Sentry project slug |
 
-`./scripts/setup_sentry.sh` sets all four of the above plus `sentry.dsn` in
+`./scripts/setup_sentry.main.kts` sets all four of the above plus `sentry.dsn` in
 `local.properties`, and checks the token can reach the chunk-upload endpoint
 before writing anything. Worth using rather than clicking through the settings
 pages: getting the org and project in as *secrets* instead of variables is an

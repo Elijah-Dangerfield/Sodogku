@@ -6,19 +6,28 @@ Utility scripts for this project.
 > `verify_template.sh`) is documented in `docs/template-maintenance.md`.
 > Those scripts are removed from generated projects.
 
-## setup_sentry.sh
+## Setup scripts, ported from KMPTemplate
 
-Turns crash reporting on. Prompts for a Sentry auth token (echo off), verifies
-it against the project before writing anything, then sets `sentry.dsn` in
-`local.properties`, the `SENTRY_DSN` / `SENTRY_AUTH_TOKEN` repo secrets, and
-the `SENTRY_ORG` / `SENTRY_PROJECT` repo **variables**:
+These read one machine-local credential store plus one folder of signing
+material that lives outside every repo, so the values that belong to your Apple
+team, your Play account and your Sentry org are entered once and every app
+reuses them.
 
 ```bash
-./scripts/setup_sentry.sh
+./scripts/setup_credentials.main.kts --list   # what is stored, masked
+./scripts/setup_credentials.main.kts          # fill in anything missing
+./scripts/setup_github_secrets.main.kts       # push every release secret to this repo
+./scripts/setup_sentry.main.kts               # Sentry DSN, secrets and variables
+./scripts/setup_fly.main.kts                  # Fly apps and their secrets
+./scripts/setup_supabase.main.kts             # a Postgres per environment
 ```
 
-Safe to re-run. Does not touch the server's own `SENTRY_DSN`, which is a Fly
-secret on a separate deployment. See SETUP.md for where the token comes from.
+`setup_github_secrets.main.kts --dry-run` prints what it would push and why any
+value is missing, without touching the repo. Nothing is required; anything it
+cannot find is reported with what that costs.
+
+This replaced `setup_sentry.sh`, which did one of these jobs with none of the
+shared store behind it.
 
 ## install_hooks.sh
 

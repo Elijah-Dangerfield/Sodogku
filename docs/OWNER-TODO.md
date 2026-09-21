@@ -432,7 +432,7 @@ to end. What follows is only for a second machine or a fresh clone.
 exist; nothing here needs code:
 
 ```bash
-./scripts/setup_sentry.sh
+./scripts/setup_sentry.main.kts
 ```
 
 It prompts for an auth token, checks it, then writes `sentry.dsn` into
