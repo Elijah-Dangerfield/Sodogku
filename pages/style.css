@@ -1,10 +1,13 @@
+/* The app's own palette (libraries/ui Colors.kt): cream page, ivory cards,
+   brown ink, brand blue for links, amber for the rule under the header. */
 :root {
-    --bg: #111214;
-    --surface: #1a1b1e;
-    --text: #f5f5f5;
-    --text-muted: #a0a0a0;
-    --accent: #EC407A;
-    --border: #2a2b2e;
+    --bg: #F5EFE7;
+    --surface: #FFFDF8;
+    --text: #3F2A1E;
+    --text-muted: #6B5648;
+    --accent: #2F8EF4;
+    --brand: #FFB300;
+    --border: #E8DBCC;
 }
 
 * {
@@ -35,7 +38,7 @@ body {
 header {
     margin-bottom: 48px;
     padding-bottom: 32px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 3px solid var(--brand);
 }
 
 .logo {
@@ -43,6 +46,7 @@ header {
     width: 96px;
     height: 96px;
     margin-bottom: 16px;
+    border-radius: 22px;
 }
 
 h1 {

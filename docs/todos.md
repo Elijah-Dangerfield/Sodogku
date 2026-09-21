@@ -611,33 +611,25 @@ flies east across the dateline can lose a local calendar day they never had a
 chance to play. That is a freeze's job (SD-28 in `docs/backlog.md`), not a grace
 window's.
 
-## SD-142 [P1] — Two different streak numbers on one screen, under the same string
+## SD-142 [P2] — The daily's own streak still shows on the daily win, under the play streak's string
 
-**Ask:** The level pane shows the streak twice, with two different numbers, using
-the same string resource for both. A player reads one screen that disagrees with
-itself.
+**Ask:** The level pane no longer prints two streak numbers: the daily card's
+"No streak yet" line came off on 2026-09-21 (the owner read it as the streak
+belonging to the daily). What is left is the same split on the daily's cleared
+screen and in the string names.
 
-**Done when:** the pane shows one streak number, or the two are visibly different
-things with different labels.
+**Done when:** `daily_streak` / `daily_streak_none` / `daily_streak_label` are
+renamed to say which streak they are (they caption the *play* streak on the
+drawer button and the streak ceremonies), and the daily win's `WinBeat.Streak`
+either shows the play streak or is deleted, per `docs/design/streak-freeze.md`
+item 7.
 
-**Where:** `LevelDrawer.kt` line ~178 passes `state.playStreak` to `StreakButton`
-with `Res.string.daily_streak`. Line ~256 passes `status.streak`, the
-daily-only fold from `daily_result`, into `DailyCard`, which renders it at
-display size through the **same** `Res.string.daily_streak`. So a player who
-cleared six campaign boards this week and no dailies sees a run of 6 on the
-button and 0 on the card, both captioned the same way.
+**Where:** `GameOutcomeSheets.kt` `WinBeat.Streak` prints `state.dailyStreak`
+(the daily-only fold) through `Res.string.daily_streak`, the resource the
+drawer's `StreakButton` uses for `playStreak`. `DailyCard` no longer takes a
+streak at all; `DailyStatus.streak` still exists for it and has one fewer reader.
 
-**Hints:** This is the visible half of the split recorded in SD-138 and worked
-through in `docs/design/streak-freeze.md`, which recommends the daily card stop
-printing its own streak entirely. Read that before picking a fix, because
-"relabel both" and "delete one" lead to different work and the design doc argues
-for the second.
-
-The string name is itself a leftover: `daily_streak` predates the streak moving
-off the daily. Whatever the fix, the resource wants renaming with it.
-
-Found while planning the streak freeze, 2026-09-20. Verified by reading both call
-sites; not yet seen on a device.
+Found while planning the streak freeze, 2026-09-20; narrowed 2026-09-21.
 
 ## SD-143 [P2] — Build phase 1 of the streak freeze
 
@@ -746,3 +738,84 @@ second; `StreakPrompts.kt` for the third.
 - Four other bones keep their outline (the lives row, the refill control, the
   level reward chip, `GameHud`'s `LiveBoneEdge`); the handoff only changed the
   loading bone. Decide whether the rest follow.
+
+## SD-147 [P1] — Buy Pro in one tap, from the places a player already is
+
+**Ask:** Owner, 2026-09-21: "I want getting pro super easy." Today the only ways
+in are the Settings row and the four paywall moments, and every one of them opens
+the bottom sheet first. The sheet is right for a cold sell; it is a step in the
+way for a player who has already decided.
+
+**Done when:** a `ProButton` (design system) starts the store purchase directly
+through `Entitlements.purchasePro(trigger)`, with no sheet in between, and it sits
+in at least these places: the level drawer's header (beside the streak button),
+the board-cleared screen (a quiet link under Next level: "No ads. Go Pro."), and
+the continue and skip dialogs beside the ad button. Each place passes its own
+trigger id so `iap.purchase` says where the sale came from. A tap while a purchase
+is in flight is a no-op; outcome feedback is the unlock toast on success
+(`UnlockToastItem`, "Sodogku Pro", no domain type needed) and a one-line message on
+failure. Pro players never see the button. Store price on the button when the store
+has answered, the plain label until it has.
+
+**Rules that still hold:** `features.md#pro` and `#ads`: the Pro offer sits below
+every free path, and a day-zero player is never sold to. The drawer and the
+cleared-screen placements are not offers the player asked for, so they respect the
+new-user grace (`AdsNewUserGraceLevels/Minutes`) the same way an ad does: hidden
+until both legs are past. `paywall.sessionCap` is about the sheet nagging; a
+button that sits still is not a nag and is not capped, but it is behind
+`paywall.triggers` with a new `direct_button` id so it can be switched off.
+
+**Hints:** `PaywallViewModel.purchase()` is the whole purchase flow (outcome to
+message) and can be lifted into a small `BuyPro` use case in `:libraries:billing`
+that both the sheet and the button call. `Entitlements.isPro` is the flow to hide
+on. Do not put the button on the board itself (`features.md#ads`: never on the
+board).
+
+## SD-148 [P1] — Ads between levels for players who have not seen one lately
+
+**Ask:** Owner, 2026-09-21: review how often ads show. Today every ad is one the
+player asked for (a continue, a booster, a skip, a freeze), so a careful free
+player sees none at all, which is a funding problem, and a struggling one sees one
+at every gate, which is a spam problem. The proposal: a floor and a ceiling. If a
+free player has cleared N levels since the last ad of any kind, the next Next
+level shows one. If they saw one recently, nothing more is added.
+
+**This reverses a written policy and the owner has to say so.** `features.md#ads`:
+"Every placement being rewarded is policy, not an accident", pinned by
+`AdPolicyTest`, and both `pages/terms.html` and `pages/privacy.html` promise "no
+ads that interrupt play". Building this means: a fifth placement `LevelComplete`
+with `AdFormat.Interstitial` back in `AdNetwork` (the KDoc there records it being
+deleted for having no caller; it now has one), the policy test rewritten to name
+the one non-rewarded placement and its gate, and both legal pages revised in the
+same commit with the date moved.
+
+**Done when:**
+- Config: `ads.interstitialEveryLevels` (default 5; 0 disables) and
+  `LevelComplete` in `ads.rewardedPlacements`' map (rename the key or add a
+  sibling; the map gates placements, not formats).
+- Gate: never for Pro, never in the new-user grace, never offline, never on the
+  daily, and only when `levelsSinceLastAd >= N`. Every ad the gate shows or
+  grants-without-ad resets the counter, so a player who just watched a continue
+  is not shown an interstitial two taps later. The counter lives in `AdState`
+  beside the grace fields.
+- The moment is the Next level tap on the cleared screen, before the next board
+  loads. Never mid-board, never on a loss. Dismissing it costs nothing (there is
+  no reward to withhold) and the board opens either way.
+- The fallback is the one the rewarded path already has: no fill or failure puts
+  up nothing (there is no reward the player was promised, so `requestAdStandIn`
+  is wrong here); a Pro sheet is not shown either, because this is the one ad
+  nobody asked for and selling off the back of it is the nag. The Pro answer to
+  this ad is the SD-147 button on the same screen.
+- Telemetry: `ads.gate_shown` / `ads.result` with the new placement id, plus
+  `levels_since_last_ad`.
+
+**One funnel, not two.** `RealAdGate.showRewarded` is already the single place
+that decides free-or-ad and falls back to Pro. Add `showInterstitial(placement)`
+to `AdGate` beside it rather than a second gate, sharing the free-reason `when`
+(pro, disabled, placement disabled, grace) and the offline handling. The only
+difference is the tail: no reward, no stand-in.
+
+**Hints:** the old `LevelComplete` placement is in git history
+(`git log -S LevelComplete -- libraries/ads`) with its triple gate and three keys;
+read it for what not to repeat. The offline grace should not be spent by an
+interstitial that could not load; it is about rewards the player was owed.

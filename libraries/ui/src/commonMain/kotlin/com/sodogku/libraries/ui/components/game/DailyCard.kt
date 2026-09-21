@@ -34,8 +34,6 @@ import sodogku.libraries.resources.generated.resources.daily_resets_minutes
 import sodogku.libraries.resources.generated.resources.daily_restore_cta
 import sodogku.libraries.resources.generated.resources.daily_restore_days
 import sodogku.libraries.resources.generated.resources.daily_review
-import sodogku.libraries.resources.generated.resources.daily_streak
-import sodogku.libraries.resources.generated.resources.daily_streak_none
 import sodogku.libraries.resources.generated.resources.daily_title
 import sodogku.libraries.resources.generated.resources.daily_today
 
@@ -67,7 +65,6 @@ enum class DailyCardState {
 @Composable
 fun DailyCard(
     dateLabel: String,
-    streak: Int,
     state: DailyCardState,
     paws: Int,
     resetsIn: Duration,
@@ -111,18 +108,11 @@ fun DailyCard(
             }
         }
 
-        // The streak is the number the card exists for, so it gets the display
-        // scale the level and score already use mid-puzzle rather than another
-        // caption nobody reads twice.
-        Text(
-            text = if (streak > 0) {
-                stringResource(Res.string.daily_streak, streak)
-            } else {
-                stringResource(Res.string.daily_streak_none)
-            },
-            typography = AppTheme.typography.Body.B600,
-            color = if (streak > 0) AppTheme.colors.text else AppTheme.colors.textSecondary,
-        )
+        // No streak line. The card used to print the daily's own run here, and
+        // the drawer's button above it prints the play streak, so one pane read
+        // "No streak yet" under a flame saying nine. The streak is not the
+        // daily's any more (SD-142); the daily's count survives in the streak
+        // page's calendar and nowhere else on this pane.
 
         when (state) {
             DailyCardState.Open -> ButtonPrimary(
@@ -237,14 +227,12 @@ private fun DailyCardPreview() {
         Column(verticalArrangement = Arrangement.spacedBy(Dimension.D500)) {
             DailyCard(
                 dateLabel = "Sep 7",
-                streak = 12,
                 state = DailyCardState.Open,
                 paws = 0,
                 resetsIn = 5.hours + 12.minutes,
             )
             DailyCard(
                 dateLabel = "Sep 7",
-                streak = 0,
                 state = DailyCardState.Completed,
                 paws = 3,
                 resetsIn = 42.minutes,
@@ -252,7 +240,6 @@ private fun DailyCardPreview() {
             )
             DailyCard(
                 dateLabel = "Sep 7",
-                streak = 0,
                 state = DailyCardState.Open,
                 paws = 0,
                 resetsIn = 3.hours,

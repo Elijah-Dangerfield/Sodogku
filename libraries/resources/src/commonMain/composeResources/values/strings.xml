@@ -757,7 +757,7 @@
          where it lands. -->
     <string name="onboarding_rule_lines">Every row and every column holds one dog</string>
     <string name="onboarding_rule_regions">Every color holds one dog</string>
-    <string name="onboarding_rule_touch">No two dogs may touch, not even corner to corner</string>
+    <string name="onboarding_rule_touch">No two dogs may touch. Side to side or diagonally</string>
 
     <!-- Everything below belongs to the streak feature and used to live in
          features/streak/impl's own composeResources. It was moved here so that

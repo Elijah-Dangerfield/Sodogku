@@ -253,7 +253,6 @@ private fun DailyCardSlot(
             stringResource(MonthNames[status.date.month.number - 1]),
             status.date.day,
         ),
-        streak = status.streak,
         state = when (status.result?.outcome) {
             null -> if (isCurrentBoard) DailyCardState.Current else DailyCardState.Open
             DailyOutcome.Completed -> DailyCardState.Completed
