@@ -12,8 +12,10 @@ SDK, or a telemetry attribute changes.**
 **Do not fill a store form straight out of this file.** This document was derived once, against the
 tree as it stood, so every future use of it is a use against a tree it was not written for. (This
 sentence used to read "the forms have been filed once already", which was about the derivation and
-was widely misread as meaning the store questionnaires had been submitted. As of 2026-09-19 no
-store form has been filed, and `docs/OWNER-TODO.md` says neither store app record exists.) Treat the code
+was widely misread as meaning the store questionnaires had been submitted. **The Play Data safety
+form was filed from §4 on 2026-09-21**, with the deletion-request question left blank per §7.3;
+Apple's App Privacy questionnaire is still unfiled, and `docs/OWNER-TODO.md` items 4 and 5 say what
+exists in each console.) Treat the code
 citations as a map of where to look and re-open them; treat §6 and §7, which are policy reasoning
 rather than code facts, as the part that keeps its value between derivations. §8 is the section
 that goes stale first, because it lists code defects and code defects get fixed.

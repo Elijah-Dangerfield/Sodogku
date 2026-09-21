@@ -191,11 +191,15 @@ screenshots from the owner's export. Still missing on the listing: 7-inch
 tablet screenshots, which the form marks required.
 
 - Also done on the Play side: category Games / Puzzle, contact email and
-  website, the privacy policy URL, and the "contains ads" declaration. Still
-  yours from the dashboard's content list: sign-in details, content rating
-  (IARC), target audience, data safety (answers in `docs/store/data-safety.md`),
-  government apps, financial features, health. Plus the keystore, Play App
-  Signing, the service account, and the first internal upload.
+  website, the privacy policy URL, the "contains ads" declaration, and every
+  item on the dashboard's content list: sign-in details (no part restricted),
+  the IARC content rating (Everyone / PEGI 3 and equivalents, "In-Game
+  Purchases" the only descriptor), target audience 13+, the Data safety form
+  from `docs/store/data-safety.md` §4 with **the optional deletion-request
+  question left blank** (§7.3 says it is undecided; the published policy points
+  at the feedback form, so "Yes" is defensible once you have made that call),
+  and No for government, financial and health. Still yours: the keystore, Play
+  App Signing, the service account, and the first internal upload.
 - **The `sodogku_pro` managed product cannot be created yet.** Play only offers
   the in-app products page once a build carrying the billing permission has
   been uploaded, so it waits on the first internal-testing upload.
