@@ -65,3 +65,19 @@ Cleans build artifacts and caches:
 ```bash
 ./scripts/cleanup.sh
 ```
+
+## build_leaderboard_art.py
+
+Builds the three Game Center leaderboard images into
+`docs/store/gamecenter/`, at 1024x1024, RGB, no alpha, which is what App Store
+Connect takes. They are assembled from art the project already owns rather than
+drawn: the app icon's gradient, tilted grid and paws, with a dog still or the
+streak flame on top.
+
+```bash
+./scripts/build_leaderboard_art.py            # rebuild all three
+./scripts/build_leaderboard_art.py --check    # exit 1 if any is out of date
+```
+
+Placeholder in the same sense as the achievement emoji in `AchievementCopy`. If
+real badge art ever lands, point the script at it instead of editing the PNGs.

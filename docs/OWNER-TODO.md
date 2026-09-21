@@ -110,9 +110,9 @@ Also still missing and owner-supplied:
 
 - **Play feature graphic**, 1024x500. Mandatory, does not exist.
 - **Play listing icon**, 512x512.
-- **iOS screenshots** at 6.9". Blocked on item 12. The eight Android frames in
-  `docs/store/screenshots/android-phone/` exist and must not be submitted as
-  iPhone screenshots.
+- **iOS screenshots**: done. Four are uploaded to version 1.0 in the 6.5" slot.
+  The eight Android frames in `docs/store/screenshots/android-phone/` are a
+  separate set and must not be submitted as iPhone screenshots.
 
   **The Android frames are also stale now.** The achievements page was rebuilt
   on 2026-09-10 and no longer looks like the one in the shot. Retake that one at
@@ -130,8 +130,9 @@ different identifiers. Anything that says otherwise is stale.
 
 **App Store Connect: done on 2026-09-21.** App record `6814528705` ("Sodogku",
 SKU `sodogku`, team Nightjar Labs LLC). The non-consumable `sodogku_pro` is
-created (Apple ID `6814529334`, $4.99 base, 175 regions, English localisation);
-it still needs a review screenshot, and it ships with the first app version.
+created (Apple ID `6814529334`, $4.99 base, 175 regions, English localisation)
+and complete; it ships with the first app version, which Apple requires for a
+first non-consumable.
 Version 1.0's page carries the promotional text, description, keywords, support
 URL and four 6.5" screenshots (the export's 1290x2796 frames resized to
 1284x2778, in the README's order); App Information has the subtitle and the
@@ -161,12 +162,18 @@ is needed. `docs/store/listing.md` §4 keeps a copy of both and says how the
 capture was staged. The notes describe entry points, so they go stale if one
 moves.
 
-Still yours on the Apple side: a build, and images for the three leaderboards.
-All
+**All three leaderboards have images**, built by
+`./scripts/build_leaderboard_art.py` out of art the project already owns and
+uploaded at 1024x1024. There is no designed source for these, so they borrow
+the app icon's background and put a dog still or the streak flame on it; if
+real badge art ever lands, rerun the script against it rather than hand-editing
+three PNGs.
+
+Still yours on the Apple side: a build. All
 three Game Center boards exist with the exact ids and an English localisation:
 Lifetime Score and Longest Streak (Classic) and Weekly Score (Recurring, 7-day
-duration and interval, first occurrence Monday 2026-09-28 00:00 EDT). None of
-them has an image yet. What follows is the reference for those records.
+duration and interval, first occurrence Monday 2026-09-28 00:00 EDT), and all
+three now carry an image. What follows is the reference for those records.
 
 - Two **Classic** Game Center leaderboards under Features → Game Center:
 
@@ -176,8 +183,8 @@ them has an image yet. What follows is the reference for those records.
   | Longest Streak | `com.sodogku.leaderboard.longest_streak` | Integer | High to Low | 0 to ~3650 |
 
   **The IDs have to match exactly** (`libraries/leaderboards/.../Leaderboard.kt`).
-  A mismatch fails silently and looks like a board nobody is on. Each needs a
-  localisation and an image.
+  A mismatch fails silently and looks like a board nobody is on. Both have an
+  English localisation and an image.
 
   There is a third board, `com.sodogku.leaderboard.weekly_score`, and it is
   **Recurring** rather than Classic. It has a schedule to fill in and its own
