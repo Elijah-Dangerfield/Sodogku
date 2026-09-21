@@ -13,9 +13,10 @@ SDK, or a telemetry attribute changes.**
 tree as it stood, so every future use of it is a use against a tree it was not written for. (This
 sentence used to read "the forms have been filed once already", which was about the derivation and
 was widely misread as meaning the store questionnaires had been submitted. **The Play Data safety
-form was filed from §4 on 2026-09-21**, with the deletion-request question left blank per §7.3;
-Apple's App Privacy questionnaire is still unfiled, and `docs/OWNER-TODO.md` items 4 and 5 say what
-exists in each console.) Treat the code
+form was filed from §4 on 2026-09-21**, with the deletion-request question left blank per §7.3,
+and **Apple's App Privacy label was filed from §5 and published the same day**, with the §7.6
+Game Center question resolved as no row. `docs/OWNER-TODO.md` items 4 and 5 say what exists in each
+console.) Treat the code
 citations as a map of where to look and re-open them; treat §6 and §7, which are policy reasoning
 rather than code facts, as the part that keeps its value between derivations. §8 is the section
 that goes stale first, because it lists code defects and code defects get fixed.
@@ -368,6 +369,17 @@ Filed per app version in App Store Connect. Categories below use Apple's own nam
 label covers the TestFlight build as well, which is the one surface where the tester feedback panel
 and its screenshot capture exist (§2.5).
 
+**Filed and published on 2026-09-21** against app `6814528705`, exactly the eight rows below, all
+answered Linked to the user, with Device ID and Advertising Data also Used for Tracking. Two things
+the table does not say, learned from filling the form:
+
+- Apple's purpose list is Third-Party Advertising, Developer's Advertising or Marketing, Analytics,
+  Product Personalization, App Functionality, Other Purposes. **There is no Developer
+  Communications**, which is a Play purpose. The Other User Content row was filed as App
+  Functionality alone, since Apple's own description of that purpose covers customer support.
+- Each data type is its own five-step wizard, and two of the five steps are Apple's definitions of
+  tracking with nothing to answer on them.
+
 | Apple category → type | Collected | Linked to the user | Used for tracking | Purposes | Mechanism |
 |---|---|---|---|---|---|
 | **Identifiers → Device ID** | Yes | **See note** | **Yes**, when ATT is granted | Third-Party Advertising, Analytics, App Functionality | The IDFA, read by the Google Mobile Ads SDK after the ATT prompt at `AdNetwork.swift:227-231`. The SDK is now genuinely linked into the app (`project.pbxproj:410-417`). Also our own install id (`CachedInstallIdProvider.kt:57`), which is device-scoped, not user-scoped. |
@@ -526,7 +538,9 @@ package is now in the project** (`project.pbxproj:410-417`), along with `sentry-
 so the SDK set for a first iOS release is known and the file can be written. Confirm while writing
 it that both packages ship their own signed manifests, which is the SDK-side half of the
 requirement and is not something our file can satisfy on their behalf. **What this needs:** the
-file authored and added to the iOS target.
+file authored and added to the iOS target. Filed as **SD-150**, and it went from P2 to P1 when the
+label was published on 2026-09-21, because the console now describes a binary that does not carry
+the matching manifest.
 
 ### 7.5 Data safety "encrypted in transit" for the Grafana endpoint
 
@@ -536,25 +550,30 @@ Cloud gateway in practice, but the claim on the form is only true if the configu
 The Sentry half of that answer is now settled, because a Sentry DSN is an HTTPS URL by
 construction. **What this needs:** confirm the Grafana value when the account exists (`docs/OWNER-TODO.md`).
 
-### 7.6 Game Center, which neither form has an obvious row for
+### 7.6 Game Center, resolved on 2026-09-21: no row
 
-New this pass. On iOS the app submits a lifetime score and a longest streak to Apple's Game Center
+**Answered when the label was filed.** Nothing was ticked for Game Center, on the reading below:
+App Privacy asks what you and your third-party partners collect, a first-party Apple framework is
+neither, and a score submitted through it never reaches us. Gameplay Content was left unticked and
+so was Identifiers → User ID. If Apple ever asks, the conservative move is to add Gameplay Content,
+which is an edit rather than a resubmission. The reasoning that produced the answer follows.
+
+On iOS the app submits a lifetime score and a longest streak to Apple's Game Center
 under the player's Game Center identity (§2.11).
 
 What is clearly true: we collect nothing from it, store nothing, and never read the player's Game
 Center id or alias, so no row in §5 gains a value and **Identifiers → User ID** stays unticked on
 the reading above.
 
-What I could not settle from Apple's published wording: whether App Privacy expects a developer to
+What Apple's published wording does not say either way: whether App Privacy expects a developer to
 declare data that the app causes to flow into a **first-party Apple service** under the user's
-Apple identity, given that the framework is Apple's own and the data never reaches us. The two
-plausible answers are "no row, it is Apple's own service and Apple's own privacy policy governs
-it", which is what most Game Center apps appear to do, and "a Gameplay Content or Other User
-Content row", which is conservative and cannot be a violation.
+Apple identity. The form itself resolves it in practice, because every question it asks is phrased
+as "do you or your third-party partners", and Apple is neither. That is also what most Game Center
+apps appear to do.
 
-**What this needs:** one check against App Store Connect Help, "App privacy details", before the
-label is filed, plus the Kids-branch question in §6. `pages/privacy.html` already describes the
-flow in plain words, which is the part that is definitely required either way. **Not determined.**
+The Kids branch in §6 is still open and still changes this: a Kids Category app has a different
+question about leaderboards entirely. `pages/privacy.html` describes the flow in plain words, which
+is required whichever way the label goes.
 
 ---
 

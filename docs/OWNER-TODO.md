@@ -135,10 +135,13 @@ it still needs a review screenshot, and it ships with the first app version.
 Version 1.0's page carries the promotional text, description, keywords, support
 URL and four 6.5" screenshots (the export's 1290x2796 frames resized to
 1284x2778, in the README's order); App Information has the subtitle and the
-Games / Puzzle / Board categories; App Privacy has the policy URL. Still yours
-on the Apple side: the App Privacy questionnaire ("Get Started", answers in
-`docs/store/data-safety.md`), the age rating, pricing (Free), content rights,
-and a build. All
+Games / Puzzle / Board categories. **App Privacy is filed and published**, on
+2026-09-21, from §5 of `docs/store/data-safety.md`: the policy URL, eight data
+types, all of them Linked to the user, with Device ID and Advertising Data also
+marked Used for Tracking. Still yours on the Apple side: the age rating, pricing
+(Free), content rights, and a build. The privacy label and a build are coupled,
+because a release with no `PrivacyInfo.xcprivacy` (§7.4) can be rejected however
+the label reads. All
 three Game Center boards exist with the exact ids and an English localisation:
 Lifetime Score and Longest Streak (Classic) and Weekly Score (Recurring, 7-day
 duration and interval, first occurrence Monday 2026-09-28 00:00 EDT). None of
@@ -160,7 +163,7 @@ them has an image yet. What follows is the reference for those records.
   set of ways to go wrong, so it is item 15 rather than a fourth row here.
 
 - A **non-consumable** with product id `sodogku_pro` (see item 7).
-- App Privacy questionnaire, age rating, screenshots.
+- Age rating and content rights. App Privacy and the screenshots are done.
 
 **developer.apple.com → Certificates, Identifiers & Profiles → the App ID:**
 
