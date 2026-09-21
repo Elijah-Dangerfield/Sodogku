@@ -92,6 +92,18 @@ interface AdGate {
 
     /** Warms a placement so it is ready when the moment arrives. Fire and forget. */
     fun preload(placement: AdPlacement)
+
+    /**
+     * Whether the player is still inside `features.md#ads`'s new-user grace:
+     * no ads before level 5 or the first five minutes, both legs.
+     *
+     * Exposed because the grace is not only about ads. The standing Go Pro
+     * button (SD-147) hides behind the same window, for the same reason the
+     * gate's own Pro offer sits below every free path: "no more ads" is not
+     * something to sell to a player who has not been shown one. Defaults to
+     * false, which is what a gate with no grace to keep means.
+     */
+    suspend fun inNewUserGrace(): Boolean = false
 }
 
 /**

@@ -309,6 +309,23 @@ data class GameState(
     /** Pro can jump to any level in the drawer, not just the ones reached. */
     val isPro: Boolean = false,
 
+    /**
+     * The standing Go Pro button, or null when none may be drawn: the player
+     * is Pro, `paywall.triggers` has switched it off, or they are inside the
+     * new-user grace and have not been shown an ad yet. One value for the
+     * three places the button appears, so they cannot disagree. See SD-147.
+     */
+    val proOffer: ProOffer? = null,
+
+    /** A purchase is in flight; every Go Pro button is held until it returns. */
+    val proPurchasing: Boolean = false,
+
+    /** Pro just landed from one of the buttons; the toast says so until dismissed. */
+    val proPurchased: Boolean = false,
+
+    /** What a purchase that did not go through has to say. */
+    val proMessage: ProPurchaseMessage? = null,
+
     /** The free dog on early levels, so the UI can mark it as not the player's doing. */
     val starterDogCell: Int? = null,
 
@@ -965,6 +982,13 @@ sealed interface GameAction {
      */
     data class ProChanged(val isPro: Boolean) : GameAction
 
+    /** One of the Go Pro buttons. Starts the store's purchase flow, no sheet first. */
+    data class BuyPro(val source: ProButtonSource) : GameAction
+
+    /** The Pro toast finished, on its own timer or on a tap. */
+    data object DismissProToast : GameAction
+    data object DismissProMessage : GameAction
+
     /** Trade an ad for the level, after enough attempts have failed. */
     data object SkipLevel : GameAction
     data object NextLevel : GameAction
@@ -1142,4 +1166,38 @@ internal fun paceAgainst(elapsedMs: Long, bestMs: Long): Pace = when {
     bestMs <= 0L -> Pace.None
     elapsedMs < bestMs -> Pace.Inside
     else -> Pace.Past
+}
+
+/**
+ * A Go Pro button that may be drawn. Carries the one thing the button shows
+ * that the screen cannot know: the price, as the store formats it, or null
+ * while the store has not answered (the label then has no number in it, which
+ * is the honest state; see `PaywallViewModel`).
+ */
+data class ProOffer(val priceLabel: String?)
+
+/**
+ * Which copy of the Go Pro button was tapped. The [trigger] rides on
+ * `iap.purchase_result`, so the paywall board can say which place sells.
+ * All three are gated by one `paywall.triggers` id, `direct_button`.
+ */
+enum class ProButtonSource(val trigger: String) {
+    /** Beside the streak button at the top of the level pane. */
+    LevelPane("pane_button"),
+
+    /** Under Next level on the board-cleared screen. */
+    Cleared("cleared_button"),
+
+    /** Beside the rewarded continue on the lose sheet. */
+    LostSheet("lost_button"),
+}
+
+/**
+ * What to tell the player when a purchase from a button did not go through.
+ * A cancelled purchase says nothing: they pressed back and know it.
+ */
+enum class ProPurchaseMessage {
+    AlreadyPro,
+    Failed,
+    StoreUnavailable,
 }

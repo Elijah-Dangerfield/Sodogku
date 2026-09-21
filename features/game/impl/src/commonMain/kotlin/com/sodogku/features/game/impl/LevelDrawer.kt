@@ -74,6 +74,7 @@ import sodogku.libraries.resources.generated.resources.month_short_6
 import sodogku.libraries.resources.generated.resources.month_short_7
 import sodogku.libraries.resources.generated.resources.month_short_8
 import sodogku.libraries.resources.generated.resources.month_short_9
+import com.sodogku.libraries.ui.components.button.ProButton
 import com.sodogku.libraries.ui.components.streak.StreakButton
 import sodogku.libraries.resources.generated.resources.daily_streak
 import sodogku.libraries.resources.generated.resources.daily_streak_label
@@ -121,6 +122,10 @@ fun BoxScope.LevelDrawer(
     onUseFreeze: () -> Unit = {},
     onRestoreStreak: () -> Unit = {},
     onOpenStreak: () -> Unit = {},
+    /** The Go Pro button beside the streak, or null when none may be drawn (SD-147). */
+    proOffer: ProOffer? = null,
+    proPurchasing: Boolean = false,
+    onBuyPro: () -> Unit = {},
     width: Dp = DrawerWidth,
 ) {
     val slide = animateFloatAsState(if (open) 1f else 0f, Motion.Pop)
@@ -163,6 +168,17 @@ fun BoxScope.LevelDrawer(
                 typography = AppTheme.typography.Heading.H700,
                 modifier = Modifier.weight(1f),
             )
+            // The one place a player passes on every visit that is not a
+            // board, so the shop is a tap away without a sheet in between.
+            // Hidden with the rest of the offer: Pro, the grace, the switch.
+            if (proOffer != null) {
+                ProButton(
+                    priceLabel = proOffer.priceLabel,
+                    enabled = !proPurchasing,
+                    onClick = onBuyPro,
+                    modifier = Modifier.padding(end = Dimension.D400),
+                )
+            }
             // Here rather than in the board's header, which already carries a
             // menu, a level, a score and a gear. The streak's only input is the
             // Always shown, and showing the *play* streak.

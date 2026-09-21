@@ -49,7 +49,15 @@ class PaywallTriggers(appConfigMap: AppConfigMap) : JsonConfigValue<List<String>
         /** Skip offered after repeated failed attempts, alongside the rewarded skip. */
         const val SKIP_LEVEL = "skip_level"
 
-        val DefaultTriggers: List<String> = listOf(OFFLINE_BLOCK, CONTINUE_LEVEL, SKIP_LEVEL)
+        /**
+         * The standing Go Pro button (SD-147): the level pane, the cleared
+         * screen, the lose sheet. One id for all three because it is one
+         * control; the purchase event carries which copy of it was tapped.
+         * Not a sheet, so `paywall.sessionCap` does not count it.
+         */
+        const val DIRECT_BUTTON = "direct_button"
+
+        val DefaultTriggers: List<String> = listOf(OFFLINE_BLOCK, CONTINUE_LEVEL, SKIP_LEVEL, DIRECT_BUTTON)
     }
 }
 

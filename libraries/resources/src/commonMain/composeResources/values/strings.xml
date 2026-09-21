@@ -640,6 +640,16 @@
     <string name="paywall_nothing_to_restore">No purchase found on this store account.</string>
     <string name="paywall_store_unreachable">Could not reach the store. Try again in a moment.</string>
 
+    <!-- The standing Go Pro button (SD-147): the level pane, the cleared screen
+         and the lose sheet. One tap starts the store, no sheet first. -->
+    <string name="pro_button">Go Pro</string>
+    <string name="pro_button_priced">Go Pro · %1$s</string>
+    <string name="pro_button_pitch">No ads, ever</string>
+    <string name="pro_toast_label">Sodogku Pro</string>
+    <string name="pro_toast_title">You have Pro</string>
+    <string name="pro_toast_body">No ads, and the boosters are on the house.</string>
+    <string name="pro_message_title">Sodogku Pro</string>
+
     <!-- Offline block (`features.md#offline`) -->
     <string name="offline_block_title">No connection</string>
     <string name="offline_block_body">Sodogku is free because of the ads, and there is no way to load one right now. Reconnect to keep playing, or get Pro and play offline as much as you like.</string>

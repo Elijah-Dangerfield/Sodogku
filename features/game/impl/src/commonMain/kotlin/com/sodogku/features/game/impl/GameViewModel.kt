@@ -13,7 +13,11 @@ import com.sodogku.libraries.ads.AdGate
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
+import com.sodogku.libraries.billing.ProductIds
+import com.sodogku.libraries.billing.PurchaseOutcome
+import com.sodogku.libraries.billing.StoreBilling
 import com.sodogku.libraries.config.values.AdsEnabled
+import com.sodogku.libraries.config.values.PaywallTriggers
 import com.sodogku.libraries.config.values.BoostersProSniffsPerAttempt
 import com.sodogku.libraries.config.values.BoostersProTreatsPerAttempt
 import com.sodogku.libraries.config.values.BoostersRefillTo
@@ -211,6 +215,14 @@ class GameViewModel(
      * moment of use; this is only how the buttons say what a tap will do.
      */
     private val adsEnabled: AdsEnabled,
+    /**
+     * The Pro price, for the standing Go Pro button and nothing else. Asked of
+     * the store because a price lives only there (`features.md#pro`); the
+     * purchase itself goes through [entitlements], which owns the flag.
+     */
+    private val store: StoreBilling,
+    /** Whether `paywall.triggers` lists `direct_button`; the button's kill switch. */
+    private val paywallTriggers: PaywallTriggers,
     /**
      * Fire and forget. Nothing here waits on it, reads a result from it or
      * branches on one, because [Leaderboards] offers no way to — see its KDoc.
@@ -627,7 +639,13 @@ class GameViewModel(
             is GameAction.BonesChanged -> action.updateState {
                 it.copy(livesRemaining = action.bones)
             }
-            is GameAction.ProChanged -> action.updateState { it.copy(isPro = action.isPro) }
+            is GameAction.ProChanged -> {
+                action.updateState { it.copy(isPro = action.isPro) }
+                action.refreshProOffer()
+            }
+            is GameAction.BuyPro -> action.buyPro()
+            GameAction.DismissProToast -> action.updateState { it.copy(proPurchased = false) }
+            GameAction.DismissProMessage -> action.updateState { it.copy(proMessage = null) }
             GameAction.SkipLevel -> action.skipLevel()
             GameAction.NextLevel -> action.nextLevel()
             GameAction.LevelsOpened -> action.loadRecords()
@@ -724,6 +742,8 @@ class GameViewModel(
                 showDailyIntro = isDaily && settings?.hasSeenDailyIntro != true,
             )
         }
+
+        refreshProOffer()
 
         // Read here and held in a field, not re-read per board: the flag is
         // written the moment the tutorial ends, and `startAttempt` for the real
@@ -1104,6 +1124,13 @@ class GameViewModel(
                 refillTo = it.refillTo,
                 treatBands = it.treatBands,
                 isPro = it.isPro,
+                // Carried, all four: this builds a fresh GameState, and a Go Pro
+                // button that vanished on every retry, or a toast that was cut
+                // off by the next board, would be this line missing.
+                proOffer = it.proOffer,
+                proPurchasing = it.proPurchasing,
+                proPurchased = it.proPurchased,
+                proMessage = it.proMessage,
                 records = it.records,
                 unlockedThrough = campaignFrontier(unlocked, level.id),
                 daily = it.daily,
@@ -2429,6 +2456,65 @@ class GameViewModel(
     }
 
     /**
+     * Whether a Go Pro button may be drawn, and with what price (SD-147).
+     *
+     * Read at load, on every entitlement change and after every level opens,
+     * because the new-user grace ends on a level count and a wall clock, and
+     * the button should appear when an ad could, not one launch later. The
+     * price is asked once per refresh and a store that cannot answer leaves
+     * the label without a number, which is the honest state.
+     *
+     * Not capped by `paywall.sessionCap`: that cap is about the sheet nagging,
+     * and a button that sits still is not a nag. It is behind `paywall.triggers`
+     * so it can be switched off from the console like the sheets.
+     */
+    private suspend fun GameAction.refreshProOffer() {
+        val offered = !entitlements.isPro.value &&
+            paywallTriggers.isEnabled(PaywallTriggers.DIRECT_BUTTON) &&
+            !adGate.inNewUserGrace()
+        if (!offered) {
+            updateState { it.copy(proOffer = null) }
+            return
+        }
+        val price = Catching { store.priceLabel(ProductIds.pro) }
+            .logOnFailure { "Could not read the Pro price for the button" }
+            .getOrNull()
+        updateState { it.copy(proOffer = ProOffer(priceLabel = price)) }
+    }
+
+    /**
+     * The store's purchase flow, straight from a button. No sheet in between:
+     * the button *is* the pitch, and a player who tapped it has decided.
+     *
+     * A second tap while the first is in flight is dropped rather than queued,
+     * because two purchase flows for one product is the store showing "already
+     * owned" over a sheet the player did not open.
+     */
+    private suspend fun GameAction.BuyPro.buyPro() {
+        if (state.proPurchasing || state.isPro) return
+        logger.logEvent("iap.pro_button_tapped", "source" to source.trigger)
+        updateState { it.copy(proPurchasing = true) }
+        val outcome = entitlements.purchasePro(source.trigger)
+        // The outcome travels as a value: `state` lags `updateState` by a
+        // dispatch, so nothing below reads back what was just written.
+        val bought = outcome is PurchaseOutcome.Success
+        updateState {
+            it.copy(
+                proPurchasing = false,
+                proPurchased = bought,
+                proMessage = outcome.toMessage(),
+            )
+        }
+        // The entitlement flow reports the flip and `ProChanged` takes the
+        // button down; this is the one case where waiting for that dispatch
+        // would leave a Go Pro button on screen next to a toast saying Pro
+        // arrived.
+        if (bought || outcome is PurchaseOutcome.AlreadyOwned) {
+            updateState { it.copy(isPro = true, proOffer = null) }
+        }
+    }
+
+    /**
      * The three numbers the ending reports, or null if the records would not
      * come off disk.
      *
@@ -3233,6 +3319,15 @@ internal fun endsTheCampaign(levelId: Int, isDaily: Boolean): Boolean =
 
 /** [RewardOutcome.GrantedWithoutAd]'s reason when Pro short-circuits the gate. */
 private const val ProGrantReason = "pro"
+
+private fun PurchaseOutcome.toMessage(): ProPurchaseMessage? = when (this) {
+    PurchaseOutcome.Success -> null
+    // The player pressed back. Telling them what they already know is noise.
+    PurchaseOutcome.Cancelled -> null
+    PurchaseOutcome.AlreadyOwned -> ProPurchaseMessage.AlreadyPro
+    PurchaseOutcome.Unavailable -> ProPurchaseMessage.StoreUnavailable
+    is PurchaseOutcome.Failed -> ProPurchaseMessage.Failed
+}
 
 /**
  * Whether this outcome is the game handing over bones it did not have to.

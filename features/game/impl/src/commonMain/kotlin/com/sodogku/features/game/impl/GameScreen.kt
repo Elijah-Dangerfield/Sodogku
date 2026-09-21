@@ -88,6 +88,9 @@ import sodogku.libraries.resources.generated.resources.game_rule_one_per_region
 import sodogku.libraries.resources.generated.resources.game_bones_remaining
 import sodogku.libraries.resources.generated.resources.game_free_bones_label
 import sodogku.libraries.resources.generated.resources.game_free_bones_title
+import sodogku.libraries.resources.generated.resources.pro_toast_body
+import sodogku.libraries.resources.generated.resources.pro_toast_label
+import sodogku.libraries.resources.generated.resources.pro_toast_title
 import sodogku.libraries.resources.generated.resources.game_bones_refill
 import sodogku.libraries.resources.generated.resources.game_booster_sniff
 import sodogku.libraries.resources.generated.resources.game_booster_treat
@@ -247,6 +250,23 @@ fun GameScreen(
             // marking that must not cost the player a tap, on a board they are
             // in the middle of. Never queued with the badges — a refill happens
             // on a board in play and badges land when one ends.
+            // Pro landing from one of the buttons. The same toast as a badge:
+            // it is the one "you just got something" the app draws, and Pro is
+            // the biggest something there is.
+            if (state.proPurchased) {
+                BoardToast(
+                    items = listOf(
+                        UnlockToastItem(
+                            glyph = ProGlyph,
+                            label = stringResource(Res.string.pro_toast_label),
+                            title = stringResource(Res.string.pro_toast_title),
+                            body = stringResource(Res.string.pro_toast_body),
+                        ),
+                    ),
+                    onDismiss = { onAction(GameAction.DismissProToast) },
+                )
+            }
+
             if (state.freeBonesGrant) {
                 BoardToast(
                     items = listOf(
@@ -284,6 +304,16 @@ fun GameScreen(
                 onUseFreeze = { onAction(GameAction.UseFreeze) },
                 onRestoreStreak = { onAction(GameAction.RestoreStreak) },
                 onOpenStreak = { onAction(GameAction.OpenStreak) },
+                proOffer = state.proOffer,
+                proPurchasing = state.proPurchasing,
+                onBuyPro = { onAction(GameAction.BuyPro(ProButtonSource.LevelPane)) },
+            )
+        }
+
+        state.proMessage?.let { message ->
+            ProMessageDialog(
+                message = message,
+                onDismiss = { onAction(GameAction.DismissProMessage) },
             )
         }
 
@@ -1085,6 +1115,9 @@ private val DailyDotSize = Dimension.D400
  * cannot be a toast glyph, which takes a string.
  */
 private const val FreeBonesGlyph = "\uD83E\uDDB4"
+
+/** A star: the glyph the Pro toast wears, and the one thing in the app that gets one. */
+private const val ProGlyph = "\u2B50"
 
 private val BoneGold = Color(0xFFF5C043)
 private val BoneGoldEdge = Color(0xFFC8871B)

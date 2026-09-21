@@ -280,7 +280,7 @@ class RealAdGate(
      * because a fast player and a slow player fail different halves of the same
      * intent, and **both** have to be past for an ad to show.
      */
-    private suspend fun inNewUserGrace(): Boolean {
+    override suspend fun inNewUserGrace(): Boolean {
         val levels = newUserGraceLevels()
         val minutes = newUserGraceMinutes()
         if (levels <= 0 && minutes <= 0) return false

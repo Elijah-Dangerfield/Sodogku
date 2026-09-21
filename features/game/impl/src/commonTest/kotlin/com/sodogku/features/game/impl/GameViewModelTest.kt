@@ -4,12 +4,17 @@ import com.sodogku.libraries.ads.AdGate
 import com.sodogku.libraries.ads.AdPlacement
 import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.billing.Entitlements
+import com.sodogku.libraries.billing.StoreBilling
+import com.sodogku.libraries.billing.StoreOwnership
+import com.sodogku.libraries.billing.StorePurchaseOutcome
+import com.sodogku.libraries.billing.StorePurchaseResult
 import com.sodogku.libraries.billing.PurchaseOutcome
 import com.sodogku.libraries.billing.RestoreOutcome
 import com.sodogku.libraries.config.AppConfigMap
 import com.sodogku.libraries.config.values.BoostersProSniffsPerAttempt
 import com.sodogku.libraries.config.values.BoostersProTreatsPerAttempt
 import com.sodogku.libraries.config.values.AdsEnabled
+import com.sodogku.libraries.config.values.PaywallTriggers
 import com.sodogku.libraries.config.values.BoostersRefillTo
 import com.sodogku.libraries.config.values.BoostersStartingSniffs
 import com.sodogku.libraries.config.values.BoostersStartingTreats
@@ -5258,6 +5263,113 @@ class GameViewModelTest : CoroutineTest() {
         assertEquals(DefaultProBoosters, cache.get().treats)
     }
 
+    // ------------------------------------------------------------------
+    // The Go Pro button (SD-147)
+    // ------------------------------------------------------------------
+
+    @Test
+    fun aFreePlayerPastTheGraceGetsAProButtonWithTheStorePrice() = runUnitTest {
+        val vm = viewModel(store = FakeStore("$4.99"))
+        settle()
+
+        assertEquals(ProOffer(priceLabel = "$4.99"), vm.state.proOffer)
+    }
+
+    @Test
+    fun aStoreThatCannotPriceProStillGetsAButtonWithNoNumberOnIt() = runUnitTest {
+        val vm = viewModel(store = FakeStore(price = null))
+        settle()
+
+        assertEquals(ProOffer(priceLabel = null), vm.state.proOffer)
+    }
+
+    @Test
+    fun aProPlayerGetsNoProButton() = runUnitTest {
+        val vm = viewModel(entitlements = ProEntitlements())
+        settle()
+
+        assertNull(vm.state.proOffer, "Pro was offered Pro")
+    }
+
+    @Test
+    fun theProButtonWaitsOutTheNewUserGrace() = runUnitTest {
+        // `features.md#ads`: a day-zero player is never sold to. The button
+        // hides behind the same window the ads do, so it cannot appear before
+        // the first ad could.
+        val vm = viewModel(adGate = GracedAdGate())
+        settle()
+
+        assertNull(vm.state.proOffer, "the button showed inside the new-user grace")
+    }
+
+    @Test
+    fun theProButtonCanBeSwitchedOffFromConfig() = runUnitTest {
+        val vm = viewModel(config = configOf("paywall.triggers" to listOf("offline_block")))
+        settle()
+
+        assertNull(vm.state.proOffer, "`direct_button` was dropped from paywall.triggers and the button stayed")
+    }
+
+    @Test
+    fun buyingFromAButtonLandsProTheToastAndTakesTheButtonDown() = runUnitTest {
+        val entitlements = RecordingBuyable(PurchaseOutcome.Success)
+        val vm = viewModel(entitlements = entitlements)
+        settle()
+        assertNotNull(vm.state.proOffer, "the fixture has no button to tap")
+
+        vm.takeAction(GameAction.BuyPro(ProButtonSource.Cleared))
+        settle()
+
+        assertTrue(vm.state.isPro)
+        assertTrue(vm.state.proPurchased, "no toast for the purchase")
+        assertNull(vm.state.proOffer, "the button outlived the purchase")
+        assertFalse(vm.state.proPurchasing)
+        assertNull(vm.state.proMessage)
+        assertEquals(listOf<String?>("cleared_button"), entitlements.triggers, "the purchase event does not say which button sold")
+    }
+
+    @Test
+    fun aPurchaseThatDoesNotGoThroughSaysSoAndKeepsTheButton() = runUnitTest {
+        val vm = viewModel(entitlements = RecordingBuyable(PurchaseOutcome.Failed("store")))
+        settle()
+
+        vm.takeAction(GameAction.BuyPro(ProButtonSource.LostSheet))
+        settle()
+
+        assertEquals(ProPurchaseMessage.Failed, vm.state.proMessage)
+        assertFalse(vm.state.isPro)
+        assertFalse(vm.state.proPurchased, "a failed purchase drew the Pro toast")
+        assertNotNull(vm.state.proOffer, "a failed purchase took the button away")
+        assertFalse(vm.state.proPurchasing, "the button stayed held after the store answered")
+    }
+
+    @Test
+    fun aCancelledPurchaseSaysNothing() = runUnitTest {
+        val vm = viewModel(entitlements = RecordingBuyable(PurchaseOutcome.Cancelled))
+        settle()
+
+        vm.takeAction(GameAction.BuyPro(ProButtonSource.LevelPane))
+        settle()
+
+        assertNull(vm.state.proMessage, "the player pressed back and was told about it")
+        assertNotNull(vm.state.proOffer)
+    }
+
+    @Test
+    fun theProButtonSurvivesARetry() = runUnitTest {
+        // `startAttempt` builds a fresh GameState and has dropped a carried
+        // field three times before this one.
+        val vm = viewModel()
+        settle()
+        val before = vm.state.proOffer
+        assertNotNull(before)
+
+        vm.takeAction(GameAction.Retry)
+        settle()
+
+        assertEquals(before, vm.state.proOffer, "starting the board over took the Go Pro button off the pane")
+    }
+
     @Test
     fun aPurchaseMadeWhileTheBoardIsOpenReachesTheBoard() = runUnitTest {
         // Settings is one tap from the board and offers the paywall, so the
@@ -5935,6 +6047,7 @@ class GameViewModelTest : CoroutineTest() {
         // Center, so the default harness runs the same code an Android player
         // does: every submit goes nowhere and nothing notices.
         leaderboards: Leaderboards = NoLeaderboards(),
+        store: StoreBilling = FakeStore(),
     ) = GameViewModel(
         levelId,
         isDaily,
@@ -5966,6 +6079,8 @@ class GameViewModelTest : CoroutineTest() {
         achievementsEnabled = FeatureAchievements(config),
         boostersEnabled = FeatureBoosters(config),
         adsEnabled = AdsEnabled(config),
+        store = store,
+        paywallTriggers = PaywallTriggers(config),
         leaderboards = leaderboards,
         appEvents = AppEvents(lifecycle),
     )
@@ -6788,6 +6903,16 @@ class GameViewModelTest : CoroutineTest() {
         }
     }
 
+    /** The store's answer to a price, and nothing else: purchases go through the entitlements fake. */
+    private class FakeStore(private val price: String? = "$4.99") : StoreBilling {
+        override suspend fun ownership(productId: String): StoreOwnership = StoreOwnership.NotOwned
+        override suspend fun purchase(productId: String): StorePurchaseOutcome =
+            StorePurchaseOutcome(StorePurchaseResult.Cancelled)
+
+        override suspend fun restore(productId: String): StoreOwnership = StoreOwnership.NotOwned
+        override suspend fun priceLabel(productId: String): String? = price
+    }
+
     private class FixedAdGate(private val outcome: RewardOutcome) : AdGate {
         var rewardedShown = 0
             private set
@@ -6817,6 +6942,26 @@ class GameViewModelTest : CoroutineTest() {
      * makes possible: Settings offers the paywall and the player comes straight
      * back to the board they left.
      */
+    /** Answers a purchase with a fixed outcome and remembers which button asked. */
+    private class RecordingBuyable(private val outcome: PurchaseOutcome) : Entitlements {
+        override val isPro = MutableStateFlow(false)
+        val triggers = mutableListOf<String?>()
+        override suspend fun purchasePro(trigger: String?): PurchaseOutcome {
+            triggers += trigger
+            if (outcome is PurchaseOutcome.Success || outcome is PurchaseOutcome.AlreadyOwned) isPro.value = true
+            return outcome
+        }
+        override suspend fun restore() = RestoreOutcome.NothingToRestore
+    }
+
+    /** Inside the new-user grace: every reward is free and nothing may be sold. */
+    private class GracedAdGate : AdGate {
+        override suspend fun showRewarded(placement: AdPlacement): RewardOutcome =
+            RewardOutcome.GrantedWithoutAd("new_user_grace")
+        override fun preload(placement: AdPlacement) = Unit
+        override suspend fun inNewUserGrace(): Boolean = true
+    }
+
     private class BuyableEntitlements : Entitlements {
         override val isPro = MutableStateFlow(false)
         override suspend fun purchasePro(trigger: String?): PurchaseOutcome {

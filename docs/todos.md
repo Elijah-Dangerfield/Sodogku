@@ -739,38 +739,6 @@ second; `StreakPrompts.kt` for the third.
   level reward chip, `GameHud`'s `LiveBoneEdge`); the handoff only changed the
   loading bone. Decide whether the rest follow.
 
-## SD-147 [P1] — Buy Pro in one tap, from the places a player already is
-
-**Ask:** Owner, 2026-09-21: "I want getting pro super easy." Today the only ways
-in are the Settings row and the four paywall moments, and every one of them opens
-the bottom sheet first. The sheet is right for a cold sell; it is a step in the
-way for a player who has already decided.
-
-**Done when:** a `ProButton` (design system) starts the store purchase directly
-through `Entitlements.purchasePro(trigger)`, with no sheet in between, and it sits
-in at least these places: the level drawer's header (beside the streak button),
-the board-cleared screen (a quiet link under Next level: "No ads. Go Pro."), and
-the continue and skip dialogs beside the ad button. Each place passes its own
-trigger id so `iap.purchase` says where the sale came from. A tap while a purchase
-is in flight is a no-op; outcome feedback is the unlock toast on success
-(`UnlockToastItem`, "Sodogku Pro", no domain type needed) and a one-line message on
-failure. Pro players never see the button. Store price on the button when the store
-has answered, the plain label until it has.
-
-**Rules that still hold:** `features.md#pro` and `#ads`: the Pro offer sits below
-every free path, and a day-zero player is never sold to. The drawer and the
-cleared-screen placements are not offers the player asked for, so they respect the
-new-user grace (`AdsNewUserGraceLevels/Minutes`) the same way an ad does: hidden
-until both legs are past. `paywall.sessionCap` is about the sheet nagging; a
-button that sits still is not a nag and is not capped, but it is behind
-`paywall.triggers` with a new `direct_button` id so it can be switched off.
-
-**Hints:** `PaywallViewModel.purchase()` is the whole purchase flow (outcome to
-message) and can be lifted into a small `BuyPro` use case in `:libraries:billing`
-that both the sheet and the button call. `Entitlements.isPro` is the flow to hide
-on. Do not put the button on the board itself (`features.md#ads`: never on the
-board).
-
 ## SD-148 [P1] — Ads between levels for players who have not seen one lately
 
 **Ask:** Owner, 2026-09-21: review how often ads show. Today every ad is one the

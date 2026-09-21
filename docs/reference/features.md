@@ -412,6 +412,16 @@ non-consumable app with no visible restore control.
 **The paywall** is a bottom sheet with four triggers: the offline block, a continue, a
 skip, and a direct tap from Settings. A session cap limits how often it can be offered.
 
+**The Go Pro button is one tap to the store, no sheet first.** It stands in three places
+a player already passes: beside the streak button at the top of the level pane, as a line
+under Next level on the cleared screen, and beside the rewarded continue on the lose
+sheet. It carries the store's price once the store has answered and no number before.
+It is hidden for Pro, hidden inside the new-user grace (a player who has not been shown
+an ad is not sold "no ads"), and switched off by dropping `direct_button` from
+`paywall.triggers`. It is not a sheet, so the session cap does not count it. A purchase
+that lands shows the same toast a badge does; one that fails says so in a dialog; a
+cancelled one says nothing.
+
 **The ad stand-in.** When a gate asked and the network had nothing, the player used to
 carry on with no sign anything was attempted. That case now raises a Pro sheet that holds
 its own close controls briefly, and system back always gets through.

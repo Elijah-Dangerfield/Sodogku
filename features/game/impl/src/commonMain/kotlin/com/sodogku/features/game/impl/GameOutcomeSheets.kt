@@ -35,6 +35,9 @@ import com.sodogku.libraries.ui.components.button.ButtonGhost
 import com.sodogku.libraries.ui.components.button.ButtonPrimary
 import com.sodogku.libraries.ui.components.button.ButtonSecondary
 import com.sodogku.libraries.ui.components.button.ButtonSize
+import com.sodogku.libraries.ui.components.button.ButtonStyle
+import com.sodogku.libraries.ui.components.button.ProButton
+import com.sodogku.libraries.ui.components.button.ProLink
 import com.sodogku.libraries.progress.daily.DailyOutcome
 import com.sodogku.libraries.progress.daily.DailyResult
 import com.sodogku.libraries.progress.daily.DailyStatus
@@ -339,16 +342,29 @@ private fun WinCelebration(state: GameState, onAction: (GameAction) -> Unit, mod
                     Arriving(order, modifier = Modifier.fillMaxWidth()) { WinBeatContent(beat, state, order) }
                 }
             }
-            OnwardButton(
-                state = state,
-                onAction = onAction,
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(
                     start = ScreenGutter,
                     top = ButtonTop,
                     end = ScreenGutter,
                     bottom = insets.calculateBottomPadding().coerceAtLeast(ButtonBottom),
                 ),
-            )
+            ) {
+                OnwardButton(state = state, onAction = onAction, modifier = Modifier)
+                // Under the one button, as a line rather than a second button:
+                // the moment a player is most pleased with the game is the
+                // moment to mention Pro, and a filled button would fight Next
+                // level for the eye. Absent with the rest of the offer.
+                state.proOffer?.let { offer ->
+                    ProLink(
+                        priceLabel = offer.priceLabel,
+                        enabled = !state.proPurchasing,
+                        onClick = { onAction(GameAction.BuyPro(ProButtonSource.Cleared)) },
+                        modifier = Modifier.padding(top = Dimension.D300),
+                    )
+                }
+            }
         }
     }
 }
@@ -692,6 +708,19 @@ private fun LostSheet(state: GameState, onAction: (GameAction) -> Unit) {
             // Refilling always costs an ad, so this one is badged unconditionally
             // — unlike Next level, where an ad is only sometimes due.
             RewardBadge(modifier = Modifier.padding(start = Dimension.D300))
+        }
+        // The other answer to "watch an ad": the same tap the sheet's Pro
+        // offer makes, without the sheet. Outlined, so the revive stays the
+        // thing this screen is for.
+        state.proOffer?.let { offer ->
+            ProButton(
+                priceLabel = offer.priceLabel,
+                size = ButtonSize.Large,
+                style = ButtonStyle.Outlined,
+                enabled = !state.proPurchasing,
+                onClick = { onAction(GameAction.BuyPro(ProButtonSource.LostSheet)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         // On the daily as well, since SD-49. The owner's line was that you
         // should always be able to start from the beginning, and the daily was
