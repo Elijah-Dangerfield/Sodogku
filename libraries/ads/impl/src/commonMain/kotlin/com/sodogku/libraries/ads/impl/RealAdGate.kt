@@ -133,6 +133,21 @@ class RealAdGate(
         adState.update { it.copy(levelsSinceLastAd = it.levelsSinceLastAd + 1) }
     }
 
+    /**
+     * SD-149. Straight through to the network, with none of this class's usual
+     * policy in front of it.
+     *
+     * Every other member here asks "should this player see an ad". This one
+     * asks "does this player have a consent answer on file", which is a
+     * different question and has to stay one. In particular it is not gated on
+     * Pro: buying Pro stops the ads, it does not withdraw a choice the player
+     * already made, and Google's policy is about being able to revisit the
+     * choice.
+     */
+    override suspend fun privacyOptionsRequired(): Boolean = network.privacyOptionsRequired()
+
+    override suspend fun showPrivacyOptions() = network.showPrivacyOptions()
+
     private suspend fun rewarded(placement: AdPlacement): RewardOutcome {
         val offline = appState.isDeviceOffline.value
         logger.logEvent(

@@ -1,5 +1,8 @@
 package com.sodogku.features.settings.impl
 
+import com.sodogku.libraries.ads.AdGate
+import com.sodogku.libraries.ads.AdPlacement
+import com.sodogku.libraries.ads.RewardOutcome
 import com.sodogku.libraries.config.AppConfigMap
 import com.sodogku.libraries.config.values.FeatureAchievements
 import com.sodogku.libraries.config.values.LegalPrivacyUrl
@@ -284,11 +287,40 @@ class SettingsViewModelTest : CoroutineTest() {
         assertEquals(SettingsEvent.OpenFeedback, vm.eventFlow.first())
     }
 
+    /**
+     * SD-149. The row is the whole feature, so the test is about whether it is
+     * offered rather than about what the form does, which is Google's code.
+     *
+     * Both directions matter and for different reasons. Hidden is the answer
+     * for most of the world, and a row that opened nothing would be the bug.
+     * Shown is a Google policy requirement in the EEA, and it is the one that
+     * gets a release rejected if it regresses.
+     */
+    @Test
+    fun theConsentRowIsHiddenWhenUmpHasNothingToAsk() = runUnitTest {
+        val vm = viewModel(InMemoryAppCache(), adGate = SilentAdGate(required = false))
+
+        assertFalse(vm.state.privacyOptionsAvailable)
+    }
+
+    @Test
+    fun theConsentRowAppearsAndOpensTheFormWhenUmpRequiresIt() = runUnitTest {
+        val gate = SilentAdGate(required = true)
+        val vm = viewModel(InMemoryAppCache(), adGate = gate)
+
+        assertTrue(vm.state.privacyOptionsAvailable)
+
+        vm.takeAction(SettingsAction.OpenPrivacyOptions)
+
+        assertEquals(1, gate.shown)
+    }
+
     private fun viewModel(
         cache: AppCache,
         config: AppConfigMap = this.config,
         entitlements: Entitlements = FakeEntitlements(),
         leaderboards: Leaderboards = NoLeaderboards(),
+        adGate: AdGate = SilentAdGate(),
     ) = SettingsViewModel(
         appCache = cache,
         termsUrl = LegalTermsUrl(config),
@@ -296,7 +328,30 @@ class SettingsViewModelTest : CoroutineTest() {
         achievementsEnabled = FeatureAchievements(config),
         entitlements = entitlements,
         leaderboards = leaderboards,
+        adGate = adGate,
     )
+
+    /**
+     * An [AdGate] with nothing to say, which is what a player outside the EEA
+     * gets. Only the two consent members are reachable from Settings; the rest
+     * throw, so a test that somehow shows an ad from this screen fails loudly
+     * rather than passing quietly.
+     */
+    private class SilentAdGate(private val required: Boolean = false) : AdGate {
+        var shown = 0
+
+
+        override suspend fun showRewarded(placement: AdPlacement): RewardOutcome =
+            error("Settings must not show an ad")
+
+        override fun preload(placement: AdPlacement) = error("Settings must not preload an ad")
+
+        override suspend fun privacyOptionsRequired(): Boolean = required
+
+        override suspend fun showPrivacyOptions() {
+            shown++
+        }
+    }
 
     /**
      * A [Leaderboards] that says it is offerable and records the one call this

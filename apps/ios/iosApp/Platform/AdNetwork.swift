@@ -209,6 +209,31 @@ class IOSAdNetwork: NSObject, AdNetwork {
         }
     }
 
+    /// SD-149, the Android side's `privacyOptionsRequired`.
+    ///
+    /// A local read of what the last consent update stored, so it costs nothing
+    /// and shows nothing. Outside the EEA and UK, and before the first ad has
+    /// ever been prepared, this is `.notRequired` and Settings hides the row.
+    func __privacyOptionsRequired() async throws -> KotlinBoolean {
+        #if canImport(GoogleMobileAds)
+        return KotlinBoolean(
+            bool: ConsentInformation.shared.privacyOptionsRequirementStatus == .required
+        )
+        #else
+        return KotlinBoolean(bool: false)
+        #endif
+    }
+
+    /// Presents the form that lets a player change or withdraw consent.
+    /// Swallowed like every other failure here: their choice is unchanged and
+    /// there is nothing useful to tell them.
+    func __showPrivacyOptions() async throws {
+        #if canImport(GoogleMobileAds)
+        guard let root = await Self.rootViewController() else { return }
+        try? await ConsentForm.presentPrivacyOptionsForm(from: root)
+        #endif
+    }
+
     /// Main-actor because the second half presents a view controller. Both
     /// failures are swallowed on purpose: a consent update that errors leaves
     /// `canRequestAds` false, which `prepare` already reads as "no ads today".

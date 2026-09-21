@@ -136,6 +136,20 @@ interface AdGate {
      * the daily's Next.
      */
     suspend fun levelCleared() = Unit
+
+    /**
+     * Whether Settings should offer a way back to the consent form (SD-149).
+     *
+     * Passed through from [AdNetwork.privacyOptionsRequired] rather than
+     * decided here, because only UMP knows. Deliberately **not** gated on Pro:
+     * a player who saw the form before buying still has a choice on record, and
+     * Google's policy is about the choice rather than about whether ads are
+     * currently being served. Defaults to false, which hides the row.
+     */
+    suspend fun privacyOptionsRequired(): Boolean = false
+
+    /** Opens UMP's privacy options form. Only call it when the above is true. */
+    suspend fun showPrivacyOptions() = Unit
 }
 
 /**

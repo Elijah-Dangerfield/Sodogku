@@ -76,6 +76,9 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
         "offlineGraceLevels" to 3,
         "offlineGraceMinutes" to 20,
         "rewardedPlacements" to AdsRewardedPlacements.AllPlacementsOn,
+        // SD-148's floor. Matches AdsInterstitialEveryLevels.default; the
+        // completeness test is what noticed it was missing here.
+        "interstitialEveryLevels" to 5,
     ),
     "progression" to mapOf(
         "skipsPerDay" to 3,

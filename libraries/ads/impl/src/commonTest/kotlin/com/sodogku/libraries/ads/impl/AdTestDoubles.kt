@@ -66,6 +66,16 @@ class FakeAdNetwork(
     override fun preload(format: AdFormat) {
         preloaded += format
     }
+
+    /** SD-149. Off by default, which is what a player outside the EEA sees. */
+    var privacyOptionsRequired: Boolean = false
+    var privacyOptionsShown = 0
+
+    override suspend fun privacyOptionsRequired(): Boolean = privacyOptionsRequired
+
+    override suspend fun showPrivacyOptions() {
+        privacyOptionsShown++
+    }
 }
 
 class FakeEntitlements(isProNow: Boolean = false) : Entitlements {

@@ -14,6 +14,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.android.ump.ConsentInformation
+import com.google.android.ump.ConsentInformation.PrivacyOptionsRequirementStatus
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
 import com.sodogku.libraries.ads.AdFormat
@@ -170,6 +171,40 @@ class AdMobAdNetwork(
         }
         initialised = true
         logger.i { "AdMob initialised" }
+    }
+
+    /**
+     * SD-149. Asked by Settings on every visit, so it has to be cheap and it has
+     * to answer without side effects: no form is shown here and the SDK is not
+     * initialised on this path.
+     *
+     * `getConsentInformation` is a local read of what the last
+     * `requestConsentInfoUpdate` stored, so outside the EEA and UK, and before
+     * the first ad has ever been prepared, this is `NOT_REQUIRED` and the row
+     * stays hidden.
+     */
+    override suspend fun privacyOptionsRequired(): Boolean = Catching {
+        UserMessagingPlatform.getConsentInformation(context)
+            .privacyOptionsRequirementStatus == PrivacyOptionsRequirementStatus.REQUIRED
+    }.logOnFailure { "Could not read the privacy options requirement" }.getOrDefault(false)
+
+    override suspend fun showPrivacyOptions() {
+        val activity = activityProvider.currentActivity() ?: run {
+            logger.i { "No foreground Activity; not showing the privacy options form" }
+            return
+        }
+        withContext(dispatchers.main) {
+            withTimeoutOrNull(CONSENT_TIMEOUT) {
+                suspendCancellableCoroutine { cont ->
+                    UserMessagingPlatform.showPrivacyOptionsForm(activity) { error ->
+                        if (error != null) {
+                            logger.w { "Privacy options form failed: ${error.errorCode} ${error.message}" }
+                        }
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                }
+            }
+        }
     }
 
     private suspend fun requestConsentInfoUpdate(activity: Activity, consent: ConsentInformation) {

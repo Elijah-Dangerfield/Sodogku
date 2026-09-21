@@ -684,6 +684,15 @@
     <string name="settings_pro_active">You have Sodogku Pro</string>
     <string name="settings_pro_active_body">Thank you. No ads, and the boosters are on the house.</string>
     <string name="settings_restore">Restore purchases</string>
+
+    <!--
+      SD-149. Shown only where UMP says the player has a consent answer they may
+      revisit, which is the EEA and UK. "Ad privacy choices" rather than
+      "Consent" because the word consent, on its own, reads like a legal
+      agreement rather than a thing you can change.
+    -->
+    <string name="settings_privacy_options">Ad privacy choices</string>
+    <string name="settings_privacy_options_body">Change what you agreed to about ads and data.</string>
     <string name="settings_restore_working">Asking the store…</string>
     <string name="settings_restore_restored">Restored. Pro is back on this device.</string>
     <string name="settings_restore_nothing">The store has no Sodogku Pro purchase for this account.</string>

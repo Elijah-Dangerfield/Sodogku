@@ -27,6 +27,8 @@ kotlin {
             implementation(projects.libraries.config)
             implementation(projects.libraries.billing)
             implementation(projects.libraries.leaderboards)
+            // For `AdGate.privacyOptionsRequired` — the consent row, SD-149.
+            implementation(projects.libraries.ads)
             implementation(projects.features.paywall)
 
             // Compose dependencies (navigation and lifecycle provided by sodogku.feature plugin)
@@ -45,6 +47,7 @@ kotlin {
             implementation(projects.libraries.config)
             implementation(projects.libraries.billing)
             implementation(projects.libraries.leaderboards)
+            implementation(projects.libraries.ads)
             implementation(projects.features.paywall)
             implementation(libs.kotlinx.coroutines.test)
         }

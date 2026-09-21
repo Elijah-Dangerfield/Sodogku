@@ -109,4 +109,29 @@ interface AdNetwork {
 
     /** Warms a format. Fire and forget; failures are the SDK's problem, not the caller's. */
     fun preload(format: AdFormat)
+
+    /**
+     * Whether this player has a consent choice that UMP says they may revisit.
+     *
+     * Google's EU user consent policy asks that a player who was shown the
+     * consent form can change their answer later from inside the app. UMP
+     * answers that question itself, through `privacyOptionsRequirementStatus`,
+     * and the answer is `false` for everyone outside the EEA and UK. So the
+     * Settings row this feeds is **absent** rather than disabled elsewhere,
+     * which is the point: a row that opens nothing is worse than no row.
+     *
+     * False if the SDK was never initialised, which includes a Pro player who
+     * has never seen an ad.
+     */
+    suspend fun privacyOptionsRequired(): Boolean
+
+    /**
+     * Presents UMP's privacy options form, the one that lets a player withdraw
+     * or change consent. Only meaningful when [privacyOptionsRequired] is true.
+     *
+     * Suspends until the form closes. Failures are swallowed the same way every
+     * other call here swallows them: the player's consent is unchanged and
+     * nothing is said, because there is nothing useful to say.
+     */
+    suspend fun showPrivacyOptions()
 }

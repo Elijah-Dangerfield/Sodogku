@@ -1,6 +1,7 @@
 package com.sodogku.features.settings.impl
 
 import androidx.lifecycle.viewModelScope
+import com.sodogku.libraries.ads.AdGate
 import com.sodogku.libraries.billing.Entitlements
 import com.sodogku.libraries.billing.RestoreOutcome
 import com.sodogku.libraries.config.values.FeatureAchievements
@@ -41,6 +42,10 @@ class SettingsViewModel(
      * offer one: see its KDoc.
      */
     private val leaderboards: Leaderboards,
+    /**
+     * Only for the consent row (SD-149). Nothing on this screen shows an ad.
+     */
+    private val adGate: AdGate,
 ) : SEAViewModel<SettingsState, SettingsEvent, SettingsAction>(
     initialStateArg = SettingsState(appVersion = BuildInfo.versionString()),
 ) {
@@ -69,6 +74,7 @@ class SettingsViewModel(
             SettingsAction.OpenAchievements -> sendEvent(SettingsEvent.OpenAchievements)
             SettingsAction.OpenQaTools -> sendEvent(SettingsEvent.OpenQaTools)
             SettingsAction.OpenLeaderboards -> leaderboards.openDashboard()
+            SettingsAction.OpenPrivacyOptions -> action.openPrivacyOptions()
             is SettingsAction.LeaderboardsOfferable -> action.updateState {
                 it.copy(leaderboardsOfferable = action.offerable)
             }
@@ -92,6 +98,13 @@ class SettingsViewModel(
             it.copy(
                 achievementsAvailable = achievementsEnabled(),
                 isPro = entitlements.isPro.value,
+                // UMP's own answer, and false everywhere it has nothing to say,
+                // which is everywhere outside the EEA and UK. The row is hidden
+                // rather than disabled, because a row that opens nothing is
+                // worse than no row.
+                privacyOptionsAvailable = Catching { adGate.privacyOptionsRequired() }
+                    .logOnFailure { "Could not read the privacy options requirement" }
+                    .getOrDefault(false),
             )
         }
 
@@ -109,6 +122,17 @@ class SettingsViewModel(
                 achievementsVisible = saved.achievementsVisible,
             )
         }
+    }
+
+    /**
+     * Reopens UMP's consent form. Google's EU policy asks for a way back to it
+     * once it has been shown, and this is that way. Nothing is reported
+     * afterwards: the form writes the player's choice itself, and the only
+     * visible consequence is which ads they see next.
+     */
+    private suspend fun SettingsAction.openPrivacyOptions() {
+        Catching { adGate.showPrivacyOptions() }
+            .logOnFailure { "Could not present the privacy options form" }
     }
 
     /**
@@ -234,6 +258,15 @@ data class SettingsState(
     /** Whether this device already has Pro, which decides what the store row offers. */
     val isPro: Boolean = false,
 
+    /**
+     * Whether to offer a way back to the ads consent form (SD-149).
+     *
+     * False for everyone UMP has nothing to ask, which is everyone outside the
+     * EEA and UK, and false before the ad SDK has ever been prepared. The row
+     * is absent in that case rather than disabled.
+     */
+    val privacyOptionsAvailable: Boolean = false,
+
     /** Set while a restore is in flight, and to its result afterwards. */
     val restoreMessage: RestoreMessage? = null,
 
@@ -304,6 +337,8 @@ sealed interface SettingsAction {
 
     /** `Leaderboards.isOfferable` changed. Decides whether the row is drawn. */
     data class LeaderboardsOfferable(val offerable: Boolean) : SettingsAction
+
+    data object OpenPrivacyOptions : SettingsAction
 
     data object OpenPaywall : SettingsAction
 

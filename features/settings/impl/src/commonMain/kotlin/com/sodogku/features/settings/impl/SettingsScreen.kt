@@ -36,6 +36,8 @@ import sodogku.libraries.resources.generated.resources.settings_haptics_body
 import sodogku.libraries.resources.generated.resources.settings_leaderboards
 import sodogku.libraries.resources.generated.resources.settings_leaderboards_body
 import sodogku.libraries.resources.generated.resources.settings_privacy
+import sodogku.libraries.resources.generated.resources.settings_privacy_options
+import sodogku.libraries.resources.generated.resources.settings_privacy_options_body
 import sodogku.libraries.resources.generated.resources.settings_progress_local_body
 import sodogku.libraries.resources.generated.resources.settings_progress_local_title
 import sodogku.libraries.resources.generated.resources.settings_reduce_animations
@@ -230,6 +232,26 @@ fun SettingsScreen(
                     ),
                 ),
             )
+
+            // SD-149, and absent for most of the world on purpose. UMP reports
+            // a privacy-options requirement only where the player was shown the
+            // consent form, so outside the EEA and UK this section never draws.
+            // Its own section rather than a fourth About row, because the About
+            // rows are documents and this one opens a form that changes
+            // something.
+            if (state.privacyOptionsAvailable) {
+                VerticalSpacerD800()
+
+                ListSection(
+                    items = listOf(
+                        ListSectionItem(
+                            headlineText = stringResource(Res.string.settings_privacy_options),
+                            supportingText = stringResource(Res.string.settings_privacy_options_body),
+                            onClick = { onAction(SettingsAction.OpenPrivacyOptions) },
+                        ),
+                    ),
+                )
+            }
 
             // Debug builds only. A hardcoded label rather than a string
             // resource, like every other dev-facing affordance: it never renders

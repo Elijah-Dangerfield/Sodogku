@@ -101,6 +101,8 @@ class RealAdGateTest : CoroutineTest() {
             override suspend fun prepare() = Unit
             override suspend fun show(format: AdFormat): AdShowOutcome = error("SDK exploded")
             override fun preload(format: AdFormat) = Unit
+            override suspend fun privacyOptionsRequired(): Boolean = false
+            override suspend fun showPrivacyOptions() = Unit
         }
 
         val outcome = gate(network = exploding).showRewarded(AdPlacement.BoosterGrant)
@@ -329,6 +331,8 @@ class RealAdGateTest : CoroutineTest() {
             override suspend fun prepare() = Unit
             override suspend fun show(format: AdFormat): AdShowOutcome = error("SDK exploded")
             override fun preload(format: AdFormat) = Unit
+            override suspend fun privacyOptionsRequired(): Boolean = false
+            override suspend fun showPrivacyOptions() = Unit
         }
         val gate = gate(ads = mapOf("interstitialEveryLevels" to 1), network = exploding)
         gate.clearLevels(1)
