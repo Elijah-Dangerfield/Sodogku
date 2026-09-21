@@ -292,10 +292,11 @@ button. `pages/app-ads.txt` authorises the publisher id.
 
 **Still yours:**
 
-- **Flip `AdUnits.useTestUnits` to `false` in the release that ships.** It is
-  left on because a development build requesting a live unit is invalid
-  traffic. Until it flips, every request goes to Google's sample units and
-  earns nothing.
+- ~~Flip `AdUnits.useTestUnits`~~. Gone. It is derived from
+  `BuildInfo.releaseChannel`, so only a `store` build requests a live unit and
+  there is nothing to remember. The one wrinkle is written down in
+  `docs/release-checklist.md` item 8: your first Play upload is a `store` build
+  routed to the internal track, so that binary does carry live units.
 - **Add the store listings to both AdMob apps** (Apps → the app → App
   settings → "Add store") once the Play and App Store records are public.
   Until then the apps read "Requires review" and serving is limited.

@@ -115,21 +115,21 @@ report, and does it once for every app instead of once per app.
 Google's EU consent policy expects a way to change the answer after the form has
 been shown. The AdMob console flagged it when the GDPR message was published.
 
-### 8. Flip the ad units, in the shipping release only · agent
+### 8. Ad units: nothing to do, one thing to know · nobody
 
-- [ ] `AdUnits.useTestUnits = false`.
+`AdUnits.useTestUnits` is derived from `BuildInfo.releaseChannel`, so only a
+`store` build requests the live units and there is no switch to remember. This
+item exists to stop someone adding the switch back.
 
-One line, and deliberately **not** remote config: an ad unit id is a store
-operation, so `AdUnits.kt` is a compile-time table on purpose. Nothing about
-this needs the server to be serving.
+The one case it does not cover: your **first** Play upload is a `store` build
+routed to the internal track, because Play will not accept a production release
+until an approved one exists. That single binary carries live units in front of
+internal testers. Keep the tester list small and do not sit there watching
+rewarded ads, and it is a non-event.
 
-Do it in the release that ships and not before. A build that is not going to the
-public tracks must not request a live unit; those impressions are invalid
-traffic and that is what gets AdMob accounts suspended. Note that this includes
-TestFlight and Play internal builds, which are *release* builds, so "is this a
-debug build" is not the question to ask. See the note on deriving this from
-`BuildInfo.releaseChannel` in `AdUnits.kt` if it has been written by the time
-you read this.
+Note also that none of this is remote config, deliberately. An ad unit id is a
+store operation, so `AdUnits.kt` is a compile-time table and nothing here waits
+on the server.
 
 ### 9. QA the app · you, with an agent
 

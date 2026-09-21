@@ -2,6 +2,7 @@
 
 package com.sodogku.libraries.ads
 
+import com.sodogku.libraries.core.BuildInfo
 import kotlin.experimental.ExperimentalObjCName
 import kotlin.native.ObjCName
 
@@ -19,10 +20,10 @@ import kotlin.native.ObjCName
  *
  * ## Going live
  *
- * Flip [useTestUnits] to `false` and fill in the `Live` blocks. Both are one
- * edit in one file, on purpose — the failure this guards against is a
- * half-migrated app with three real units and one test unit still in it. The
- * app id itself is *not* here: it goes in `AndroidManifest.xml`
+ * There is nothing to flip. [useTestUnits] is derived from the release channel,
+ * so the live units below are requested by the binaries that go to the public
+ * tracks and by nothing else. Fill in the `Live` blocks and that is the whole
+ * migration. The app id itself is *not* here: it goes in `AndroidManifest.xml`
  * (`com.google.android.gms.ads.APPLICATION_ID`) and `Info.plist`
  * (`GADApplicationIdentifier`), because both SDKs read it before any Kotlin
  * runs. `docs/OWNER-TODO.md` lists what has to be created and where each value
@@ -32,14 +33,41 @@ import kotlin.native.ObjCName
 object AdUnits {
 
     /**
-     * The single switch. The live units exist (2026-09-21) and are filled in
-     * below; this stays `true` until the store builds go out, because a
-     * development build requesting a live unit is invalid traffic and gets the
-     * account suspended. Flip it in the release that ships. When it flips,
-     * `Live` must be complete on **both** platforms or the placement falls back
-     * to its test unit rather than silently requesting an empty string.
+     * The release channel that is allowed to request live units.
+     *
+     * Set by `RELEASE_CHANNEL_OVERRIDE` in `.github/workflows/release.yml` and
+     * read back through `BuildInfo.releaseChannel`. The other two values it
+     * takes are `dev`, the local default in `versions.properties`, and `beta`,
+     * which `beta.yml` uses for TestFlight and Play internal.
      */
-    const val useTestUnits: Boolean = true
+    private const val STORE_CHANNEL = "store"
+
+    /**
+     * True for every build except the ones going to the public store tracks.
+     *
+     * Derived rather than hand-flipped, because the thing this guards against
+     * is someone forgetting. A build that is not headed for the store must not
+     * request a live unit: those impressions are invalid traffic and they get
+     * AdMob accounts suspended.
+     *
+     * **`BuildInfo.isDebug` is the wrong question**, which is worth stating
+     * because it is the obvious one. TestFlight and Play internal ship *release*
+     * binaries, so `isDebug` is false in exactly the case that matters most —
+     * a tester watching a rewarded ad is the likeliest source of bad
+     * impressions this app has. The release channel separates them; the build
+     * type does not.
+     *
+     * One case this does not cover, named rather than solved: the first Play
+     * upload is a `store` build routed to the internal track, because Play will
+     * not take a production release until an approved one exists. That single
+     * binary carries live units in front of internal testers. See
+     * `docs/release-checklist.md`.
+     *
+     * `Live` must be complete on **both** platforms before a store build goes
+     * out, or the placement falls back to its test unit rather than silently
+     * requesting an empty string. [pick] does that on purpose.
+     */
+    val useTestUnits: Boolean get() = BuildInfo.releaseChannel != STORE_CHANNEL
 
     /** https://developers.google.com/admob/android/test-ads — reserved sample units. */
     object AndroidTest {

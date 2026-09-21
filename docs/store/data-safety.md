@@ -136,10 +136,11 @@ Collected by the Google Mobile Ads SDK, not by our code. We never read it direct
 - iOS: App Tracking Transparency prompt at `AdNetwork.swift:227-231`, fired from the ad prepare
   path at `:79`, with `NSUserTrackingUsageDescription` at `apps/ios/iosApp/Info.plist:37`.
   `GADApplicationIdentifier` at `Info.plist:29`.
-- **Today the app requests Google's published *test* ad units.** `AdUnits.useTestUnits = true`
-  (`libraries/ads/src/commonMain/.../AdUnits.kt:39`), and both the manifest
-  (`AndroidManifest.xml:74-76`, `com.google.android.gms.ads.APPLICATION_ID`) and `Info.plist:29`
-  carry Google's sample app ids. **This does not change the disclosure.** The SDK is still
+- **Which ad units are requested depends on the release channel.** `AdUnits.useTestUnits` is
+  `BuildInfo.releaseChannel != "store"`, so a `dev` or `beta` build requests Google's published
+  test units and only a store build requests the real ones. The app ids in
+  `AndroidManifest.xml` and `Info.plist` are the real ones in every build, since both SDKs read
+  them before any Kotlin runs. **None of this changes the disclosure.** The SDK is still
   initialised and still reads the advertising identifier, so from the first public release the
   ad-id rows below are required on both platforms.
 

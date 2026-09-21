@@ -65,69 +65,60 @@ terms above need to appear naturally in the long description instead. They do.
 
 ## 3. Long description
 
-Same text for both stores. 4,000 character limit on each; this is about 2,250.
+Same text for both stores. The limit is 4,000 characters on each and this is about 650, which is
+deliberate. The previous draft was 2,250 and read like a feature list with headings. Nobody
+reads a store description to the end; they read the first line and the shape of it.
 
-> Every board is a grid of coloured regions and a simple question: where does each dog go?
->
-> Three rules, and they never change.
->
-> One dog per colour. One dog per row and column. No two dogs touching, not even at the corners.
->
-> That is the whole game. There are no numbers to add up and nothing to memorise. Every level has
-> exactly one solution and can be reached by reasoning alone, because a solver checked every one
-> of them before they shipped. If you are ever stuck, there is something on the board that proves
-> the next move.
->
-> **Tap to think, tap twice to commit.** A single tap crosses a square out and costs nothing, so
-> you can leave notes all over the board while you work. Two quick taps places a dog. Get it right
-> and the dog rules out its own row, column, colour and neighbours for you, and half the board
-> falls into place at once. Get it wrong and it costs a bone.
->
-> **Boards from 4x4 up to 10x10.** They open small and get wider slowly, and the campaign is long
-> enough that the first 10x10 is a long way in. The difficulty is the depth of reasoning a board
-> needs, not the size of it, so a 6x6 can be harder than an 8x8 and sometimes is.
->
-> **No two boards are the same puzzle.** Not even turned around, mirrored, or with the colours
-> swapped. That holds across the whole set and is checked before any of it ships.
->
-> **A daily board.** One puzzle a day, the same one for everyone, with a streak that only counts if
-> you keep showing up. It comes from its own set, so it never hands you a board you were about to
-> play anyway.
->
-> **Two helpers, and neither one solves it for you.** A Sniff dims the board and lights the squares
-> your own deduction has already ruled out, so it shows you the technique rather than the answer. A
-> Treat places one dog correctly with no bone at risk. Both refuse to be spent if they have nothing
-> to add.
->
-> **Plays offline.** Every level is in the app. Nothing to download, nothing to log in to. A long
-> stretch with no connection is a Pro thing, because the free game is paid for by ads it cannot
-> reach.
->
-> **No account, ever.** There is no sign-up, no email, no password. Your progress lives on this
-> phone.
->
-> **Built to be readable.** Region colours are the mechanic, and no set of ten colours survives
-> red-green colour blindness, so there is a setting that puts a distinct shape on every colour as
-> well. Every animation can be turned down.
->
-> Sodogku Pro is a one-off purchase that removes ads, makes offline play unlimited, and starts
-> every board with helpers in hand.
+Spelled **colored**, not coloured, because both listings are US English. The rest of this repo
+writes British English and this one field deliberately does not.
 
-### Things deliberately not in it
+> Sodogku is sudoku with dogs instead of numbers.
+>
+> Every board is a grid of colored regions, and every region hides one dog. Work out where each
+> one goes: one dog per color, one per row and column, and no two touching, not even at the
+> corners. Tap once to cross a square off, twice to place a dog. Get it wrong and it costs you a
+> bone.
+>
+> Boards run from 4x4 up to 10x10. Every one has exactly one answer and you can reason your way
+> to all of it, so there is never anything to guess. There is a new board every day as well, the
+> same one for everybody.
+>
+> No account, no signup, nothing to sign in to.
+>
+> Sodogku Pro is a one-time purchase: no ads, unlimited offline play, and boosters topped back up
+> at the start of every attempt.
+>
+> Go find the dogs.
+
+### What came out, and why
+
+The cuts are the point, so they are listed rather than just made.
+
+- **The auto-marking sentence was wrong**, not merely long. It said placing a dog correctly
+  "rules out its own row, column, colour and neighbours for you, and half the board falls into
+  place at once". That is the "Cross off squares for me" setting, and `AppCache.autoMarkEnabled`
+  defaults to **false**, so it is not what a new player sees. It would have been the first thing
+  in the listing a reviewer could call untrue.
+- **"Plays offline" is gone as a flat claim.** Every level is in the app, but the free game needs
+  a connection for ads and `pages/terms.html` says so. Offline now appears only where it is
+  unconditionally true, in the Pro line.
+- **The two helpers, the uniqueness guarantee, the colourblind setting and the difficulty
+  curve** were all true and all cut. They are reasons to keep playing, not reasons to install,
+  and the screenshots carry more of them than a paragraph does.
+- **No count of levels.** It went stale once already, at 500, and a number in the long
+  description can only be corrected through a release. The App Store promotional text is the
+  field for anything that grows, because it can be edited without submitting a build.
+
+### Still deliberately absent
 
 - No "endless hours of fun", no "train your brain", no claim about IQ or cognition.
-- No feature that is behind a flag or unbuilt. Achievements exist and are not mentioned, because
-  a badge count is not a reason to install and the space is better spent on the rules.
-- No score-and-paws explanation. It is a good system and it does not fit in a store listing; the
-  screenshot carries it.
-- **No leaderboards**, deliberately, even though they are built. This is one description for both
-  stores, and on Android every board id is still an empty string, so the feature is inert there
-  and the row is not even drawn (`features.md#leaderboards`). A sentence that is true on iPhone
-  and false on a Pixel is worse than no sentence. Revisit when the Play Console ids exist.
-- **No sharing.** There used to be a line here about posting your daily result as coloured
-  squares. The whole feature was removed, launchers and strings and all
-  (`features.md#what-the-game-does-not-have`), and the sentence outlived it by long enough to be
-  worth recording.
+- No achievements. A badge count is not a reason to install.
+- **No leaderboards**, even though they are built, because on Android every board id is still an
+  empty string and the feature is inert there. One description serves both stores, and a sentence
+  that is true on an iPhone and false on a Pixel is worse than no sentence.
+- **No sharing.** The feature was removed entirely
+  (`features.md#what-the-game-does-not-have`) and the sentence about posting coloured squares
+  outlived it long enough to be worth recording here.
 
 ---
 
