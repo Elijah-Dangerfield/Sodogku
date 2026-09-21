@@ -154,8 +154,14 @@ mechanism. Apple's own note on the result: the app will not be sold in
 and board are the author's, which is what `pages/terms.html` already says, and
 the question is about licensed content rather than about linked SDKs.
 
-Still yours on the Apple side: a build, the `sodogku_pro` review screenshot, and
-images for the three leaderboards. All
+The `sodogku_pro` **review screenshot is uploaded** as well, a real capture of
+the paywall rather than an export frame (`docs/store/listing.md` §4 says where
+the copy lives and how it was staged). Its Review Notes field is still empty,
+and a line naming the path to the purchase, Settings then "Get Sodogku Pro", is
+worth adding before submission.
+
+Still yours on the Apple side: a build, and images for the three leaderboards.
+All
 three Game Center boards exist with the exact ids and an English localisation:
 Lifetime Score and Longest Streak (Classic) and Weekly Score (Recurring, 7-day
 duration and interval, first occurrence Monday 2026-09-28 00:00 EDT). None of

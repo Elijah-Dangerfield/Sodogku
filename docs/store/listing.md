@@ -179,10 +179,22 @@ Frames were driven with `scripts/dev/drive.py` (`text`, `tap`, `shot`) against a
 - **No onboarding or tutorial frame.** Capturing one needs `drive.py launch --fresh`, which wipes
   app data, and another agent was mid-session on the same emulator. Worth adding: a coach-mark
   frame is a good #2 or #3 for a puzzle game because it says "this teaches you".
-- **No iOS screenshots.** App Store Connect needs 6.9" (1320x2868) and, if the app supports iPad,
-  13". They have to come from an iOS simulator, and iOS has never been run on this machine
-  (`xcode-select` points at something that is not Xcode, per BUILD-PLAN C0). Android renders must
-  not be submitted as iPhone screenshots.
+- **iOS product-page screenshots are uploaded**, four of them, from the designed export frames
+  resized to 1284x2778 for the 6.5" slot. The claim that lived here, that iOS had never been run on
+  this machine, stopped being true well before that: Xcode builds and the simulator both work.
+
+- **The `sodogku_pro` review screenshot is a real capture, not an export frame**, and lives at
+  `docs/store/screenshots/ios-review/sodogku-pro-iap.png`. 1206x2622 from an iPhone 17 Pro
+  simulator, taken of the actual paywall reached through Settings, "Get Sodogku Pro". It is the
+  copy of what Apple holds; re-upload it rather than re-shooting if the console ever loses it.
+  Two things about the capture that are not obvious:
+  - **The price renders.** `$4.99` comes back from StoreKit on the simulator even with no
+    `Products.storekit` configuration, which is not what `StoreBilling.swift`'s setup comment
+    predicts. Do not assume a blank price and mock one up.
+  - **The status bar was staged**, `simctl status_bar ... override --time 9:41`, and the app was
+    relaunched from the home screen first, because launching it over another app leaves a
+    "◀ Doublestack" return chip in the corner that no override removes. Clear the override
+    afterwards.
 - **No feature graphic** (Play, 1024x500) and no App Store preview video. Both want the icon
   artwork first.
 
