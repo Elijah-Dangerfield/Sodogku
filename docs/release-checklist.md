@@ -11,6 +11,31 @@ and the exact console path. This file is only the order and the ownership.
 **Who** is `you` for anything needing a password, a payment method or a
 physical file, and `agent` for anything that is a change to this repo.
 
+## Context, for anyone picking this up cold
+
+Sodogku is a Kotlin Multiplatform puzzle game, Compose UI on both platforms,
+free with ads and one non-consumable unlock called Sodogku Pro at $4.99.
+
+| | |
+|---|---|
+| Android package | `com.sodogku` |
+| iOS bundle id | `com.sodogku.Sodogku`, **not** `com.sodogku` |
+| Play app | `4973873913912329622`, Nightjar Labs |
+| App Store app | `6814528705`, in-app purchase `6814529334` |
+| AdMob publisher | `pub-7008637445039253` |
+| Release automation | release-please, then `.github/workflows/release.yml` |
+
+Three release channels, set by `RELEASE_CHANNEL_OVERRIDE` and readable at
+runtime as `BuildInfo.releaseChannel`: `dev` locally, `beta` from `beta.yml`
+(TestFlight and Play internal), `store` from `release.yml`. Several items below
+only apply to one of them.
+
+Where the detail lives: `OWNER-TODO.md` for credentials and console work,
+`todos.md` for the `SD-` queue, `docs/store/` for listing copy and the derived
+privacy answers, `docs/reference/features.md` for what the app actually does.
+Anything one of those asserts about a console is a claim as of a date, not a
+live reading. Check the console before acting on it.
+
 ---
 
 ## Required
@@ -90,15 +115,7 @@ report, and does it once for every app instead of once per app.
 Google's EU consent policy expects a way to change the answer after the form has
 been shown. The AdMob console flagged it when the GDPR message was published.
 
-### 8. Tablet screenshots · agent
-
-- [ ] 7-inch and 10-inch, captured from an emulator.
-
-Both are marked required on the Play listing form. The listing did save without
-them, so this is not proven to block the release step, but they are cheap to
-produce and the alternative is finding out at submission.
-
-### 9. Flip the ad units, in the shipping release only · agent
+### 8. Flip the ad units, in the shipping release only · agent
 
 - [ ] `AdUnits.useTestUnits = false`.
 
@@ -106,10 +123,15 @@ One line, and deliberately **not** remote config: an ad unit id is a store
 operation, so `AdUnits.kt` is a compile-time table on purpose. Nothing about
 this needs the server to be serving.
 
-Do it in the release that ships and not before. A development build requesting a
-live unit is invalid traffic, and that is what gets AdMob accounts suspended.
+Do it in the release that ships and not before. A build that is not going to the
+public tracks must not request a live unit; those impressions are invalid
+traffic and that is what gets AdMob accounts suspended. Note that this includes
+TestFlight and Play internal builds, which are *release* builds, so "is this a
+debug build" is not the question to ask. See the note on deriving this from
+`BuildInfo.releaseChannel` in `AdUnits.kt` if it has been written by the time
+you read this.
 
-### 10. QA the app · you, with an agent
+### 9. QA the app · you, with an agent
 
 - [ ] A full pass on a real iPhone and a real Android device, not a simulator.
 
@@ -150,9 +172,10 @@ None of these block a release.
 ## Already done
 
 Listed so nobody redoes them. Both store records exist with listings, pricing,
-categories and screenshots. Apple: App Privacy published, `PrivacyInfo.xcprivacy`
-written, age rating 4+, content rights, `sodogku_pro` complete with its review
-screenshot and notes, all three Game Center boards with images, and the Paid
-Applications agreement signed. Play: IARC rating, Data safety, target audience
-and every other content declaration. AdMob: both apps, four units, the GDPR
-message. Sentry: live in CI and on this machine.
+categories and screenshots, including Play's phone, 7-inch and 10-inch sets.
+Apple: App Privacy published, `PrivacyInfo.xcprivacy` written, `SKAdNetworkItems`
+filled with 50 buyers, age rating 4+, content rights, `sodogku_pro` complete with
+its review screenshot and notes, all three Game Center boards with images, and
+the Paid Applications agreement signed. Play: IARC rating, Data safety, target
+audience and every other content declaration. AdMob: both apps, four units, the
+GDPR message. Sentry: live in CI and on this machine.
