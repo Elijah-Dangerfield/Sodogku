@@ -84,17 +84,17 @@
 
         <!--
           AdMob reads this before any Kotlin runs, so it cannot live in
-          `AdUnits.kt` with the ad unit ids. The value below is Google's
-          published *sample* app id, which pairs with the sample ad units in
-          `AdUnits.AndroidTest`. Replace it with the real one from the AdMob
-          console at the same time as `AdUnits.useTestUnits` flips — the SDK
+          `AdUnits.kt` with the ad unit ids. This is the real id of
+          "Sodogku (Android)" in the AdMob console (2026-09-21); the units it
+          pairs with are in `AdUnits.AndroidLive`, and `AdUnits.useTestUnits`
+          decides whether those or Google's samples are requested. The SDK
           crashes the app at startup if this key is missing entirely, and
           silently serves nothing if it names an app the ad units do not
           belong to.
         -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-7008637445039253~4172266958" />
 
         <!--
           Play Games Services reads its project number from here, the way AdMob

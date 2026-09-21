@@ -192,55 +192,28 @@ Package `com.sodogku`, read from `versions.properties:1` by
 
 ---
 
-## 6. AdMob: nothing exists yet, and the app ships Google's test IDs
+## 6. AdMob: the records exist, the switch is still on
 
-Every ad identifier compiled into the app today is a Google-published sample,
-labelled as such in source:
+**Done on 2026-09-21** in the AdMob console (publisher `pub-7008637445039253`):
+two apps, "Sodogku (Android)" `~4172266958` and "Sodogku (iOS)" `~9668136217`,
+each with a rewarded unit and an interstitial unit. All six values are in
+`AdUnits.kt` (`AndroidLive` / `IosLive`), and the two app ids are in
+`AndroidManifest.xml` and `Info.plist`. A GDPR message ("Sodogku GDPR message")
+is published for both apps with the privacy policy URL and a Do not consent
+button. `pages/app-ads.txt` authorises the publisher id.
 
-| Value | Where | What it is |
-|---|---|---|
-| `ca-app-pub-3940256099942544/5224354917` | `AdUnits.kt:43` | Android rewarded **test** unit |
-| `ca-app-pub-3940256099942544/1712485313` | `AdUnits.kt:51` | iOS rewarded **test** unit |
-| `ca-app-pub-3940256099942544~3347511713` | `AndroidManifest.xml:76` | Android **test** app id |
-| `ca-app-pub-3940256099942544~1458002511` | `Info.plist:30` | iOS **test** app id |
-| `""` | `AdUnits.kt:59`, `:64` | the real units, unset |
-| `useTestUnits = true` | `AdUnits.kt:39` | the switch, still on |
+**Still yours:**
 
-**Rewarded only, which matches the decision that ads pay for bones and sniffs
-and nothing else.** `AdNetwork.kt:22-24` declares exactly one `AdFormat`. So:
-two AdMob apps, one per platform, one rewarded unit each. **Four values.**
-
-Real ones look like `ca-app-pub-<16 digits>~<10 digits>` for an app id and
-`ca-app-pub-<16 digits>/<10 digits>` for a unit id.
-
-The **app id has to go into both native files** as well, because both SDKs read
-it before any Kotlin runs (`AdUnits.kt:26-29` explains why it cannot live with
-the unit ids). On Android a missing key crashes the app at startup and a wrong
-one silently serves nothing.
-
-Also in the AdMob console: set the **GDPR message** under Privacy & messaging.
-Without it the UMP form has nothing to display in the EEA and
-`isConsentFormAvailable` is false at `AdMobAdNetwork.kt:136`.
-
-Two related gaps:
-
-- **No `app-ads.txt`.** `pages/` does not have one. AdMob wants it on the
-  developer website named in the listing to authorise sellers. Missing it
-  depresses fill rate.
-- **The iOS ads SDK is in the project now**, so the rest of this bullet is what
-  is left rather than the whole of it. `project.pbxproj:426-429` references the
-  `GoogleMobileAds` product from `swift-package-manager-google-mobile-ads`, and
-  it resolves and links in a device build. The `#if canImport(GoogleMobileAds)`
-  guards in `Platform/AdNetwork.swift` are therefore live rather than compiled
-  out, and iOS no longer grants every reward for free. What is still a revenue
-  blocker is the four real ad unit ids below.
-
-  One thing to watch: the project references only the `GoogleMobileAds` product,
-  and consent is guarded by `#if canImport(UserMessagingPlatform)` on the
-  assumption that the ads product carries it. If that stops being true for a
-  pinned version, consent is skipped with no build error.
-
----
+- **Flip `AdUnits.useTestUnits` to `false` in the release that ships.** It is
+  left on because a development build requesting a live unit is invalid
+  traffic. Until it flips, every request goes to Google's sample units and
+  earns nothing.
+- **Add the store listings to both AdMob apps** (Apps → the app → App
+  settings → "Add store") once the Play and App Store records are public.
+  Until then the apps read "Requires review" and serving is limited.
+- **A way to change consent inside the app.** Google's EU policy wants a
+  privacy-options entry point once the UMP form has been shown (the console
+  calls it the revocation link). Filed as SD-149 in `docs/todos.md`.
 
 ## 7. In-app purchase: one product, same ID on both stores
 

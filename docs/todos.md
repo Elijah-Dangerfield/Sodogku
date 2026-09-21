@@ -751,3 +751,23 @@ second; `StreakPrompts.kt` for the third.
 - Four other bones keep their outline (the lives row, the refill control, the
   level reward chip, `GameHud`'s `LiveBoneEdge`); the handoff only changed the
   loading bone. Decide whether the rest follow.
+
+## SD-149 [P2] — A Settings row that reopens the ads consent form
+
+**Ask:** Google's EU user consent policy asks that a player who was shown the
+UMP consent form can change their choice later from inside the app. The AdMob
+console flagged it on publishing the GDPR message (2026-09-21). Nothing in the
+app opens the form a second time.
+
+**Done when:** Settings shows a "Privacy options" row only when the UMP SDK
+reports `privacyOptionsRequirementStatus == REQUIRED`, and tapping it presents
+`UserMessagingPlatform.showPrivacyOptionsForm` (Android) /
+`ConsentForm.presentPrivacyOptionsForm` (iOS). Absent everywhere else, so a
+player outside the EEA never sees a row that does nothing.
+
+**Hints:** the consent code is `AdMobAdNetwork.consentThenInitialise` and
+`IOSAdNetwork.requestConsent`; add a `privacyOptions` seam to `AdNetwork`
+beside `prepare`, and let the Settings view-model ask the ad gate whether the
+row applies. `pages/privacy.html`'s Ads section should mention the row once it
+exists.
+

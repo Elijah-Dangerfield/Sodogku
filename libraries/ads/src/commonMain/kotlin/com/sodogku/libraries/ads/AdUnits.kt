@@ -32,7 +32,10 @@ import kotlin.native.ObjCName
 object AdUnits {
 
     /**
-     * The single switch. Left `true` until real units exist; when it flips,
+     * The single switch. The live units exist (2026-09-21) and are filled in
+     * below; this stays `true` until the store builds go out, because a
+     * development build requesting a live unit is invalid traffic and gets the
+     * account suspended. Flip it in the release that ships. When it flips,
      * `Live` must be complete on **both** platforms or the placement falls back
      * to its test unit rather than silently requesting an empty string.
      */
@@ -56,16 +59,28 @@ object AdUnits {
         const val applicationId = "ca-app-pub-3940256099942544~1458002511"
     }
 
-    /** Real Android units. Empty until the AdMob app exists — see [useTestUnits]. */
+    /**
+     * Real Android units, created 2026-09-21 in AdMob app `~4172266958`
+     * ("Sodogku (Android)"). Only requested once [useTestUnits] is off.
+     */
     object AndroidLive {
-        const val rewarded = ""
-        const val interstitial = ""
+        const val rewarded = "ca-app-pub-7008637445039253/5984786931"
+        const val interstitial = "ca-app-pub-7008637445039253/7928423992"
+
+        /** In `AndroidManifest.xml` already; here so the four values read together. */
+        const val applicationId = "ca-app-pub-7008637445039253~4172266958"
     }
 
-    /** Real iOS units. Empty until the AdMob app exists — see [useTestUnits]. */
+    /**
+     * Real iOS units, created 2026-09-21 in AdMob app `~9668136217`
+     * ("Sodogku (iOS)"). Only requested once [useTestUnits] is off.
+     */
     object IosLive {
-        const val rewarded = ""
-        const val interstitial = ""
+        const val rewarded = "ca-app-pub-7008637445039253/6862754337"
+        const val interstitial = "ca-app-pub-7008637445039253/9485048246"
+
+        /** In `Info.plist` already; here so the four values read together. */
+        const val applicationId = "ca-app-pub-7008637445039253~9668136217"
     }
 
     /**

@@ -20,14 +20,14 @@
 	<string>We'd like to send you notifications.</string>
 	<!--
 	  AdMob reads this before any app code runs, which is why the ad unit ids
-	  live in shared Kotlin (`AdUnits.kt`) and the *app* id lives here. The
-	  value below is Google's published sample app id and it pairs with the
-	  sample units in `AdUnits.IosTest`. Replace it at the same time as
-	  `AdUnits.useTestUnits` flips. A missing key crashes the SDK at start; a
-	  wrong one silently serves nothing.
+	  live in shared Kotlin (`AdUnits.kt`) and the *app* id lives here. This
+	  is the real id of "Sodogku (iOS)" in the AdMob console (2026-09-21); the
+	  units it pairs with are in `AdUnits.IosLive`, and `AdUnits.useTestUnits`
+	  decides whether those or Google's samples are requested. A missing key
+	  crashes the SDK at start; a wrong one silently serves nothing.
 	-->
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-7008637445039253~9668136217</string>
 	<!--
 	  The App Tracking Transparency prompt, `features.md#audience-and-consent`.
 	  Shown before the first ad
