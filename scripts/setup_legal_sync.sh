@@ -4,7 +4,11 @@
 #
 #   1. NIGHTJAR_SITE_TOKEN on this repo, so this repo can open a pull request
 #      against the website repo. GitHub has no API for minting a personal access
-#      token, so this one you create in the browser and paste in. Per app.
+#      token, so this one you create in the browser and paste in. The *secret*
+#      is per app; the *token* is not, because it is scoped to the website repo
+#      rather than to any app. So the first run saves it to the machine-local
+#      credential store the Kotlin setup scripts share, and later runs in other
+#      apps find it there and never ask again.
 #   2. FIREBASE_SERVICE_ACCOUNT on the website repo, so merging that PR deploys
 #      the site. Once ever, across all apps.
 #
@@ -30,6 +34,63 @@ SA_EMAIL="${SA_NAME}@${GCP_PROJECT}.iam.gserviceaccount.com"
 bold() { printf "\033[1m%s\033[0m\n" "$1"; }
 step() { printf "\n\033[1;36m==> %s\033[0m\n" "$1"; }
 ok()   { printf "  \033[32m✓\033[0m %s\n" "$1"; }
+warn() { printf "  \033[33m!\033[0m %s\n" "$1"; }
+
+# ── The shared credential store ──────────────────────────────────────────────
+# Same file `scripts/lib/setup_store.main.kts` reads and writes, found the same
+# way: an explicit APPSETUP_DIR wins outright, otherwise the first of the two
+# conventional directories that already holds one, otherwise the default. Kept
+# in step with that file by hand, because a bash script cannot import a Kotlin
+# one. If the search order changes there, change it here.
+STORE_KEY="nightjar.siteToken"
+
+store_path() {
+  if [ -n "${APPSETUP_DIR:-}" ]; then
+    printf '%s\n' "$APPSETUP_DIR/credentials.properties"; return
+  fi
+  local default="${XDG_CONFIG_HOME:-$HOME/.config}/appsetup"
+  local dir
+  for dir in "$default" "$HOME/Documents/appsetup"; do
+    if [ -f "$dir/credentials.properties" ]; then
+      printf '%s\n' "$dir/credentials.properties"; return
+    fi
+  done
+  printf '%s\n' "$default/credentials.properties"
+}
+
+STORE="$(store_path)"
+
+# A java.util.Properties file, so `key=value` with no spaces around the `=`.
+store_read() {
+  [ -f "$STORE" ] || return 0
+  awk -F= -v key="$STORE_KEY" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$STORE"
+}
+
+# Permissions are set before the value is written, never after, so the token is
+# not briefly world-readable. Same reasoning as the Kotlin side.
+store_write() {
+  local value="$1" directory
+  directory="$(dirname "$STORE")"
+  mkdir -p "$directory" && chmod 700 "$directory"
+  if [ ! -f "$STORE" ]; then
+    : > "$STORE"
+    printf '#Machine-local setup credentials, shared by every project you generate.\n' >> "$STORE"
+  fi
+  chmod 600 "$STORE"
+  local temporary
+  temporary="$(umask 077 && mktemp -t appsetup-store)"
+  grep -v "^${STORE_KEY}=" "$STORE" > "$temporary" || true
+  printf '%s=%s\n' "$STORE_KEY" "$value" >> "$temporary"
+  cat "$temporary" > "$STORE"
+  rm -f "$temporary"
+}
+
+# The exact call actions/checkout makes. Its failure is the confusing one:
+# GitHub answers 404 rather than 403 for a repo the token cannot see, so a
+# wrongly-scoped token looks like a missing repo.
+token_can_read_site() {
+  GH_TOKEN="$1" gh api "repos/$SITE_REPO" >/dev/null 2>&1
+}
 
 # ── Preflight ────────────────────────────────────────────────────────────────
 step "Checking tools"
@@ -58,6 +119,22 @@ if gh secret list --repo "$APP_REPO" | grep -q '^NIGHTJAR_SITE_TOKEN'; then
 fi
 
 if [ "$replace" != "no" ]; then
+  # A token saved by an earlier run in another app, tried before asking. It is
+  # validated rather than trusted: a saved token that has expired would
+  # otherwise be set as the secret and fail later, in CI, where the cause is far
+  # less obvious than it is here.
+  TOKEN="$(store_read)"
+  if [ -n "$TOKEN" ]; then
+    if token_can_read_site "$TOKEN"; then
+      ok "reusing the token saved in $STORE"
+    else
+      warn "the saved token cannot see $SITE_REPO any more, so it has expired or been revoked"
+      TOKEN=""
+    fi
+  fi
+fi
+
+if [ "$replace" != "no" ] && [ -z "${TOKEN:-}" ]; then
   cat <<EOF
 
   Create a fine-grained personal access token:
@@ -93,11 +170,9 @@ EOF
     exit 1
   fi
 
-  # Check the token can actually see the website repo before storing it. This
-  # is the exact call actions/checkout makes, and its failure is the confusing
-  # one: GitHub answers 404 rather than 403 for a repo the token cannot see, so
-  # a wrongly-scoped token looks like a missing repo.
-  if ! GH_TOKEN="$TOKEN" gh api "repos/$SITE_REPO" >/dev/null 2>&1; then
+  # Checked before it is stored anywhere, so a wrongly-scoped token is rejected
+  # here rather than in CI.
+  if ! token_can_read_site "$TOKEN"; then
     echo "  ✗ That token cannot see $SITE_REPO." >&2
     echo "    Either its Repository access does not include ${SITE_REPO#*/}, or it is a" >&2
     echo "    fine-grained token still awaiting approval. Nothing was set." >&2
@@ -106,6 +181,11 @@ EOF
   fi
   ok "token can read $SITE_REPO"
 
+  store_write "$TOKEN"
+  ok "saved it to $STORE, so the next app does not ask"
+fi
+
+if [ "$replace" != "no" ]; then
   printf '%s' "$TOKEN" | gh secret set NIGHTJAR_SITE_TOKEN --repo "$APP_REPO"
   unset TOKEN
   ok "set NIGHTJAR_SITE_TOKEN on $APP_REPO"

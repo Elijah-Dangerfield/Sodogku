@@ -324,6 +324,26 @@ object Keys {
     )
 
     /**
+     * The token `legal-sync.yml` uses to open its pull request on the studio
+     * website repo.
+     *
+     * Stored because it is scoped to the *website* repo rather than to any app,
+     * so one token serves every project you generate. GitHub has no API for
+     * minting one, so it is the rare value that can only be typed in once and
+     * then has to be remembered somewhere.
+     */
+    val NIGHTJAR_SITE_TOKEN = SetupKey(
+        storeKey = "nightjar.siteToken",
+        env = "NIGHTJAR_SITE_TOKEN",
+        label = "Website repo PAT (github_pat_...)",
+        secret = true,
+        where = "github.com/settings/personal-access-tokens/new, scoped to the website " +
+            "repo only, Contents and Pull requests read and write. " +
+            "setup_legal_sync.sh walks you through it.",
+        consequence = "setup_legal_sync.sh asks for a fresh token in every app you set up.",
+    )
+
+    /**
      * The folder holding the binary signing material: the upload keystore, the
      * Apple distribution `.p12`, the App Store Connect `.p8`, and the Play
      * service-account JSON.
@@ -387,7 +407,7 @@ object Keys {
         APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH, APPLE_DIST_CERT_PASSWORD,
         SUPABASE_ACCESS_TOKEN, SUPABASE_ORG,
         GRAFANA_OTLP_BASE_URL, GRAFANA_OTLP_INSTANCE_ID, GRAFANA_LOGS_WRITE_TOKEN,
-        FLY_ORG,
+        FLY_ORG, NIGHTJAR_SITE_TOKEN,
         SIGNING_DIR, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD,
     )
 }

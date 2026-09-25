@@ -127,6 +127,7 @@ values.plan(
         Keys.ANDROID_KEYSTORE_PASSWORD, Keys.ANDROID_KEY_ALIAS, Keys.ANDROID_KEY_PASSWORD,
         Keys.APPLE_TEAM_ID, Keys.ASC_KEY_ID, Keys.ASC_ISSUER_ID, Keys.APPLE_DIST_CERT_PASSWORD,
         Keys.GRAFANA_OTLP_BASE_URL, Keys.GRAFANA_OTLP_INSTANCE_ID, Keys.GRAFANA_LOGS_WRITE_TOKEN,
+        Keys.NIGHTJAR_SITE_TOKEN,
     )
 )
 
@@ -157,6 +158,12 @@ val distCert = findSigningFile(
 
 bold("\nPushing")
 
+push(
+    Secret(
+        "NIGHTJAR_SITE_TOKEN", values.optional(Keys.NIGHTJAR_SITE_TOKEN),
+        "not in the store. Legal Sync cannot publish edits to legal/*.md.",
+    )
+)
 push(
     Secret(
         "ANDROID_KEYSTORE_BASE64", keystore?.let(::base64),
