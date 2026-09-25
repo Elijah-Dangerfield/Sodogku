@@ -88,8 +88,9 @@ Neither of these blocks a release, and the app is correct without them.
       and `nightjarlabs.llc/delete-data` exists. Three things are yours, in
       order: run `./scripts/setup_legal_sync.sh` once, merge the sync PR it
       opens against the website (until that merges the URLs 404), then re-file
-      four fields: Play's privacy policy URL, Play's listing website, Play's
-      Data safety **delete-data URL**, and Apple's support URL.
+      three fields: Play's privacy policy URL, Play's Data safety
+      **delete-data URL**, and Apple's support URL. Play's listing website is
+      already pointed at `nightjarlabs.llc`, which is what `app-ads.txt` needed.
 
 ---
 
@@ -120,7 +121,9 @@ the sync workflow, the setup script and all eight compiled URL references
 repointed. `pages/` and `pages.yml` are deleted. The studio site has a shared
 delete-my-data form that emails the request.
 
-**Ads.** Both AdMob apps and four units, the GDPR message, `SKAdNetworkItems`,
+**Ads.** Play's listing website repointed at `nightjarlabs.llc`, the bare domain,
+so the `app-ads.txt` there is finally where AdMob's crawler looks for it. Both
+AdMob apps and four units, the GDPR message, `SKAdNetworkItems`,
 `MAX_AD_CONTENT_RATING_G` on both platforms, the under-16 flag ruled on, the
 test-unit switch derived from the release channel so there is nothing to
 remember, and SD-149's consent row in Settings.

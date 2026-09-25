@@ -23,29 +23,30 @@ a placeholder or a public test credential, it says so.
 
 ## 2. Read and own the privacy policy and the terms
 
-**Both stores link to these pages, and both are live.**
+**Both stores link to these pages.**
 
-> **These pages are moving, and the move is queued as `SD-150` in `todos.md`.**
-> They will be written as `legal/privacy.md` and `legal/terms.md` at the repo
-> root and published to `https://nightjarlabs.llc/sodogku/privacy` and
-> `/terms`, the same arrangement Drop2048 moved to on 2026-09-21. The prose
-> carries over unchanged, so reading and accepting it now is not wasted.
+> **The pages moved on 2026-09-25.** They are now `legal/privacy.md` and
+> `legal/terms.md` at the repo root, and `legal-sync.yml` publishes them to
+> `https://nightjarlabs.llc/sodogku/privacy` and `/terms`, the same arrangement
+> Drop2048 moved to on 2026-09-21. The prose carried over unchanged, so reading
+> and accepting an earlier version of it was not wasted. `pages/` is deleted.
 >
 > Two parts of that are yours and cannot be delegated. **Run
-> `./scripts/setup_legal_sync.sh` once** after the agent work lands, which
-> creates the token the sync needs and prompts you for it. Then **re-file the
-> store URLs**: the privacy policy URL, the listing website and the Data safety
-> delete-data URL on Play, and the Support URL on Apple. Free before
-> submission, two review cycles after.
+> `./scripts/setup_legal_sync.sh` once**, which sets the token the sync needs,
+> then **merge the pull request it opens on the website repo**. Until that
+> merges the two URLs 404. Then **re-file the store URLs**: the privacy policy
+> URL and the Data safety delete-data URL on Play, and the Support URL on
+> Apple. Free before submission, two review cycles after. Play's listing
+> website is already done, on 2026-09-25, for the reason in item 6.
 >
 > Sodogku is already listed on nightjarlabs.llc with its icon and tagline.
 > Nothing to do there.
 
-`pages/privacy.html` was rewritten against the code in `1ec24e0`; every statement traces to a
-file. `pages/terms.html` gained sections on ads, Sodogku Pro, and in-game items on 2026-09-10,
+The privacy policy was rewritten against the code in `1ec24e0`; every statement traces to a
+file. The terms gained sections on ads, Sodogku Pro, and in-game items on 2026-09-10,
 written from `StoreBilling.kt`, `AdNetwork.kt`, the paywall strings and `features.md#pro` and
 §6. An agent wrote both. A person has to read them end to end and accept them as their own, and
-that person is you. Read them in a browser at the Pages URL rather than in the editor, since
+that person is you. Read them rendered in a browser rather than in the editor, since
 that is what a reviewer sees.
 
 Three things in the privacy policy were deliberate choices rather than
@@ -288,7 +289,19 @@ each with a rewarded unit and an interstitial unit. All six values are in
 `AdUnits.kt` (`AndroidLive` / `IosLive`), and the two app ids are in
 `AndroidManifest.xml` and `Info.plist`. A GDPR message ("Sodogku GDPR message")
 is published for both apps with the privacy policy URL and a Do not consent
-button. `pages/app-ads.txt` authorises the publisher id.
+button.
+
+**`app-ads.txt` has never been found, and that was fixed on 2026-09-25.** The
+file authorising `pub-7008637445039253` is served from
+`https://nightjarlabs.llc/app-ads.txt`. AdMob does not take that URL from a
+setting in its own console: it takes the website from the **store listing** and
+looks for `app-ads.txt` at the root of that domain. Play's listing website was
+`https://elijah-dangerfield.github.io/Sodogku/`, so the crawler asked for
+`https://elijah-dangerfield.github.io/app-ads.txt` and got a 404, because the
+file only ever existed one directory down. The field is now the bare domain
+`https://nightjarlabs.llc`, set through the Play Publishing API and read back to
+confirm. Nothing about this blocks a release; an unverified `app-ads.txt` costs
+demand from buyers who will not bid without one. Drop2048 was already correct.
 
 **Still yours:**
 
@@ -725,8 +738,9 @@ Stated so nobody adds them by reflex.
 - **A separate analytics account.** Grafana Cloud is the pipe. No Google Analytics, Amplitude
   or Firebase Analytics.
 - **A support Discord or channel.** A support *email* is needed; a channel is not.
-- **A custom domain.** GitHub Pages satisfies the privacy policy URL requirement. You will want
-  one only if you use the developer website field, which is where `app-ads.txt` would live.
+- **Another domain.** `nightjarlabs.llc` serves the legal pages and the
+  `app-ads.txt` the ad buyers check, and it is what the Play listing points at.
+  One domain for every app is the arrangement; a per-app domain buys nothing.
 - **Remote config keys for the ad units or the product id.** Deliberately kept out of config
   (`AdUnits.kt:16-18`, `features.md#remote-config`): changing one is a store operation, and a
   config outage that blanked them would take ads and purchases down together.
