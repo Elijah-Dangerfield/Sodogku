@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/Elijah-Dangerfield/Sodogku/compare/v0.2.0...v0.3.0) (2026-09-25)
+
+
+### Features
+
+* publish the legal documents from legal/, and point deletion at a real form ([7ea4631](https://github.com/Elijah-Dangerfield/Sodogku/commit/7ea4631e46b33582f13b67f2ee08ef1955b94001))
+
+
+### Bug Fixes
+
+* delete the camera scaffolding Apple rejected the build for ([1b0983c](https://github.com/Elijah-Dangerfield/Sodogku/commit/1b0983c06aaf95e254c4330c42cf0f9082dda310))
+* present ads from the top of the stack, and unstick navigation when the host lies ([9103a9f](https://github.com/Elijah-Dangerfield/Sodogku/commit/9103a9f3499ff8b8e4951b3fb09232e1fc629297))
+
 ## [0.2.0](https://github.com/Elijah-Dangerfield/Sodogku/compare/v0.1.0...v0.2.0) (2026-09-21)
 
 
