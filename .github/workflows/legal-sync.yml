@@ -4,9 +4,10 @@
 #
 # Fires on:     Pushes to main that touch legal/** or this workflow. Also
 #               workflow_dispatch, to re-open the PR after closing one.
-# Side effects: Creates or updates a branch and a pull request on
-#               Elijah-Dangerfield/nightjar. It does not merge or deploy;
-#               merging that PR is what publishes.
+# Side effects: Publishes to the live site. This opens a pull request on
+#               Elijah-Dangerfield/nightjar rather than pushing, but that repo's
+#               auto-merge-legal.yml merges it as soon as the site builds, so
+#               treat a push to legal/** here as going straight out.
 # Needs:        NIGHTJAR_SITE_TOKEN — a fine-grained PAT scoped to the nightjar
 #               repository with Contents and Pull requests set to read/write.
 #               `scripts/setup_legal_sync.sh` sets it.
@@ -19,10 +20,14 @@
 # Both are filed with Apple and Google, and both are the compiled defaults in
 # LegalConfigValues.kt. The slug below is what makes them those URLs.
 #
-# A pull request, not a push, because these are legal documents and one review
-# step before publication is cheap. The cost is that an unmerged PR means the
-# published policy is stale — docs/release-checklist.md makes merging it
-# part of shipping.
+# A pull request rather than a push, but nobody merges it by hand. The site repo
+# merges it automatically once its Preview build passes, and the build is the
+# only gate: a file that fails the frontmatter schema leaves the PR open and the
+# live site serving the last good version.
+#
+# The review step this used to have was dropped deliberately. A PR nobody
+# remembers to merge means the published policy drifts behind the app, and that
+# policy is the URL filed with Apple and Google. Stale is the worse failure.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Legal Sync

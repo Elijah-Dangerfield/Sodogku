@@ -86,8 +86,9 @@ Neither of these blocks a release, and the app is correct without them.
       `legal/terms.md` are the source, `legal-sync.yml` publishes them to
       `nightjarlabs.llc/sodogku/…`, the compiled defaults already point there,
       and `nightjarlabs.llc/delete-data` exists. Three things are yours, in
-      order: run `./scripts/setup_legal_sync.sh` once, merge the sync PR it
-      opens against the website (until that merges the URLs 404), then re-file
+      order: run `./scripts/setup_legal_sync.sh` once, which is enough to
+      publish (the website merges the sync PR itself once it builds, so the
+      URLs stop 404ing on their own), then re-file
       three fields: Play's privacy policy URL, Play's Data safety
       **delete-data URL**, and Apple's support URL. Play's listing website is
       already pointed at `nightjarlabs.llc`, which is what `app-ads.txt` needed.
