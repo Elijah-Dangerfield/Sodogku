@@ -535,15 +535,51 @@ jobs:
           PY
           )
           rm -f "$KEY_PATH"
-          RESP=$(curl -fsS -H "Authorization: Bearer $TOKEN" "https://api.appstoreconnect.apple.com/v1/apps?filter[bundleId]=$BUNDLE_ID&limit=1" || echo '{"data":[]}')
-          APP_COUNT=$(echo "$RESP" | python3 -c 'import json,sys;print(len(json.load(sys.stdin).get("data",[])))' 2>/dev/null || echo "0")
+          # -g is load-bearing. curl treats [ and ] in a URL as glob syntax, so
+          # without it this request never leaves the machine: it aborts with
+          # "bad range in URL", the fallback below substitutes an empty result
+          # set, and an app that plainly exists reads as "no app record, first
+          # release". The job then skips the App Store submission and reports
+          # success. Moving Eyes shipped four releases that way before anyone
+          # noticed the submission was never happening.
+          if ! RESP=$(curl -g -fsS -H "Authorization: Bearer $TOKEN" "https://api.appstoreconnect.apple.com/v1/apps?filter[bundleId]=$BUNDLE_ID&limit=1"); then
+            echo "::error::Could not ask App Store Connect whether $BUNDLE_ID exists."
+            echo "A failed query is not evidence of a first release. Refusing to"
+            echo "guess, because guessing wrong silently downgrades a production"
+            echo "release to a TestFlight upload."
+            exit 1
+          fi
+          # Every failure below is fatal, and that is the whole point. Only a
+          # query that succeeded and parsed may answer "first release", because
+          # that answer routes to the beta lane and silently turns a production
+          # release into a TestFlight upload. `|| echo '{"data":[]}'` and
+          # `|| echo "0"` both read as harmless defaults and are the exact
+          # shape of the bug: they convert "could not tell" into "no app".
+          if ! APP_COUNT=$(printf '%s' "$RESP" | python3 -c 'import json,sys;print(len(json.load(sys.stdin).get("data",[])))'); then
+            echo "::error::App Store Connect returned a body this step could not parse."
+            echo "Refusing to treat an unreadable answer as 'no app record'."
+            exit 1
+          fi
           if [ "$APP_COUNT" = "0" ]; then
             echo "::warning::No app record found on App Store Connect for $BUNDLE_ID — first release. TestFlight internal only; skipping App Store submission."
             echo "is_first_release=true" >> "$GITHUB_OUTPUT"
           else
-            APP_ID=$(echo "$RESP" | python3 -c 'import json,sys;print(json.load(sys.stdin)["data"][0]["id"])')
-            BUILDS=$(curl -fsS -H "Authorization: Bearer $TOKEN" "https://api.appstoreconnect.apple.com/v1/apps/$APP_ID/builds?limit=1" || echo '{"data":[]}')
-            BUILD_COUNT=$(echo "$BUILDS" | python3 -c 'import json,sys;print(len(json.load(sys.stdin).get("data",[])))' 2>/dev/null || echo "0")
+            if ! APP_ID=$(printf '%s' "$RESP" | python3 -c 'import json,sys;print(json.load(sys.stdin)["data"][0]["id"])'); then
+              echo "::error::App Store Connect listed an app for $BUNDLE_ID with no id."
+              exit 1
+            fi
+            if ! BUILDS=$(curl -fsS -H "Authorization: Bearer $TOKEN" "https://api.appstoreconnect.apple.com/v1/apps/$APP_ID/builds?limit=1"); then
+              echo "::error::Could not ask App Store Connect whether $APP_ID has builds."
+              echo "A failed query is not evidence of a first release, for the same"
+              echo "reason the app lookup above refuses to guess. An expired token"
+              echo "or a 5xx here used to read as 'zero builds' and skip the"
+              echo "submission while the run stayed green."
+              exit 1
+            fi
+            if ! BUILD_COUNT=$(printf '%s' "$BUILDS" | python3 -c 'import json,sys;print(len(json.load(sys.stdin).get("data",[])))'); then
+              echo "::error::App Store Connect returned a builds body this step could not parse."
+              exit 1
+            fi
             if [ "$BUILD_COUNT" = "0" ]; then
               echo "::warning::App exists on ASC but has zero builds — first release. TestFlight internal only; skipping App Store submission."
               echo "is_first_release=true" >> "$GITHUB_OUTPUT"
