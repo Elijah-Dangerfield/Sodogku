@@ -33,34 +33,42 @@ live reading. Check the console before acting on it.
 
 ## The two steps
 
-### 1. Merge the release-please PR
+### 1. ~~Merge the release-please PR~~ — done, 2026-09-25
 
-- [ ] Merge it. CI signs, builds and uploads to Play internal and TestFlight.
+`v0.3.0` is built, signed and uploaded. Both platforms are installable:
 
-Every secret it needs is set: the upload keystore, the Play service account, the
-App Store Connect key, the Apple distribution certificate and Sentry. Nothing
-about this needs you beyond the merge.
+| | Where | What |
+|---|---|---|
+| Android | Play **internal** track | 0.3.0, version code 390 |
+| iOS | TestFlight, internal group | build `202609252107`, ready for testing |
 
-**Two things happen the first time and never again.** Play routes this to the
-internal track rather than production, because it will not accept a production
-release until an approved one exists, and `release.yml` already detects that.
-And because it is a `store` build, it carries live ad units in front of whoever
-is on that internal track. Keep the list small and do not sit watching rewarded
-ads on it.
+Both landed on a testing track rather than in front of the public, because both
+platforms carry a first-release guard and this was the first release. Play will
+not accept an automated production upload before an approved release exists, so
+`release.yml` routed to `internal`. App Store Connect had zero builds, so the
+same workflow resolved the iOS lane to `beta`: TestFlight only, **no App Store
+submission**. Neither guard fires again.
 
-**If the Play upload fails with a permissions error**, the service account is
-shared across apps and may not have been granted access to this one yet. Play
-Console → Users and permissions → the service account → add this app. Once,
-ever.
+It is still a `store` build, so it carries live ad units in front of whoever is
+on that internal track. Keep the list small and do not sit watching rewarded ads
+on it.
 
 ### 2. Create `sodogku_pro` in Play, then QA, then submit
 
-- [ ] Managed product, id `sodogku_pro`, $4.99. Only possible after step 1,
-      because Play hides the in-app products page until a build carrying the
-      billing permission exists. Without it Pro cannot be bought on Android.
-      The App Store side is already complete.
+- [ ] Managed product, id `sodogku_pro`, $4.99. Only possible now that a build
+      carrying the billing permission exists, which is why Play hid the page
+      until today. Without it Pro cannot be bought on Android. The App Store
+      side is already complete.
+- [ ] **Rename the App Store Connect version record from `1.0` to `0.3.0`.** It
+      holds all the metadata and it is one field. A build whose version string
+      is 0.3.0 cannot be attached to a record called 1.0, so the submission has
+      nothing to attach to until these agree. TestFlight does not care, so this
+      blocks submission and not QA.
 - [ ] QA the build from TestFlight and from Play internal, on real hardware.
-- [ ] Submit on both platforms.
+- [ ] Submit on both platforms, by hand this once: promote the Play internal
+      release to production, and submit the iOS build against the renamed
+      version record. From the next release on, merging the release PR does
+      both.
 
 On QA, two things are worth doing deliberately because both have failed here and
 neither shows up in a test: **watch a rewarded ad to the end and check the board
@@ -82,16 +90,16 @@ Neither of these blocks a release, and the app is correct without them.
       analytics. Sentry is live, so crashes are covered either way. Run
       `./scripts/setup_credentials.main.kts` to store the values and
       `./scripts/setup_github_secrets.main.kts` to push them.
-- [ ] **Finish the legal move.** The agent half is done: `legal/privacy.md` and
-      `legal/terms.md` are the source, `legal-sync.yml` publishes them to
-      `nightjarlabs.llc/sodogku/…`, the compiled defaults already point there,
-      and `nightjarlabs.llc/delete-data` exists. Three things are yours, in
-      order: run `./scripts/setup_legal_sync.sh` once, which is enough to
-      publish (the website merges the sync PR itself once it builds, so the
-      URLs stop 404ing on their own), then re-file
-      three fields: Play's privacy policy URL, Play's Data safety
-      **delete-data URL**, and Apple's support URL. Play's listing website is
-      already pointed at `nightjarlabs.llc`, which is what `app-ads.txt` needed.
+- [ ] **Attach build artifacts to the GitHub Release.** The `attach-artifacts`
+      job failed on `v0.3.0` with "Resource not accessible by integration". It
+      asks for `contents: write`, but the repository caps the default workflow
+      token at read, and a job cannot request more than the cap. Nothing about
+      the release depends on it; you simply have no `.aab`, `.apk` or `.ipa`
+      hanging off the tag. Fix it in Settings → Actions → General → Workflow
+      permissions, or with
+      `gh api -X PUT repos/Elijah-Dangerfield/Sodogku/actions/permissions/workflow -f default_workflow_permissions=write`.
+      Worth knowing before flipping it: that grants write to every workflow in
+      the repo, not just this job.
 
 ---
 
@@ -120,7 +128,20 @@ declaration. Listing icon flattened too.
 **Legal.** `privacy.md` and `terms.md` moved out of `pages/` into `legal/`, with
 the sync workflow, the setup script and all eight compiled URL references
 repointed. `pages/` and `pages.yml` are deleted. The studio site has a shared
-delete-my-data form that emails the request.
+delete-my-data form that emails the request. The pages are published and every
+store URL was re-filed on 2026-09-25: Apple's support URL and privacy policy
+URL, Play's privacy policy URL, and Play's Data safety delete-data URL. The old
+`elijah-dangerfield.github.io/Sodogku/` still answers 200 because Pages keeps
+serving its last deploy, and nothing points at it any more. Turn that Pages site
+off once both stores have cleared review, or the frozen copy outlives the real
+one.
+
+**Export compliance.** `ITSAppUsesNonExemptEncryption=false` is in
+`Info.plist`. Before it was, build `202609252107` finished processing and then
+sat in TestFlight as "Missing Compliance", installable by nobody. The answer for
+that build was filed through the API on 2026-09-25; the key means no later build
+stalls the same way. The app's only encryption is system TLS, which Apple
+exempts.
 
 **Ads.** Play's listing website repointed at `nightjarlabs.llc`, the bare domain,
 so the `app-ads.txt` there is finally where AdMob's crawler looks for it. Both

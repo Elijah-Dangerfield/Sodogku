@@ -38,6 +38,22 @@
 	<key>NSUserTrackingUsageDescription</key>
 	<string>This lets us show ads that are more relevant to you. Sodogku is free because of them.</string>
 	<!--
+	  The export compliance answer, stated once here instead of by hand on every
+	  upload. Without it a build finishes processing and then sits in TestFlight
+	  as "Missing Compliance", installable by nobody, until someone opens the
+	  console and answers the encryption question. That happened to v0.3.0 on
+	  2026-09-25 and is why this key exists.
+
+	  False is the correct answer, not a convenient one: the app's only
+	  encryption is HTTPS to Sentry, Grafana and the ad network through the
+	  system's own TLS, which Apple exempts (Category 5 Part 2, the "standard
+	  encryption built into the OS" exemption). Nothing here implements or
+	  bundles a cipher. If that ever changes, this key has to change with it,
+	  and the answer stops being a formality.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!--
 	  The launch screen, which is the first thing anyone sees and was previously
 	  nothing at all. With neither this key nor a storyboard, iOS shows a blank
 	  system screen and then hands over — the flash of white against the app's
