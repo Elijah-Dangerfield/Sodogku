@@ -100,7 +100,7 @@ The cuts are the point, so they are listed rather than just made.
   defaults to **false**, so it is not what a new player sees. It would have been the first thing
   in the listing a reviewer could call untrue.
 - **"Plays offline" is gone as a flat claim.** Every level is in the app, but the free game needs
-  a connection for ads and `pages/terms.html` says so. Offline now appears only where it is
+  a connection for ads and `legal/terms.md` says so. Offline now appears only where it is
   unconditionally true, in the Pro line.
 - **The two helpers, the uniqueness guarantee, the colourblind setting and the difficulty
   curve** were all true and all cut. They are reasons to keep playing, not reasons to install,
@@ -231,8 +231,8 @@ Uploads are the opposite: a file input persists as soon as it is set, with no Sa
 | App price | Free, all 175 regions | Free, all 175 regions |
 | Content rating | Everyone, IARC filed 2026-09-21, sole descriptor "In-Game Purchases" | 4+, calculated 2026-09-21, no override |
 | Target audience | 13+ on the general-audience branch (`features.md#audience-and-consent`) | N/A |
-| Privacy policy URL | `https://elijah-dangerfield.github.io/Sodogku/privacy.html` | same |
-| Support URL | `https://elijah-dangerfield.github.io/Sodogku/` | same |
+| Privacy policy URL | `https://nightjarlabs.llc/sodogku/privacy` | same |
+| Support URL | `https://nightjarlabs.llc/contact` | same |
 
 Data safety and the privacy nutrition label are in
 [`data-safety.md`](./data-safety.md), not here.

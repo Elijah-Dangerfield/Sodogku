@@ -32,7 +32,7 @@ class LegalTermsVersion(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMa
 class LegalTermsUrl(appConfigMap: AppConfigMap) : StringConfigValue(appConfigMap) {
     override val name = "Terms URL"
     override val path = "legal.termsUrl"
-    override val default = "https://elijah-dangerfield.github.io/Sodogku/terms.html"
+    override val default = "https://nightjarlabs.llc/sodogku/terms"
 }
 
 /** Current privacy policy version. Tracked separately from terms; the two change independently. */
@@ -55,7 +55,7 @@ class LegalPrivacyVersion(appConfigMap: AppConfigMap) : IntConfigValue(appConfig
 class LegalPrivacyUrl(appConfigMap: AppConfigMap) : StringConfigValue(appConfigMap) {
     override val name = "Privacy URL"
     override val path = "legal.privacyUrl"
-    override val default = "https://elijah-dangerfield.github.io/Sodogku/privacy.html"
+    override val default = "https://nightjarlabs.llc/sodogku/privacy"
 }
 
 /**

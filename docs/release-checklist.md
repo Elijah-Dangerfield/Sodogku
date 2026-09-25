@@ -82,12 +82,14 @@ Neither of these blocks a release, and the app is correct without them.
       analytics. Sentry is live, so crashes are covered either way. Run
       `./scripts/setup_credentials.main.kts` to store the values and
       `./scripts/setup_github_secrets.main.kts` to push them.
-- [ ] **Move the legal pages to `nightjarlabs.llc`** and give every Nightjar app
-      one **delete my data** form (SD-150). The `github.io` URLs work and are
-      filed with both stores, so this is about not shipping a personal GitHub
-      username, and about answering Play's deletion question with a real route
-      instead of leaving it blank. It needs the studio site and the template
-      changed as well, so it is not a Sodogku-only job.
+- [ ] **Finish the legal move.** The agent half is done: `legal/privacy.md` and
+      `legal/terms.md` are the source, `legal-sync.yml` publishes them to
+      `nightjarlabs.llc/sodogku/…`, the compiled defaults already point there,
+      and `nightjarlabs.llc/delete-data` exists. Three things are yours, in
+      order: run `./scripts/setup_legal_sync.sh` once, merge the sync PR it
+      opens against the website (until that merges the URLs 404), then re-file
+      four fields: Play's privacy policy URL, Play's listing website, Play's
+      Data safety **delete-data URL**, and Apple's support URL.
 
 ---
 
@@ -112,6 +114,11 @@ icon flattened so the upload cannot be rejected for an alpha channel.
 
 **Play.** IARC rating, Data safety, target audience, and every other content
 declaration. Listing icon flattened too.
+
+**Legal.** `privacy.md` and `terms.md` moved out of `pages/` into `legal/`, with
+the sync workflow, the setup script and all eight compiled URL references
+repointed. `pages/` and `pages.yml` are deleted. The studio site has a shared
+delete-my-data form that emails the request.
 
 **Ads.** Both AdMob apps and four units, the GDPR message, `SKAdNetworkItems`,
 `MAX_AD_CONTENT_RATING_G` on both platforms, the under-16 flag ruled on, the

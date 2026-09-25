@@ -51,9 +51,9 @@
   { "path": "paywall.sessionCap", "type": "int", "default": 2, "description": "How many times the paywall may appear in one session." },
 
   { "path": "legal.termsVersion", "type": "int", "default": 1, "description": "Current terms version, compared against the accepted one at launch." },
-  { "path": "legal.termsUrl", "type": "string", "default": "https://elijah-dangerfield.github.io/Sodogku/terms.html", "description": "Where the terms are published." },
+  { "path": "legal.termsUrl", "type": "string", "default": "https://nightjarlabs.llc/sodogku/terms", "description": "Where the terms are published." },
   { "path": "legal.privacyVersion", "type": "int", "default": 1, "description": "Current privacy policy version." },
-  { "path": "legal.privacyUrl", "type": "string", "default": "https://elijah-dangerfield.github.io/Sodogku/privacy.html", "description": "Where the privacy policy is published. Must match the store listings." },
+  { "path": "legal.privacyUrl", "type": "string", "default": "https://nightjarlabs.llc/sodogku/privacy", "description": "Where the privacy policy is published. Must match the store listings." },
   { "path": "legal.forceReacceptBelow", "type": "int", "default": 0, "description": "Below this accepted version, a blocking re-acceptance sheet. 0 forces nobody." },
 
   { "path": "upgrade.minSupportedVersionCode", "type": "int", "default": 0, "description": "Below this build code, force upgrade. 0 blocks nobody." },

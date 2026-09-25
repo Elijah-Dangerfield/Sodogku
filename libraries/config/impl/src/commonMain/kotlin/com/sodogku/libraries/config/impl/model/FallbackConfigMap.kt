@@ -130,9 +130,9 @@ internal val BundledConfigDefaults: Map<String, Any> = mapOf(
     ),
     "legal" to mapOf(
         "termsVersion" to 1,
-        "termsUrl" to "https://elijah-dangerfield.github.io/Sodogku/terms.html",
+        "termsUrl" to "https://nightjarlabs.llc/sodogku/terms",
         "privacyVersion" to 1,
-        "privacyUrl" to "https://elijah-dangerfield.github.io/Sodogku/privacy.html",
+        "privacyUrl" to "https://nightjarlabs.llc/sodogku/privacy",
         "forceReacceptBelow" to 0,
     ),
     // The upgrade gates live under the namespace the admin console already

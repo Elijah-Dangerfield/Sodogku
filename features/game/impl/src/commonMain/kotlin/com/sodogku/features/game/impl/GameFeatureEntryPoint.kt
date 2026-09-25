@@ -84,5 +84,5 @@ class GameFeatureEntryPoint(
 }
 
 /** Placeholders until `legal.privacyUrl` / `legal.termsUrl` land in remote config (C11). */
-private const val PrivacyUrl = "https://elijah-dangerfield.github.io/Sodogku/privacy.html"
-private const val TermsUrl = "https://elijah-dangerfield.github.io/Sodogku/terms.html"
+private const val PrivacyUrl = "https://nightjarlabs.llc/sodogku/privacy"
+private const val TermsUrl = "https://nightjarlabs.llc/sodogku/terms"
