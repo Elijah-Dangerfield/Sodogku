@@ -751,3 +751,33 @@ second; `StreakPrompts.kt` for the third.
 - Four other bones keep their outline (the lives row, the refill control, the
   level reward chip, `GameHud`'s `LiveBoneEdge`); the handoff only changed the
   loading bone. Decide whether the rest follow.
+
+## SD-151 [P2] — Show the install ID in Settings, so a deletion request can name something
+
+**Ask:** `nightjarlabs.llc/delete-data` asks for the install ID, because it is
+the only key on any record we hold. The app never shows it, so a player cannot
+supply it and we cannot honour the request. The privacy policy says so in as
+many words, which is honest and unsatisfying.
+
+**Done when:** Settings → About has a row showing `AppData.installId` with a
+copy action, and the paragraph in `legal/privacy.md` under "How long it is kept"
+stops saying the app does not show it. Play's Data safety deletion question can
+then be answered yes without a caveat.
+
+**Hints:** `CachedInstallIdProvider` mints it and `AppCache.installId` holds it.
+The row belongs in the About section of `SettingsScreen.kt`, next to Version. It
+is a random UUID with nothing behind it, so there is no secret to leak, but it
+will look like an account number in an app that has no accounts: word the
+supporting text so it reads as a reference number for a support request.
+
+**The alternative, and why it is not this.** Doublestack solved the same problem
+the other way, with a "Delete local data" action that erases the tables and
+issues a fresh install ID (`PlayerDataEraser.kt`). That breaks the link going
+forward without needing the player to read anything out, and it is the better
+answer for a player who just wants to be forgotten. It does not help the one who
+wants records *already sent* deleted, which is what the web form is for. The two
+are complements; this item is the cheaper half.
+
+Raised by the owner on 2026-09-25, after the deletion form went live. The open
+question it closes is `OWNER-TODO.md` item 2, "how visible should the install id
+be", where option 2 is this.
