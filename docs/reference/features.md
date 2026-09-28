@@ -411,6 +411,16 @@ non-consumable app with no visible restore control.
 
 **The paywall** is a bottom sheet with four triggers: the offline block, a continue, a
 skip, and a direct tap from Settings. A session cap limits how often it can be offered.
+While the store is working, the buy and restore controls hold a spinner and say so; the
+platform's payment sheet is slow often enough that a greyed button on its own reads as
+"unavailable" rather than "in progress".
+
+**A purchase made on that sheet lands on a celebration page**: the band, the dog and the
+staged arrival of the win screen, with the same five benefits the sheet just promised, and
+a thank-you. It is not shown after a restore or after a purchase the store reports as
+already owned, because nothing was bought in either case. A purchase from a Go Pro button
+keeps its toast instead, since two of the three places that button stands are already
+mid-celebration.
 
 **The Go Pro button is one tap to the store, no sheet first.** It stands in three places
 a player already passes: beside the streak button at the top of the level pane, as a line

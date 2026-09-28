@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -27,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import com.sodogku.libraries.ui.PreviewContent
+import com.sodogku.libraries.ui.components.CircularProgressIndicator
 import com.sodogku.libraries.ui.components.HorizontalDivider
 import com.sodogku.libraries.ui.components.button.ButtonGhost
 import com.sodogku.libraries.ui.components.dialog.bottomsheet.BottomSheet
@@ -62,6 +64,7 @@ import sodogku.libraries.resources.generated.resources.paywall_benefit_jump
 import sodogku.libraries.resources.generated.resources.paywall_benefit_no_ads
 import sodogku.libraries.resources.generated.resources.paywall_benefit_offline
 import sodogku.libraries.resources.generated.resources.paywall_buy
+import sodogku.libraries.resources.generated.resources.paywall_buy_working
 import sodogku.libraries.resources.generated.resources.paywall_headline
 import sodogku.libraries.resources.generated.resources.paywall_nothing_to_restore
 import sodogku.libraries.resources.generated.resources.paywall_not_now
@@ -222,6 +225,7 @@ fun PaywallScreen(
                 BuyButton(
                     priceLabel = state.priceLabel,
                     enabled = !state.isWorking && !state.isPro,
+                    working = state.working == PaywallWork.Buy,
                     onClick = { onAction(PaywallAction.Buy) },
                 )
 
@@ -246,7 +250,22 @@ fun PaywallScreen(
                         onClick = { onAction(PaywallAction.Restore) },
                         enabled = !state.isWorking,
                     ) {
-                        Text(text = stringResource(Res.string.paywall_restore))
+                        // The same round trip as Buy and just as capable of
+                        // taking a while, so it says so the same way. A Row
+                        // because the content slot is one composable rather
+                        // than a row scope, so two children here would be laid
+                        // out by whatever the button happens to use.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (state.working == PaywallWork.Restore) {
+                                CircularProgressIndicator(
+                                    color = AppTheme.colors.textSecondary.color,
+                                    strokeWidth = WorkingStroke,
+                                    modifier = Modifier.size(WorkingSize),
+                                )
+                                HorizontalSpacerD400()
+                            }
+                            Text(text = stringResource(Res.string.paywall_restore))
+                        }
                     }
 
                     ButtonGhost(
@@ -354,7 +373,7 @@ private fun ProSlab(onClose: (() -> Unit)?, modifier: Modifier = Modifier) {
  * the same cream and still sits a step behind the sentence it marks.
  */
 @Composable
-private fun Benefit(text: String) {
+internal fun Benefit(text: String) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Icon(
             icon = Icons.Paw.decorative,
@@ -373,15 +392,33 @@ private fun Benefit(text: String) {
  *
  * **The right half is empty when the store has not answered**, and that is the
  * designed state rather than a hole in the layout. The price is per-storefront
- * and only the store knows it (`features.md#remote-config`); today no product
- * exists at all, so this is what every build renders. A placeholder price that
- * turns out to be wrong in a currency nobody thought about is worse than no
- * price, and a button that reads "Get Pro" on its own is a complete sentence.
+ * and only the store knows it (`features.md#remote-config`), so a build that
+ * has not heard back yet, or one running against a storefront where the product
+ * is not sold, renders exactly this. A placeholder price that turns out to be
+ * wrong in a currency nobody thought about is worse than no price, and a button
+ * that reads "Get Pro" on its own is a complete sentence.
+ *
+ * **While the store is thinking, the right half holds a spinner instead.** The
+ * payment sheet is the platform's and it can take its time: a slow network, a
+ * password prompt, a card the bank wants to ask about. Before this, the only
+ * sign the tap had registered was the button going grey, which is
+ * indistinguishable from the button being unavailable, and the second tap that
+ * invites is the one that opens a second payment sheet.
+ *
+ * The face stays amber while it works rather than dropping to the disabled
+ * grey, because nothing is disabled: something is happening. Only the click is
+ * held.
  */
 @Composable
-private fun BuyButton(priceLabel: String?, enabled: Boolean, onClick: () -> Unit) {
-    val face = if (enabled) ProAmber else AppTheme.colors.surfaceDisabled
-    val ink = if (enabled) AppTheme.colors.text else AppTheme.colors.onSurfaceDisabled
+private fun BuyButton(
+    priceLabel: String?,
+    enabled: Boolean,
+    working: Boolean,
+    onClick: () -> Unit,
+) {
+    val live = enabled || working
+    val face = if (live) ProAmber else AppTheme.colors.surfaceDisabled
+    val ink = if (live) AppTheme.colors.text else AppTheme.colors.onSurfaceDisabled
 
     DeepSurface(
         color = face.color,
@@ -398,16 +435,30 @@ private fun BuyButton(priceLabel: String?, enabled: Boolean, onClick: () -> Unit
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = stringResource(Res.string.paywall_buy),
+                text = stringResource(
+                    if (working) Res.string.paywall_buy_working else Res.string.paywall_buy,
+                ),
                 typography = AppTheme.typography.Label.L600,
                 color = ink,
             )
-            priceLabel?.let {
-                Text(text = it, typography = AppTheme.typography.Label.L600, color = ink)
+            if (working) {
+                CircularProgressIndicator(
+                    color = ink.color,
+                    strokeWidth = WorkingStroke,
+                    modifier = Modifier.size(WorkingSize),
+                )
+            } else {
+                priceLabel?.let {
+                    Text(text = it, typography = AppTheme.typography.Label.L600, color = ink)
+                }
             }
         }
     }
 }
+
+/** Sized to the label beside it rather than to the Material default, which is 40dp. */
+private val WorkingSize = Dimension.D800
+private val WorkingStroke = Dimension.D50
 
 /**
  * The texture in the slab: a few paws in the top-right, a shade lighter than the

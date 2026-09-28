@@ -59,6 +59,14 @@ class SettingsViewModel(
         leaderboards.isOfferable.collectIn(viewModelScope) {
             takeAction(SettingsAction.LeaderboardsOfferable(it))
         }
+        // Same reason, and it was a real bug rather than a hypothetical one:
+        // this screen is what the player comes back to after buying Pro on the
+        // sheet it opens, and a value read once at load still said "Get Pro"
+        // under a purchase that had already gone through. The flow emits its
+        // current value on subscribe, so this covers the first draw as well.
+        entitlements.isPro.collectIn(viewModelScope) {
+            takeAction(SettingsAction.ProChanged(it))
+        }
     }
 
     override suspend fun handleAction(action: SettingsAction) {
@@ -78,6 +86,7 @@ class SettingsViewModel(
             is SettingsAction.LeaderboardsOfferable -> action.updateState {
                 it.copy(leaderboardsOfferable = action.offerable)
             }
+            is SettingsAction.ProChanged -> action.updateState { it.copy(isPro = action.isPro) }
             SettingsAction.OpenTerms -> sendEvent(SettingsEvent.OpenLink(termsUrl()))
             SettingsAction.OpenPrivacy -> sendEvent(SettingsEvent.OpenLink(privacyUrl()))
             SettingsAction.OpenFeedback -> sendEvent(SettingsEvent.OpenFeedback)
@@ -97,7 +106,6 @@ class SettingsViewModel(
         updateState {
             it.copy(
                 achievementsAvailable = achievementsEnabled(),
-                isPro = entitlements.isPro.value,
                 // UMP's own answer, and false everywhere it has nothing to say,
                 // which is everywhere outside the EEA and UK. The row is hidden
                 // rather than disabled, because a row that opens nothing is
@@ -150,10 +158,11 @@ class SettingsViewModel(
         val outcome = Catching { entitlements.restore() }
             .logOnFailure { "Restore failed" }
             .getOrNull()
-        val pro = entitlements.isPro.value
+        // `isPro` is not set here. A successful restore moves the entitlement
+        // flow, and the collector in `init` is what writes the row, so setting
+        // it here as well would be a second source for one value.
         updateState {
             it.copy(
-                isPro = pro,
                 restoreMessage = when (outcome) {
                     RestoreOutcome.Restored -> RestoreMessage.Restored
                     RestoreOutcome.NothingToRestore -> RestoreMessage.NothingToRestore
@@ -337,6 +346,13 @@ sealed interface SettingsAction {
 
     /** `Leaderboards.isOfferable` changed. Decides whether the row is drawn. */
     data class LeaderboardsOfferable(val offerable: Boolean) : SettingsAction
+
+    /**
+     * `Entitlements.isPro` changed. Emitted on subscribe, after a purchase on
+     * the sheet this screen opens, after a restore, and on any foreground
+     * refresh that finds the store disagrees with the cache.
+     */
+    data class ProChanged(val isPro: Boolean) : SettingsAction
 
     data object OpenPrivacyOptions : SettingsAction
 

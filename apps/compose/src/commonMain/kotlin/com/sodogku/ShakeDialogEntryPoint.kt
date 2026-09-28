@@ -7,6 +7,7 @@ import com.sodogku.libraries.core.BuildInfo
 import com.sodogku.libraries.core.isTesterBuild
 import com.sodogku.libraries.navigation.FeatureEntryPoint
 import com.sodogku.libraries.navigation.Router
+import com.sodogku.features.paywall.ProCelebrationRoute
 import com.sodogku.libraries.navigation.QaToolsRoute
 import com.sodogku.libraries.navigation.ShakeDialogRoute
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,6 +45,7 @@ class ShakeDialogEntryPoint(
             viewModel.ObserveEvents { event ->
                 when (event) {
                     QaToolsEvent.Back -> router.goBack()
+                    QaToolsEvent.ShowProCelebration -> router.navigate(ProCelebrationRoute())
                 }
             }
 

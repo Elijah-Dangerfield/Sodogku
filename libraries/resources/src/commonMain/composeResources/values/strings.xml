@@ -631,6 +631,13 @@
     <string name="paywall_benefit_boosters">Boosters topped back up at the start of every attempt</string>
     <string name="paywall_benefit_jump">Every level in the campaign, open from the start</string>
     <string name="paywall_buy">Get Pro</string>
+    <!-- The buy button while the store is working. The platform's payment sheet
+         can take a while (a password prompt, a bank check, a slow network), and
+         before this the only sign a tap had registered was the button going
+         grey, which reads as unavailable rather than busy. Deliberately vague
+         about what is happening: "Opening the store" is wrong once the sheet
+         has closed and we are waiting on the answer. -->
+    <string name="paywall_buy_working">One moment</string>
     <string name="paywall_one_time">One payment. Not a subscription.</string>
     <string name="paywall_restore">Restore purchases</string>
     <string name="paywall_not_now">Not now</string>
@@ -639,6 +646,15 @@
     <string name="paywall_store_unavailable">The store is not available on this device.</string>
     <string name="paywall_nothing_to_restore">No purchase found on this store account.</string>
     <string name="paywall_store_unreachable">Could not reach the store. Try again in a moment.</string>
+
+    <!-- The page after a purchase goes through. Not after a restore: nothing was
+         bought there. The thanks is the point of the screen and is written to be
+         said once, plainly, by a small studio that means it. No exclamation
+         mark: the amber display face is already doing the cheering. -->
+    <string name="pro_celebration_kicker">Sodogku Pro</string>
+    <string name="pro_celebration_headline">It's yours</string>
+    <string name="pro_celebration_thanks">Thank you. This is a small studio, and a purchase like this is what keeps it going.</string>
+    <string name="pro_celebration_done">Back to the board</string>
 
     <!-- The standing Go Pro button (SD-147): the level pane, the cleared screen
          and the lose sheet. One tap starts the store, no sheet first. -->

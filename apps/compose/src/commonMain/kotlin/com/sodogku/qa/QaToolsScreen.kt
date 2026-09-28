@@ -170,6 +170,22 @@ fun QaToolsScreen(
             ) {
                 Text("Clear every played day")
             }
+
+            VerticalSpacerD500()
+
+            Text(text = "Pro", typography = AppTheme.typography.Heading.H600)
+
+            // The page after a purchase is otherwise reachable only by making
+            // one, which on a store build means a licence tester and a sandbox
+            // transaction. This is the same argument as the streak tools above:
+            // a screen nobody can look at is a screen nobody checks.
+            ButtonSecondary(
+                onClick = { onAction(QaToolsAction.ShowProCelebration) },
+                size = ButtonSize.Small,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Show the Pro celebration")
+            }
         }
     }
 }

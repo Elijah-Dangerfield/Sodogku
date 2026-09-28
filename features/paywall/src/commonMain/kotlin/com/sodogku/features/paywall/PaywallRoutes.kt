@@ -48,6 +48,24 @@ class PaywallRoute(
 ) : Route()
 
 /**
+ * The page after a purchase goes through.
+ *
+ * A screen rather than a sheet, and reached only from
+ * `PaywallEvent.Purchased` with `celebrate` set, which a restore never sets.
+ * Fades in: it replaces the sheet that has already slid away, and a second
+ * upward slide immediately after the first reads as the sheet coming back.
+ *
+ * A `class`, never a `data object`, for the same reason as [PaywallRoute]: an
+ * arg-less object route SIGSEGVs the iOS navigator at navigate time.
+ */
+@Serializable
+class ProCelebrationRoute : Route(
+    enter = AnimationType.FadeIn,
+    exit = AnimationType.FadeOut,
+    popExit = AnimationType.FadeOut,
+)
+
+/**
  * The offline block: the one screen in this app that stops a player.
  *
  * It only appears when the OS reports no network at all *and* the offline grace

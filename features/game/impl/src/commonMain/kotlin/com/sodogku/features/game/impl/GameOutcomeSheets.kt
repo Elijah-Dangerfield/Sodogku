@@ -360,6 +360,7 @@ private fun WinCelebration(state: GameState, onAction: (GameAction) -> Unit, mod
                     ProLink(
                         priceLabel = offer.priceLabel,
                         enabled = !state.proPurchasing,
+                        working = state.proPurchasing,
                         onClick = { onAction(GameAction.BuyPro(ProButtonSource.Cleared)) },
                         modifier = Modifier.padding(top = Dimension.D300),
                     )
@@ -719,6 +720,7 @@ private fun LostSheet(state: GameState, onAction: (GameAction) -> Unit) {
                 size = ButtonSize.Large,
                 style = ButtonStyle.Outlined,
                 enabled = !state.proPurchasing,
+                working = state.proPurchasing,
                 onClick = { onAction(GameAction.BuyPro(ProButtonSource.LostSheet)) },
                 modifier = Modifier.fillMaxWidth(),
             )

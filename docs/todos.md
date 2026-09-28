@@ -782,33 +782,3 @@ Raised by the owner on 2026-09-25, after the deletion form went live. The open
 question it closes is `OWNER-TODO.md` item 2, "how visible should the install id
 be", where option 2 is this.
 
----
-
-## SD-152 [P1] — One failed app-scope coroutine takes the whole process down
-
-**What happened.** `SODOGKU-T` was a launch crash on 0.3.0+390: Play Games
-sign-in touched the object graph from a background thread, a lifecycle
-registration threw, and the app died. The throw is fixed in
-`AndroidAppLifecycle`. The part that turned a bug into a crash is not.
-
-`AppCoroutineScope` is `SupervisorJob() + Dispatchers.Default` and nothing
-else (`DispatcherProvider.kt:53`). A supervisor keeps one failed child from
-cancelling its siblings, which is what people usually mean when they reach for
-one. It does nothing about an exception nobody catches: that goes to the
-thread's default handler, which on Android is the one that kills the process.
-So every `appScope.launch` in the app, in any feature, is one uncaught throw
-away from a crash at whatever moment it happens to run.
-
-**Done when:** the scope carries a `CoroutineExceptionHandler` that logs at
-error and reports the throwable to Sentry as handled, and the app keeps
-running. The visibility has to survive the change or this trades a loud
-failure for a silent one, which is worse.
-
-**Worth deciding rather than assuming.** Crashing is a defensible policy: it is
-loud, and it is what makes a bug like this reach Sentry within minutes of a
-release. The argument against it here is that these are background jobs in a
-puzzle game, and a player who loses their board because a leaderboard write
-failed is a worse outcome than a report that arrives the same day either way.
-
-**Found** on 2026-09-28 while checking whether 390 was fit to release. It is
-the reason that crash was fatal rather than a log line.

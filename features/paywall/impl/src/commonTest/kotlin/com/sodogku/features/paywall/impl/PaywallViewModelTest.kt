@@ -65,8 +65,30 @@ class PaywallViewModelTest : CoroutineTest() {
 
         assertTrue(vm.state.isPro)
         assertFalse(vm.state.isWorking)
-        assertNull(vm.state.message, "Nothing to say; the game behind the sheet is already Pro")
-        assertEquals(PaywallEvent.Purchased, vm.eventFlow.first())
+        assertNull(vm.state.message, "Nothing to say; the celebration page says it")
+        assertEquals(PaywallEvent.Purchased(celebrate = true), vm.eventFlow.first())
+    }
+
+    @Test
+    fun aRestoreDoesNotAskForACelebration() = runUnitTest {
+        // Nothing was bought. Confetti at someone reinstalling on a new phone
+        // reads as the app not knowing what happened.
+        val vm = paywall(entitlements = FakeEntitlements(restoreResult = RestoreOutcome.Restored))
+
+        vm.takeAction(PaywallAction.Restore)
+
+        assertEquals(PaywallEvent.Purchased(celebrate = false), vm.eventFlow.first())
+    }
+
+    @Test
+    fun aPurchaseTheStoreSaysWeAlreadyOwnDoesNotCelebrate() = runUnitTest {
+        // The store correcting us about something already paid for is a fact,
+        // not an occasion.
+        val vm = paywall(entitlements = FakeEntitlements(purchaseResult = PurchaseOutcome.AlreadyOwned))
+
+        vm.takeAction(PaywallAction.Buy)
+
+        assertEquals(PaywallEvent.Purchased(celebrate = false), vm.eventFlow.first())
     }
 
     @Test

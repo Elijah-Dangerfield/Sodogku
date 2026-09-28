@@ -86,24 +86,30 @@ class PaywallViewModel(
     }
 
     private suspend fun PaywallAction.Buy.buy() {
-        updateState { it.copy(isWorking = true) }
+        updateState { it.copy(working = PaywallWork.Buy) }
         val outcome = entitlements.purchasePro(trigger)
         // `state` lags `updateState` by a dispatch, so the outcome travels as a
         // value rather than being read back off the state that was just written.
-        updateState { it.copy(isWorking = false, message = outcome.toMessage()) }
+        updateState { it.copy(working = null, message = outcome.toMessage()) }
         if (outcome is PurchaseOutcome.Success || outcome is PurchaseOutcome.AlreadyOwned) {
             updateState { it.copy(isPro = true) }
-            sendEvent(PaywallEvent.Purchased)
+            // Only a purchase made here is worth a celebration. `AlreadyOwned`
+            // is the store correcting us about something the player already
+            // paid for, which is a fact rather than an occasion.
+            sendEvent(PaywallEvent.Purchased(celebrate = outcome is PurchaseOutcome.Success))
         }
     }
 
     private suspend fun PaywallAction.Restore.restore() {
-        updateState { it.copy(isWorking = true) }
+        updateState { it.copy(working = PaywallWork.Restore) }
         val outcome = entitlements.restore()
-        updateState { it.copy(isWorking = false, message = outcome.toMessage()) }
+        updateState { it.copy(working = null, message = outcome.toMessage()) }
         if (outcome is RestoreOutcome.Restored) {
             updateState { it.copy(isPro = true) }
-            sendEvent(PaywallEvent.Purchased)
+            // No celebration for a restore. Nothing was bought; something was
+            // returned, and throwing confetti at a player reinstalling on a new
+            // phone reads as the app not knowing what happened.
+            sendEvent(PaywallEvent.Purchased(celebrate = false))
         }
     }
 }
@@ -136,11 +142,21 @@ enum class PaywallMessage {
     StoreUnreachable,
 }
 
+/**
+ * Which store round trip is in flight, so the screen can say so on the control
+ * that started it rather than dimming both and explaining neither.
+ */
+enum class PaywallWork { Buy, Restore }
+
 data class PaywallState(
     /** As the store formats it. Null until it answers, or forever if it cannot. */
     val priceLabel: String? = null,
-    /** A purchase or restore is in flight; both buttons are held. */
-    val isWorking: Boolean = false,
+    /**
+     * The store call in flight, or null. Both buttons are held while either one
+     * runs, because they reach the same place and a second tap during the first
+     * is how a player ends up looking at two payment sheets.
+     */
+    val working: PaywallWork? = null,
     val isPro: Boolean = false,
     val message: PaywallMessage? = null,
     /**
@@ -149,11 +165,19 @@ data class PaywallState(
      * does; zero means no dwell was ever asked for, which is the normal case.
      */
     val secondsUntilDismissible: Int = 0,
-)
+) {
+    val isWorking: Boolean get() = working != null
+}
 
 sealed interface PaywallEvent {
     data object Dismiss : PaywallEvent
-    data object Purchased : PaywallEvent
+
+    /**
+     * The player is Pro now. [celebrate] separates the two ways that happens:
+     * a purchase made on this sheet, which earns the celebration screen, and a
+     * restore or a purchase the store says already existed, which do not.
+     */
+    data class Purchased(val celebrate: Boolean) : PaywallEvent
 }
 
 sealed interface PaywallAction {

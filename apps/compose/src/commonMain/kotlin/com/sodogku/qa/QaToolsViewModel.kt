@@ -73,6 +73,7 @@ class QaToolsViewModel(
             is QaToolsAction.ShiftDay -> action.write { shiftable?.shiftBy(action.days) }
             QaToolsAction.ClearDayShift -> action.write { shiftable?.clearShift() }
             QaToolsAction.Back -> sendEvent(QaToolsEvent.Back)
+            QaToolsAction.ShowProCelebration -> sendEvent(QaToolsEvent.ShowProCelebration)
         }
     }
 
@@ -143,6 +144,16 @@ data class QaToolsState(
 
 sealed interface QaToolsEvent {
     data object Back : QaToolsEvent
+
+    /**
+     * Show the page a purchase lands on, without a purchase.
+     *
+     * It is the one screen in the app that costs $4.99 to look at: it is
+     * reached only from a real transaction, and a sandbox purchase needs a
+     * licence tester on a store build. So it belongs here for the same reason
+     * the streak tools do, which is that waiting is not a test plan.
+     */
+    data object ShowProCelebration : QaToolsEvent
 }
 
 sealed interface QaToolsAction {
@@ -155,4 +166,5 @@ sealed interface QaToolsAction {
     data class ShiftDay(val days: Int) : QaToolsAction
     data object ClearDayShift : QaToolsAction
     data object Back : QaToolsAction
+    data object ShowProCelebration : QaToolsAction
 }

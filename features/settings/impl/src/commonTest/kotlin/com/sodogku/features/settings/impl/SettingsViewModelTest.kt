@@ -451,6 +451,21 @@ class SettingsViewModelTest : CoroutineTest() {
     }
 
     @Test
+    fun buyingProSomewhereElseUpdatesTheRowWithoutReloading() = runUnitTest {
+        // The reported bug. Settings opens the Pro sheet, the player buys there,
+        // the sheet closes and this screen is what they come back to. It never
+        // reloads, so a value read once at load left the row still offering a
+        // purchase that had already gone through.
+        val entitlements = FakeEntitlements()
+        val vm = viewModel(InMemoryAppCache(), entitlements = entitlements)
+        assertFalse(vm.state.isPro, "the fixture has to start un-Pro or this proves nothing")
+
+        entitlements.becomePro()
+
+        assertTrue(vm.state.isPro)
+    }
+
+    @Test
     fun theStoreRowIsReachableWhetherOrNotYouAlreadyPaid() = runUnitTest {
         // Apple rejects a non-consumable app with no visible restore control, so
         // this is a submission requirement rather than a nicety.
@@ -471,6 +486,11 @@ class SettingsViewModelTest : CoroutineTest() {
         override suspend fun restore(): RestoreOutcome {
             if (proAfterRestore) pro.value = true
             return restore
+        }
+
+        /** A purchase that happened somewhere other than this screen. */
+        fun becomePro() {
+            pro.value = true
         }
     }
 

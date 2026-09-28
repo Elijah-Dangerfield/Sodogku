@@ -175,6 +175,7 @@ fun BoxScope.LevelDrawer(
                 ProButton(
                     priceLabel = proOffer.priceLabel,
                     enabled = !proPurchasing,
+                    working = proPurchasing,
                     onClick = onBuyPro,
                     modifier = Modifier.padding(end = Dimension.D400),
                 )

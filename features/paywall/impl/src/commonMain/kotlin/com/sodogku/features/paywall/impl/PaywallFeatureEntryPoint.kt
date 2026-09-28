@@ -1,11 +1,16 @@
 package com.sodogku.features.paywall.impl
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.toRoute
 import com.sodogku.features.paywall.OfflineBlockRoute
 import com.sodogku.features.paywall.PaywallRoute
+import com.sodogku.features.paywall.ProCelebrationRoute
 import com.sodogku.libraries.billing.PaywallTrigger
 import com.sodogku.libraries.flowroutines.ObserveEvents
 import com.sodogku.libraries.navigation.FeatureEntryPoint
@@ -43,21 +48,37 @@ class PaywallFeatureEntryPoint(
             }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
 
+            // Remembered rather than navigated to from the event handler,
+            // because the sheet has to land before anything else moves: a
+            // navigate issued while it is still sliding down deletes the
+            // destination out from under it. So the event records what should
+            // happen next and `onDismissed`, which runs once the sheet is
+            // actually down, does it.
+            var celebrateOnClose by remember { mutableStateOf(false) }
+
             viewModel.ObserveEvents { event ->
                 when (event) {
                     PaywallEvent.Dismiss -> sheetState.dismiss()
-                    // Nothing to celebrate on this screen: the board behind it
-                    // is already Pro by the time the sheet closes, and a
-                    // "thanks!" interstitial after a purchase is one more thing
-                    // between the player and the game they just paid for.
-                    PaywallEvent.Purchased -> sheetState.dismiss()
+                    // A purchase made here earns the celebration page. It used
+                    // to close onto the board saying nothing, on the reasoning
+                    // that an interstitial after a purchase is one more thing in
+                    // the way. A payment with no visible response is the shape
+                    // of a payment that failed, which is worse. A restore still
+                    // closes quietly: nothing was bought.
+                    is PaywallEvent.Purchased -> {
+                        celebrateOnClose = event.celebrate
+                        sheetState.dismiss()
+                    }
                 }
             }
 
             PaywallScreen(
                 state = state,
                 sheetState = sheetState,
-                onDismissed = { router.goBack() },
+                onDismissed = {
+                    router.goBack()
+                    if (celebrateOnClose) router.navigate(ProCelebrationRoute())
+                },
                 onAction = viewModel::takeAction,
                 standInNote = route.standInNote,
                 // The dwell is what only a stand-in has, so it is what
@@ -65,6 +86,10 @@ class PaywallFeatureEntryPoint(
                 // state keeps the explanation up after the countdown ends.
                 isStandIn = route.dwellSeconds > 0,
             )
+        }
+
+        screen<ProCelebrationRoute> {
+            ProCelebrationScreen(onDone = { router.goBack() })
         }
 
         // Deliberately still a `screen<>`. The offline block is the one thing
