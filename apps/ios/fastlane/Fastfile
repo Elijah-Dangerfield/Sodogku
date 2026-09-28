@@ -1,6 +1,7 @@
 require "base64"
 require "fileutils"
 require "securerandom"
+require "shellwords"
 require "tmpdir"
 
 default_platform(:ios)
@@ -308,11 +309,50 @@ def upload_sentry_release(marketing_version, build_number)
   # SentryRuntimeConfig.forApp: "sodogku@<version>+<build>") or events
   # won't attach to the release created here.
   release = "sodogku@#{marketing_version}+#{build_number}"
-  dsym_dir = File.join(OUTPUT_DIR)
-  sh("npx @sentry/cli releases new #{release} --org #{org} --project #{project}")
-  sh("npx @sentry/cli releases set-commits #{release} --auto --org #{org} --project #{project} || true")
-  sh("npx @sentry/cli debug-files upload --org #{org} --project #{project} #{dsym_dir}")
-  sh("npx @sentry/cli releases finalize #{release} --org #{org} --project #{project}")
-rescue => e
-  UI.important("Sentry release upload failed: #{e.message} (non-fatal)")
+
+  # OUTPUT_DIR is where gym drops its dSYM *zip*, and pointing sentry-cli at
+  # that directory uploads nothing at all. Every build up to 2026-09-28 logged
+  # "Found 0 debug information files", exited zero, and went green, so no iOS
+  # crash Sentry has ever received could be symbolicated. The archive is where
+  # the actual .dSYM bundles are.
+  #
+  # Its path contains spaces ("Sodogku 2026-09-28 14.31.19.xcarchive"), hence
+  # the escaping below. An unquoted path here fails in a way that looks exactly
+  # like the bug being fixed: sentry-cli gets a truncated path, finds nothing,
+  # and says so quietly.
+  archive = lane_context[SharedValues::XCODEBUILD_ARCHIVE]
+  archive_dsyms = archive && File.join(archive, "dSYMs")
+  dsym_path =
+    if archive_dsyms && Dir.exist?(archive_dsyms)
+      archive_dsyms
+    else
+      lane_context[SharedValues::DSYM_OUTPUT_PATH] || OUTPUT_DIR
+    end
+
+  found =
+    if dsym_path.end_with?(".zip")
+      File.exist?(dsym_path)
+    else
+      !Dir.glob(File.join(dsym_path, "**", "*.dSYM")).empty?
+    end
+
+  # Fatal, and deliberately outside the rescue below. Nothing to upload is a
+  # configuration error that repeats on every build; a failed upload is a blip.
+  # Treating the two the same is precisely what hid this.
+  unless found
+    UI.user_error!(
+      "No dSYM under #{dsym_path}. Sentry would receive no symbols and every " \
+      "iOS crash would arrive unreadable. sentry-cli reports this as success, " \
+      "so it has to be checked here."
+    )
+  end
+
+  begin
+    sh("npx @sentry/cli releases new #{release} --org #{org} --project #{project}")
+    sh("npx @sentry/cli releases set-commits #{release} --auto --org #{org} --project #{project} || true")
+    sh("npx @sentry/cli debug-files upload --org #{org} --project #{project} #{Shellwords.escape(dsym_path)}")
+    sh("npx @sentry/cli releases finalize #{release} --org #{org} --project #{project}")
+  rescue => e
+    UI.important("Sentry release upload failed: #{e.message} (non-fatal)")
+  end
 end
