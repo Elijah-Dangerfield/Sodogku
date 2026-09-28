@@ -2,7 +2,7 @@
 app: Sodogku
 title: Terms of Service
 updated: 2026-09-25
-contact: elijahdangerfield111@gmail.com
+contact: contact@nightjarlabs.llc
 ---
 
 These terms cover your use of the Sodogku app. What the app collects is a separate page, the [privacy policy](privacy.html).
@@ -52,4 +52,4 @@ These terms may be updated from time to time. If they change materially, the new
 
 ## Contact
 
-Questions? Reach out at [elijahdangerfield111@gmail.com](mailto:elijahdangerfield111@gmail.com).
+Questions? Reach out at [contact@nightjarlabs.llc](mailto:contact@nightjarlabs.llc).

@@ -2,7 +2,7 @@
 app: Sodogku
 title: Privacy Policy
 updated: 2026-09-25
-contact: elijahdangerfield111@gmail.com
+contact: contact@nightjarlabs.llc
 ---
 
 Sodogku has no accounts and no sign-in, so nothing here is attached to a name, an email address or a profile. Your puzzles and your progress live on your phone. Some things do leave the device: crash reports, gameplay analytics, requests for the app's own configuration, and whatever Google's ad software collects when it shows you an ad. This page says what each of those contains.
@@ -121,4 +121,4 @@ If this policy changes, the new version will be posted here and the "Last update
 
 ## Contact
 
-Questions, or a request about your data? Write to [elijahdangerfield111@gmail.com](mailto:elijahdangerfield111@gmail.com).
+Questions, or a request about your data? Write to [contact@nightjarlabs.llc](mailto:contact@nightjarlabs.llc).
