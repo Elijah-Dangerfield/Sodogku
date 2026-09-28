@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/Elijah-Dangerfield/Sodogku/compare/v0.3.0...v0.4.0) (2026-09-28)
+
+
+### Features
+
+* a page for the purchase, a spinner while it happens, a Settings row that keeps up ([3b9fd94](https://github.com/Elijah-Dangerfield/Sodogku/commit/3b9fd9430e25ac04b387bab8488c4901e8fb169a))
+
+
+### Bug Fixes
+
+* **android:** register the process lifecycle observer on the main thread ([d4c446f](https://github.com/Elijah-Dangerfield/Sodogku/commit/d4c446f06ade0b884f42e4fb2e9a0830353b472b))
+* **ios:** declare the ad domains that NSPrivacyTracking true requires ([c4fbbeb](https://github.com/Elijah-Dangerfield/Sodogku/commit/c4fbbeb43f24412b30320ac9c4f0a46b844ca239))
+
 ## [0.3.0](https://github.com/Elijah-Dangerfield/Sodogku/compare/v0.2.0...v0.3.0) (2026-09-25)
 
 
