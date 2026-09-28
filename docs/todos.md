@@ -782,3 +782,38 @@ Raised by the owner on 2026-09-25, after the deletion form went live. The open
 question it closes is `OWNER-TODO.md` item 2, "how visible should the install id
 be", where option 2 is this.
 
+
+---
+
+## SD-153 [P2] — A half-tuned paw ladder throws the whole scoring block away
+
+**What happens.** `ScoringConfig`'s guard requires the four paw fractions to
+ascend. They are resolved one at a time, so a remote config that sets some of
+them and not the others mixes tuned values with compiled defaults, and the mix
+can fail a check that neither set would fail on its own. `ConfiguredScoring`
+then catches, logs, and scores the whole game on `ScoringConfig.Default`:
+every other coefficient in that block is discarded too, including the ones
+that were fine.
+
+**Seen on 2026-09-28** as `SODOGKU-V`, four times on a debug emulator. Its
+config cache holds `twoPawFraction 0.6` and `threePawFraction 0.85` with no
+fourth or fifth, so the ladder resolved to 0.6, 0.85, 0.77, 0.89. Nothing is
+serving that block now: both config hosts are NXDOMAIN, and the cache also
+carries `scoring.completionBase`, a key retired when it became
+`completionPerCell`, which dates it.
+
+**Why it matters later rather than now.** The failure is invisible. A tuning
+change that sets two of the four would look applied, score on the shipped
+numbers, and report one Sentry error per attempt start that reads like a bug
+in the app rather than in the values.
+
+**Done when:** setting part of the ladder cannot silently void the rest.
+Either the four are read as a group (any set, all required) with the rejection
+named at the value rather than at the whole block, or the admin refuses to
+save a non-ascending ladder, which catches it before a device ever sees it.
+The second is better: it fails where the mistake is made.
+
+**Worth doing at the same time.** The cache has a `v` that was not bumped when
+`completionBase` was renamed, so a device can keep feeding retired keys into a
+current build indefinitely. Nothing reads that key now, so it is harmless
+today and will not be next time.
