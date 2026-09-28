@@ -683,11 +683,53 @@ jobs:
         continue-on-error: true
 
       - name: Attach artifacts
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.resolve-tag.outputs.tag }}
-          files: |
-            artifacts/android-aab/*.aab
-            artifacts/android-apk/*.apk
-            artifacts/ios-ipa/*.ipa
-          fail_on_unmatched_files: false
+        # Plain `gh release upload` rather than softprops/action-gh-release,
+        # which 403s here. That action PATCHes the release before uploading any
+        # asset, and it echoes the release's existing `target_commitish` back
+        # into the PATCH. release-please creates releases with `target_commitish`
+        # set to the release COMMIT SHA, and GITHUB_TOKEN may not set a raw SHA
+        # there. The update is rejected with "Resource not accessible by
+        # integration" even though this job has contents: write. Reproduced
+        # against a real release: the identical PATCH succeeds with
+        # `target_commitish` omitted, and succeeds with a branch name; only the
+        # SHA form is refused.
+        #
+        # The action's own error text sends you the wrong way. It prints
+        # "error fetching GitHub release for tag refs/heads/main" because the
+        # catch block interpolates `github.ref`, which on release-please's
+        # workflow_dispatch is the branch, not the tag. The lookup by tag had
+        # already SUCCEEDED ("Found release v0.2.0"); the failure is the write
+        # that follows, and nothing here is keyed off `github.ref`.
+        #
+        # Uploading assets needs only contents: write and mutates no release
+        # metadata, which is also what we want: release-please owns the body.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.resolve-tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          FILES=()
+          while IFS= read -r -d '' f; do
+            FILES+=("$f")
+          done < <(find artifacts -type f \( -name '*.aab' -o -name '*.apk' -o -name '*.ipa' \) -print0 2>/dev/null)
+
+          # A platform job that failed earlier leaves its artifact unpublished,
+          # so the download step above 404s and there is simply nothing to
+          # attach. That is already reported by the job that failed, so do not
+          # fail the release a second time over it.
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "::warning::No release artifacts were produced, nothing to attach to $TAG."
+            exit 0
+          fi
+
+          # release-please normally creates the release before dispatching this
+          # workflow. A hand-pushed tag has no release yet; --verify-tag keeps
+          # that path from inventing a tag if the name is wrong.
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::No GitHub Release for $TAG yet, creating one from the existing tag."
+            gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
+          fi
+
+          printf 'Attaching to %s:\n' "$TAG"
+          printf '  %s\n' "${FILES[@]}"
+          gh release upload "$TAG" "${FILES[@]}" --clobber

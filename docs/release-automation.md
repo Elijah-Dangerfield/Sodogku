@@ -223,6 +223,8 @@ Marketing/landing pages (`index.html`, `privacy.html`, `terms.html`, `style.css`
 | Crash-free rate spikes after release | Halt phased rollout manually: App Store Connect → your app → Phased Release → **Pause Rollout**. Play Console → Production → **Halt rollout**. Ship a fix via normal flow; next release supersedes. |
 | Tag created but release.yml didn't fire | release-please.yml failed at the dispatch step (check its run). Manual remediation: Actions → Release → Run workflow → enter the tag. If a human pushed the tag (not release-please), the push trigger would have fired it — if that's not the case, the `v*` prefix is probably wrong. |
 | AI triage PR failed CI | Check the PR — if the fix is wrong, close it. `ai-autofix` PRs don't auto-merge without green CI. |
+| `release.yml` attach-artifacts: a binary is missing from the Release | Cosmetic only. The store uploads happen in the platform jobs, which run first. A missing file means that platform's job failed and never published its artifact; fix that job. The step warns and passes rather than failing twice for one cause. |
+| `release.yml` attach-artifacts: "Resource not accessible by integration" | Should not recur. This was `softprops/action-gh-release` PATCHing the release with the SHA `target_commitish` release-please sets, which GITHUB_TOKEN may not write; the step uses `gh release upload` now and touches no metadata. Don't reintroduce an action that updates the release, and read the comment on the step first. |
 
 ## Extending the pipeline
 
