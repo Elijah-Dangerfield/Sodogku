@@ -1,11 +1,48 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
+<!--
+  The two tracking keys are a pair, and there is no comfortable setting.
+
+  This file used to pair `NSPrivacyTracking = true` with an empty
+  `NSPrivacyTrackingDomains`. Apple bars that combination from review with
+  ITMS-91064, which Drop2048 hit on a TestFlight build; this app had the same
+  combination and was fixed before its first iOS upload. The mail states the
+  rule in the other direction, "NSPrivacyTracking must be true if
+  NSPrivacyTrackingDomains isn't empty", which was already satisfied and makes
+  it read like it cannot apply. The validator enforces the converse too.
+
+  `false` is not the way out. It is a declaration, not a switch, so it disables
+  nothing: `Info.plist` still ships `NSUserTrackingUsageDescription`, the ad
+  path still runs UMP then ATT, and AdMob still reads the IDFA once permission
+  is granted. An ATT prompt inside an app claiming it does not track is a
+  documented rejection pattern.
+
+  These two domains, because there is no tracking-only domain to list instead.
+  Checked by reading the resolved binary rather than guessing: `strings` on
+  `GoogleMobileAds.framework/GoogleMobileAds` yields only
+  `googleads.g.doubleclick.net`, `pagead2.googlesyndication.com` and
+  `imasdk.googleapis.com` (the IMA video SDK, unused here). Every domain the
+  SDK touches is on the ad delivery path.
+
+  That matters because iOS blocks connections to anything listed here whenever
+  ATT is not granted, so this list cannot add the personalised-then-fallback
+  behaviour we want, only remove it. Apple documents the blocking; whether it
+  is enforced is less clear, since developers have listed a domain, denied ATT
+  and seen the request succeed anyway. Honest declaration, known risk.
+
+  **Verify before promoting any build.** On a physical device with tracking
+  denied, confirm a banner still loads. If ads fail there and load with
+  tracking allowed, this list is the cause, and that is a release blocker.
+-->
 <dict>
 	<key>NSPrivacyTracking</key>
 	<true/>
 	<key>NSPrivacyTrackingDomains</key>
-	<array/>
+	<array>
+		<string>googleads.g.doubleclick.net</string>
+		<string>pagead2.googlesyndication.com</string>
+	</array>
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
 		<dict>
