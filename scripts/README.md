@@ -29,6 +29,31 @@ cannot find is reported with what that costs.
 This replaced `setup_sentry.sh`, which did one of these jobs with none of the
 shared store behind it.
 
+## beta_ios.sh
+
+Builds the iOS app and uploads it to TestFlight internal from this machine,
+which is the same lane `beta.yml` runs:
+
+```bash
+./scripts/beta_ios.sh
+```
+
+Prefer it to dispatching the workflow. The hosted macOS runner starts cold
+every time and spends over ten minutes on the Kotlin/Native release link alone
+before it reaches the archive. Reach for `gh workflow run beta.yml` when the
+thing being tested is CI itself: the runner image, the secrets, the workflow.
+
+It reads `APPLE_TEAM_ID`, the three App Store Connect key values and the Sentry
+token from the same credential store the setup scripts write, encodes the `.p8`
+the way a CI secret would carry it, and takes the Sentry org and project from
+the repo's own variables. Anything already in your environment wins. The build
+is tagged `beta`, as the workflow tags it, so it requests test ad units rather
+than live ones.
+
+One-time setup: `(cd apps/ios && bundle install)`. Signing uses your own
+keychain rather than the stored `.p12`, which is what the Fastfile intends for
+a local run.
+
 ## install_hooks.sh
 
 Installs the repo's git hooks (`.githooks/`) into your local clone. Run once
