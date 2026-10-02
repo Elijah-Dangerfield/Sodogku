@@ -817,3 +817,65 @@ The second is better: it fails where the mistake is made.
 `completionBase` was renamed, so a device can keep feeding retired keys into a
 current build indefinitely. Nothing reads that key now, so it is harmless
 today and will not be next time.
+
+---
+
+## SD-154 [P1] — The release lane uploads the binary, then fails to submit it
+
+**What happened on v0.4.0.** `deliver` crashed with `No data` out of
+spaceship's `model.rb:82`, immediately after it logged "Creating phased release
+on App Store Connect". The lane had already done the expensive and durable
+part: build `202610021835` was uploaded, processed, and is in TestFlight. What
+it did not do is attach that build to the `0.4.0` version record or submit
+anything. App Store Connect is left holding a version in Prepare for
+Submission with a phased release object, no build, and no submission.
+
+The log line two steps earlier names the condition: "Skipping
+'release_notes'... this is the first version of the app". A first submission
+needs review contact details and answers the lane never supplies, so this may
+not be reproducible once the app has shipped once. That is a reason to find
+out, not a reason to assume.
+
+**The part that is wrong either way.** A crash after upload leaves no way to
+finish from CI. Re-running the whole workflow rebuilds and re-uploads a new
+build number for a binary that is already up there, so the only path forward
+is the App Store Connect UI. The submit half should be separable from the
+build half, either as its own lane that takes an existing build number or by
+making the release lane resumable.
+
+**Done when:** a submit failure after a successful upload can be retried
+without a rebuild, and the first-submission path either works unattended or
+fails early with a message that says what a person has to go fill in.
+
+---
+
+## SD-155 [P2] — A late iOS failure silently cancels the Android release
+
+**What happens.** `release.yml`'s android job is gated on
+`needs.ios.result == 'success' || 'skipped'`. When iOS fails at the very last
+step, after its binary is already on App Store Connect, Android never runs at
+all. v0.4.0 shipped to no store on either platform despite the iOS binary
+being uploaded, and the recovery is a second dispatch with `skip_ios`.
+
+The gate is right for a build-time failure, since a broken commit should not
+go to one store and not the other. It is wrong for a submit-time failure,
+where the platforms have already diverged and holding Android back fixes
+nothing.
+
+**Done when:** Android is held back only for failures that happen before iOS
+uploads anything.
+
+---
+
+## SD-156 [P3] — The release-attach job runs git commands without a checkout
+
+**What happens.** The `Attach artifacts to GitHub Release` job calls
+`gh release create "$TAG" --verify-tag` on the path where release-please has
+not created the release yet. The job never checks out the repository, so git
+has no repository to verify the tag against and the step dies with "fatal: not
+a git repository". It failed on v0.4.0 for exactly this reason, which is also
+how a release whose artifacts are merely missing gets reported as a failed
+release.
+
+**Done when:** that fallback either checks out the repo first or drops
+`--verify-tag` and verifies the tag through the API.
