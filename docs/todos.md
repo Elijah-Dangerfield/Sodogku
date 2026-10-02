@@ -869,13 +869,19 @@ uploads anything.
 
 ## SD-156 [P3] — The release-attach job runs git commands without a checkout
 
-**What happens.** The `Attach artifacts to GitHub Release` job calls
-`gh release create "$TAG" --verify-tag` on the path where release-please has
-not created the release yet. The job never checks out the repository, so git
-has no repository to verify the tag against and the step dies with "fatal: not
-a git repository". It failed on v0.4.0 for exactly this reason, which is also
-how a release whose artifacts are merely missing gets reported as a failed
-release.
+**What happens.** The `Attach artifacts to GitHub Release` job never checks out
+the repository, and `gh` outside a checkout cannot infer which repository it is
+talking about. So `gh release view "$TAG"` fails for want of a repo rather than
+for want of a release, the step reads that failure as "no release yet", and the
+fallback `gh release create "$TAG" --verify-tag` dies on the same cause with
+"fatal: not a git repository".
 
-**Done when:** that fallback either checks out the repo first or drops
-`--verify-tag` and verifies the tag through the API.
+The release for v0.4.0 existed the whole time. It failed twice this way on
+2026-10-02, the second time with the artifacts already downloaded and ready to
+attach, which is the clearest version of the bug: nothing was wrong except that
+the job could not name its own repository.
+
+**Done when:** the job can attach artifacts to an existing release. Setting
+`GH_REPO: ${{ github.repository }}` is the one-line version and needs no
+checkout. Whatever the fix, the "no release yet" path should be reachable only
+when there is genuinely no release.
