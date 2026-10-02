@@ -885,3 +885,32 @@ the job could not name its own repository.
 `GH_REPO: ${{ github.repository }}` is the one-line version and needs no
 checkout. Whatever the fix, the "no release yet" path should be reachable only
 when there is genuinely no release.
+
+---
+
+## SD-157 [P2] — The Play release notes are raw release-please markdown
+
+**What happens.** `release.yml` renders the Play "what's new" by piping the
+GitHub release body through `head -c 500`. The body is release-please's
+changelog, so what reaches the store listing is `## [0.4.0](https://github...)`
+headers, `### Bug Fixes`, commit subjects written for other developers, seven-
+character SHAs, and full commit URLs. The byte cap then cuts it mid-word. That
+is what shipped with v0.4.0 to the internal track, and it is what the first
+production promotion would have carried if nobody looked.
+
+**Why a byte cap is the wrong tool anyway.** Play's limit is 500 characters per
+language. `head -c` counts bytes, so one non-ASCII character in a commit
+subject makes the file silently shorter than the limit allows, and no version
+of this ever ends on a sentence.
+
+**Done when:** the text that reaches Play is written for players. The cheapest
+honest version is a `whatsnew/en-US.txt` committed in the repo that a person
+edits per release, with the changelog as the fallback only when that file is
+absent. Deriving player-facing copy from conventional-commit subjects is not
+worth attempting: the subjects are deliberately written for the other audience.
+
+**While you are there:** iOS has the same split and solves it differently.
+`build_changelog` in the Fastfile sends branch, commit and subject to
+TestFlight, which is right for testers and would be wrong on the store. Apple
+skips release notes entirely on a first version, which is why this only bit
+Android first.
